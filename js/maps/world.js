@@ -16,9 +16,11 @@ function startMap(id, def) {
   return building;
 }
 const add = (...objs) => building.root.add(...objs);
+// what a material sounds like to walk on: 'grass', 'sand', 'wood', 'stone', 'metal' or 'water'. Solids built from it pick it up
+const surf = (m, s) => { m.userData.surf = s; return m; };
 function addBlock(x, z, w, d, h, m) { // a solid box you can stand on; stops bullets
   const mesh = box(w, h, d, m); mesh.position.set(x, h / 2, z); add(mesh);
-  building.solids.push({ mesh, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top: h });
+  building.solids.push({ mesh, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top: h, surf: m.userData.surf });
   building.cover.push(mesh);
   return mesh;
 }
@@ -32,12 +34,12 @@ function tbox(w, h, d, m, k = 1) {
 // a solid box from height bot up to top, so it can float (upper floors, the wall above a window, stairs)
 function addSlab(x, z, w, d, bot, top, m, cover = true, k = 1) {
   const mesh = tbox(w, top - bot, d, m, k); mesh.position.set(x, (bot + top) / 2, z); add(mesh);
-  building.solids.push({ mesh, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, bot, top });
+  building.solids.push({ mesh, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, bot, top, surf: m.userData.surf });
   if (cover) building.cover.push(mesh);
   return mesh;
 }
 // a solid area with no mesh of its own (tree trunks drawn by an instanced mesh, invisible walls)
-const addSolid = (x, z, w, d, top) => building.solids.push({ mesh: null, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top });
+const addSolid = (x, z, w, d, top, surf) => { const s = { mesh: null, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top, surf }; building.solids.push(s); return s; };
 // invisible wall: stops players and zombies (even jumping off a tall crate) but bullets go through
 const addWall = (x, z, w, d) => addSolid(x, z, w, d, 99);
 function addGround(G, mat) {
@@ -58,7 +60,7 @@ function instanced(geo, mat, list) { // list of [x, y, z, sx, sy, sz, rotY, colo
 }
 const seeThru = t => new THREE.MeshLambertMaterial({ map: t, alphaTest: .3, side: THREE.DoubleSide });
 const leafMat = lam({ map: tex(g => { noise(g, [60, 130, 45], 35); g.fillStyle = 'rgba(0,40,0,.35)'; for (let i = 0; i < 12; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }) });
-const barkMat = lam({ map: tex(g => { noise(g, [95, 70, 45], 25); g.fillStyle = 'rgba(0,0,0,.3)'; for (const x of [3, 8, 12]) g.fillRect(x, 0, 1, 16); }) });
+const barkMat = surf(lam({ map: tex(g => { noise(g, [95, 70, 45], 25); g.fillStyle = 'rgba(0,0,0,.3)'; for (const x of [3, 8, 12]) g.fillRect(x, 0, 1, 16); }) }), 'wood');
 const LEAF_TINTS = [0xffffff, 0xddeecc, 0xc8dca8, 0xeaffd8, 0xb8d098];
 const grassMat = seeThru(tex(g => {
   for (let x = 0; x < 16; x++) {
@@ -73,10 +75,19 @@ function grassTufts(tufts) {
   instanced(grassGeo, grassMat, tufts);
   instanced(grassGeo, grassMat, tufts.map(t => { const u = [...t]; u[6] += Math.PI / 2; return u; }));
 }
-const crate1 = crateMat(1), crate2 = crateMat(2);
+const crate1 = surf(crateMat(1), 'wood'), crate2 = surf(crateMat(2), 'wood');
 const addCrates = list => { for (const [x, z, tall] of list) addBlock(x, z, 1.2, 1.2, tall ? 2.4 : 1.2, tall ? crate2 : crate1); };
 // fixed random numbers: the same seed gives the same layout every game
 const seeded = s => () => (s = s * 16807 % 2147483647) / 2147483647;
+
+// what's under your feet at x, z (for footsteps): the thing you're standing on, or the map's ground there
+function surfaceAt(x, z, r, feet) {
+  const keep = [groundRamp, groundSolid]; // don't disturb what the movement code just read
+  groundAt(x, z, r, feet + .05);
+  const s = groundSolid, base = s ? s.surf || 'stone' : MAP.surf || 'grass';
+  [groundRamp, groundSolid] = keep;
+  return MAP.surfAt ? MAP.surfAt(x, z, feet, base, s) : base;
+}
 
 function useMap(id) {
   const m = MAPS[id];

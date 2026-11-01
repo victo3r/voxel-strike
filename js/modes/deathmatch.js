@@ -325,11 +325,11 @@ function updateBot(b, dt) {
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // a footstep each time a leg swings through
-    if (ph !== b.stepPh) { b.stepPh = ph; if (!b.vy) sfx(ph ? 'step' : 'step2', { at: pos, far: 22, v: .8 }); }
+    if (ph !== b.stepPh) { b.stepPh = ph; if (!b.vy) sfx('step_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)) + (ph ? '' : '2'), { at: pos, far: 22, v: .8 }); }
   } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; }
   const air = b.vy < -6;
   settle(b, dt);
-  if (air && !b.vy) sfx('land', { at: pos, far: 22, v: .7 });
+  if (air && !b.vy) sfx('land_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)), { at: pos, far: 22, v: .7 });
 
   if (b.hp < b.maxHp) for (const p of pads) {
     if (p.item && p.type === 'health' && Math.hypot(pos.x - p.x, pos.z - p.z) < 1 && pos.y < 1.5) {

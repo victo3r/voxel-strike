@@ -27,11 +27,11 @@ function update(dt) {
   if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } } // bumped your head
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
   if (!wasAir && P.vy <= 0 && sticks(prevY - gy, P.onRamp)) P.pos.y = gy; // walking down stairs: stay on your feet. Off anything else you fall
-  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land'); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; } else P.onGround = false;
+  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; } else P.onGround = false;
   easeLag(P.pos, dt);
   camera.position.set(P.pos.x, P.pos.y + 1.6 - (P.pos.lag || 0), P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
-  if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33; stepAlt = !stepAlt; sfx(P.pos.y > .05 ? 'stepCrate' : stepAlt ? 'step' : 'step2', { v: .7 }); } }
+  if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33; stepAlt = !stepAlt; sfx('step_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, P.pos.y)) + (stepAlt ? '' : '2'), { v: .75 }); } }
   else stepT = .08; // first step comes right after you start moving
 
   cd -= dt;

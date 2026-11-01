@@ -137,7 +137,7 @@ const bushes = [];
 for (let tries = 0, k = 0; k < 30 && tries < 3000; tries++) {
   const x = (rnd() * 2 - 1) * (FA - 2), z = (rnd() * 2 - 1) * (FA - 2), w = 1.4 + rnd() * .9, d = 1.3 + rnd() * .9, h = 1 + rnd() * .35;
   if (pathDist(x, z) < PW / 2 + 1.2 || inClearing(x, z, 1) || hitsFixed(x, z, 1.4) || !roomFor(x, z, 3) || Math.max(Math.abs(x), Math.abs(z)) > FA - 2) continue;
-  bushes.push([x, h / 2, z, w, h, d, 0, pick(F_TINTS)]); addSolid(x, z, w, d, h); spots.push([x, z]); k++;
+  bushes.push([x, h / 2, z, w, h, d, 0, pick(F_TINTS)]); addSolid(x, z, w, d, h, 'grass'); spots.push([x, z]); k++;
 }
 building.cover.push(instanced(unit, leafMat, bushes));
 for (const [x, z, len, alongX] of LOGS) {
@@ -145,7 +145,7 @@ for (const [x, z, len, alongX] of LOGS) {
   addBlock(x, z, logW, logD, .85, barkMat);
   const stub = box(.4, .4, .4, barkMat); stub.position.set(x + (alongX ? len * .2 : .5), .9, z + (alongX ? .5 : len * .2)); add(stub);
 }
-const rockMat = lam({ map: tex(g => { noise(g, [112, 116, 108], 34); g.fillStyle = 'rgba(70,120,50,.7)'; for (let i = 0; i < 10; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 6 | 0, 2, 1); }) });
+const rockMat = surf(lam({ map: tex(g => { noise(g, [112, 116, 108], 34); g.fillStyle = 'rgba(70,120,50,.7)'; for (let i = 0; i < 10; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 6 | 0, 2, 1); }) }), 'stone');
 for (const [x, z, w, d, h] of ROCKS) addBlock(x, z, w, d, h, rockMat);
 addCrates(M.crates);
 

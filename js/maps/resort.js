@@ -199,9 +199,9 @@ const LH = 3.6, FLOORS = 4, HALF = LH / 2, RUNS = FLOORS * 2;
 const LO = 2.8, LI = 2.3, CELL = 1.1, GA = 3.6; // half-widths: outside of the walls, inside, gallery. CELL = stair width
 const GY = FLOORS * LH; // gallery floor
 const paint = rgb => lam({ map: tex(g => { noise(g, rgb, 12); g.fillStyle = 'rgba(0,0,0,.07)'; for (const y of [3, 7, 11, 15]) g.fillRect(0, y, 16, 1); for (const [x, y] of [[4, 0], [12, 4], [4, 8], [12, 12]]) g.fillRect(x, y, 1, 3); }) });
-const white = paint([240, 238, 232]), red = paint([200, 52, 44]);
-const plank = lam({ map: tex(g => { noise(g, [150, 108, 66], 18); g.fillStyle = 'rgba(60,35,15,.45)'; for (const y of [0, 4, 8, 12]) g.fillRect(0, y, 16, 1); g.fillRect(5, 1, 1, 3); g.fillRect(11, 5, 1, 3); g.fillRect(3, 9, 1, 3); g.fillRect(13, 13, 1, 3); }) });
-const ironMat = plain(0x3a3f45);
+const white = surf(paint([240, 238, 232]), 'stone'), red = surf(paint([200, 52, 44]), 'stone');
+const plank = surf(lam({ map: tex(g => { noise(g, [150, 108, 66], 18); g.fillStyle = 'rgba(60,35,15,.45)'; for (const y of [0, 4, 8, 12]) g.fillRect(0, y, 16, 1); g.fillRect(5, 1, 1, 3); g.fillRect(11, 5, 1, 3); g.fillRect(3, 9, 1, 3); g.fillRect(13, 13, 1, 3); }) }), 'wood');
+const ironMat = surf(plain(0x3a3f45), 'metal');
 const lh = (u0, u1, v0, v1, bot, top, m, cover = true) => addSlab(LX + (u0 + u1) / 2, LZ + (v0 + v1) / 2, u1 - u0, v1 - v0, bot, top, m, cover);
 const LEVEL_MAT = [white, red, white, red];
 const G3 = [-LI, -LI + CELL, LI - CELL, LI], E0 = LI - CELL;
@@ -233,12 +233,12 @@ for (let k = 0; k < FLOORS; k++) {
   });
 }
 // stairs. You collide with a smooth slope (so you walk straight up), the steps are just what you see
-const STEPS = 6, stairMat = lam({ map: tex(g => { noise(g, [120, 84, 50], 16); g.fillStyle = 'rgba(40,22,10,.5)'; g.fillRect(0, 0, 16, 2); }) });
+const STEPS = 6, stairMat = surf(lam({ map: tex(g => { noise(g, [120, 84, 50], 16); g.fillStyle = 'rgba(40,22,10,.5)'; g.fillRect(0, 0, 16, 2); }) }), 'wood');
 for (let j = 0; j < RUNS; j++) {
   const [u0, u1, v0, v1] = EDGE[j % 4], f = RUN[j % 4], fl = Math.floor(j / 2) * LH, bot = j * HALF, o = f.ax === 'x' ? LX : LZ;
   const rect = { mesh: null, minX: LX + u0, maxX: LX + u1, minZ: LZ + v0, maxZ: LZ + v1 };
-  building.solids.push({ ...rect, bot, top: bot + HALF, ramp: { ax: f.ax, a: o + f.a, b: o + f.b } });
-  if (bot > fl) building.solids.push({ ...rect, bot: fl, top: bot }); // filled in underneath, so you can't walk under the upper run
+  building.solids.push({ ...rect, bot, top: bot + HALF, ramp: { ax: f.ax, a: o + f.a, b: o + f.b }, surf: 'wood' });
+  if (bot > fl) building.solids.push({ ...rect, bot: fl, top: bot, surf: 'wood' }); // filled in underneath, so you can't walk under the upper run
   for (let s = 0; s < STEPS; s++) {
     const p0 = f.a + (f.b - f.a) * s / STEPS, p1 = f.a + (f.b - f.a) * (s + 1) / STEPS, lo = Math.min(p0, p1), hi = Math.max(p0, p1);
     const h = bot + HALF * (s + 1) / STEPS - fl;
@@ -298,7 +298,7 @@ const lampHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color
 lampHalo.scale.setScalar(2.8); lampHalo.position.set(LX, LAMP_Y, LZ); add(lampHalo);
 
 // rocks round the point it stands on (kept clear of the door on the south side)
-const rockMat = lam({ map: tex(g => { noise(g, [128, 122, 112], 30); g.fillStyle = 'rgba(70,60,50,.5)'; for (let i = 0; i < 8; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }) });
+const rockMat = surf(lam({ map: tex(g => { noise(g, [128, 122, 112], 30); g.fillStyle = 'rgba(70,60,50,.5)'; for (let i = 0; i < 8; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }) }), 'stone');
 for (const [x, z, w, d, h] of [[26, -36.5, 3, 2.5, 1.2], [30, -37, 3.5, 2.2, 1.6], [33.5, -35, 2.6, 3, 1.4], [35.5, -31, 2.4, 3.2, 1.1],
   [34.5, -27.5, 2, 2, .8], [37.5, -34, 2.2, 2.4, .7], [23.5, -36, 1.8, 1.6, .9], [36.5, -38.5, 3, 2.6, 1.8], [32, -39.5, 2.4, 2, 1]]) addBlock(x, z, w, d, h, rockMat);
 
@@ -328,9 +328,9 @@ M.nav = (p, t) => {
 };
 
 // --- the pool: a raised deck with a step all round, a ledge inside so you can climb out anywhere ---
-const tile = lam({ map: tex(g => { noise(g, [234, 226, 208], 9); g.fillStyle = '#c8bca6'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(8, 0, 1, 16); }) });
+const tile = surf(lam({ map: tex(g => { noise(g, [234, 226, 208], 9); g.fillStyle = '#c8bca6'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(8, 0, 1, 16); }) }), 'stone');
 const drawPoolTile = g => { noise(g, [72, 172, 214], 10); g.fillStyle = '#e4f4fb'; for (const i of [0, 4, 8, 12]) { g.fillRect(0, i, 16, 1); g.fillRect(i, 0, 1, 16); } };
-const poolTile = lam({ map: tex(drawPoolTile) });
+const poolTile = surf(lam({ map: tex(drawPoolTile) }), 'stone');
 const POOL = [-24, -12, -5, 5], POOL_FLOOR = [-23.2, -12.8, -4.2, 4.2], DECK = [-27, -9, -8, 8], DECK_STEP = [-28, -8, -9, 9];
 const DECK_Y = 1;
 rectMinus(DECK, POOL).forEach(r => rectSlab(r, 0, DECK_Y, tile, true, 2));
@@ -373,7 +373,7 @@ for (const [x, z] of [[22, -7], [27, -7], [22, -1.5], [27, -1.5]]) {
 }
 
 // --- tiki bar ---
-const wood = lam({ map: tex(g => { noise(g, [140, 96, 58], 18); g.fillStyle = 'rgba(50,28,12,.4)'; for (const x of [0, 5, 10]) g.fillRect(x, 0, 1, 16); }) });
+const wood = surf(lam({ map: tex(g => { noise(g, [140, 96, 58], 18); g.fillStyle = 'rgba(50,28,12,.4)'; for (const x of [0, 5, 10]) g.fillRect(x, 0, 1, 16); }) }), 'wood');
 const thatch = lam({ map: tex(g => { noise(g, [200, 164, 92], 26); g.fillStyle = 'rgba(120,85,40,.55)'; for (let i = 0; i < 12; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 4); }) });
 const BX = 0, BZ = -18;
 addSlab(BX, BZ + 2, 6.4, .6, 0, 1.1, wood);
@@ -414,7 +414,7 @@ const ball = box(.3, .3, .3, plain(0xf4f0e0)); ball.position.set(10.5, .15, 20.4
 
 // --- pier and boats ---
 const PZ = 12, PX0 = 18, PX1 = 60, PW = 3;
-building.solids.push({ mesh: null, minX: PX0, maxX: PX1, minZ: PZ - PW / 2, maxZ: PZ + PW / 2, bot: 0, top: .5 });
+building.solids.push({ mesh: null, minX: PX0, maxX: PX1, minZ: PZ - PW / 2, maxZ: PZ + PW / 2, bot: 0, top: .5, surf: 'wood' });
 const pierDeck = tbox(PX1 - PX0, .12, PW, plank); pierDeck.position.set((PX0 + PX1) / 2, .44, PZ); add(pierDeck); building.cover.push(pierDeck);
 for (let x = PX0 + .4; x < PX1; x += 3) for (const s of [-1, 1]) { const p = box(.26, .9, .26, wood); p.position.set(x, .05, PZ + s * (PW / 2 - .15)); add(p); building.cover.push(p); }
 for (const x of [26, 34, 40]) for (const s of [-1, 1]) addSlab(x, PZ + s * 1.25, .3, .3, .5, .85, ironMat); // bollards
@@ -445,7 +445,7 @@ const yWin = box(6.05, .5, 3.05, plain(0x1b2a3a)); yWin.position.set(yx - .8, 2.
 const yTop = box(3.4, 1, 2.4, hullWhite); yTop.position.set(yx - 1.5, 3.3, yz); add(yTop);
 const yMast = box(.12, 2.4, .12, ironMat); yMast.position.set(yx - 1.5, 5, yz); add(yMast);
 // an old rowboat turned upside down on the sand
-for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) addSlab(16, 35.5, w, d, y0, y1, lam({ map: tex(g => { noise(g, [150, 62, 40], 16); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 7, 16, 1); }) }), true, 1);
+for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) addSlab(16, 35.5, w, d, y0, y1, surf(lam({ map: tex(g => { noise(g, [150, 62, 40], 16); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 7, 16, 1); }) }), 'wood'), true, 1);
 
 // --- palm trees ---
 const trunkMat = lam({ map: tex(g => { noise(g, [158, 124, 84], 16); g.fillStyle = 'rgba(80,55,30,.55)'; for (const y of [0, 5, 10]) g.fillRect(0, y, 16, 2); }) });
@@ -542,7 +542,7 @@ for (let L = .5; L <= 8; L += .5) {
     let w = 1; while (on(i + w, j)) w++;
     let d = 1; while ((() => { for (let a = 0; a < w; a++) if (!on(i + a, j + d)) return false; return true; })()) d++;
     for (let b = 0; b < d; b++) for (let a = 0; a < w; a++) used[at(i + a, j + b)] = 1;
-    building.solids.push({ mesh: null, minX: i - O, maxX: i - O + w, minZ: j - O, maxZ: j - O + d, top: L });
+    building.solids.push({ mesh: null, minX: i - O, maxX: i - O + w, minZ: j - O, maxZ: j - O + d, top: L, surf: 'grass' });
   }
   if (!any) break;
 }
@@ -555,6 +555,14 @@ for (let i = 0; i < 16; i++) {
   const c2 = box(w * .55, 2.5, d * .6, cloudMat); c2.position.set(x + (rnd() - .5) * w * .3, y + 2.4, z + (rnd() - .5) * d * .3); add(c2);
 }
 
+// footsteps: wading in the pool or the sea, the sand and the lawn on the ground
+M.surfAt = (x, z, y, base, s) => {
+  if (y < .8 && x > POOL[0] && x < POOL[1] && z > POOL[2] && z < POOL[3]) return 'water';
+  if (s) return base;
+  if (Math.abs(x - LX) < LI && Math.abs(z - LZ) < LI) return 'stone'; // the lighthouse's ground floor
+  if (x > PIT[0] && x < PIT[1] && z > PIT[2] && z < PIT[3]) return 'sand';
+  const k = kindAt(x, z); return k === SEA ? 'water' : k === GRASS ? 'grass' : 'sand';
+};
 M.tick = () => {
   const t = performance.now() / 1000;
   for (const w of waters) w.material.map.offset.set(t * .03, t * .015);

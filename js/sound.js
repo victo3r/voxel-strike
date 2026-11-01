@@ -94,6 +94,42 @@ function kit(c, seed) {
         }
       }, v);
     },
+    // weight landing: low rumbly noise (no pure tone) that dies away over d. f = how deep
+    thud({ t = 0, d = .05, f = 140, v = .8 }) {
+      const k = 1 - Math.exp(-6.2832 * f / SR);
+      s.draw(t, d * 4 + .01, o => {
+        let a = 0, b = 0;
+        for (let i = 0; i < o.length; i++) { const x = i / SR; a += (r() * 2 - 1 - a) * k; b += (a - b) * k; o[i] = b * Math.min(1, x / .002) * Math.exp(-x / d); }
+      }, v);
+    },
+    // lots of tiny random clicks: grass blades, sand grains, gravel. dens = how many per sample, lo-hi = the band they ring in
+    crunch({ t = 0, a = .003, d = .08, dens = .05, lo = 900, hi = 5000, v = .6 }) {
+      const kh = 1 - Math.exp(-6.2832 * hi / SR), kl = 1 - Math.exp(-6.2832 * lo / SR);
+      s.draw(t, a + d * 3, o => {
+        let g = 0, p = 0, q = 0;
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR;
+          if (r() < dens) g += (r() * 2 - 1) * (.4 + r());
+          g *= .7; p += (g - p) * kh; q += (p - q) * kl;
+          o[i] = (p - q) * Math.min(1, x / a) * Math.exp(-Math.max(0, x - a) / (d * .45));
+        }
+      }, v);
+    },
+    // a hollow knock: noise hitting a few low resonances that die out over tau (wood, a metal deck). Low and short, so it doesn't ring
+    knock({ t = 0, f = 300, tau = .02, v = .8, parts = [[1, 1], [1.58, .55], [2.37, .3]] }) {
+      const res = parts.map(([k, A]) => {
+        const R = Math.exp(-1 / (tau * SR * (1 - .25 * Math.log2(k)))), w = 6.2832 * f * k * (.96 + r() * .08) / SR;
+        return { A: A * (1 - R), c1: 2 * R * Math.cos(w), c2: -R * R, y1: 0, y2: 0 };
+      });
+      s.draw(t, tau * 6 + .02, o => {
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR, ex = (r() * 2 - 1) * Math.exp(-x / .0012);
+          let y = ex * .15;
+          for (const q of res) { const yy = ex + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A * 4; }
+          o[i] = y;
+        }
+      }, v);
+    },
     // metal sliding on metal: gritty band-limited noise around f
     scrape({ t = 0, d = .08, f = 1500, v = .35 }) {
       const k1 = 1 - Math.exp(-6.2832 * f * 1.6 / SR), k2 = 1 - Math.exp(-6.2832 * f * .6 / SR);
@@ -275,10 +311,7 @@ const SOUNDS = {
   }],
 
   // ---- moving ----
-  step: [.12, .3, s => { s.hiss({ f: 700, f2: 250, d: .06, v: 1 }); s.tone({ f: 90, f2: 55, d: .05, v: .6 }); }],
-  step2: [.12, .3, s => { s.hiss({ f: 800, f2: 280, d: .06, v: 1 }); s.tone({ f: 100, f2: 60, d: .05, v: .6 }); }],
-  stepCrate: [.15, .35, s => { s.tone({ f: 220, f2: 150, d: .06, v: .8 }); s.hiss({ ft: 'bandpass', f: 900, q: 2, d: .05, v: .7 }); }],
-  land: [.2, .5, s => { s.hiss({ f: 500, f2: 150, d: .12, v: 1 }); s.tone({ f: 80, f2: 45, d: .1, v: .8 }); }],
+  // footsteps and landings (step_<surface>, step_<surface>2 for the other foot, land_<surface>) are made from FOOT below
 
   // ---- pickups ----
   pickHealth: [.75, .5, s => { // sparkly "bling"
@@ -317,8 +350,49 @@ const SOUNDS = {
   levelUp: [.9, .5, s => { s.arp(0, [523, 784, 1046, 1568, 2093], { gap: .045, d: .4, v: .4 }); s.hiss({ ft: 'highpass', f: 7000, t: .15, a: .05, d: .5, v: .2 }); }],
 };
 
+// one foot coming down on each surface at time t. k = pitch (the two feet differ a little), w = how hard
+const FOOT = {
+  grass(s, t, k, w) {
+    s.thud({ t, d: .04, f: 120 * k, v: .8 * w });
+    s.crunch({ t, d: .075, dens: .04, lo: 800 * k, hi: 4500 * k, v: .9 * w }); // the blades crushing
+    s.hiss({ t, f: 1500 * k, f2: 500, a: .003, d: .07, v: .3 * w });
+  },
+  sand(s, t, k, w) {
+    s.thud({ t, d: .05, f: 110 * k, v: .7 * w });
+    s.crunch({ t, a: .012, d: .12, dens: .3, lo: 1500 * k, hi: 7000, v: .75 * w }); // fine grains shifting
+    s.hiss({ t, ft: 'bandpass', f: 2600 * k, f2: 1100, q: .7, a: .01, d: .11, v: .4 * w });
+  },
+  wood(s, t, k, w) { // a hollow plank knock with a little scuff
+    s.thud({ t, d: .035, f: 160 * k, v: .8 * w });
+    s.knock({ t, f: 240 * k, tau: .022, v: w, parts: [[1, 1], [1.47, .6], [2.3, .35], [3.1, .15]] });
+    s.crunch({ t, d: .02, dens: .03, lo: 2000, hi: 6000, v: .2 * w });
+  },
+  stone(s, t, k, w) { // a hard heel tap and a gritty scuff
+    s.thud({ t, d: .03, f: 150 * k, v: .6 * w });
+    s.clack({ t, f: 2200 * k, d: .01, v: .65 * w, body: .6 });
+    s.scrape({ t: t + .004, d: .045, f: 2800 * k, v: .3 * w });
+  },
+  metal(s, t, k, w) { // a dull clunk on an iron deck
+    s.thud({ t, d: .035, f: 150 * k, v: .7 * w });
+    s.knock({ t, f: 520 * k, tau: .03, v: .8 * w, parts: [[1, 1], [2.03, .45], [2.9, .4], [4.2, .2]] });
+    s.clack({ t, f: 1900 * k, d: .008, v: .35 * w });
+  },
+  water(s, t, k, w) { // a splash with some bubbling
+    s.hiss({ t, ft: 'bandpass', f: 500 * k, f2: 2000 * k, q: 1.2, a: .02, d: .16, v: .7 * w });
+    s.crunch({ t, a: .01, d: .14, dens: .012, lo: 300 * k, hi: 1800 * k, v: .8 * w });
+    s.thud({ t, d: .06, f: 100, v: .5 * w });
+  },
+};
+for (const [surf, foot] of Object.entries(FOOT)) {
+  const toe = surf === 'water' ? .08 : .05; // heel, then the rest of the foot rolling down
+  SOUNDS['step_' + surf] = [.32, .38, s => { foot(s, 0, 1, 1); foot(s, toe, 1.08, .45); }];
+  SOUNDS['step_' + surf + '2'] = [.32, .38, s => { foot(s, 0, .93, 1); foot(s, toe + .006, 1, .45); }];
+  SOUNDS['land_' + surf] = [.42, .55, s => { s.thud({ d: .09, f: 110, v: 1 }); foot(s, 0, .9, 1.3); foot(s, .022, .97, 1); }]; // both feet, nearly together
+}
+const FOOT_OK = s => FOOT[s] ? s : 'stone';
+
 // small close-up sounds (gun handling, voices, steps) get much less of the shared echo, so clicks don't smear into a ringing room
-const CLOSE = /^(r_|dry$|equip$|pick|hurt|die$|armorHit$|step|land$|ui$|slash$)/;
+const CLOSE = /^(r_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$)/;
 // render every recipe into a buffer, scaled so its loudest point is the same for all of them
 const soundsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [len, v, build]], i) => {
   const c = new OfflineAudioContext(1, Math.ceil(SR * len), SR);
