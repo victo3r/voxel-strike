@@ -66,17 +66,71 @@ function kit(c, seed) {
       ratios.forEach((k, i) => s.tone({ f: f * k, t, d: d / (1 + i * .5), v: v / (1 + i * .8) }));
     },
     click({ t = 0, f = 2500, v = .6 }) { s.hiss({ t, ft: 'bandpass', f, q: 5, d: .018, v }); s.tone({ type: 'triangle', f: f * .35, f2: f * .25, t, d: .025, v: v * .4 }); },
+    // a sound drawn sample by sample. fill(array) writes it, then it's scaled so its loudest point is v
+    draw(t, dur, fill, v = 1) {
+      const b = c.createBuffer(1, Math.ceil(dur * SR), SR), o = b.getChannelData(0);
+      fill(o);
+      let pk = 0; for (let i = 0; i < o.length; i++) pk = Math.max(pk, Math.abs(o[i]));
+      if (pk) for (let i = 0; i < o.length; i++) o[i] *= v / pk;
+      const src = c.createBufferSource(); src.buffer = b; src.connect(out); src.start(t);
+    },
+    // two metal parts hitting: a noise tick plus a few short out-of-tune rings. body = the weight behind it (a dull noisy thud, not a tone)
+    clack({ t = 0, f = 2400, d = .02, v = .8, body = 0 }) {
+      const modes = [1, 1.52, 2.17, 2.94, 3.81].map((k, i) => [f * k * (.96 + r() * .08), 1 / (1 + i * .7), r() * 6.28, d / (1 + i * .35)]);
+      s.draw(t, d * 5 + .04, o => {
+        let lp = 0, lp2 = 0;
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR, w = r() * 2 - 1;
+          let y = w * Math.exp(-x / .0015) * .9;
+          for (const [fr, a, ph, dd] of modes) y += a * Math.sin(6.2832 * fr * x + ph) * Math.exp(-x / dd);
+          if (body) { lp += (w - lp) * .06; lp2 += (lp - lp2) * .06; y += body * lp2 * 8 * Math.exp(-x / .012); }
+          o[i] = y;
+        }
+      }, v);
+    },
+    // metal sliding on metal: gritty band-limited noise around f
+    scrape({ t = 0, d = .08, f = 1500, v = .35 }) {
+      const k1 = 1 - Math.exp(-6.2832 * f * 1.6 / SR), k2 = 1 - Math.exp(-6.2832 * f * .6 / SR);
+      s.draw(t, d + .01, o => {
+        let a = 0, b = 0, g = 0;
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR; a += (r() * 2 - 1 - a) * k1; b += (a - b) * k2;
+          if (r() < .004) g = 1; g *= .995;
+          o[i] = (a - b) * (.4 + g) * Math.sin(Math.PI * Math.min(1, x / d));
+        }
+      }, v);
+    },
+    // a short vocal grunt: a buzzing voice through vowel resonances, pitch sliding f0 -> f1
+    voice({ t = 0, d = .18, f0 = 170, f1 = 120, v = 1, fm = [[640, 80, 1], [1190, 90, .5], [2390, 120, .22]], breath = .25 }) {
+      s.draw(t, d * 1.6 + .05, o => {
+        const res = fm.map(([F, B, A]) => ({ A, c1: 2 * Math.exp(-Math.PI * B / SR) * Math.cos(2 * Math.PI * F / SR), c2: -Math.exp(-2 * Math.PI * B / SR), y1: 0, y2: 0 }));
+        let ph = 0, prev = 0, jit = 0;
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR, p = Math.min(1, x / d);
+          jit += (r() * 2 - 1 - jit) * .01;
+          ph = (ph + f0 * (f1 / f0) ** p * (1 + jit * .04) / SR) % 1;
+          const g = ph < .45 ? Math.sin(Math.PI * ph / .45) ** 2 : 0, dg = g - prev; prev = g;
+          const env = Math.min(1, x / .012) * (x < d * .5 ? 1 : Math.exp(-(x - d * .5) / (d * .25)));
+          const src = (dg * 20 + (r() * 2 - 1) * breath * (x < .025 ? 1.5 : .5)) * env;
+          let y = 0;
+          for (const q of res) { const yy = src + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A; }
+          o[i] = y;
+        }
+      }, v);
+    },
+    // a bullet hitting a body: a soft thud and a slap
+    impact(t) { s.hiss({ t, f: 350, d: .05, v: .9 }); s.hiss({ t, ft: 'bandpass', f: 1500, q: 1, d: .012, v: .6 }); },
     // pieces of reloads (and the ammo pickup)
-    magOut(t) { s.click({ t, f: 2200, v: .7 }); s.hiss({ t: t + .01, ft: 'bandpass', f: 1500, f2: 800, q: 2, d: .09, v: .35 }); },
-    magIn(t) { s.hiss({ t, ft: 'bandpass', f: 900, f2: 1600, q: 2, a: .03, d: .03, v: .3 }); s.tone({ f: 230, f2: 130, t: t + .05, d: .05, v: .7 }); s.click({ t: t + .05, f: 3000, v: .9 }); s.click({ t: t + .08, f: 1800, v: .4 }); },
-    rack(t) { s.hiss({ t, ft: 'bandpass', f: 1800, q: 2, d: .06, v: .45 }); s.click({ t: t + .05, f: 2600, v: .8 }); s.click({ t: t + .14, f: 3400, v: .9 }); },
-    pump(t) { s.hiss({ t, ft: 'bandpass', f: 1100, q: 2, d: .07, v: .5 }); s.click({ t: t + .03, f: 1700, v: .8 }); s.hiss({ t: t + .11, ft: 'bandpass', f: 1500, q: 2, d: .06, v: .5 }); s.click({ t: t + .15, f: 2600, v: 1 }); },
-    shell(t) { s.click({ t, f: 1600, v: .7 }); s.tone({ f: 320, f2: 210, t, d: .05, v: .45 }); },
-    boltUp(t) { s.click({ t, f: 1900, v: .8 }); s.hiss({ t: t + .02, ft: 'bandpass', f: 2600, f2: 1400, q: 3, d: .08, v: .35 }); },
-    boltDown(t) { s.hiss({ t, ft: 'bandpass', f: 1400, f2: 2600, q: 3, d: .07, v: .35 }); s.click({ t: t + .07, f: 2700, v: 1 }); },
-    latch(t) { s.click({ t, f: 1300, v: .8 }); s.tone({ f: 190, f2: 120, t, d: .04, v: .5 }); },
-    thunk(t) { s.tone({ f: 150, f2: 80, t, d: .1, v: .9 }); s.hiss({ t, f: 900, d: .06, v: .6 }); s.click({ t, f: 900, v: .4 }); },
-    rattle(t) { for (let k = 0; k < 6; k++) s.click({ t: t + k * .035, f: 2000 + r() * 1200, v: .45 }); },
+    magOut(t) { s.clack({ t, f: 3600, d: .008, v: .35 }); s.scrape({ t: t + .02, d: .1, f: 1800, v: .3 }); },
+    magIn(t) { s.scrape({ t, d: .06, f: 1400, v: .3 }); s.clack({ t: t + .06, f: 1600, d: .022, v: 1, body: .9 }); s.clack({ t: t + .085, f: 3400, d: .01, v: .4 }); },
+    rack(t) { s.scrape({ t, d: .07, f: 2000, v: .35 }); s.clack({ t: t + .07, f: 1900, d: .018, v: .7, body: .3 }); s.clack({ t: t + .16, f: 2300, d: .025, v: 1, body: .7 }); },
+    pump(t) { s.scrape({ t, d: .07, f: 1300, v: .4 }); s.clack({ t: t + .07, f: 1500, d: .022, v: .8, body: .6 }); s.scrape({ t: t + .12, d: .05, f: 1500, v: .35 }); s.clack({ t: t + .17, f: 2000, d: .025, v: 1, body: .9 }); },
+    shell(t) { s.scrape({ t, d: .05, f: 1100, v: .3 }); s.clack({ t: t + .05, f: 1250, d: .012, v: .7, body: .5 }); s.clack({ t: t + .065, f: 3000, d: .006, v: .25 }); },
+    boltUp(t) { s.clack({ t, f: 2600, d: .012, v: .6 }); s.scrape({ t: t + .03, d: .1, f: 1600, v: .35 }); s.clack({ t: t + .13, f: 1800, d: .015, v: .55 }); },
+    boltDown(t) { s.scrape({ t, d: .08, f: 1800, v: .35 }); s.clack({ t: t + .08, f: 2100, d: .02, v: .9, body: .5 }); s.clack({ t: t + .12, f: 2800, d: .012, v: .6 }); },
+    latch(t) { s.clack({ t, f: 1500, d: .015, v: .8, body: .3 }); },
+    thunk(t) { s.clack({ t, f: 750, d: .03, v: 1, body: 1.4 }); },
+    rattle(t) { for (let k = 0; k < 6; k++) s.clack({ t: t + k * .035, f: 2400 + r() * 1200, d: .006, v: .3 }); },
     // pickup jingle: quick rising notes
     arp(t, notes, { type = 'triangle', gap = .055, d = .3, v = .4 } = {}) { notes.forEach((f, i) => s.tone({ type, f, t: t + i * gap, d, v })); },
   };
@@ -148,8 +202,8 @@ const SOUNDS = {
     s.tone({ f: 2600, f2: 2400, d: .14, v: .25 }); s.tone({ f: 3900, d: .08, v: .15 });
     s.tone({ f: 160, f2: 70, d: .06, v: .6 });
   }],
-  dry: [.08, .5, s => { s.click({ f: 1200, v: 1 }); s.tone({ type: 'square', f: 200, d: .02, v: .3, lp: 600 }); }],
-  equip: [.2, .4, s => { s.hiss({ ft: 'bandpass', f: 1500, f2: 900, q: 2, d: .07, v: .5 }); s.click({ t: .06, f: 2200, v: .8 }); }],
+  dry: [.1, .5, s => { s.clack({ f: 2800, d: .01, v: .8 }); }],
+  equip: [.25, .4, s => { s.scrape({ d: .07, f: 1500, v: .4 }); s.clack({ t: .07, f: 2200, d: .015, v: .8, body: .3 }); }],
 
   // ---- reloads: one per gun, timed to the gun's base reload. Upgrades make reloads faster, so these just play faster too ----
   r_voxel: [1, .45, s => { // mag out, mag in, then the teal charge-up
@@ -162,24 +216,18 @@ const SOUNDS = {
   r_ar: [1.4, .45, s => { s.magOut(.15); s.magIn(.7); s.rack(1.05); }],
   r_sniper: [2, .45, s => { s.boltUp(.15); s.magOut(.45); s.magIn(1.1); s.boltDown(1.6); }],
   r_eradicator: [2.6, .45, s => { s.latch(.2); s.rattle(.9); s.rattle(1.4); s.latch(2.0); s.tone({ type: 'sawtooth', f: 60, f2: 180, t: 2.15, a: .2, d: .2, v: .15, lp: 900 }); }],
-  r_flame: [2.2, .45, s => { s.latch(.15); s.hiss({ ft: 'highpass', f: 3000, t: .45, a: .05, d: .35, v: .5 }); s.thunk(1.2); s.latch(1.75); s.click({ t: 1.95, f: 4000, v: .5 }); s.hiss({ t: 1.98, f: 400, f2: 1200, d: .15, v: .5 }); }],
+  r_flame: [2.2, .45, s => { s.latch(.15); s.hiss({ ft: 'highpass', f: 3000, t: .45, a: .05, d: .35, v: .5 }); s.thunk(1.2); s.latch(1.75); s.clack({ t: 1.95, f: 4000, d: .008, v: .5 }); s.hiss({ t: 1.98, f: 400, f2: 1200, d: .15, v: .5 }); }],
   r_rocket: [2.6, .45, s => { s.latch(.3); s.hiss({ ft: 'bandpass', f: 600, f2: 300, q: 2, t: 1.0, a: .1, d: .25, v: .5 }); s.thunk(1.35); s.latch(2.1); }],
   r_flare: [1.3, .45, s => { s.latch(.1); s.shell(.6); s.latch(1.0); }],
 
   // ---- getting hit. These play from whoever got hit, so a far-away hit is barely audible ----
-  hurt: [.25, .75, s => { // a cartoony "uhf"
-    s.tone({ type: 'sawtooth', f: 250, f2: 150, d: .14, v: .9, bp: 750, q: 3 });
-    s.tone({ type: 'sawtooth', f: 250, f2: 150, d: .12, v: .5, bp: 1300, q: 4 });
-    s.hiss({ f: 600, d: .05, v: .7 }); s.tone({ f: 120, f2: 60, d: .07, v: .8 });
-  }],
-  hurtHead: [.3, .8, s => { // same, plus a bright "tink"
-    s.tone({ type: 'sawtooth', f: 270, f2: 160, d: .14, v: .8, bp: 750, q: 3 });
-    s.tone({ type: 'sawtooth', f: 270, f2: 160, d: .12, v: .45, bp: 1300, q: 4 });
-    s.hiss({ f: 600, d: .05, v: .6 });
+  hurt: [.35, .75, s => { s.impact(0); s.voice({ t: .01, d: .17, f0: 175, f1: 125 }); }], // a thud and an "uhh"
+  hurtHead: [.4, .8, s => { // same, plus a bright "tink"
+    s.impact(0); s.voice({ t: .01, d: .17, f0: 185, f1: 130, v: .9 });
     s.tone({ f: 1800, d: .22, v: .5 }); s.tone({ f: 2700, d: .14, v: .3 });
   }],
   armorHit: [.35, .55, s => { s.ring({ f: 900, d: .28, v: .7 }); s.hiss({ ft: 'highpass', f: 5000, d: .04, v: .5 }); }],
-  die: [.7, .8, s => { s.tone({ type: 'sawtooth', f: 320, f2: 70, a: .01, d: .5, v: .8, bp: 800, q: 2, glide: .5 }); s.tone({ f: 150, f2: 50, t: .05, d: .3, v: .6 }); }],
+  die: [.9, .8, s => { s.impact(0); s.voice({ t: .01, d: .5, f0: 165, f1: 85, breath: .4, fm: [[600, 90, 1], [1000, 100, .5], [2400, 140, .2]] }); }], // a falling groan
 
   // ---- kills (only for yours) ----
   kill: [.45, .55, s => { s.tone({ f: 120, f2: 60, d: .1, v: .8 }); s.tone({ type: 'triangle', f: 1046, t: .02, d: .3, v: .6 }); s.tone({ f: 2093, t: .02, d: .15, v: .2 }); }],
