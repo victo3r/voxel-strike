@@ -4,7 +4,11 @@
 // lead = how far ahead of a moving target it aims. aimErr = random wobble on each shot, in radians.
 // dmgMul = bot guns do this much of their normal damage (to you and to other bots).
 // moveErr = extra wobble when the target is running (at full speed), so strafing really does make it miss more.
-const BOT = { hp: 100, speed: 5, react: .45, turn: 8, lead: .05, aimErr: .025, moveErr: .045, dmgMul: .9, respawn: 1.5 };
+// Bots have your stats (speed, damage, reload). What keeps them beatable is reaction time, aim lag and wobble, and bursts.
+const BOT = { hp: 100, speed: 6, react: .45, turn: 8, lead: .05, aimErr: .025, moveErr: .045, dmgMul: 1, respawn: 1.5 };
+// target focus: a bot sticks with the enemy it's fighting. It only gives up after losing sight of it for LOSE_T seconds,
+// and only turns on someone else who's shooting it once they've done SWITCH_DMG damage within a couple of seconds.
+const LOSE_T = 2.5, SWITCH_DMG = 40;
 const SNIPE_T = .9; // a sniper bot lines up its shot this long before it fires
 const MATCH_T = 240, YOU_RESPAWN = 3, JOIN_T = 60; // match length (s), your respawn wait (s), bots finish joining by this time (s)
 let BOT_COUNT = 3; // fill the lobby: 3 bots on small maps like the yard, 7 on bigger ones (set in setupMode from the map)
@@ -155,7 +159,7 @@ function makeBot(rec) {
   const b = { g, head, flashM, tag, pivL, pivR, parts: [head, body, armL, armR, legL, legR], mats: [skin, side, face, hair, shirt, pants], rec,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun, ammo: W.mag, reload: 0, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
-    strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, hitBy: null, hitByT: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0 };
+    strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0 };
   b.parts.forEach(p => p.userData.zombie = b);
   zombies.push(b); rec.b = b;
   return b;
@@ -191,17 +195,22 @@ function canSee(t) { // from the eye set up in updateBot: can it see the target'
   const p = tPos(t);
   return clearLine(eye, aimV.set(p.x, p.y + 1.1, p.z)) || clearLine(eye, aimV.set(p.x, p.y + 1.6, p.z));
 }
-// pick who to fight: whoever just shot it (if it can see them), else keep its target while it can see it,
-// else the closest one it can see, else go hunting for the closest one
+// pick who to fight. Once it has seen its target it stays on it until the target dies or has been out of sight for LOSE_T,
+// unless someone else is hurting it badly (SWITCH_DMG). Otherwise: whoever shot it, else the closest one it can see,
+// else go hunting for the closest one.
 function pickTarget(b) {
   const pos = b.g.position, enemies = [];
   if (respawnT <= 0) enemies.push(YOU_T);
   for (const z of zombies) if (z !== b && !z.dead) enemies.push(z);
   if (!enemies.length) return null;
   const d = t => Math.hypot(tPos(t).x - pos.x, tPos(t).z - pos.z);
-  if (b.hitBy && b.hitByT > 0 && tAlive(b.hitBy) && canSee(b.hitBy)) return b.hitBy;
+  const shooter = b.hitBy && b.hitByT > 0 && b.hitBy !== b.tgt && tAlive(b.hitBy) && canSee(b.hitBy) ? b.hitBy : null;
+  if (b.tgt && tAlive(b.tgt) && b.engaged && b.lostT < LOSE_T) {
+    if (shooter && (b.hitDmg >= SWITCH_DMG || b.lostT > 0)) return shooter; // getting shot hard, or can't see its own target right now
+    return b.tgt;
+  }
+  if (shooter) return shooter;
   const seen = enemies.filter(canSee).sort((a, c) => d(a) - d(c));
-  if (b.tgt && tAlive(b.tgt) && seen.includes(b.tgt) && !(seen[0] !== b.tgt && d(seen[0]) < d(b.tgt) * .5)) return b.tgt;
   if (seen.length) return seen[0];
   return enemies.sort((a, c) => d(a) - d(c))[0];
 }
@@ -209,13 +218,13 @@ function pickTarget(b) {
 function botFire(b, W, dist) {
   b.ammo--; b.muzzle = .05;
   if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
-  else b.cd = W.rate * 1.5 + Math.random() * .15; // semi-auto guns: a bit slower than you can click
+  else b.cd = W.rate + Math.random() * .12; // semi-auto guns: about as fast as a person clicks
   if (W.scope) b.aimT = 0;
-  if (b.ammo <= 0) b.reload = W.reload * 1.2;
+  if (b.ammo <= 0) b.reload = W.reload;
   const youD0 = Math.hypot(P.pos.x - eye.x, P.pos.z - eye.z);
   shotSound(W.vol * Math.max(.15, 1 - youD0 / 45), .15, W.cut);
   const youUp = respawnT <= 0;
-  pBox.min.set(P.pos.x - .35, P.pos.y, P.pos.z - .35); pBox.max.set(P.pos.x + .35, P.pos.y + 1.85, P.pos.z + .35);
+  pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25); // as wide as a bot's body
   const others = []; for (const z of zombies) if (z !== b && !z.dead) others.push(...z.parts); // shots can hit any bot in the way, not just its target
   // the sniper's listed spread is its unscoped hip-fire, but the bot lines up its shots, so it gets a tighter cone
   const err = BOT.aimErr + BOT.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8), walls = [ground, ...crateMeshes];
@@ -245,13 +254,15 @@ function updateBot(b, dt) {
   if ((b.scanT -= dt) <= 0 || !b.tgt || !tAlive(b.tgt)) {
     b.scanT = .3;
     const t = pickTarget(b);
-    if (t !== b.tgt) { b.tgt = t; b.seeT = 0; b.aimT = 0; b.pvx = b.pvz = 0; if (t) { b.lpx = tPos(t).x; b.lpz = tPos(t).z; } }
+    if (t !== b.tgt) { b.tgt = t; b.seeT = 0; b.aimT = 0; b.lostT = 0; b.engaged = false; b.pvx = b.pvz = 0; if (t) { b.lpx = tPos(t).x; b.lpz = tPos(t).z; } }
   }
   const t = b.tgt;
   if (!t) { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; return; }
   const tp = tPos(t), dx = tp.x - pos.x, dz = tp.z - pos.z, dist = Math.hypot(dx, dz) || .001;
   const sees = canSee(t);
   b.seeT = sees ? b.seeT + dt : 0;
+  b.lostT = sees ? 0 : b.lostT + dt;
+  if (sees) b.engaged = true;
 
   // aim: turns toward the target's chest and leads it a little, but lags behind. Changing direction makes it miss.
   if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }

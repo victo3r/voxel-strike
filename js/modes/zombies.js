@@ -62,7 +62,11 @@ function spawnZombie(type = pickType()) {
 // by = the deathmatch bot doing the damage, or null if it's you
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
   zz.hp -= dmg;
-  if (zz.type === 'bot') { zz.hitBy = by ?? YOU_T; zz.hitByT = 2; }
+  if (zz.type === 'bot') { // remember who's hurting it and how much they've done in the last 2s
+    const who = by ?? YOU_T;
+    if (zz.hitBy !== who || zz.hitByT <= 0) zz.hitDmg = 0;
+    zz.hitBy = who; zz.hitByT = 2; zz.hitDmg += dmg;
+  }
   if (quiet) burst(point, 0xff7a1a, 2);
   else { zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4); if (!by) setCross('#f44'); }
   if (zz.hp <= 0 && !zz.dead) {
