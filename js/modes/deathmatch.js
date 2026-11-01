@@ -32,11 +32,11 @@ const REWARDS = {
 const rewardFor = place => { const t = REWARDS[MAP.size]; return t[Math.min(place, t.length) - 1]; };
 // guns a bot can spawn with, and the distance it tries to keep from its target with each one [closest, furthest]
 const BOT_GUNS = {
-  0: [6, 13],  // pistol
-  1: [2.5, 6], // shotgun: rushes in
-  2: [8, 16],  // rifle
-  3: [16, 32], // sniper: hangs back
-  4: [6, 12],  // minigun
+  voxel: [6, 13],
+  shotgun: [2.5, 6], // rushes in
+  ar: [8, 16],
+  sniper: [16, 32],  // hangs back
+  eradicator: [6, 12],
 };
 
 // ---------- the bots' look: Minecraft-style players, each with their own shirt color ----------
@@ -141,7 +141,7 @@ function spawnSpot(skip) {
 }
 function makeBot(rec) {
   const [x, z] = spawnSpot();
-  const keys = Object.keys(BOT_GUNS), gun = +keys[Math.random() * keys.length | 0], W = BASE[gun];
+  const keys = Object.keys(BOT_GUNS), gun = gi(keys[Math.random() * keys.length | 0]), W = BASE[gun];
   const skin = lam({ map: botSkinT }), side = lam({ map: botSideT }), face = lam({ map: botFaceT }), hair = lam({ map: botHairT });
   const shirt = lam({ map: shirtTs[rec.look] }), pants = lam({ map: pantsTex });
   const g = new THREE.Group(); g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
@@ -178,7 +178,7 @@ function youDown(by) {
 function respawnYou() {
   const [x, z] = spawnSpot(YOU_T);
   Object.assign(P, { vy: 0, kx: 0, kz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0 }); P.pos.set(x, groundAt(x, z, .35, 0), z);
-  WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].def) reserve[i] = resMax(i); } });
+  WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   reloading = 0; vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
 
@@ -245,7 +245,7 @@ function botFire(b, W, dist) {
 }
 
 function updateBot(b, dt) {
-  const W = BASE[b.gun], keep = BOT_GUNS[b.gun], pos = b.g.position, sniper = !!W.scope;
+  const W = BASE[b.gun], keep = BOT_GUNS[W.id], pos = b.g.position, sniper = !!W.scope;
   eye.set(pos.x, 1.6, pos.z);
   b.hitByT -= dt;
   if ((b.scanT -= dt) <= 0 || !b.tgt || !tAlive(b.tgt)) { // look around for who to fight a few times a second
@@ -348,9 +348,9 @@ function endMatch() {
   const place = ranked().indexOf(youRec) + 1;
   $('postPlace').textContent = place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
   $('postBoard').innerHTML = boardHTML();
-  const [xp, gold] = rewardFor(place), ups = grant(xp, gold);
+  const [xp, gold] = rewardFor(place), { ups, bonus } = grant(xp, gold);
   $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ◆</span></div>`
-    + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv}</div>` : `<div class="rl">LVL ${prof.lv} · ${prof.xp} / ${xpNeed(prof.lv)} XP</div>`) + xpBar();
+    + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ◆</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
   beep(place === 1 ? 880 : 330, .6, 'triangle', .15);
   if (ups) setTimeout(() => beep(1040, .4, 'triangle', .14), 350); // extra chime for a level up
@@ -366,11 +366,17 @@ function setupMode() {
   $('post').style.display = 'none'; $('board').style.display = 'none'; $('banner').style.opacity = 0; // clears "KILLED BY" if you left while dead
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
   $('chat').style.display = mode === 'dm' ? '' : 'none'; // nobody to talk to in zombie waves
-  if (mode === 'dm') { // no shop here, so you start with a loadout: rifle + shotgun (primary), sniper, pistol, knife
+  if (mode === 'dm') { // every starter weapon, plus any unlockable guns saved on your account (prof.guns: id -> stars 1-3)
     makeRecs(); matchT = MATCH_T;
-    for (const g of [1, 2, 3]) { owned[g] = true; reserve[g] = resMax(g); }
-    slotGun[slotOf(2)] = 2; slotGun[slotOf(3)] = 3;
-    cur = 2; buildGun(); renderHotbar();
+    BASE.forEach((w, g) => {
+      const st = prof.guns[w.id];
+      if (!w.start && !st) return;
+      if (st) { lvl[g] = Math.min(2, st - 1); applyLvl(g); ammo[g] = WEAPONS[g].mag; }
+      owned[g] = true; reserve[g] = resMax(g);
+      if (slotGun[slotOf(g)] < 0) slotGun[slotOf(g)] = g; // first one in each category goes in the slot
+    });
+    slotGun[slotOf(gi('ar'))] = gi('ar'); // assault rifle in hand to start; press the primary key again for the shotgun
+    cur = gi('ar'); buildGun(); renderHotbar();
   }
   const tab = binds.board.filter(Boolean).map(nice).join('/') || 'the scoreboard key';
   const tips = mode === 'dm'

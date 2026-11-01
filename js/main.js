@@ -64,7 +64,13 @@ function update(dt) {
   // waves (zombie mode only)
   if (mode === 'zombies' && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = Math.max(.3, 1.5 - wave * .1); }
   if (mode === 'zombies' && toSpawn === 0 && zombies.length === 0) {
-    if (wave > 0 && shopWave < wave) { shopWave = wave; bonus = 5 + wave * 2; coins += bonus; openShop(); return; }
+    if (wave > 0 && shopWave < wave) {
+      shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
+      // account rewards: 1 real coin every wave, 15 XP every 5th wave
+      const xp = wave % 5 ? 0 : 15, r = grant(xp, 1);
+      waveReward = `Account: +1 ◆${xp ? ` +${xp} XP` : ''}` + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ◆` : '');
+      openShop(); return;
+    }
     if ((waveWait -= dt) <= 0) {
       wave++; toSpawn = Math.round(5 + wave * 2.5); spawnT = 0; waveWait = 3;
       const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!' };
@@ -194,6 +200,8 @@ function update(dt) {
     r.m.position.addScaledVector(r.dir, step);
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, 0x888888, 1); }
   }
+
+  updateFlares(dt); // flare gun shots (combat.js)
 
   // flamethrower fire: drifts up and grows as it burns out
   for (let i = flames.length - 1; i >= 0; i--) {

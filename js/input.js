@@ -5,7 +5,7 @@ const ACTIONS = [
   ['fwd', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'], ['jump', 'Jump'],
   ['shoot', 'Shoot'], ['aim', 'Aim / scope'], ['reload', 'Reload'], ['next', 'Next gun'], ['prev', 'Previous gun'],
   ['lookL', 'Look left'], ['lookR', 'Look right'], ['lookU', 'Look up'], ['lookD', 'Look down'],
-  ['slot1', 'Primary slot'], ['slot2', 'Backup slot'], ['slot3', 'Melee slot'], ['slot4', 'Special slot'], ['slot5', 'Sniper slot'], ['slot6', 'Premium slot'],
+  ['slot1', 'Primary slot'], ['slot2', 'Backup slot'], ['slot3', 'Melee slot'], ['slot4', 'Special slot'], ['slot5', 'Sniper slot'], ['slot6', 'Heavy slot'],
   ['board', 'Leaderboard (hold)'], ['chat', 'Chat'],
 ];
 const DEFAULT_BINDS = {
@@ -169,13 +169,14 @@ function restart() {
   booms.forEach(b => scene.remove(b.m)); booms.length = 0;
   rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;
   flames.forEach(f => scene.remove(f.m)); flames.length = 0;
+  flares.forEach(f => scene.remove(f.m)); flares.length = 0;
   parts.forEach(p => scene.remove(p.m)); parts.length = 0;
   useMap(mapId); setupPads(); // load the map you picked in the lobby
   Object.assign(P, { vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, kx: 0, kz: 0 }); P.pos.set(0, 0, 0);
-  wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0;
-  WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.def; reserve[i] = w.def ? Infinity : 0; }); reloading = 0; newBest = false;
+  wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = '';
+  WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.inf; reserve[i] = w.inf ? Infinity : 0; }); reloading = 0; newBest = false;
   emptyPads();
-  cur = 0; resetSlots(); buildGun(); renderHotbar();
+  cur = gi('voxel'); resetSlots(); buildGun(); renderHotbar();
   setupMode(); // deathmatch loadout, pause-menu tips (modes/deathmatch.js)
 }
 

@@ -117,25 +117,27 @@ function blast(p, R, zDmg, pDmg, skip) {
 }
 
 // ---------- shop ----------
+// guns are listed by weapon id; their names come from weapons.js
 const SHOP = [
-  { name: 'Shotgun', price: 40, gun: 1, desc: '9 pellets, close range' },
-  { name: 'Rifle',   price: 90, gun: 2, desc: 'full auto, 30 mag' },
-  { name: 'Minigun', price: 280, gun: 4, desc: '120 round bullet hose' },
-  { name: 'Sniper',  price: 140, gun: 3, desc: '150 dmg, aim to scope' },
-  { name: 'Flamethrower', price: 200, gun: 6, desc: 'burns everything in front of you' },
-  { name: 'Rocket Launcher', price: 450, gun: 7, desc: 'big splash damage, don\'t fire point blank' },
+  { gun: 'shotgun', price: 40, desc: '9 pellets, close range' },
+  { gun: 'ar', price: 90, desc: 'full auto, 30 mag' },
+  { gun: 'eradicator', price: 280, desc: '120 round bullet hose' },
+  { gun: 'sniper', price: 140, desc: '150 dmg, aim to scope' },
+  { gun: 'flame', price: 200, desc: 'burns everything in front of you' },
+  { gun: 'flare', price: 120, desc: 'one fiery shot that sets them on fire' },
+  { gun: 'rocket', price: 450, desc: 'big splash damage, don\'t fire point blank' },
   { name: 'Medkit',  price: 15, heal: 50, desc: '+50 HP' },
   { name: 'Armor',   price: 40, armor: 25, desc: `+25 max armor, refills it (cap ${ARMOR_CAP})` },
   { name: 'Ammo',    price: 20, refill: true, desc: 'refill all spare ammo' },
-];
+].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i));
-let shopOpen = false, shopWave = 0, bonus = 0, armorBought = 0;
+let shopOpen = false, shopWave = 0, bonus = 0, armorBought = 0, waveReward = '';
 // each armor costs 25 more than the last; upgrades cost 75% of the gun's price for ★★ and 125% for ★★★
 const isUpg = it => it.gun !== undefined && owned[it.gun];
 const maxed = it => (isUpg(it) && lvl[it.gun] >= 2) || (it.armor && P.maxArmor >= ARMOR_CAP);
 const priceOf = it => it.armor ? it.price + armorBought * 25 : isUpg(it) ? Math.round(it.price * (lvl[it.gun] ? 1.25 : .75)) : it.price;
 function renderShop() {
-  $('shopInfo').textContent = `Wave ${wave} cleared! +${bonus} bonus   ·   ◆ ${coins}   ·   ♥ ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ⛨ ${P.armor}/${P.maxArmor}` : '');
+  $('shopInfo').textContent = `Wave ${wave} cleared! +${bonus} bonus   ·   ◆ ${coins}   ·   ♥ ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ⛨ ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
   $('items').innerHTML = SHOP.map((it, i) => {
     const upg = isUpg(it), done = maxed(it);
     const off = done || (it.heal && P.hp >= P.max) || (it.refill && ammoFull()) || coins < priceOf(it);

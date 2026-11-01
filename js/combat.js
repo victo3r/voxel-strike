@@ -14,9 +14,10 @@ function shoot() {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3;
     shotSound(w.vol, .15, w.cut);
     if (w.rocket) fireRocket(w);
+    else if (w.flare) fireFlare(w);
     else {
       const targets = shotTargets();
-      // Pixel Gun style: only primaries spread (shotgun wide, rifle/minigun small); aiming halves it. Pistol and sniper are pinpoint, scoped or not.
+      // Pixel Gun style: only primaries spread (shotgun wide, rifle/minigun small); aiming halves it. Voxel gun and sniper rifle are pinpoint, scoped or not.
       const spread = w.spread * (1 - adsT * .5);
       for (let i = 0; i < w.pellets; i++) {
         ndc.set((Math.random() - .5) * spread * 2, (Math.random() - .5) * spread * 2);
@@ -77,6 +78,37 @@ function fireRocket(w) {
   m.position.copy(camera.position).addScaledVector(fwd, .6); m.lookAt(tmp.copy(m.position).add(fwd)); scene.add(m);
   rockets.push({ m, dir: fwd.clone(), life: 3, dmg: w.dmg, smoke: 0 });
 }
+// flares: glowing shot that drops a little over distance. Hits one target, then it keeps burning
+const FLARE_SPD = 30, FLARE_DROP = 6; // speed, how fast it falls
+const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
+function fireFlare(w) {
+  camera.getWorldDirection(fwd);
+  const m = box(.14, .14, .14, flareMat);
+  m.position.copy(camera.position).addScaledVector(fwd, .6); scene.add(m);
+  flares.push({ m, v: fwd.clone().multiplyScalar(FLARE_SPD), life: 2.5, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0 });
+}
+function updateFlares(dt) {
+  for (let i = flares.length - 1; i >= 0; i--) {
+    const f = flares[i]; f.life -= dt; f.v.y -= FLARE_DROP * dt;
+    const step = f.v.length() * dt;
+    ray2.set(f.m.position, tmp.copy(f.v).normalize()); ray2.far = step;
+    const hit = ray2.intersectObjects(shotTargets(), false)[0];
+    if (hit || f.life <= 0) {
+      scene.remove(f.m); flares.splice(i, 1);
+      const p = hit ? hit.point : f.m.position;
+      burst(p, 0xffaa33, 10); burst(p, 0xff4a1a, 6);
+      const zz = hit?.object.userData.zombie;
+      if (zz && !zz.dead) {
+        const head = !!hit.object.userData.head;
+        hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head);
+        if (!zz.dead) { zz.burn = Math.max(zz.burn || 0, f.burnT); zz.burnDmg = Math.max(zz.burnDmg || 0, f.burn); }
+      }
+      continue;
+    }
+    f.m.position.addScaledVector(f.v, dt); f.m.rotation.x += dt * 9; f.m.rotation.y += dt * 7;
+    if ((f.trail -= dt) <= 0) { f.trail = .025; burst(f.m.position, Math.random() < .5 ? 0xffcc55 : 0xff6a1a, 1); }
+  }
+}
 
 // ---------- pickups ----------
 // pads at fixed spots around the map. They start empty each game. Each holds one pickup; after you grab it, a new random one appears 20-30s later.
@@ -101,7 +133,7 @@ function setupPads() { // the loaded map's pads: same spots every game on that m
 }
 function pickupType() { // ammo only once you own a gun that uses it, armor only once you've bought some
   const opts = ['health', 'health'];
-  if (owned.some((o, i) => o && !BASE[i].def)) opts.push('ammo', 'ammo');
+  if (owned.some((o, i) => o && !BASE[i].inf)) opts.push('ammo', 'ammo');
   if (P.maxArmor > 0) opts.push('armor', 'armor');
   return opts[Math.random() * opts.length | 0];
 }
@@ -121,7 +153,7 @@ function usePickup(type) {
     P.armor = Math.min(P.maxArmor, P.armor + ARMOR_PICK); toast(`+${ARMOR_PICK} ARMOR`, '#c9ced6');
   } else { // +2 mags of spare ammo for every gun you own
     let got = false;
-    WEAPONS.forEach((w, i) => { if (!BASE[i].def && owned[i] && reserve[i] < resMax(i)) { reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); got = true; } });
+    WEAPONS.forEach((w, i) => { if (!BASE[i].inf && owned[i] && reserve[i] < resMax(i)) { reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); got = true; } });
     if (!got) return false;
     toast('+AMMO', '#ffd23f');
   }

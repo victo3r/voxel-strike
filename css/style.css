@@ -21,7 +21,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #menu #msg{font-size:34px;font-weight:bold;color:#ffd23f;text-shadow:3px 3px 0 #b33;margin-bottom:10px}
 #shop{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.8);color:#fff;text-shadow:2px 2px 0 #000}
 #shop h1{font-size:56px;margin:0;color:#ffd23f;text-shadow:5px 5px 0 #b33}
-#shopInfo{font-size:20px}
+#shopInfo{font-size:20px;white-space:pre-line}
 #items{display:grid;grid-template-columns:repeat(3,210px);gap:12px;margin:14px}
 #shop button{font:bold 18px monospace;padding:12px;background:#3a2a1a;color:#fff;border:3px solid #ffd23f;cursor:pointer}
 #shop button:hover:not(:disabled){background:#5a3f22}
