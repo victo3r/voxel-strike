@@ -1,19 +1,16 @@
-// maps: shared map helpers and the map switcher.
-// Each map file (yard.js, forest.js) builds everything into its own group and registers itself in MAPS.
 // useMap(id) swaps which one is in the scene and points the globals the rest of the game uses
 // (A, solids, ground, crateMeshes, MAP) at that map.
 // Each map has a fixed layout: same pads, crates and trees every game.
 // Pad count depends on map size. Each map's pads list must have exactly that many spots.
 const PAD_COUNT = { small: 4, medium: 6, large: 8 };
-// most players a match can have on a map this size (you + bots, later real players too)
+// most players a match can have on a map this size
 const MAX_PLAYERS = { small: 4, medium: 8, large: 8 };
 const MAPS = {};
 // the map that's loaded right now. A = arena half-size, solids = things you bump into,
 // crateMeshes = things that stop bullets and block line of sight (besides the ground)
 let MAP = null, A = 24, solids = [], ground = null, crateMeshes = [];
 
-// ---------- building a map ----------
-let building = null; // the map currently being built
+let building = null;
 function startMap(id, def) {
   building = MAPS[id] = { id, root: new THREE.Group(), solids: [], cover: [], ground: null, ...def };
   return building;
@@ -35,7 +32,6 @@ function addGround(G, mat) {
   return g;
 }
 
-// ---------- shared pieces ----------
 const dummy = new THREE.Object3D(), tint = new THREE.Color(), unit = new THREE.BoxGeometry(1, 1, 1);
 function instanced(geo, mat, list) { // list of [x, y, z, sx, sy, sz, rotY, color]
   const m = new THREE.InstancedMesh(geo, mat, list.length);
@@ -59,7 +55,7 @@ const grassMat = seeThru(tex(g => {
 }));
 grassMat.alphaTest = .5;
 const grassGeo = new THREE.PlaneGeometry(1, 1).translate(0, .5, 0);
-function grassTufts(tufts) { // tall grass: two crossed planes per tuft
+function grassTufts(tufts) {
   instanced(grassGeo, grassMat, tufts);
   instanced(grassGeo, grassMat, tufts.map(t => { const u = [...t]; u[6] += Math.PI / 2; return u; }));
 }
@@ -68,17 +64,15 @@ const addCrates = list => { for (const [x, z, tall] of list) addBlock(x, z, 1.2,
 // fixed random numbers: the same seed gives the same layout every game
 const seeded = s => () => (s = s * 16807 % 2147483647) / 2147483647;
 
-// ---------- switching maps ----------
 function useMap(id) {
   const m = MAPS[id];
   if (MAP === m) return;
   if (MAP) scene.remove(MAP.root);
   MAP = m; scene.add(m.root);
   A = m.half; solids = m.solids; ground = m.ground; crateMeshes = m.cover;
-  // sky, fog and light for this map
   const e = m.env;
   scene.background.setHex(e.sky); scene.fog.color.setHex(e.fog); scene.fog.near = e.fogNear; scene.fog.far = e.fogFar;
   hemi.color.setHex(e.hemiSky); hemi.groundColor.setHex(e.hemiGround); hemi.intensity = e.hemi;
-  sun.color.setHex(e.sunColor); sun.intensity = e.sun; sun.position.set(...(e.sunDir || [10, 20, 5])); // which way the light comes from
+  sun.color.setHex(e.sunColor); sun.intensity = e.sun; sun.position.set(...(e.sunDir || [10, 20, 5]));
   if (m.pads.length !== PAD_COUNT[m.size]) console.warn(`${id} has ${m.pads.length} pads, ${m.size} maps should have ${PAD_COUNT[m.size]}`);
 }

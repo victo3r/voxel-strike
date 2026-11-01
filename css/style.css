@@ -1,4 +1,3 @@
-/* Voxel Strike styles */
 html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:monospace;user-select:none}
 canvas{width:100vw!important;height:100vh!important;display:block}
 #hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:2px 2px 0 #000;font-size:22px;font-weight:bold}
@@ -44,7 +43,6 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #bindList{grid-template-columns:minmax(100px,190px) minmax(70px,150px) minmax(70px,150px)}
 #items{grid-template-columns:repeat(3,minmax(0,210px))}
 #bindX{position:fixed;top:8px;right:8px;z-index:11}
-/* hotbar: one slot per weapon category, bottom middle */
 #hotbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px}
 .slot{position:relative;width:84px;height:58px;box-sizing:border-box;background:rgba(0,0,0,.45);border:3px solid #555;display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .15s}
 .slot.on{border-color:#ffd23f;background:rgba(70,50,10,.65);transform:translateY(-6px)}
@@ -57,7 +55,6 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #ctrlBtn:hover,#lobbyBtn:hover,#armBtn:hover{background:#5a3f22}
 #armBtn{font:bold 18px monospace;padding:10px 18px;margin-top:14px;background:#3a2a1a;color:#fff;border:3px solid #ffd23f;cursor:pointer}
 #menu #msg:empty{display:none}
-/* armory: category tabs on top, the guns in that category underneath */
 #armory{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;background:rgba(0,0,0,.88);color:#fff;text-shadow:2px 2px 0 #000;z-index:9;overflow-y:auto;padding:12px 8px;box-sizing:border-box}
 #armory h1{font-size:48px;margin:auto 0 4px;color:#ffd23f;text-shadow:5px 5px 0 #b33}
 #armory>:last-child{margin-bottom:auto}
@@ -82,7 +79,6 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armList .cb button.eq{opacity:1;border-color:#5c5;color:#9f9}
 #armX{position:fixed;top:8px;right:8px;z-index:11;font:bold 15px monospace;padding:7px;background:#3a2a1a;color:#fff;border:3px solid #ffd23f;cursor:pointer}
 @media (max-height:620px),(max-width:620px){#armory h1{font-size:28px}#armTabs button{width:64px}#armTabs img{width:44px;height:22px}}
-/* deathmatch: timer + your place top middle, hold-Tab leaderboard under it, kill feed top right */
 #top .clock{font-size:30px;color:#fff}
 #top .clock.low{color:#ff5a5a}
 #top .place{font-size:16px;margin-top:2px}
@@ -94,7 +90,6 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #board{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:none;width:min(440px,94vw)}
 #feed{position:absolute;right:14px;top:12px;text-align:right;font-size:15px}
 #feed .kf{margin-bottom:4px;background:rgba(0,0,0,.35);padding:2px 6px}
-/* chat: bottom left, above health. Old lines fade out, but they all come back while you're typing */
 #chat{position:absolute;left:20px;bottom:86px;width:min(380px,42vw);font-size:15px}
 #chatLog .cl{background:rgba(0,0,0,.35);padding:2px 6px;margin-top:3px;transition:opacity .6s;overflow-wrap:anywhere}
 #chatLog .cl span{font-weight:normal}
@@ -102,13 +97,11 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #chat.open .cl.old{opacity:1}
 #chatIn{display:none;width:100%;box-sizing:border-box;margin-top:4px;font:bold 15px monospace;padding:5px 7px;background:rgba(0,0,0,.65);color:#fff;border:2px solid #ffd23f;outline:none}
 #chat.open #chatIn{display:block}
-/* your name in the lobby */
 #nameRow{display:flex;gap:6px;margin-top:10px}
 #nameIn{flex:1;min-width:0;font:bold 16px monospace;padding:6px 9px;background:rgba(0,0,0,.45);color:#ffd23f;border:3px solid #2a5a60;outline:none;text-shadow:2px 2px 0 #000}
 #nameIn:focus{border-color:#ffd23f}
 #nameDice{font-size:16px;padding:0 10px;background:rgba(18,48,54,.85);border:3px solid #2a5a60;cursor:pointer}
 #nameDice:hover{border-color:#ffd23f}
-/* post-game screen */
 #post{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;background:rgba(0,0,0,.8);color:#fff;text-shadow:2px 2px 0 #000;overflow-y:auto;padding:12px 8px;box-sizing:border-box}
 #postSub{margin:auto 0 0;font-size:16px;letter-spacing:4px;color:#7fe3d8}
 #postPlace{font-size:56px;margin:4px 0 14px;color:#ffd23f;text-shadow:5px 5px 0 #b33}
@@ -118,13 +111,11 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #post button:hover{background:#5a3f22}
 #post>:last-child{margin-bottom:auto}
 @media (max-height:620px),(max-width:620px){#postPlace{font-size:34px}#post .lb{font-size:15px}.lb span{padding:2px 4px}#board{top:70px}}
-/* lobby: menu panel on the left, your character on its island on the right */
 #lobby{position:fixed;inset:0;display:flex;z-index:5;color:#fff;text-shadow:2px 2px 0 #000}
 #lobbyPanel{width:min(460px,46vw);box-sizing:border-box;padding:24px 30px;display:flex;flex-direction:column;overflow-y:auto;background:linear-gradient(90deg,rgba(3,16,22,.94),rgba(3,16,22,.8) 72%,rgba(3,16,22,0))}
 #lobbyPanel>*{flex-shrink:0}
 #prof{margin:auto 0 0}
 #lobbyBest{font-size:16px;color:#ffd23f;margin:10px 0 0;min-height:1em}
-/* level, XP bar and coins (lobby + post-game) */
 .pl{display:flex;align-items:baseline;gap:12px;font-size:14px;color:#bcd}
 .pl b{font-size:22px;color:#fff}
 .pc{color:#ffd23f;margin-left:auto}
@@ -154,7 +145,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #lobbyBtns button:hover{background:#5a3f22}
 #stage{flex:1;position:relative;cursor:grab;touch-action:none}
 #stage:active{cursor:grabbing}
-@media (max-width:700px){ /* narrow window: character on top, menu underneath */
+@media (max-width:700px){
   #lobby{flex-direction:column}#stage{order:-1;flex:none;height:40vh}
   #lobbyPanel{width:100%;flex:1;background:rgba(3,16,22,.9);padding:12px 16px}
 }

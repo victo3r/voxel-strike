@@ -1,8 +1,7 @@
-// lobby: its own scene. A clearing in a blocky forest at dusk, with your character on a pedestal.
-// The character uses Minecraft proportions: 1 pixel = 1/16 block, head 8x8x8, body 8x12x4, arms and legs 4x12x4.
+// character proportions: 1 pixel = 1/16 block, head 8x8x8, body 8x12x4, arms and legs 4x12x4
 const lobbyScene = new THREE.Scene();
 const lobbyCam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, .1, 300);
-{ // teal dusk sky, peeking over the treetops; the lower part matches the fog so the far trees melt into it
+{
   const c = document.createElement('canvas'); c.width = 2; c.height = 256;
   const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
   gr.addColorStop(0, '#061a1e'); gr.addColorStop(.35, '#0f4d50'); gr.addColorStop(.55, '#22786a'); gr.addColorStop(.72, '#173f37'); gr.addColorStop(1, '#0e2a24');
@@ -15,7 +14,6 @@ lobbyScene.add(new THREE.HemisphereLight(0xcff6e8, 0x1d2f1a, 1));
 const lKey = new THREE.DirectionalLight(0xfff0d8, 1.6); lKey.position.set(-4, 8, 7); lobbyScene.add(lKey);
 const lRim = new THREE.DirectionalLight(0x5ff5e6, 1.4); lRim.position.set(3, 4, -6); lobbyScene.add(lRim);
 
-// ---------- pixel helpers ----------
 const rgb = ([r, g, b], k = 0) => `rgb(${r + k | 0},${g + k | 0},${b + k | 0})`;
 const dot = (g, col, x, y, w = 1, h = 1) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
 const fillN = (g, w, h, c, v) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) dot(g, rgb(c, (Math.random() - .5) * v), x, y); };
@@ -27,9 +25,7 @@ function pixMat(w, h, draw, extra) {
   return lam({ map: t, ...extra });
 }
 
-// ---------- the forest ----------
 const lCube = new THREE.BoxGeometry(1, 1, 1);
-// grass floor that runs off into the fog
 const lGround = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), lam({ map: tex(g => {
   noise(g, [86, 150, 56], 30); g.fillStyle = 'rgba(25,70,20,.35)';
   for (let i = 0; i < 10; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 2);
@@ -51,12 +47,12 @@ const lTrunks = [], lLeaves = [], lSpots = [];
 const lFree = (x, z, gap) => lSpots.every(([a, b]) => (a - x) ** 2 + (b - z) ** 2 > gap * gap);
 const lBlocksView = (x, z) => Math.hypot(x, z) < 8.5 || (z > -4 && Math.abs(x) < 12); // keep the clearing and the line to the camera open
 function lForestTree(x, z) {
-  if (Math.random() < .3) { // pine: stacked layers that shrink toward the top
+  if (Math.random() < .3) {
     const h = 2 + Math.random() * 1.5, layers = 3 + (Math.random() * 2 | 0), col = lPick(L_PINE);
     lTrunks.push([x, (h + layers) / 2, z, .8, h + layers, .8]);
     for (let k = 0; k < layers; k++) { const s = 4 - k * (3 / layers); lLeaves.push([x, h + .6 + k * 1.1, z, s, 1.2, s, col]); }
     lLeaves.push([x, h + .6 + layers * 1.1, z, .7, .8, .7, col]);
-  } else { // oak: a wide blob of leaves with a smaller one on top
+  } else {
     const big = Math.random() < .35, h = 3.5 + Math.random() * 4 + (big ? 2 : 0), w = big ? 1.4 : 1, s = (big ? 5.5 : 4) + Math.random(), col = lPick(L_OAK);
     lTrunks.push([x, (h + 1) / 2, z, w, h + 1, w]);
     lLeaves.push([x, h + .9, z, s, 2.6, s, col]);
@@ -76,7 +72,6 @@ for (let tries = 0, k = 0; k < 70 && tries < 3000; tries++) {
   const s = .9 + Math.random() * .9; lBushes.push([x, s * .4, z, s * 1.3, s * .8, s * 1.1, lPick(L_OAK)]); k++;
 }
 lInst(lBark, lTrunks); lInst(lLeaf, lLeaves); lInst(lLeaf, lBushes);
-// a fallen log and some red mushrooms round the edge of the clearing
 const lLog = box(3.6, .7, .7, lBark); lLog.position.set(-6.2, .35, -6.5); lLog.rotation.y = .5; lobbyScene.add(lLog);
 const lStem = lam({ color: 0xeee3cf }), lCap = lam({ color: 0xd8322e });
 for (let i = 0; i < 7; i++) {
@@ -84,14 +79,12 @@ for (let i = 0; i < 7; i++) {
   const st = box(.12, .22, .12, lStem); st.position.set(x, .11, z); lobbyScene.add(st);
   const cp = box(.34, .14, .34, lCap); cp.position.set(x, .28, z); lobbyScene.add(cp);
 }
-// soft light shafts coming down through the canopy
 const lRays = [];
 for (const [x, z, r] of [[-7, -14, .3], [3, -18, .25], [11, -12, .35], [-15, -22, .28]]) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 26), new THREE.MeshBasicMaterial({ color: 0xc8ffe8, transparent: true, opacity: .07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
   m.position.set(x, 9, z); m.rotation.z = r; lRays.push(m); lobbyScene.add(m);
 }
 
-// pedestal you stand on: stone with a gold trim and a teal glow strip
 const pedTop = stoneMat(2, 2), pedSide = stoneMat(2, .5);
 const ped = new THREE.Mesh(new THREE.BoxGeometry(2.2, .5, 2.2), [pedSide, pedSide, pedTop, pedTop, pedSide, pedSide]);
 ped.position.y = .25; lobbyScene.add(ped);
@@ -100,7 +93,6 @@ const glowStrip = box(2.3, .06, 2.3, new THREE.MeshBasicMaterial({ color: 0x3ff0
 const shadow = new THREE.Mesh(new THREE.CircleGeometry(.42, 20), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .35 }));
 shadow.rotation.x = -Math.PI / 2; shadow.position.y = .505; lobbyScene.add(shadow);
 
-// props: crates, trees, lamps, flowers
 for (const [x, y, z, r] of [[-3.2, .5, -2.4, .2], [-4.2, .5, -1.5, -.3], [-3.5, 1.5, -2.1, .6], [3.8, .5, -2.8, .4]]) {
   const c = box(1, 1, 1, crateMat(1)); c.position.set(x, y, z); c.rotation.y = r; lobbyScene.add(c);
 }
@@ -118,13 +110,12 @@ for (const x of [-3.1, 3.1]) {
   const pl = new THREE.PointLight(0xffb45a, 6, 7); pl.position.set(x, 2.3, -1.4); lobbyScene.add(pl);
   lamps.push(pl);
 }
-for (let i = 0; i < 14; i++) { // little flowers dotted on the grass
+for (let i = 0; i < 14; i++) {
   const a = Math.random() * Math.PI * 2, d = 1.8 + Math.random() * 3.8;
   const f = box(.14, .14, .14, lam({ color: [0xff4d6d, 0xffd23f, 0xb48cff, 0xffffff][i % 4] }));
   f.position.set(Math.cos(a) * d, .07, Math.sin(a) * d); lobbyScene.add(f);
 }
 
-// fireflies drifting between the trees, and stars above the treetops
 const flies = [];
 for (let i = 0; i < 45; i++) {
   const s = .07 + Math.random() * .07;
@@ -140,7 +131,6 @@ for (let i = 0; i < 45; i++) {
   lobbyScene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: .8 })));
 }
 
-// ---------- your character ----------
 const SK = [214, 163, 124], HAIR = [74, 48, 28], SHIRT = [28, 158, 152], PANTS = [44, 62, 128], SHOE = [58, 58, 64];
 const n = () => (Math.random() - .5) * 18;
 const headFront = blink => pixMat(8, 8, g => {
@@ -183,7 +173,6 @@ const limb = (x, y, mats, dy) => { const p = new THREE.Group(); p.position.set(x
 const armL = limb(-6, 22, armMats, -4), armR = limb(6, 22, armMats, -4); // armL = your right arm (on the left of the screen)
 limb(-2, 12, legMats, -6); limb(2, 12, legMats, -6);
 
-// ---------- animation, drag to spin, head follows the mouse ----------
 const REST = .45; // default 3/4 view
 let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, blinkT = 3, mNX = 0, mNY = 0;
 const heroScreen = { x: innerWidth * .7, y: innerHeight / 2 };
@@ -215,31 +204,27 @@ function updateLobby(dt) {
   const t = performance.now() / 1000;
   if (dragX === null) {
     spin += spinV * dt; spinV *= Math.exp(-4 * dt);
-    if (performance.now() - lastDrag > 2500) { // drift back to the 3/4 view after a bit
+    if (performance.now() - lastDrag > 2500) {
       const rest = REST + Math.round((spin - REST) / (Math.PI * 2)) * Math.PI * 2;
       spin += (rest - spin) * Math.min(1, dt * 1.5);
     }
   }
   hero.rotation.y = spin;
-  // idle: arms sway a little, chest breathes
   armL.rotation.z = -.05 - Math.sin(t * 1.6) * .03; armR.rotation.z = .05 + Math.sin(t * 1.6) * .03;
   armL.rotation.x = Math.sin(t * 1.1) * .05; armR.rotation.x = -Math.sin(t * 1.1) * .05;
   torso.scale.z = 1 + Math.sin(t * 1.6) * .02;
-  // head turns toward the mouse (only as far as a neck can)
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   headPiv.rotation.y += (Math.max(-.9, Math.min(.9, rel)) - headPiv.rotation.y) * Math.min(1, dt * 6);
   headPiv.rotation.x += (-mNY * .45 - headPiv.rotation.x) * Math.min(1, dt * 6);
-  // blink every few seconds
   blinkT -= dt;
   headMats[4] = blinkT < 0 ? faceBlink : faceOpen; heroHead.material = headMats;
   if (blinkT < -.13) blinkT = 2 + Math.random() * 3;
-  // scenery
-  for (const f of flies) { // wander and blink on and off
+  for (const f of flies) {
     f.m.position.set(f.x + Math.sin(t * f.s * .7 + f.p) * .6, f.y + Math.sin(t * f.s + f.p * 2) * .35, f.z + Math.cos(t * f.s * .5 + f.p) * .6);
     f.m.material.opacity = .2 + .8 * Math.max(0, Math.sin(t * f.s * 2 + f.p));
   }
   for (const r of lRays) r.material.opacity = .055 + Math.sin(t * .5 + r.position.x) * .02;
-  for (const l of lamps) l.intensity = 5.5 + Math.sin(t * 9 + l.position.x) * .4 + Math.sin(t * 23) * .2; // lantern flicker
+  for (const l of lamps) l.intensity = 5.5 + Math.sin(t * 9 + l.position.x) * .4 + Math.sin(t * 23) * .2;
   glowStrip.material.color.setHSL(.48, .85, .5 + Math.sin(t * 2) * .08);
   frameLobby();
 }

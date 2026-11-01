@@ -1,4 +1,4 @@
-// your account: level, XP, coins and the guns you've unlocked. Saved in the browser, kept between matches (separate from the zombie-run shop coins).
+// your account: level, XP, coins and unlocked guns, kept between matches (separate from the zombie-waves shop coins)
 // XP needed to go from level L to L+1: XP_BASE + XP_STEP * (L - 1). So 50 for level 2, 75 for level 3, 100 for level 4...
 const XP_BASE = 50, XP_STEP = 25, LV_MAX = 30;
 const xpNeed = lv => XP_BASE + XP_STEP * (lv - 1);
@@ -24,7 +24,7 @@ function grant(xp, coins) {
 }
 const xpBar = () => `<div class="xpbar"><div style="width:${prof.lv >= LV_MAX ? 100 : Math.min(100, prof.xp / xpNeed(prof.lv) * 100)}%"></div></div>`;
 const xpText = () => prof.lv >= LV_MAX ? 'MAX LEVEL' : `${prof.xp} / ${xpNeed(prof.lv)} XP`;
-function showProf() { // level, XP bar and coins in the lobby
+function showProf() {
   $('prof').innerHTML = `<div class="pl"><b>LVL ${prof.lv}</b><span>${xpText()}</span><span class="pc">◆ ${prof.coins}</span></div>${xpBar()}`;
 }
 showProf();

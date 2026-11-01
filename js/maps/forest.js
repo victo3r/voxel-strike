@@ -1,11 +1,7 @@
-// map: the forest (medium map) - big old trees whose canopy covers most of the sky,
-// two dirt paths crossing in a clearing in the middle, and lanterns along the paths.
 startMap('forest', {
   name: 'The Forest', size: 'medium', half: 36,
-  // dim green light under the leaves, fog that swallows the far trees
   env: { sky: 0x0f2a22, fog: 0x15342b, fogNear: 10, fogFar: 62, hemiSky: 0xa8e0c0, hemiGround: 0x1c2a16, hemi: .8, sunColor: 0xbccdf0, sun: .45, sunDir: [-.45, 1, .3] }, // the "sun" here is the moon
   pads: [[-5, 26], [6, -25], [-26, 4], [26, -2], [19, 19], [-19, -19]],
-  // a few crates: some round the middle clearing, an old camp in the north-east, a stash in the south-west
   crates: [[4.8, 4.2, 0], [5.4, 5.6, 0], [-5.2, -4.4, 1], [-6, 4.4, 0], [5.6, -4.8, 0],
     [16.8, 16.6, 0], [17.2, 15.2, 1], [21.6, 20.8, 0], [15.6, 21, 0], [22.4, 16.4, 0],
     [-21.2, -16.8, 1], [-16.4, -20.8, 0], [-17.8, -21.8, 0], [-21.6, -21.4, 0]],
@@ -15,18 +11,17 @@ const M = MAPS.forest, FA = M.half, rnd = seeded(4242);
 const G = 140;
 addGround(G, lam({ map: tex(g => {
   noise(g, [58, 84, 40], 28);
-  for (let i = 0; i < 9; i++) { g.fillStyle = ['#5a4628', '#6b5430', '#3e5a26'][i % 3]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); } // dead leaves and moss
+  for (let i = 0; i < 9; i++) { g.fillStyle = ['#5a4628', '#6b5430', '#3e5a26'][i % 3]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }
 }, G * 2, G * 2) }));
 addWall(0, -FA, FA * 2 + .3, .3); addWall(0, FA, FA * 2 + .3, .3);
 addWall(-FA, 0, .3, FA * 2 + .3); addWall(FA, 0, .3, FA * 2 + .3);
 
-// ---------- paths: one runs north-south, one east-west, they cross in the middle ----------
 // they carry on past the edge of the map so they look like they lead somewhere
 const PATHS = [
   [[-3, 70], [-3, 40], [-5, 28], [1, 18], [3, 9], [0, 0], [-4, -9], [-1, -19], [6, -27], [5, -40], [5, -70]],
   [[-70, 7], [-40, 7], [-27, 5], [-17, 1], [-8, 2], [0, 0], [9, -2], [18, 3], [27, -3], [40, -1], [70, -1]],
 ];
-const PW = 3.4; // path width
+const PW = 3.4;
 const dirtMat = lam({ map: tex(g => { noise(g, [118, 92, 60], 26); g.fillStyle = 'rgba(60,45,25,.5)'; for (let i = 0; i < 6; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 const scaleUV = (geo, su, sv) => { const uv = geo.attributes.uv.array; for (let i = 0; i < uv.length; i += 2) { uv[i] *= su; uv[i + 1] *= sv; } return geo; };
 PATHS.forEach((pts, p) => {
@@ -35,10 +30,10 @@ PATHS.forEach((pts, p) => {
     const m = new THREE.Mesh(scaleUV(new THREE.PlaneGeometry(PW, len), PW / 2.5, len / 2.5), dirtMat);
     m.rotation.order = 'YXZ'; m.rotation.set(-Math.PI / 2, Math.atan2(-dx, -dz), 0);
     m.position.set((ax + bx) / 2, .02 + p * .012, (az + bz) / 2); add(m);
-    if (i) { const j = new THREE.Mesh(scaleUV(new THREE.CircleGeometry(PW / 2, 14), PW / 2.5, PW / 2.5), dirtMat); j.rotation.x = -Math.PI / 2; j.position.set(ax, .045, az); add(j); } // round the corners
+    if (i) { const j = new THREE.Mesh(scaleUV(new THREE.CircleGeometry(PW / 2, 14), PW / 2.5, PW / 2.5), dirtMat); j.rotation.x = -Math.PI / 2; j.position.set(ax, .045, az); add(j); }
   }
 });
-function pathDist(x, z) { // how far a point is from the nearest path
+function pathDist(x, z) {
   let best = Infinity;
   for (const pts of PATHS) for (let i = 0; i < pts.length - 1; i++) {
     const [ax, az] = pts[i], [bx, bz] = pts[i + 1], dx = bx - ax, dz = bz - az;
@@ -57,8 +52,7 @@ const ROCKS = [[-9, 21, 1.8, 1.5, 1.3], [-7.8, 22.2, 1.1, 1, .7], [21, -19, 2, 1
 const FIXED = [...LOGS.map(([x, z, len]) => [x, z, len / 2 + .5]), ...ROCKS.map(([x, z, w, d]) => [x, z, Math.max(w, d) / 2 + .3]), ...M.crates.map(([x, z]) => [x, z, 1])];
 const hitsFixed = (x, z, r) => FIXED.some(([fx, fz, fr]) => Math.hypot(fx - x, fz - z) < fr + r);
 
-// ---------- lanterns along the paths ----------
-const glowTex = (() => { // soft round glow, used for the light on the ground and the halo round each lantern
+const glowTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.4, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
@@ -92,17 +86,16 @@ lamps.forEach((l, i) => {
   const post = box(.22, 3.1, .22, postMat); post.position.set(l.x, 1.55, l.z); add(post);
   building.cover.push(post); addSolid(l.x, l.z, .3, .3, 99);
   const arm = box(.1, .1, .9, postMat); arm.position.set(l.x + l.ax * .4, 3, l.z + l.az * .4); arm.rotation.y = Math.atan2(l.ax, l.az); add(arm);
-  const hx = l.x + l.ax * .8, hz = l.z + l.az * .8; // where the lantern hangs
+  const hx = l.x + l.ax * .8, hz = l.z + l.az * .8;
   const lan = box(.32, .42, .32, lanternMat); lan.position.set(hx, 2.55, hz); add(lan);
   const cap = box(.42, .07, .42, ironMat); cap.position.set(hx, 2.8, hz); add(cap);
   const hook = box(.04, .14, .04, ironMat); hook.position.set(hx, 2.88, hz); add(hook);
   const halo = new THREE.Sprite(haloMat); halo.scale.setScalar(1.8); halo.position.set(hx, 2.55, hz); add(halo);
   const pool = new THREE.Mesh(poolGeo, poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(hx, .06, hz); add(pool);
-  if (i % 2 === 0 && lampLights.length < LIGHTS) { // every other lantern gets a real light
+  if (i % 2 === 0 && lampLights.length < LIGHTS) {
     const pl = new THREE.PointLight(LAMP_C, 9, 13, 1.4); pl.position.set(hx, 2.4, hz); add(pl); lampLights.push(pl);
   }
 });
-// a ring of lanterns round the middle clearing too, where the paths cross
 for (let k = 0; k < 4; k++) {
   const a = Math.PI / 8 + k * Math.PI / 2, x = Math.cos(a) * 6.8, z = Math.sin(a) * 6.8;
   if (M.crates.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.6)) continue;
@@ -114,7 +107,6 @@ for (let k = 0; k < 4; k++) {
   lamps.push({ x, z });
 }
 
-// ---------- big trees ----------
 const F_TINTS = [0x9cbf88, 0x86a876, 0xa9c890, 0x7b9b6c, 0x94b07e];
 const pick = a => a[rnd() * a.length | 0];
 const trunks = [], edgeTrunks = [], leaves = [], spots = [];
@@ -122,19 +114,17 @@ const roomFor = (x, z, gap) => spots.every(([a, b]) => Math.hypot(a - x, b - z) 
 function bigTree(x, z, inside) {
   const w = 1.3 + rnd() * .9, h = 7.5 + rnd() * 3, s = 8 + rnd() * 3.5, c = pick(F_TINTS), ry = rnd() * Math.PI;
   (inside ? trunks : edgeTrunks).push([x, h / 2, z, w, h, w, 0]);
-  (inside ? trunks : edgeTrunks).push([x, .3, z, w * 1.4, .6, w * 1.4, 0]); // roots flaring out at the bottom
+  (inside ? trunks : edgeTrunks).push([x, .3, z, w * 1.4, .6, w * 1.4, 0]);
   if (inside) addSolid(x, z, w * 1.4, w * 1.4, 99);
   leaves.push([x, h + .6, z, s, 3, s, ry, c], [x, h + 2.8, z, s * .62, 2, s * .62, ry, c]);
-  if (rnd() < .6) { const a = rnd() * 6.28; leaves.push([x + Math.cos(a) * s * .3, h - 1, z + Math.sin(a) * s * .3, s * .5, 1.8, s * .5, ry, c]); } // lower clump hanging off one side
+  if (rnd() < .6) { const a = rnd() * 6.28; leaves.push([x + Math.cos(a) * s * .3, h - 1, z + Math.sin(a) * s * .3, s * .5, 1.8, s * .5, ry, c]); }
   spots.push([x, z]);
 }
-// inside the map: as many as fit, spaced so you can walk (and fight) between them
 for (let tries = 0, k = 0; k < 60 && tries < 4000; tries++) {
   const x = (rnd() * 2 - 1) * (FA - 1.5), z = (rnd() * 2 - 1) * (FA - 1.5);
   if (pathDist(x, z) < PW / 2 + 2.2 || inClearing(x, z, 1.4) || hitsFixed(x, z, 2.2) || !roomFor(x, z, 6.2)) continue;
   bigTree(x, z, true); k++;
 }
-// outside the walls: a thick wall of trees, then forest running off into the fog
 for (let tries = 0, k = 0; k < 170 && tries < 6000; tries++) {
   const x = (rnd() * 2 - 1) * 75, z = (rnd() * 2 - 1) * 75, e = Math.max(Math.abs(x), Math.abs(z));
   if (e < FA + 1.6 || pathDist(x, z) < PW / 2 + 1.6 || !roomFor(x, z, e < FA + 8 ? 3.6 : 6)) continue;
@@ -143,7 +133,6 @@ for (let tries = 0, k = 0; k < 170 && tries < 6000; tries++) {
 const trunkMesh = instanced(unit, barkMat, trunks); building.cover.push(trunkMesh); // bullets stop on the trunks inside the map
 instanced(unit, barkMat, edgeTrunks); instanced(unit, leafMat, leaves);
 
-// ---------- cover on the ground: bushes, fallen logs, mossy rocks ----------
 const bushes = [];
 for (let tries = 0, k = 0; k < 30 && tries < 3000; tries++) {
   const x = (rnd() * 2 - 1) * (FA - 2), z = (rnd() * 2 - 1) * (FA - 2), w = 1.4 + rnd() * .9, d = 1.3 + rnd() * .9, h = 1 + rnd() * .35;
@@ -154,13 +143,12 @@ building.cover.push(instanced(unit, leafMat, bushes));
 for (const [x, z, len, alongX] of LOGS) {
   const logW = alongX ? len : .85, logD = alongX ? .85 : len;
   addBlock(x, z, logW, logD, .85, barkMat);
-  const stub = box(.4, .4, .4, barkMat); stub.position.set(x + (alongX ? len * .2 : .5), .9, z + (alongX ? .5 : len * .2)); add(stub); // broken branch sticking up
+  const stub = box(.4, .4, .4, barkMat); stub.position.set(x + (alongX ? len * .2 : .5), .9, z + (alongX ? .5 : len * .2)); add(stub);
 }
 const rockMat = lam({ map: tex(g => { noise(g, [112, 116, 108], 34); g.fillStyle = 'rgba(70,120,50,.7)'; for (let i = 0; i < 10; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 6 | 0, 2, 1); }) });
 for (const [x, z, w, d, h] of ROCKS) addBlock(x, z, w, d, h, rockMat);
 addCrates(M.crates);
 
-// ---------- little things: grass, ferns, mushrooms ----------
 const tufts = [];
 for (let tries = 0; tufts.length < 650 && tries < 8000; tries++) {
   const x = (rnd() * 2 - 1) * (FA + 6), z = (rnd() * 2 - 1) * (FA + 6);
@@ -176,11 +164,10 @@ for (let i = 0; i < 40; i++) {
   const cp = box(.3, .12, .3, capMats[i % 2]); cp.position.set(x, .25, z); add(cp);
 }
 
-// ---------- the moon, and moonlight coming down through gaps in the canopy ----------
 // everything uses one direction (MOON): the moon sits that way in the sky, the main light shines from there,
 // and every shaft leans the same way, so they all look like they come from the moon
 const MOON = new THREE.Vector3(...M.env.sunDir).normalize(), MOON_C = 0xcfdcff;
-const moonTex = tex(g => { // pixel-art full moon with a few craters
+const moonTex = tex(g => {
   g.clearRect(0, 0, 16, 16);
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
     const d = Math.hypot(x - 7.5, y - 7.5); if (d > 7.2) continue;
@@ -213,7 +200,7 @@ const shaftTex = (() => { // long soft fade-in up in the sky, full through the c
 })();
 const shaftMat = new THREE.MeshBasicMaterial({ map: shaftTex, color: MOON_C, transparent: true, opacity: .07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 const moonPoolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: MOON_C, transparent: true, opacity: .16, blending: THREE.AdditiveBlending, depthWrite: false });
-const shaftGeo = new THREE.CylinderGeometry(1.0, 1.5, shaftLen, 14, 1, true); // a soft open tube, a bit wider at the bottom
+const shaftGeo = new THREE.CylinderGeometry(1.0, 1.5, shaftLen, 14, 1, true);
 const shafts = [], srnd = seeded(91), gaps = [];
 for (let x = -FA + 3; x <= FA - 3; x += 1.5) for (let z = -FA + 3; z <= FA - 3; z += 1.5) gaps.push([x, z, srnd()]);
 gaps.sort((a, b) => a[2] - b[2]); // check the spots in a fixed shuffled order so they spread over the map
@@ -228,7 +215,6 @@ for (const [x, z] of gaps) {
   shafts.push({ m, x, z });
 }
 
-// ---------- fireflies ----------
 const flies = [];
 for (let i = 0; i < 70; i++) {
   const s = .06 + rnd() * .06;
@@ -242,8 +228,8 @@ M.tick = () => { // runs every frame while this map is loaded
     f.m.position.set(f.x + Math.sin(t * f.s * .7 + f.p) * .8, f.y + Math.sin(t * f.s + f.p * 2) * .4, f.z + Math.cos(t * f.s * .5 + f.p) * .8);
     f.m.material.opacity = .15 + .85 * Math.max(0, Math.sin(t * f.s * 2 + f.p));
   }
-  for (const l of lampLights) l.intensity = 9 + Math.sin(t * 9 + l.position.x) * .7 + Math.sin(t * 23 + l.position.z) * .35; // lanterns flicker
-  for (const s of shafts) s.m.material.opacity = .07 + Math.sin(t * .4 + s.x) * .02; // leaves moving overhead
+  for (const l of lampLights) l.intensity = 9 + Math.sin(t * 9 + l.position.x) * .7 + Math.sin(t * 23 + l.position.z) * .35;
+  for (const s of shafts) s.m.material.opacity = .07 + Math.sin(t * .4 + s.x) * .02;
   moon.position.copy(camera.position).addScaledVector(MOON, 150); moonGlow.position.copy(moon.position);
 };
 }

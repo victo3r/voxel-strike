@@ -1,4 +1,3 @@
-// player names: your saved name, plus the name pool bots draw from.
 // The bot that's there when the match starts gets a NATO-alphabet name ("Foxtrot"). The ones that join later
 // get names that look like real people made them, so a lobby full of bots doesn't feel like one.
 // Most are English. The rest are spread across other big languages, and each name remembers its language
@@ -6,7 +5,6 @@
 const NAME_MAX = 16;
 const pickN = a => a[Math.random() * a.length | 0];
 
-// ---------- English ----------
 const N_ADJ = ['Brave', 'Silent', 'Swift', 'Crazy', 'Lucky', 'Angry', 'Happy', 'Sneaky', 'Wild', 'Dark', 'Golden', 'Frozen', 'Mighty',
   'Tiny', 'Fat', 'Lazy', 'Epic', 'Toxic', 'Salty', 'Spicy', 'Fuzzy', 'Rapid', 'Iron', 'Shadow', 'Crimson', 'Electric', 'Savage', 'Sleepy',
   'Hungry', 'Fierce', 'Noble', 'Royal', 'Rusty', 'Cosmic', 'Mad', 'Bold', 'Clever', 'Grumpy', 'Ancient', 'Burning', 'Silver', 'Stealthy',
@@ -15,7 +13,6 @@ const N_NOUN = ['Lion', 'Tiger', 'Wolf', 'Fox', 'Bear', 'Eagle', 'Hawk', 'Shark'
   'Sniper', 'Hunter', 'Ghost', 'Robot', 'Potato', 'Taco', 'Noodle', 'Pickle', 'Muffin', 'Cookie', 'Penguin', 'Llama', 'Goat', 'Viper',
   'Cobra', 'Falcon', 'Raven', 'Phoenix', 'Panther', 'Rhino', 'Gorilla', 'Monkey', 'Duck', 'Frog', 'Cat', 'Dog', 'Bunny', 'Turtle', 'Storm',
   'Blade', 'Bullet', 'Rocket', 'Cactus', 'Banana', 'Waffle', 'Nugget', 'Yeti', 'Kraken', 'Samurai', 'Viking', 'Cowboy', 'Chef', 'Goblin'];
-// gamer-tag style names, the kind people pick when they want to sound cool
 const N_TAGS = ['Vortex', 'Shadow', 'Zyro', 'Nova', 'Frost', 'Blaze', 'Raven', 'Phantom', 'Reaper', 'Jinx', 'Viper', 'Echo', 'Hex',
   'Onyx', 'Kairo', 'Lunar', 'Pixel', 'Glitch', 'Nexus', 'Havoc', 'Rogue', 'Zenith', 'Apex', 'Ember', 'Static', 'Volt', 'Cipher', 'Riot',
   'Talon', 'Wraith', 'Sable', 'Cryo', 'Drift', 'Fury', 'Nyx', 'Orbit', 'Pulse', 'Rift', 'Slayer', 'Specter', 'Venom', 'Xeno', 'Zero',
@@ -23,7 +20,6 @@ const N_TAGS = ['Vortex', 'Shadow', 'Zyro', 'Nova', 'Frost', 'Blaze', 'Raven', '
   'Sky', 'Titan', 'Umbra', 'Vex', 'Wolfie', 'Zap', 'NoScope', 'Headshot', 'OneTap', 'Sweaty', 'Clutch', 'Tryhard', 'Snipez', 'Quickscope',
   'Laggy', 'Noob', 'ProGamer', 'NotABot', 'Camper', 'Spammer', 'Reloading', 'Dorito', 'MrBean', 'SirLag', 'Kawaii', 'Chungus', 'Bobby',
   'Goose', 'Boop', 'Pog', 'Yeet', 'Bonk', 'Sus', 'Moist', 'Bruh', 'DeathStar', 'Skull', 'Maverick', 'Ronin', 'Shogun'];
-// first names, the way kids type them as usernames
 const N_FIRST = ['jake', 'tyler', 'ethan', 'noah', 'liam', 'mason', 'logan', 'owen', 'ryan', 'kyle', 'jayden', 'aiden', 'caleb', 'dylan',
   'max', 'sam', 'ben', 'leo', 'eli', 'zach', 'nate', 'josh', 'mia', 'ava', 'emma', 'lily', 'zoe', 'chloe', 'ella', 'maya', 'ruby', 'nora',
   'jack', 'luke', 'evan', 'cole', 'alex', 'jordan', 'chris', 'brandon', 'kevin', 'danny', 'tommy', 'charlie', 'grace', 'hannah', 'sophie'];
@@ -32,7 +28,6 @@ const N_NUMS = ['1', '2', '7', '9', '11', '13', '21', '23', '42', '64', '77', '8
   '2008', '2009', '2010', '2011', '2012', '2013', '1337'];
 const num = () => Math.random() < .55 ? pickN(N_NUMS) : String(10 + (Math.random() * 90 | 0));
 
-// ---------- other languages ----------
 // [weight out of 100, full names in that language]. English takes whatever weight is left (about 60%).
 const N_LANGS = {
   es: [9, ['LeonValiente', 'LoboNegro', 'ElTigre', 'Fuego', 'Sombra', 'ElCrack', 'Rayo', 'DragonRojo', 'Pollito', 'ElProXD', 'Toro',
@@ -56,7 +51,6 @@ const N_LANGS = {
 };
 const N_LATIN = s => /^[\x00-\x7f]*$/.test(s); // only add number tags and the like to names in plain letters
 
-// one English name: adjective + noun, a gamer tag, or a first name, dressed up the way people actually type them
 function enName() {
   const r = Math.random();
   if (r < .35) { // BraveLion, brave_lion, BraveLion42, xBraveLionx
@@ -109,7 +103,6 @@ function randomName() {
   }
   return { name: enName(), lang: 'en' };
 }
-// names for one match: no repeats, nothing too long, nothing the same as yours
 function nameMaker(taken) {
   const used = new Set(taken.map(s => s.toLowerCase()));
   return () => {
@@ -121,17 +114,15 @@ function nameMaker(taken) {
     return { name: 'Player' + (1000 + Math.random() * 9000 | 0), lang: 'en' };
   };
 }
-// the bot that's in the match with you from the start gets a plain NATO-alphabet name ("Foxtrot").
-// These names are kept only for bots (no real-looking name can be one exactly), so later a playstyle can hang off each.
+// NATO-alphabet names are kept only for bots (no generated name can match one exactly)
 const BOT_DEFAULTS = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliett', 'Kilo', 'Lima',
   'Mike', 'November', 'Oscar', 'Papa', 'Quebec', 'Romeo', 'Sierra', 'Tango', 'Uniform', 'Victor', 'Whiskey', 'Xray', 'Yankee', 'Zulu'];
 const NATO_SET = new Set(BOT_DEFAULTS.map(s => s.toLowerCase()));
-const defaultBotName = (not = '') => { // never the same as your name
+const defaultBotName = (not = '') => {
   const ok = BOT_DEFAULTS.filter(s => s.toLowerCase() !== not.toLowerCase());
   return pickN(ok);
 };
 
-// ---------- your name: saved in the browser, set in the lobby ----------
 function cleanName(s) { return String(s ?? '').replace(/[<>&"']/g, '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX); }
 // the default name a new player gets, and what the dice rolls: always adjective + noun (BraveLion, BraveLion42)
 function newMyName(not = '') {

@@ -1,6 +1,4 @@
-// weapons, hotbar, viewmodel, particles
-// ---------- weapons ----------
-// weapon categories, like old Pixel Gun: one hotbar slot each. You can own several guns in a category,
+// one hotbar slot per category. You can own several guns in a category,
 // but only the one in your loadout (picked in the armory, js/armory.js) is in your hotbar during a match.
 const CATS = [['primary', 'PRIMARY'], ['backup', 'BACKUP'], ['melee', 'MELEE'], ['special', 'SPECIAL'], ['sniper', 'SNIPER'], ['premium', 'PREMIUM']];
 const CAT_I = Object.fromEntries(CATS.map(([k], i) => [k, i]));
@@ -16,13 +14,11 @@ const BASE = [
   { id: 'ar', name: 'Assault Rifle', cat: 'primary', start: true, dmg: 22, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55, vol: .2, cut: 2600 },
   { id: 'sniper', name: 'Sniper Rifle', cat: 'sniper', start: true, dmg: 150, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, vol: .5, cut: 3200, scope: true },
   { id: 'eradicator', name: 'Eradicator', cat: 'primary', unlock: 12, price: 450, dmg: 14, rate: .05, mag: 120, reload: 2.6, pellets: 1, spread: .012, auto: true, color: 0x777777, len: .7, vol: .18, cut: 2000 },
-  // knife: hold shoot to keep stabbing. range is how far it reaches
   { id: 'knife', name: 'Combat Knife', cat: 'melee', start: true, free: true, inf: true, melee: true, dmg: 60, rate: .4, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xd8dde3, len: .3, vol: .1, cut: 3500, model: 'knife' },
   // flamethrower: short cone that hits everything in front of you and sets it on fire. mag = fuel
   { id: 'flame', name: 'Flamethrower', cat: 'special', start: true, flame: true, dmg: 9, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, vol: .05, cut: 600, model: 'flame' },
-  // rocket launcher: slow rocket that explodes on whatever it hits. Can hurt you if you fire it point blank
   { id: 'rocket', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, rocket: true, dmg: 220, rate: 1.1, mag: 4, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, vol: .4, cut: 700, model: 'rocket' },
-  // flare gun: one glowing flare that drops a little over distance. dmg on hit, then sets the target on fire (burn = damage per quarter second, burnT = seconds)
+  // flare gun: burn = damage per quarter second, burnT = seconds
   { id: 'flare', name: 'Flare Gun', cat: 'premium', start: true, flare: true, dmg: 45, burn: 4, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, vol: .3, cut: 1400, model: 'flare' },
 ];
 const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
@@ -35,12 +31,11 @@ function applyLvl(i) {
   const b = BASE[i], L = lvl[i];
   Object.assign(WEAPONS[i], { dmg: Math.round(b.dmg * (1 + .25 * L)), mag: Math.round(b.mag * (1 + .25 * L)), reload: +(b.reload * (1 - .15 * L)).toFixed(2) });
 }
-// deathmatch: starters have no stars. Zombie waves (for now, until we rework it): everything you buy in its shop can be starred
+// deathmatch: starters have no stars. Zombie waves: everything you buy in its shop can be starred
 const upgradable = i => mode === 'zombies' ? !BASE[i].free : !BASE[i].start;
 const stars = i => upgradable(i) ? '★'.repeat(lvl[i] + 1) + '☆'.repeat(2 - lvl[i]) : '';
 let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0;
 const ammo = WEAPONS.map(w => w.mag);
-// spare ammo: the knife never runs out, every gun carries up to 4 extra mags
 const resMax = i => BASE[i].inf ? Infinity : WEAPONS[i].mag * 4;
 const reserve = WEAPONS.map(w => w.inf ? Infinity : 0);
 const owned = WEAPONS.map(w => !!w.free); // zombie waves starts you with the voxel gun and knife; deathmatch gives you your account's guns
@@ -48,7 +43,6 @@ const slotOf = i => CAT_I[BASE[i].cat];
 const slotGun = CATS.map(() => -1); // which weapon each hotbar slot holds (-1 = empty)
 function resetSlots() { slotGun.fill(-1); BASE.forEach((w, i) => { if (w.free) slotGun[slotOf(i)] = i; }); }
 resetSlots();
-// your account's guns and loadout (saved in prof, js/profile.js)
 const hasGun = i => !!BASE[i].start || !!prof.guns[BASE[i].id]; // starters are free for everyone, the rest you buy in the armory
 function loadoutGun(cat) { // the gun in your loadout for this category. Falls back to the starter if the save points at something you don't have
   const i = gi(prof.loadout[cat]);
@@ -132,11 +126,10 @@ function equip(i) {
   if (i === cur || !WEAPONS[i] || !owned[i]) return;
   cur = i; slotGun[slotOf(i)] = i; reloading = 0; cd = .2; buildGun(); renderHotbar(); beep(600, .05);
 }
-const dry = () => beep(150, .05, 'square', .08); // empty click
+const dry = () => beep(150, .05, 'square', .08);
 function reload() { const w = WEAPONS[cur]; if (w.melee || reloading > 0 || ammo[cur] === w.mag) return; if (!reserve[cur]) { dry(); return; } reloading = w.reload; beep(300, .08); }
 buildGun();
 
-// ---------- particles ----------
 const parts = [], pGeo = new THREE.BoxGeometry(.08, .08, .08), pMats = {};
 function burst(p, color, n) {
   pMats[color] ??= new THREE.MeshBasicMaterial({ color });
@@ -145,4 +138,3 @@ function burst(p, color, n) {
     parts.push({ m, v: new THREE.Vector3((Math.random() - .5) * 4, Math.random() * 4, (Math.random() - .5) * 4), life: .6 });
   }
 }
-

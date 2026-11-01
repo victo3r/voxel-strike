@@ -1,4 +1,3 @@
-// deathmatch mode: a 4 minute free-for-all between you and bots. Everyone respawns. Highest score at the end wins.
 // The match starts with you + 1 bot, and the rest join over the first minute until the map's lobby is full.
 // Bots live in the zombies list (type 'bot'), so your bullets, knife, fire and rockets already hurt them.
 // react = how long a bot has to see its target before it shoots. turn = how fast its aim catches up (higher = snappier).
@@ -33,13 +32,12 @@ const rewardFor = place => { const t = REWARDS[MAP.size]; return t[Math.min(plac
 // guns a bot can spawn with, and the distance it tries to keep from its target with each one [closest, furthest]
 const BOT_GUNS = {
   voxel: [6, 13],
-  shotgun: [2.5, 6], // rushes in
+  shotgun: [2.5, 6],
   ar: [8, 16],
-  sniper: [16, 32],  // hangs back
+  sniper: [16, 32],
   eradicator: [6, 12],
 };
 
-// ---------- the bots' look: Minecraft-style players, each with their own shirt color ----------
 const SKIN_C = [214, 163, 124];
 const botSkinT = tex(g => noise(g, SKIN_C, 14));
 const botHairT = tex(g => noise(g, [62, 42, 26], 20));
@@ -67,17 +65,15 @@ function tagMat(name, css) { // name tag floating over its head, as wide as the 
   g.font = TAG_FONT; g.textAlign = 'center'; // resizing the canvas resets the font
   g.fillStyle = '#000'; g.fillText(name, c.width / 2 + 1, 13); g.fillStyle = css; g.fillText(name, c.width / 2, 12);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter;
-  return { mat: new THREE.SpriteMaterial({ map: t, transparent: true }), w: c.width / 64 }; // 64 canvas px = 1 block, same as before
+  return { mat: new THREE.SpriteMaterial({ map: t, transparent: true }), w: c.width / 64 }; // 64 canvas px = 1 block
 }
 
-// ---------- the match: one record per player on the leaderboard ----------
 const YOU_T = { you: true }; // stands in for you whenever a bot is picking or tracking a target
 let recs = [], youRec = null, matchT = 0, killedBy = '', joins = [];
 function makeRecs() {
   youRec = { name: myName, you: true, css: '#ffd23f', score: 0, kills: 0, deaths: 0, streak: 0 };
   recs = [youRec]; joins = [];
-  // bot 1 is there from the start and has a plain NATO-alphabet name like "Foxtrot" (it never chats).
-  // Later, its playstyle can be picked from that name (js/names.js BOT_DEFAULTS).
+  // bot 1 is there from the start with a NATO-alphabet name and never chats.
   // The others join spread across the first minute, a little randomly, with real-looking names (js/names.js).
   const next = nameMaker([myName]);
   for (let i = 0; i < BOT_COUNT; i++) {
@@ -101,7 +97,7 @@ function boardHTML() {
   const head = '<div class="r h"><span>#</span><span>PLAYER</span><span>SCORE</span><span>KILLS</span><span>DEATHS</span></div>';
   return head + ranked().map((r, i) => `<div class="r${r.you ? ' you' : ''}"><span>${i + 1}</span><span style="color:${r.css}">${r.name}</span><span>${r.score}</span><span>${r.kills}</span><span>${r.deaths}</span></div>`).join('');
 }
-function feed(html) { // kill feed, top right
+function feed(html) {
   const d = document.createElement('div'); d.className = 'kf'; d.innerHTML = html; $('feed').append(d);
   while ($('feed').children.length > 5) $('feed').firstChild.remove();
   setTimeout(() => d.remove(), 5000);
@@ -116,16 +112,15 @@ function scoreKill(killer, victim, head) {
     killer.score += pts;
     if (killer.you) {
       toast(`+${pts}${head ? ' HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#ffd23f');
-      beep(st ? 260 + Math.min(killer.streak, 20) * 20 : 180, .3, 'sawtooth', .12); // streak kills sound higher
+      beep(st ? 260 + Math.min(killer.streak, 20) * 20 : 180, .3, 'sawtooth', .12);
     }
   }
   feed(killer && killer !== victim ? `${nameTag(killer)} ${head ? '⌖' : '✖'} ${nameTag(victim)}` : `${nameTag(victim)} ✖`);
   const st = killer && killer !== victim && STREAKS[killer.streak];
-  if (st) feed(`${nameTag(killer)} <b style="color:#ffd23f">${st[1]}!</b>`); // everyone sees streaks in the feed
-  // bots only talk when you say something first (js/chat.js botsHear), not on their own
+  if (st) feed(`${nameTag(killer)} <b style="color:#ffd23f">${st[1]}!</b>`);
 }
 
-// ---------- spawning: somewhere open, as far from everyone else as it can find ----------
+// spawning: somewhere open, as far from everyone else as it can find
 function spawnSpot(skip) {
   const others = [];
   if (skip !== YOU_T && respawnT <= 0) others.push(P.pos);
@@ -147,7 +142,7 @@ function makeBot(rec) {
   const g = new THREE.Group(); g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
   const head = box(.5, .5, .5, [side, side, hair, skin, face, hair]); head.position.y = 1.6; head.userData.head = true;
   const body = box(.5, .7, .3, shirt); body.position.y = 1.0;
-  const armL = box(.18, .18, .65, skin); armL.position.set(-.34, 1.25, .25); // both arms out front holding the gun
+  const armL = box(.18, .18, .65, skin); armL.position.set(-.34, 1.25, .25);
   const armR = box(.18, .18, .65, skin); armR.position.set(.34, 1.25, .25);
   const mkLeg = sx => { const piv = new THREE.Group(); piv.position.set(sx, .65, 0); const l = box(.22, .65, .25, pants); l.position.y = -.325; piv.add(l); return [piv, l]; };
   const [pivL, legL] = mkLeg(-.13), [pivR, legR] = mkLeg(.13);
@@ -155,7 +150,7 @@ function makeBot(rec) {
   const flashM = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 })); flashM.position.set(.16, 1.33, .47 + W.len); flashM.visible = false;
   const tag = new THREE.Sprite(rec.tag); tag.scale.set(rec.tagW, .25, 1); tag.position.y = 2.25;
   g.add(head, body, armL, armR, pivL, pivR, gunM, flashM, tag); scene.add(g);
-  const yaw = Math.atan2(-x, -z); // face the middle of the map
+  const yaw = Math.atan2(-x, -z);
   g.rotation.y = yaw;
   const b = { g, head, flashM, tag, pivL, pivR, parts: [head, body, armL, armR, legL, legR], mats: [skin, side, face, hair, shirt, pants], rec,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
@@ -182,7 +177,6 @@ function respawnYou() {
   reloading = 0; vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
 
-// ---------- seeing and shooting ----------
 const eye = new THREE.Vector3(), aimV = new THREE.Vector3(), dirV = new THREE.Vector3(), hitV = new THREE.Vector3(), losDir = new THREE.Vector3();
 const losRay = new THREE.Raycaster(), pBox = new THREE.Box3();
 function clearLine(a, c) { // nothing solid between two points (crates block, the see-through fence doesn't)
@@ -214,9 +208,9 @@ function pickTarget(b) {
 
 function botFire(b, W, dist) {
   b.ammo--; b.muzzle = .05;
-  if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } } // fires in bursts
+  if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate * 1.5 + Math.random() * .15; // semi-auto guns: a bit slower than you can click
-  if (W.scope) b.aimT = 0; // has to line up the next sniper shot from scratch
+  if (W.scope) b.aimT = 0;
   if (b.ammo <= 0) b.reload = W.reload * 1.2;
   const youD0 = Math.hypot(P.pos.x - eye.x, P.pos.z - eye.z);
   shotSound(W.vol * Math.max(.15, 1 - youD0 / 45), .15, W.cut);
@@ -248,7 +242,7 @@ function updateBot(b, dt) {
   const W = BASE[b.gun], keep = BOT_GUNS[W.id], pos = b.g.position, sniper = !!W.scope;
   eye.set(pos.x, 1.6, pos.z);
   b.hitByT -= dt;
-  if ((b.scanT -= dt) <= 0 || !b.tgt || !tAlive(b.tgt)) { // look around for who to fight a few times a second
+  if ((b.scanT -= dt) <= 0 || !b.tgt || !tAlive(b.tgt)) {
     b.scanT = .3;
     const t = pickTarget(b);
     if (t !== b.tgt) { b.tgt = t; b.seeT = 0; b.aimT = 0; b.pvx = b.pvz = 0; if (t) { b.lpx = tPos(t).x; b.lpz = tPos(t).z; } }
@@ -268,7 +262,6 @@ function updateBot(b, dt) {
   b.aimPitch += (wantPitch - b.aimPitch) * k;
   b.g.rotation.y = b.aimYaw; b.head.rotation.x = -b.aimPitch;
 
-  // shooting
   b.cd -= dt; b.muzzle -= dt; b.flashM.visible = b.muzzle > 0;
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   const ready = sees && b.seeT >= BOT.react && b.reload <= 0;
@@ -279,15 +272,15 @@ function updateBot(b, dt) {
   let radial = 1, side = 0;
   if (sees) {
     radial = dist > keep[1] ? 1 : dist < keep[0] ? -1 : 0;
-    if (b.reload > 0 && dist < keep[1] + 4) radial = -1; // backs off while it reloads
+    if (b.reload > 0 && dist < keep[1] + 4) radial = -1;
     if ((b.strafeT -= dt) <= 0) { b.strafeT = .4 + Math.random() * 1.1; b.strafe = Math.random() < .15 ? 0 : Math.random() < .5 ? -1 : 1; }
-    side = b.strafe * (sniper && b.aimT > 0 ? .3 : 1); // a sniper holds fairly still while lining up
+    side = b.strafe * (sniper && b.aimT > 0 ? .3 : 1);
   }
   if (dist < 1.5) radial = -1;
   if (b.detour > 0) { b.detour -= dt; side = b.detourDir; radial *= .3; } // stuck on a crate: sidestep around it
   const ux = dx / dist, uz = dz / dist;
   let mx = ux * radial + uz * side, mz = uz * radial - ux * side;
-  for (const o of zombies) { // don't walk into other bots
+  for (const o of zombies) {
     if (o === b || o.dead) continue;
     const ox = pos.x - o.g.position.x, oz = pos.z - o.g.position.z, od = Math.hypot(ox, oz);
     if (od < .8 && od > 0) { mx += ox / od; mz += oz / od; }
@@ -298,19 +291,17 @@ function updateBot(b, dt) {
     const ox = pos.x, oz = pos.z; let bump = false;
     if (!blocked(pos.x + mx, pos.z, b.r, 0)) pos.x += mx; else bump = true;
     if (!blocked(pos.x, pos.z + mz, b.r, 0)) pos.z += mz; else bump = true;
-    if (bump && sees) b.strafe = -b.strafe; // strafed into a crate: go the other way
+    if (bump && sees) b.strafe = -b.strafe;
     if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) { b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1; }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
   } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; }
 
-  // red flash when hit, orange flicker when burning
   b.flash -= dt;
   const e = b.flash > 0 ? 0x880000 : b.burn > 0 ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : 0;
   b.mats.forEach(m => m.emissive.setHex(e));
 }
 
-// ---------- per-frame upkeep: respawns, timer, HUD ----------
 // while you're dead: camera drops to the floor, the banner counts down, then you respawn. Returns true while you're down.
 function dmDown(dt) {
   if (respawnT <= 0) return false;
@@ -325,24 +316,21 @@ function dmDown(dt) {
 let lastTop = '', lastBoard = '', lastSec = 0;
 function updateDM(dt) {
   if (matchOver) return; // the mouse can stay locked for a frame or two after the end, don't pay out twice
-  while (joins.length && MATCH_T - matchT >= joins[0].at) joinBot(joins.shift()); // new bots joining
-  chatTick(dt); // bot chat lines that are due
+  while (joins.length && MATCH_T - matchT >= joins[0].at) joinBot(joins.shift());
+  chatTick(dt);
   for (const r of recs) if (!r.you && (!r.b || r.b.dead) && (r.wait -= dt) <= 0) makeBot(r); // bots come back after their body falls
   matchT -= dt;
   const sec = Math.max(0, Math.ceil(matchT));
-  if (sec <= 10 && sec !== lastSec && sec > 0) beep(880, .08, 'square', .08); // last 10 seconds tick
+  if (sec <= 10 && sec !== lastSec && sec > 0) beep(880, .08, 'square', .08);
   lastSec = sec;
-  // top middle: time left and where you are on the leaderboard
   const place = ranked().indexOf(youRec) + 1;
   const top = `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div><div class="place">${ord(place)} OF ${recs.length}  ·  ${youRec.score} PTS  ·  ${youRec.kills} KILLS</div>`;
   if (top !== lastTop) { $('top').innerHTML = lastTop = top; }
-  // hold Tab: full leaderboard under it
   const show = held('board');
   $('board').style.display = show ? 'grid' : 'none';
   if (show) { const h = boardHTML(); if (h !== lastBoard) $('board').innerHTML = lastBoard = h; }
   if (matchT <= 0) endMatch();
 }
-// time's up: post-game screen with the final leaderboard and what you earned
 function endMatch() {
   matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('banner').style.opacity = 0;
   const place = ranked().indexOf(youRec) + 1;
@@ -353,7 +341,7 @@ function endMatch() {
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ◆</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
   beep(place === 1 ? 880 : 330, .6, 'triangle', .15);
-  if (ups) setTimeout(() => beep(1040, .4, 'triangle', .14), 350); // extra chime for a level up
+  if (ups) setTimeout(() => beep(1040, .4, 'triangle', .14), 350);
   document.exitPointerLock();
 }
 $('againBtn').addEventListener('click', () => { restart(); renderer.domElement.requestPointerLock()?.catch?.(() => {}); });
@@ -371,12 +359,12 @@ function setupMode() {
   BOT_COUNT = MAX_PLAYERS[MAP.size] - 1;
   $('post').style.display = 'none'; $('board').style.display = 'none'; $('banner').style.opacity = 0; // clears "KILLED BY" if you left while dead
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
-  $('chat').style.display = mode === 'dm' ? '' : 'none'; // nobody to talk to in zombie waves
-  if (mode === 'dm') { // your loadout from the armory: one gun per category, the others stay out of your hotbar
+  $('chat').style.display = mode === 'dm' ? '' : 'none';
+  if (mode === 'dm') {
     makeRecs(); matchT = MATCH_T;
     BASE.forEach((w, g) => { if (hasGun(g)) giveGun(g); });
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
-    cur = slotGun[0]; buildGun(); renderHotbar(); // start holding your primary
+    cur = slotGun[0]; buildGun(); renderHotbar();
   }
   const tab = binds.board.filter(Boolean).map(nice).join('/') || 'the scoreboard key';
   const tips = mode === 'dm'

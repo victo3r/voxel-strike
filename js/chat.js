@@ -1,4 +1,3 @@
-// chat (deathmatch only): press the chat key (T or Enter) to type, Enter sends (an empty line just closes it), Esc closes it.
 // Bots never talk on their own. They only answer when you say something (hi, gg, lol, compliments, trash talk,
 // or now and then a plain "?" / "ok" to anything else). Bots with names in another language usually answer in it.
 // The NATO-named bot never talks.
@@ -41,11 +40,11 @@ const chatSay = (r, text) => chatLine(`${nameTag(r)}<span>: ${esc(text)}</span>`
 function botSay(r, kind, chance = 1, delay = 1 + Math.random() * 2) {
   if (!r || r.you || r.quiet || Math.random() > chance) return;
   const mine = SAY[r.lang] ?? SAY.en, en = SAY.en;
-  // other-language bots switch to English a third of the time (lots of people do)
+  // other-language bots switch to English a third of the time
   const pool = (r.lang !== 'en' && Math.random() < .35) || !mine[kind] ? en[kind] : mine[kind];
   if (!pool) return;
   let text = pickN(pool);
-  if (Math.random() < .15 && /^[a-z ]+$/.test(text)) text = text.toUpperCase(); // sometimes it's in caps
+  if (Math.random() < .15 && /^[a-z ]+$/.test(text)) text = text.toUpperCase();
   chatQ.push({ r, text, t: delay });
 }
 // each frame (from updateDM): send queued bot lines when they're due, with a gap so they don't all land at once
@@ -58,7 +57,6 @@ function chatTick(dt) {
     if (recs.includes(m.r)) { chatSay(m.r, m.text); chatGap = .6 + Math.random() * .8; }
   }
 }
-// bots answer a few things you say
 function botsHear(text) {
   const t = text.toLowerCase(), bots = recs.filter(r => !r.you && !r.quiet);
   const some = (kind, max, chance) => [...bots].sort(() => Math.random() - .5).slice(0, max).forEach(r => botSay(r, kind, chance, 1.2 + Math.random() * 2.5));
@@ -68,12 +66,12 @@ function botsHear(text) {
   else if (/(lol|lmao|haha|xd|jaja|mdr|kkk)/.test(t)) some('lol', 1, .4);
   else if (/\b(nice|ns|nt|gj|wp|good shot|well played)\b/.test(t)) some('ty', 1, .6);
   else if (/\b(ez|noob|nub|trash|bad|camper|hacker|hacks?)\b/.test(t)) some('trash', 1, .6);
-  else some('meh', 1, .25); // anything else: sometimes one bot goes "?" or "ok"
+  else some('meh', 1, .25);
 }
 
 function openChat() {
   if (chatting || mode !== 'dm' || matchOver) return;
-  chatting = true; for (const k in keys) keys[k] = false; // stop walking/shooting while you type
+  chatting = true; for (const k in keys) keys[k] = false;
   $('chat').classList.add('open'); $('chatIn').value = ''; $('chatIn').focus();
 }
 function closeChat() {
@@ -81,7 +79,7 @@ function closeChat() {
   chatting = false; $('chat').classList.remove('open'); $('chatIn').blur();
 }
 $('chatIn').addEventListener('keydown', e => {
-  e.stopPropagation(); // typing here shouldn't move or shoot
+  e.stopPropagation();
   if (e.code === 'Enter' || e.code === 'NumpadEnter') {
     e.preventDefault();
     const text = $('chatIn').value.replace(/\s+/g, ' ').trim().slice(0, 80);

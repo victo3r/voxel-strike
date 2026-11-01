@@ -1,14 +1,12 @@
-// core: renderer, scene, camera, lights, pixel textures
 const $ = id => document.getElementById(id);
 
-// ---------- renderer / scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); // full-res render; only textures stay pixelated
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 35, 120); // pushed back so the trees and tower outside show
+scene.fog = new THREE.Fog(0x87ceeb, 35, 120);
 const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 200);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
@@ -16,7 +14,6 @@ const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 1.1); scene.add(hemi)
 const sun = new THREE.DirectionalLight(0xffffff, 1.3); sun.position.set(10, 20, 5); scene.add(sun);
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
-// ---------- pixel textures ----------
 function tex(draw, rx = 1, ry = 1) {
   const c = document.createElement('canvas'); c.width = c.height = 16;
   draw(c.getContext('2d'));
@@ -46,4 +43,3 @@ const runShirtTex = tex(g => noise(g, [200, 75, 40], 30));
 const bruteShirtTex = tex(g => noise(g, [70, 45, 85], 25));
 const boomShirtTex = tex(g => noise(g, [185, 200, 55], 30));
 const bossShirtTex = tex(g => noise(g, [110, 20, 20], 25));
-

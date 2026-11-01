@@ -1,7 +1,3 @@
-// armory: buy guns with account coins, upgrade their stars, and pick your loadout (one gun per category).
-// Open it from the lobby, or from the menu during a deathmatch. Changes made mid-match apply right away,
-// but the match keeps going while you're in here.
-// A gun needs your account level to reach its unlock level before you can buy it.
 // Star upgrades cost a share of the gun's own price: UPG[0] for ★★, UPG[1] for ★★★ (so less than buying the gun again).
 const UPG = [.75, .9];
 let armCat = 'primary', armOpen = false;
@@ -9,7 +5,7 @@ const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought yet (starter
 const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
 const inMatch = () => !inLobby && mode === 'dm' && !matchOver;
 
-function gunStats(i) { // short stat line for a card
+function gunStats(i) {
   const w = BASE[i], L = Math.max(0, gunStars(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), mag = Math.round(w.mag * (1 + .25 * L));
   if (w.melee) return `DMG ${dmg} · MELEE`;
   const L2 = Math.max(0, gunStars(i) - 1), rl = +(w.reload * (1 - .15 * L2)).toFixed(1);
@@ -21,7 +17,6 @@ function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">◆ ${prof.coins}</span>`;
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img src="${SPRITES[loadoutGun(c)]}"><span>${label}</span></button>`).join('');
-  // starters first, then by the level they unlock at
   const list = BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
   const eq = loadoutGun(armCat);
   $('armList').innerHTML = list.map(i => {
@@ -39,10 +34,9 @@ function renderArmory() {
   }).join('');
 }
 
-// mid-match, make your hotbar match the armory
 function armSync(i, how) {
   if (!inMatch()) return;
-  if (how === 'buy') giveGun(i); // new gun, full ammo
+  if (how === 'buy') giveGun(i);
   if (how === 'up') { lvl[i] = gunStars(i) - 1; applyLvl(i); if (i === cur) buildGun(); }
   const s = slotOf(i);
   if (slotGun[s] !== loadoutGun(BASE[i].cat)) { slotGun[s] = loadoutGun(BASE[i].cat); if (slotOf(cur) === s) { const g = slotGun[s]; cur = -1; equip(g); } }
@@ -51,7 +45,7 @@ function armSync(i, how) {
 $('armory').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (b.dataset.c) { armCat = b.dataset.c; beep(600, .05); }
-  else if (b.dataset.buy) { // buying a gun also puts it in your loadout
+  else if (b.dataset.buy) {
     const i = +b.dataset.buy, w = BASE[i]; if (prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
     prof.coins -= w.price; prof.guns[w.id] = 1; prof.loadout[w.cat] = w.id; saveProf(); showProf();
     armSync(i, 'buy'); beep(900, .12, 'triangle', .12);
@@ -67,6 +61,6 @@ $('armory').addEventListener('click', e => {
 });
 function openArmory() { armOpen = true; renderArmory(); $('armory').style.display = 'flex'; }
 function closeArmory() { if (!armOpen) return; armOpen = false; $('armory').style.display = 'none'; }
-$('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // from the in-game menu (don't click back into the game)
+$('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // stopPropagation so the click doesn't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => { if (e.code === 'Escape' && armOpen && $('binds').style.display !== 'flex') closeArmory(); });

@@ -1,5 +1,3 @@
-// zombie wave mode: zombies, bosses, shop
-// ---------- zombies ----------
 const zombies = [];
 let wave = 0, toSpawn = 0, spawnT = 0, waveWait = 1.5, kills = 0, coins = 0;
 // hp is a multiplier on the wave's base zombie hp; coins are per kill (headshots add 2 more)
@@ -33,7 +31,7 @@ function makeZombie(x, z, type) {
   g.add(head, body, armL, armR, pivL, pivR); scene.add(g);
   const parts = [head, body, armL, armR, legL, legR], mats = [skin, face, shirt, pants];
   let tankMat = null;
-  if (T.tank) { // red tank on its back that blinks
+  if (T.tank) {
     tankMat = lam({ color: 0xdd2222 });
     const tank = box(.34, .44, .18, tankMat); tank.position.set(0, 1.05, -.24); g.add(tank); parts.push(tank); mats.push(tankMat);
   }
@@ -62,33 +60,33 @@ function spawnZombie(type = pickType()) {
 // by = the deathmatch bot doing the damage, or null if it's you
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
   zz.hp -= dmg;
-  if (zz.type === 'bot') { zz.hitBy = by ?? YOU_T; zz.hitByT = 2; } // bots turn on whoever shoots them
+  if (zz.type === 'bot') { zz.hitBy = by ?? YOU_T; zz.hitByT = 2; }
   if (quiet) burst(point, 0xff7a1a, 2);
   else { zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4); if (!by) setCross('#f44'); }
   if (zz.hp <= 0 && !zz.dead) {
     zz.dead = .0001;
     if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); }
-    if (zz.type === 'bot') botDown(zz, by, head); // deathmatch bot (see modes/deathmatch.js)
+    if (zz.type === 'bot') botDown(zz, by, head);
     else if (zz.type === 'exploder') explode(zz); // shooting one still sets it off, so keep your distance
     else if (zz.type === 'boss') { beep(60, .9, 'sawtooth', .2); banner(`BOSS DOWN!\n+${zz.coins} ◆`); }
     else beep(zz.type === 'brute' ? 110 : 180, .3, 'sawtooth', .12);
   }
 }
-// pierce = special damage that skips armor and hits HP directly (nothing uses it yet). by = the deathmatch bot that shot you
+// pierce = damage that skips armor and hits HP directly. by = the deathmatch bot that shot you
 function hurtPlayer(d, pierce = false, by = null) {
-  if (respawnT > 0 || matchOver) return; // already down in deathmatch
+  if (respawnT > 0 || matchOver) return;
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;
   $('hit').style.background = soak === d ? '#c9ced6' : 'red'; // silver flash = armor took all of it
   $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
-  if (P.hp <= 0 && mode === 'dm') { P.hp = 0; youDown(by); return; } // deathmatch: you respawn instead of the game ending
+  if (P.hp <= 0 && mode === 'dm') { P.hp = 0; youDown(by); return; }
   if (P.hp <= 0 && !dead) { P.hp = 0; dead = true; saveBest(); document.exitPointerLock(); }
 }
 // high score: best wave reached, ties go to more kills. Saved in the browser like your keybinds.
 let best = { wave: 0, kills: 0 }, newBest = false;
 try { best = JSON.parse(localStorage.getItem('voxelstrike-best')) ?? best; } catch {}
 function saveBest() {
-  if (mode !== 'zombies') return; // the best score is for zombie waves only
+  if (mode !== 'zombies') return;
   newBest = wave > best.wave || (wave === best.wave && kills > best.kills);
   if (newBest) { best = { wave, kills }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
   showBest();
@@ -108,7 +106,6 @@ function blast(p, R, zDmg, pDmg, skip) {
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
   if (pd < R && !dead && pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)));
-  // also hurts zombies, which can chain into other exploders
   for (const o of zombies) {
     if (o === skip || o.dead) continue;
     const c = o.g.position.clone().setY(o.scale), od = c.distanceTo(p);
@@ -116,8 +113,6 @@ function blast(p, R, zDmg, pDmg, skip) {
   }
 }
 
-// ---------- shop ----------
-// guns are listed by weapon id; their names come from weapons.js
 const SHOP = [
   { gun: 'shotgun', price: 40, desc: '9 pellets, close range' },
   { gun: 'ar', price: 90, desc: 'full auto, 30 mag' },
@@ -176,4 +171,3 @@ $('next').addEventListener('click', () => {
 });
 function banner(text) { const b = $('banner'); b.textContent = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }
 let crossT = 0; function setCross(c) { $('cross').style.setProperty('--c', c); crossT = .08; }
-

@@ -1,14 +1,10 @@
-// main update loop and HUD
-// ---------- update ----------
 function update(dt) {
-  // deathmatch: while you're dead you can't move or shoot until you respawn
   const down = mode === 'dm' && dmDown(dt);
   const w = WEAPONS[cur];
   if (!down) {
-  // movement
   const mx = held('right') - held('left'), mz = held('back') - held('fwd');
   const lx = held('lookR') - held('lookL'), ly = held('lookU') - held('lookD');
-  if (lx || ly) { // keyboard look, slower when zoomed
+  if (lx || ly) {
     const ls = 2.4 * dt * camera.fov / 75;
     P.yaw -= lx * ls; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ly * ls));
   }
@@ -32,14 +28,12 @@ function update(dt) {
   camera.position.set(P.pos.x, P.pos.y + 1.6, P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
 
-  // weapon
   cd -= dt;
   if (w.auto && held('shoot')) shoot();
   aiming = held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; beep(500, .06); } }
   kick = Math.max(0, kick - dt * 8);
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
-  // aim down sights / scope
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
   const fov = 75 - adsT * (w.scope ? 57 : 20);
   if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -48,7 +42,7 @@ function update(dt) {
   $('cross').style.display = scoped ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
-  if (w.melee) { // knife: quick forward stab with a twist
+  if (w.melee) {
     vm.position.set(.3 - kick * .08, -.28 + bob, -.5 - kick * .2);
     vm.rotation.set(-kick * .9, kick * .5, 0);
   } else {
@@ -56,12 +50,10 @@ function update(dt) {
     vm.rotation.set(kick * .25 + (reloading > 0 ? -.6 : 0), 0, 0);
   }
   if ((crossT -= dt) <= 0) $('cross').style.setProperty('--c', '#fff');
-  } // end of !down
+  }
 
-  // deathmatch: bot respawns, match timer, leaderboard
   if (mode === 'dm') { updateDM(dt); if (matchOver) return; }
 
-  // waves (zombie mode only)
   if (mode === 'zombies' && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = Math.max(.3, 1.5 - wave * .1); }
   if (mode === 'zombies' && toSpawn === 0 && zombies.length === 0) {
     if (wave > 0 && shopWave < wave) {
@@ -80,7 +72,6 @@ function update(dt) {
     }
   }
 
-  // zombies
   for (let i = zombies.length - 1; i >= 0; i--) {
     const z = zombies[i];
     if (z.dead) {
@@ -93,7 +84,7 @@ function update(dt) {
       if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.scale * 1.2), false, true); }
       if (z.dead) continue;
     }
-    if (z.type === 'bot') { updateBot(z, dt); continue; } // bots have their own brain (modes/deathmatch.js)
+    if (z.type === 'bot') { updateBot(z, dt); continue; }
     const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz);
     z.g.rotation.y = Math.atan2(dx, dz);
     // exploders stop, swell and blink when they get close, then blow up. Run!
@@ -112,15 +103,15 @@ function update(dt) {
     let spd = z.speed, hold = false;
     z.glow = 0;
     if (z.type === 'boss') {
-      if (z.stun > 0) { // dazed: wobbles and can't attack
+      if (z.stun > 0) {
         z.stun -= dt; hold = true;
         z.glow = Math.sin(z.stun * 25) > 0 ? 0x555500 : 0;
         z.g.rotation.z = z.stun > 0 ? Math.sin(z.stun * 18) * .12 : 0;
-      } else if (z.wind > 0) { // winding up: stands still, swells, flashes red
+      } else if (z.wind > 0) {
         z.wind -= dt; hold = true;
         z.glow = Math.sin(z.wind * 30) > 0 ? 0xaa0000 : 0x330000;
         z.g.scale.setScalar(z.scale * (1 + (WIND - z.wind) * .1));
-        if (z.wind <= 0) { // lock onto where you are right now and go
+        if (z.wind <= 0) {
           z.charging = CHARGE_T; z.cdx = dx / (dist || 1); z.cdz = dz / (dist || 1); z.hitP = false;
           z.g.scale.setScalar(z.scale); beep(40, .5, 'sawtooth', .25);
         }
@@ -128,7 +119,7 @@ function update(dt) {
         z.charging -= dt; z.glow = 0x660000;
         z.g.rotation.y = Math.atan2(z.cdx, z.cdz);
         const s = CHARGE_SPD * dt, nx = z.g.position.x + z.cdx * s, nz = z.g.position.z + z.cdz * s;
-        if (blocked(nx, nz, z.r, 0)) { // rammed a crate or wall
+        if (blocked(nx, nz, z.r, 0)) {
           z.charging = 0; z.stun = 1.8; beep(90, .35, 'square', .2); burst(z.g.position.clone().setY(1.5), 0xaa8855, 10);
         } else {
           z.g.position.x = nx; z.g.position.z = nz;
@@ -136,7 +127,7 @@ function update(dt) {
           z.pivL.rotation.x = Math.sin(z.t) * .8; z.pivR.rotation.x = -Math.sin(z.t) * .8;
         }
         const pd = Math.hypot(P.pos.x - z.g.position.x, P.pos.z - z.g.position.z);
-        if (!z.hitP && pd < z.reach && P.pos.y < 3.5) { // run you over: big hit + knockback
+        if (!z.hitP && pd < z.reach && P.pos.y < 3.5) {
           z.hitP = true; hurtPlayer(Math.round(z.dmg * 1.5));
           P.kx = z.cdx * 16; P.kz = z.cdz * 16; P.vy = Math.max(P.vy, 6); P.onGround = false;
           beep(60, .3, 'sawtooth', .25);
@@ -165,14 +156,13 @@ function update(dt) {
       z.atk = z.atkRate; hurtPlayer(z.dmg); beep(z.type === 'brute' || z.type === 'boss' ? 70 : 120, .2, 'sawtooth', .15);
     }
     z.flash -= dt;
-    const e = z.flash > 0 ? 0x880000 : z.burn > 0 ? (Math.sin(performance.now() * .03 + i) > 0 ? 0x993300 : 0x441100) : z.glow; // burning ones flicker orange
+    const e = z.flash > 0 ? 0x880000 : z.burn > 0 ? (Math.sin(performance.now() * .03 + i) > 0 ? 0x993300 : 0x441100) : z.glow;
     z.mats.forEach(m => m.emissive.setHex(e));
     if (z.tankMat && z.flash <= 0) z.tankMat.emissive.setHex(Math.sin(performance.now() * .008) > 0 ? 0x771100 : 0);
   }
 
-  MAP.tick?.(dt); // map scenery that moves (forest fireflies and lanterns)
+  MAP.tick?.(dt);
 
-  // pickups: spin and bob, grab by walking over them
   const now = performance.now();
   for (const p of pads) {
     if (!p.item) { if ((p.t -= dt) <= 0) spawnPickup(p); continue; }
@@ -180,7 +170,6 @@ function update(dt) {
     if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 1 && P.pos.y < 1.5 && !down && usePickup(p.type)) { clearPad(p); p.t = RESPAWN + Math.random() * 10; }
   }
 
-  // explosion fireballs
   for (let i = booms.length - 1; i >= 0; i--) {
     const b = booms[i]; b.t += dt;
     b.m.scale.setScalar(.5 + b.t * 12 * b.R / BLAST); b.m.material.opacity = Math.max(0, .9 * (1 - b.t / .3));
@@ -201,9 +190,8 @@ function update(dt) {
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, 0x888888, 1); }
   }
 
-  updateFlares(dt); // flare gun shots (combat.js)
+  updateFlares(dt);
 
-  // flamethrower fire: drifts up and grows as it burns out
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;
     f.m.position.addScaledVector(f.v, dt); f.v.y += 2 * dt;
@@ -211,18 +199,15 @@ function update(dt) {
     if (f.life <= 0) { scene.remove(f.m); flames.splice(i, 1); }
   }
 
-  // boss health bar
   const boss = zombies.find(z => z.type === 'boss' && !z.dead);
   $('bossbar').style.display = boss ? 'block' : 'none';
   if (boss) $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
 
-  // particles
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.life -= dt; p.v.y -= 15 * dt; p.m.position.addScaledVector(p.v, dt);
     if (p.life <= 0 || p.m.position.y < 0) { scene.remove(p.m); parts.splice(i, 1); }
   }
 
-  // HUD
   $('hp').textContent = `♥ ${P.hp}`;
   $('arm').textContent = P.maxArmor ? `⛨ ${P.armor}` : '';
   const spare = reserve[cur] === Infinity ? '∞' : reserve[cur];
@@ -235,7 +220,7 @@ const clock = new THREE.Clock();
 (function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), .05);
-  if (inLobby) { updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; } // lobby has its own scene
+  if (inLobby) { updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; }
   // the game keeps running while the menu is open (it isn't a pause). Only the zombie-waves shop and death screen stop it,
   // and with the mouse unlocked your keys are released, so you just stand there
   if (!dead && !shopOpen && !matchOver) update(dt);

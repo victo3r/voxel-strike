@@ -1,5 +1,3 @@
-// keybinds and input
-// ---------- keybinds ----------
 // every action has two slots; codes are keyboard e.code values, 'Mouse0'-'Mouse4', or 'WheelUp'/'WheelDown'
 const ACTIONS = [
   ['fwd', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'], ['jump', 'Jump'],
@@ -32,7 +30,7 @@ function nice(code) {
 function renderHelp() {
   const b = a => binds[a].filter(Boolean).map(nice).join('/') || '—';
   $('help').textContent = `${b('fwd')}${b('left')}${b('back')}${b('right')} move · ${b('jump')} jump · ${b('shoot')} shoot · ${b('aim')} aim/scope · ${b('reload')} reload · ${b('lookL')}${b('lookR')}${b('lookU')}${b('lookD')} look · ${[1, 2, 3, 4, 5, 6].map(n => b('slot' + n)).join('')} or ${b('next')}/${b('prev')} switch weapons${mode === 'zombies' ? ' (press a slot again to flip between guns you bought in it)' : ''} · hold ${b('board')} leaderboard (deathmatch)`;
-  renderHotbar(); // slot key labels follow your binds
+  renderHotbar();
 }
 let rebinding = null; // { a: action, s: slot }
 function renderBinds() {
@@ -57,12 +55,10 @@ $('ctrlBtn').addEventListener('click', e => { e.stopPropagation(); rebinding = n
 $('bindDone').addEventListener('click', () => { rebinding = null; $('binds').style.display = 'none'; });
 $('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); renderHelp(); renderBinds(); });
 renderHelp();
-// ways out of the controls menu: the ✕ button, or Esc when you're not in the middle of setting a key
 const closeBinds = () => { rebinding = null; $('binds').style.display = 'none'; };
 $('bindX').addEventListener('click', closeBinds);
 addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && $('binds').style.display === 'flex') closeBinds(); });
 
-// ---------- input ----------
 function press(code) { // one-shot actions fire on the press, held actions are read every frame in update()
   if (!locked || chatting) return;
   if (isBind('chat', code)) { openChat(); if (chatting) return; }
@@ -78,7 +74,7 @@ addEventListener('keydown', e => {
     assign(e.code === 'Escape' ? null : (e.code === 'Backspace' || e.code === 'Delete') ? '' : e.code);
     return;
   }
-  if (chatting) return; // the chat box handles its own keys (js/chat.js)
+  if (chatting) return;
   if (locked && (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab' || isBind('chat', e.code))) e.preventDefault(); // so the T doesn't get typed into chat
   if (e.target.tagName === 'INPUT') return; // typing your name in the lobby
   if (e.repeat) return;
@@ -118,24 +114,22 @@ document.addEventListener('pointerlockchange', () => {
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
   if (locked) closeArmory();
   if (!locked) {
-    // the menu doesn't pause anything: the match keeps going behind it, so you can still get shot while you're in here
+    // the menu doesn't pause: the match keeps running behind it
     for (const k in keys) keys[k] = false;
     $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}You died on wave ${wave} with ${kills} kills.` : '';
     $('go').textContent = dead ? '[ CLICK TO TRY AGAIN ]' : '[ CLICK TO GO BACK IN ]';
     $('armBtn').style.display = mode === 'dm' ? '' : 'none'; // zombie waves has its own shop between waves
-    renderHelp(); // the slot-flip tip only shows in zombie waves
+    renderHelp();
   }
 });
 // if the browser refuses to re-lock the mouse, show the menu so you can click back in
 document.addEventListener('pointerlockerror', () => { if (!shopOpen && !inLobby && !matchOver) { $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex'; } });
 
-// ---------- lobby ----------
-// PLAY starts a fresh game in the arena. LOBBY (from the pause or death screen) ends the game and goes back.
 function showLobby(on) {
   inLobby = on;
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
-  vm.visible = !on; // hide the gun in your hands while the lobby camera spins
+  vm.visible = !on;
   if (on) { $('menu').style.display = 'none'; camera.fov = 75; camera.updateProjectionMatrix(); }
 }
 $('playBtn').addEventListener('click', () => {
@@ -143,18 +137,17 @@ $('playBtn').addEventListener('click', () => {
   renderer.domElement.requestPointerLock()?.catch?.(() => {});
 });
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); showLobby(true); });
-$('modes').addEventListener('click', e => { // pick a mode; PLAY starts whichever one is highlighted
+$('modes').addEventListener('click', e => {
   const b = e.target.closest('.mode'); if (!b || b.disabled) return;
   document.querySelectorAll('.mode').forEach(m => m.classList.toggle('sel', m === b));
   mode = b.dataset.mode; beep(600, .05);
 });
-// pick a map; it remembers your choice for next time
 const markMap = () => document.querySelectorAll('.map').forEach(m => m.classList.toggle('sel', m.dataset.map === mapId));
 if (!MAPS[mapId]) mapId = 'yard';
 markMap();
 $('maps').addEventListener('click', e => {
   const b = e.target.closest('.map'); if (!b) return;
-  mapId = b.dataset.map; localStorage.setItem('pg_map', mapId); markMap(); beep(600, .05);
+  mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId); markMap(); beep(600, .05);
 });
 // your name: saves when you click away or press Enter. Blank goes back to the old one. 🎲 rolls a random one.
 $('nameIn').value = myName;
@@ -174,12 +167,11 @@ function restart() {
   flames.forEach(f => scene.remove(f.m)); flames.length = 0;
   flares.forEach(f => scene.remove(f.m)); flares.length = 0;
   parts.forEach(p => scene.remove(p.m)); parts.length = 0;
-  useMap(mapId); setupPads(); // load the map you picked in the lobby
+  useMap(mapId); setupPads();
   Object.assign(P, { vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, kx: 0, kz: 0 }); P.pos.set(0, 0, 0);
   wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = '';
   WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); reloading = 0; newBest = false;
   emptyPads();
   cur = gi('voxel'); resetSlots(); buildGun(); renderHotbar();
-  setupMode(); // deathmatch loadout, pause-menu tips (modes/deathmatch.js)
+  setupMode();
 }
-

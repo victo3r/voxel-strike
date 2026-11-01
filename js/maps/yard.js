@@ -1,4 +1,3 @@
-// map: the yard (small map) - ground, fence, tower, trees
 startMap('yard', {
   name: 'The Yard', size: 'small', half: 24,
   env: { sky: 0x87ceeb, fog: 0x87ceeb, fogNear: 35, fogFar: 120, hemiSky: 0xffffff, hemiGround: 0x556633, hemi: 1.1, sunColor: 0xffffff, sun: 1.3 },
@@ -14,7 +13,6 @@ addGround(G, lam({ map: tex(g => noise(g, [90, 160, 60], 40), G * 2, G * 2) }));
 addWall(0, -YA, YA * 2 + .3, .3); addWall(0, YA, YA * 2 + .3, .3);
 addWall(-YA, 0, .3, YA * 2 + .3); addWall(YA, 0, .3, YA * 2 + .3);
 
-// ---------- fence: see-through chain-link with barbed wire on top, gate on the north side ----------
 const FH = 2.6, GATE = 2.2; // chain-link height (barbed wire sits above it), half-width of the gate gap
 const metal = lam({ color: 0x8a9099 }), darkMetal = lam({ color: 0x4a4f55 });
 const chainMat = (rx, ry) => seeThru(tex(g => { g.fillStyle = '#b4bcc4'; for (let i = 0; i < 16; i++) { g.fillRect(i, i, 1, 1); g.fillRect(15 - i, i, 1, 1); } }, rx, ry));
@@ -24,7 +22,7 @@ const barbMat = rx => seeThru(tex(g => {
 }, rx, 1));
 const postSpots = [];
 function flat(geo, mat, x, y, z, ry) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; add(m); return m; }
-function fenceRun(x1, z1, x2, z2, chain = true) { // one straight stretch of fence from (x1,z1) to (x2,z2)
+function fenceRun(x1, z1, x2, z2, chain = true) {
   const len = Math.hypot(x2 - x1, z2 - z1), cx = (x1 + x2) / 2, cz = (z1 + z2) / 2, ry = Math.atan2(-(z2 - z1), x2 - x1);
   flat(new THREE.PlaneGeometry(len, .9), barbMat(len), cx, FH + .55, cz, ry);
   if (!chain) return;
@@ -37,7 +35,6 @@ fenceRun(-YA, -YA, -GATE, -YA); fenceRun(GATE, -YA, YA, -YA); fenceRun(-GATE, -Y
 const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(.14, FH + 1.05, .14), metal, postSpots.length);
 postSpots.forEach(([x, z], i) => { dummy.position.set(x, (FH + 1.05) / 2, z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); posts.setMatrixAt(i, dummy.matrix); });
 add(posts);
-// gate: two closed leaves with a chain and padlock on the outside
 for (const s of [-1, 1]) { const gp = box(.24, FH + 1.2, .24, darkMetal); gp.position.set(s * GATE, (FH + 1.2) / 2, -YA); add(gp); }
 function gateLeaf(x0, x1) {
   const w = Math.abs(x1 - x0), cx = (x0 + x1) / 2, y0 = .12, h = FH - .2, cy = y0 + h / 2, z = -YA;
@@ -50,11 +47,9 @@ gateLeaf(-GATE + .15, -.05); gateLeaf(.05, GATE - .15);
 const lockMat = lam({ color: 0x9a9a9a, emissive: 0x111111 });
 for (const [x, y] of [[-.12, 1.42], [.12, 1.42], [0, 1.5]]) { const c = box(.14, .05, .05, darkMetal); c.position.set(x, y, -YA - .07); add(c); }
 const lock = box(.16, .2, .08, lockMat); lock.position.set(0, 1.3, -YA - .1); add(lock);
-// dirt road leading away from the gate
 const dirt = new THREE.MeshLambertMaterial({ map: tex(g => noise(g, [135, 105, 70], 30), 3, (G - YA) / 1.5), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 const road = new THREE.Mesh(new THREE.PlaneGeometry(4.5, G - YA), dirt); road.rotation.x = -Math.PI / 2; road.position.set(0, .02, -YA - (G - YA) / 2); add(road);
 
-// ---------- guard tower outside the north-east corner ----------
 const wood = lam({ map: tex(g => { noise(g, [115, 82, 50], 25); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 5, 16, 1); g.fillRect(0, 11, 16, 1); }) });
 const TX = YA + 5, TZ = -YA - 5, TH = 7; // tower spot and platform height
 const tower = new THREE.Group(); tower.position.set(TX, 0, TZ); add(tower);
@@ -65,18 +60,17 @@ for (const yc of [1.8, 5.2]) for (const s of [-1.4, 1.4]) for (const d of [-1, 1
   tw(.14, brLen, .14, 0, yc, s).rotation.z = brA * d; // X braces on the north/south faces
   tw(.14, brLen, .14, s, yc, 0).rotation.x = brA * d; // and the east/west faces
 }
-tw(3.8, .3, 3.8, 0, TH + .15, 0); // platform floor
-for (const s of [-1.84, 1.84]) { tw(3.8, .9, .12, 0, TH + .75, s); tw(.12, .9, 3.8, s, TH + .75, 0); } // railing walls
+tw(3.8, .3, 3.8, 0, TH + .15, 0);
+for (const s of [-1.84, 1.84]) { tw(3.8, .9, .12, 0, TH + .75, s); tw(.12, .9, 3.8, s, TH + .75, 0); }
 const roof = new THREE.Mesh(new THREE.ConeGeometry(3.1, 1.4, 4), lam({ map: tex(g => noise(g, [120, 45, 35], 25)) }));
 roof.rotation.y = Math.PI / 4; roof.position.set(0, TH + 3.3, 0); tower.add(roof);
-for (const s of [-.35, .35]) tw(.1, TH + .3, .1, 1.75, (TH + .3) / 2, s); // ladder on the outside face
+for (const s of [-.35, .35]) tw(.1, TH + .3, .1, 1.75, (TH + .3) / 2, s);
 for (let y = .4; y < TH; y += .5) tw(.08, .08, .8, 1.75, y, 0);
 const lamp = new THREE.Group(); lamp.rotation.order = 'YXZ'; lamp.position.set(-1.25, TH + 1.35, 1.25);
-lamp.rotation.set(.3, Math.atan2(-TX, -TZ), 0); tower.add(lamp); // searchlight aimed at the yard
+lamp.rotation.set(.3, Math.atan2(-TX, -TZ), 0); tower.add(lamp);
 const lampBody = box(.45, .4, .55, darkMetal), lens = box(.36, .3, .05, new THREE.MeshBasicMaterial({ color: 0xfff2a8 }));
 lens.position.z = .29; lamp.add(lampBody, lens);
 
-// ---------- trees, bushes and tall grass outside the fence (same layout every game) ----------
 const rnd = seeded(1337);
 // gap = how far outside the fence it must be, r = how much room it needs (keeps things off the road and the tower)
 const clear = (x, z, gap, r) => Math.max(Math.abs(x), Math.abs(z)) > YA + gap && !(Math.abs(x) < 2.3 + r && z < -YA) && Math.hypot(x - TX, z - TZ) > 2.8 + r;
