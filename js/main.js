@@ -236,6 +236,8 @@ const clock = new THREE.Clock();
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), .05);
   if (inLobby) { updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; } // lobby has its own scene
-  if (locked && !dead) update(dt);
+  // the game keeps running while the menu is open (it isn't a pause). Only the zombie-waves shop and death screen stop it,
+  // and with the mouse unlocked your keys are released, so you just stand there
+  if (!dead && !shopOpen && !matchOver) update(dt);
   renderer.render(scene, camera);
 })();

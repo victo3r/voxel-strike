@@ -344,7 +344,7 @@ function updateDM(dt) {
 }
 // time's up: post-game screen with the final leaderboard and what you earned
 function endMatch() {
-  matchOver = true; closeChat(); $('board').style.display = 'none'; $('banner').style.opacity = 0;
+  matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('banner').style.opacity = 0;
   const place = ranked().indexOf(youRec) + 1;
   $('postPlace').textContent = place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
   $('postBoard').innerHTML = boardHTML();
@@ -359,6 +359,12 @@ function endMatch() {
 $('againBtn').addEventListener('click', () => { restart(); renderer.domElement.requestPointerLock()?.catch?.(() => {}); });
 $('postLobby').addEventListener('click', () => { restart(); showLobby(true); });
 
+// deathmatch: a gun from your account, with its saved stars (prof.guns: id -> stars 1-3) and full ammo
+function giveGun(g) {
+  const st = prof.guns[BASE[g].id];
+  lvl[g] = st ? Math.min(2, st - 1) : 0; applyLvl(g);
+  owned[g] = true; ammo[g] = WEAPONS[g].mag; reserve[g] = resMax(g);
+}
 // called at the end of restart(): sets up whichever mode you picked in the lobby
 function setupMode() {
   matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = '';
@@ -366,17 +372,11 @@ function setupMode() {
   $('post').style.display = 'none'; $('board').style.display = 'none'; $('banner').style.opacity = 0; // clears "KILLED BY" if you left while dead
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
   $('chat').style.display = mode === 'dm' ? '' : 'none'; // nobody to talk to in zombie waves
-  if (mode === 'dm') { // every starter weapon, plus any unlockable guns saved on your account (prof.guns: id -> stars 1-3)
+  if (mode === 'dm') { // your loadout from the armory: one gun per category, the others stay out of your hotbar
     makeRecs(); matchT = MATCH_T;
-    BASE.forEach((w, g) => {
-      const st = prof.guns[w.id];
-      if (!w.start && !st) return;
-      if (st) { lvl[g] = Math.min(2, st - 1); applyLvl(g); ammo[g] = WEAPONS[g].mag; }
-      owned[g] = true; reserve[g] = resMax(g);
-      if (slotGun[slotOf(g)] < 0) slotGun[slotOf(g)] = g; // first one in each category goes in the slot
-    });
-    slotGun[slotOf(gi('ar'))] = gi('ar'); // assault rifle in hand to start; press the primary key again for the shotgun
-    cur = gi('ar'); buildGun(); renderHotbar();
+    BASE.forEach((w, g) => { if (hasGun(g)) giveGun(g); });
+    CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
+    cur = slotGun[0]; buildGun(); renderHotbar(); // start holding your primary
   }
   const tab = binds.board.filter(Boolean).map(nice).join('/') || 'the scoreboard key';
   const tips = mode === 'dm'

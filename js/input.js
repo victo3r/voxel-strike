@@ -5,7 +5,7 @@ const ACTIONS = [
   ['fwd', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'], ['jump', 'Jump'],
   ['shoot', 'Shoot'], ['aim', 'Aim / scope'], ['reload', 'Reload'], ['next', 'Next gun'], ['prev', 'Previous gun'],
   ['lookL', 'Look left'], ['lookR', 'Look right'], ['lookU', 'Look up'], ['lookD', 'Look down'],
-  ['slot1', 'Primary slot'], ['slot2', 'Backup slot'], ['slot3', 'Melee slot'], ['slot4', 'Special slot'], ['slot5', 'Sniper slot'], ['slot6', 'Heavy slot'],
+  ['slot1', 'Primary slot'], ['slot2', 'Backup slot'], ['slot3', 'Melee slot'], ['slot4', 'Special slot'], ['slot5', 'Sniper slot'], ['slot6', 'Premium slot'],
   ['board', 'Leaderboard (hold)'], ['chat', 'Chat'],
 ];
 const DEFAULT_BINDS = {
@@ -31,7 +31,7 @@ function nice(code) {
 }
 function renderHelp() {
   const b = a => binds[a].filter(Boolean).map(nice).join('/') || '—';
-  $('help').textContent = `${b('fwd')}${b('left')}${b('back')}${b('right')} move · ${b('jump')} jump · ${b('shoot')} shoot · ${b('aim')} aim/scope · ${b('reload')} reload · ${b('lookL')}${b('lookR')}${b('lookU')}${b('lookD')} look · ${[1, 2, 3, 4, 5, 6].map(n => b('slot' + n)).join('')} or ${b('next')}/${b('prev')} switch weapons (press a slot again to flip between guns in it) · hold ${b('board')} leaderboard (deathmatch)`;
+  $('help').textContent = `${b('fwd')}${b('left')}${b('back')}${b('right')} move · ${b('jump')} jump · ${b('shoot')} shoot · ${b('aim')} aim/scope · ${b('reload')} reload · ${b('lookL')}${b('lookR')}${b('lookU')}${b('lookD')} look · ${[1, 2, 3, 4, 5, 6].map(n => b('slot' + n)).join('')} or ${b('next')}/${b('prev')} switch weapons${mode === 'zombies' ? ' (press a slot again to flip between guns you bought in it)' : ''} · hold ${b('board')} leaderboard (deathmatch)`;
   renderHotbar(); // slot key labels follow your binds
 }
 let rebinding = null; // { a: action, s: slot }
@@ -116,11 +116,14 @@ document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
   $('menu').style.display = locked || shopOpen || inLobby || matchOver ? 'none' : 'flex';
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
+  if (locked) closeArmory();
   if (!locked) {
+    // the menu doesn't pause anything: the match keeps going behind it, so you can still get shot while you're in here
     for (const k in keys) keys[k] = false;
-    $('msg').textContent = !dead ? 'Paused'
-      : `${newBest ? 'NEW BEST! ' : ''}You died on wave ${wave} with ${kills} kills.`;
-    $('go').textContent = dead ? '[ CLICK TO TRY AGAIN ]' : '[ CLICK TO RESUME ]';
+    $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}You died on wave ${wave} with ${kills} kills.` : '';
+    $('go').textContent = dead ? '[ CLICK TO TRY AGAIN ]' : '[ CLICK TO GO BACK IN ]';
+    $('armBtn').style.display = mode === 'dm' ? '' : 'none'; // zombie waves has its own shop between waves
+    renderHelp(); // the slot-flip tip only shows in zombie waves
   }
 });
 // if the browser refuses to re-lock the mouse, show the menu so you can click back in
@@ -174,7 +177,7 @@ function restart() {
   useMap(mapId); setupPads(); // load the map you picked in the lobby
   Object.assign(P, { vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, kx: 0, kz: 0 }); P.pos.set(0, 0, 0);
   wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = '';
-  WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.inf; reserve[i] = w.inf ? Infinity : 0; }); reloading = 0; newBest = false;
+  WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); reloading = 0; newBest = false;
   emptyPads();
   cur = gi('voxel'); resetSlots(); buildGun(); renderHotbar();
   setupMode(); // deathmatch loadout, pause-menu tips (modes/deathmatch.js)
