@@ -46,17 +46,8 @@ const BOT_GUNS = {
   eradicator: [6, 12],
 };
 
-const SKIN_C = [214, 163, 124];
-const botSkinT = tex(g => noise(g, SKIN_C, 14));
-const botHairT = tex(g => noise(g, [62, 42, 26], 20));
-const botSideT = tex(g => { noise(g, SKIN_C, 14); g.fillStyle = '#3e2a1a'; g.fillRect(0, 0, 16, 5); });
-const botFaceT = tex(g => {
-  noise(g, SKIN_C, 14); g.fillStyle = '#3e2a1a'; g.fillRect(0, 0, 16, 4); g.fillRect(0, 4, 2, 2); g.fillRect(14, 4, 2, 2);
-  g.fillStyle = '#fff'; g.fillRect(3, 7, 3, 2); g.fillRect(10, 7, 3, 2);
-  g.fillStyle = '#222'; g.fillRect(5, 7, 1, 2); g.fillRect(10, 7, 1, 2);
-  g.fillStyle = '#b06a50'; g.fillRect(7, 10, 2, 1); g.fillStyle = '#8a4a3a'; g.fillRect(5, 12, 6, 1);
-});
-const BOT_LOOKS = [ // shirt color, name color (used on the tag, leaderboard and kill feed)
+const BOT_U = 1.85 / 32; // one skin pixel on a bot: 32 pixels tall = 1.85, same height as you
+const BOT_LOOKS = [ // shirt color, name color (used on the tag, leaderboard and kill feed). The rest of the look comes from the name
   { shirt: [185, 40, 40], css: '#ff6a6a' },
   { shirt: [205, 120, 30], css: '#ffa94a' },
   { shirt: [120, 55, 175], css: '#c08aff' },
@@ -65,7 +56,6 @@ const BOT_LOOKS = [ // shirt color, name color (used on the tag, leaderboard and
   { shirt: [30, 150, 150], css: '#5fe0d8' },
   { shirt: [200, 190, 50], css: '#f0e45a' },
 ];
-const shirtTs = BOT_LOOKS.map(l => tex(g => { noise(g, l.shirt, 26); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 15, 16, 1); }));
 const TAG_FONT = 'bold 13px monospace';
 function tagMat(name, css) { // name tag floating over its head, as wide as the name needs. Returns { mat, w } (w in world units)
   const c = document.createElement('canvas'), g = c.getContext('2d');
@@ -93,7 +83,8 @@ function makeRecs() {
 }
 function joinBot(j) {
   const n = j.i % BOT_LOOKS.length, look = BOT_LOOKS[n], tag = tagMat(j.name, look.css);
-  const r = { name: j.name, lang: j.lang, quiet: !!j.quiet, css: look.css, look: n, tag: tag.mat, tagW: tag.w,
+  const [sr, sg, sb] = look.shirt;
+  const r = { name: j.name, lang: j.lang, quiet: !!j.quiet, css: look.css, look: randomLook(j.name, sr << 16 | sg << 8 | sb), tag: tag.mat, tagW: tag.w,
     score: 0, kills: 0, deaths: 0, streak: 0, b: null, wait: .5 };
   recs.push(r);
   if (MATCH_T - matchT > 1) { feed(`${nameTag(r)} joined`); sfx('join'); } // no message for the one that starts with you
@@ -145,22 +136,20 @@ function spawnSpot(skip) {
 function makeBot(rec) {
   const [x, z] = spawnSpot();
   const keys = Object.keys(BOT_GUNS), gun = gi(keys[Math.random() * keys.length | 0]), W = BASE[gun];
-  const skin = lam({ map: botSkinT }), side = lam({ map: botSideT }), face = lam({ map: botFaceT }), hair = lam({ map: botHairT });
-  const shirt = lam({ map: shirtTs[rec.look] }), pants = lam({ map: pantsTex });
-  const g = new THREE.Group(); g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
-  const head = box(.5, .5, .5, [side, side, hair, skin, face, hair]); head.position.y = 1.6; head.userData.head = true;
-  const body = box(.5, .7, .3, shirt); body.position.y = 1.0;
-  const armL = box(.18, .18, .65, skin); armL.position.set(-.34, 1.25, .25);
-  const armR = box(.18, .18, .65, skin); armR.position.set(.34, 1.25, .25);
-  const mkLeg = sx => { const piv = new THREE.Group(); piv.position.set(sx, .65, 0); const l = box(.22, .65, .25, pants); l.position.y = -.325; piv.add(l); return [piv, l]; };
-  const [pivL, legL] = mkLeg(-.13), [pivR, legR] = mkLeg(.13);
-  const gunM = box(.09, .13, W.len, lam({ color: W.color })); gunM.position.set(.16, 1.33, .42 + W.len / 2);
-  const flashM = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 })); flashM.position.set(.16, 1.33, .47 + W.len); flashM.visible = false;
+  const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U;
+  g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
+  // both arms forward holding the gun, swung up and down with the aim from the shoulders
+  const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
+  for (const a of [ch.armR, ch.armL]) { aim.add(a); a.position.y = 0; }
+  ch.armR.rotation.set(-Math.PI / 2, 0, .2); ch.armL.rotation.set(-Math.PI / 2, 0, -.85);
+  const gunM = box(.09, .13, W.len, lam({ color: W.color })); gunM.position.set(-4 * u, -1.5 * u, 9 * u + W.len / 2);
+  const flashM = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 })); flashM.position.set(-4 * u, -1.5 * u, 9 * u + W.len + .05); flashM.visible = false;
+  aim.add(gunM, flashM);
   const tag = new THREE.Sprite(rec.tag); tag.scale.set(rec.tagW, .25, 1); tag.position.y = 2.25;
-  g.add(head, body, armL, armR, pivL, pivR, gunM, flashM, tag); scene.add(g);
+  g.add(tag); scene.add(g);
   const yaw = Math.atan2(-x, -z);
   g.rotation.y = yaw;
-  const b = { g, head, flashM, tag, pivL, pivR, parts: [head, body, armL, armR, legL, legR], mats: [skin, side, face, hair, shirt, pants], rec,
+  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, flashM, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun, ammo: W.mag, reload: 0, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0 };
@@ -285,7 +274,7 @@ function updateBot(b, dt) {
   const wantYaw = Math.atan2(tx, tz), wantPitch = Math.atan2(tp.y + 1.1 - 1.6, Math.hypot(tx, tz)), k = Math.min(1, dt * BOT.turn);
   b.aimYaw += Math.atan2(Math.sin(wantYaw - b.aimYaw), Math.cos(wantYaw - b.aimYaw)) * k;
   b.aimPitch += (wantPitch - b.aimPitch) * k;
-  b.g.rotation.y = b.aimYaw; b.head.rotation.x = -b.aimPitch;
+  b.g.rotation.y = b.aimYaw; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
   b.cd -= dt; b.muzzle -= dt; b.flashM.visible = b.muzzle > 0;
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;

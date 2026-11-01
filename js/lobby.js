@@ -131,45 +131,23 @@ for (let i = 0; i < 45; i++) {
   lobbyScene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: .8 })));
 }
 
-const SK = [214, 163, 124], HAIR = [74, 48, 28], SHIRT = [28, 158, 152], PANTS = [44, 62, 128], SHOE = [58, 58, 64];
-const n = () => (Math.random() - .5) * 18;
-const headFront = () => pixMat(8, 8, g => {
-  fillN(g, 8, 8, SK, 10);
-  for (let x = 0; x < 8; x++) { dot(g, rgb(HAIR, n()), x, 0); dot(g, rgb(HAIR, n()), x, 1); }
-  dot(g, rgb(HAIR, n()), 0, 2); dot(g, rgb(HAIR, n()), 7, 2); dot(g, rgb(HAIR, n()), 1, 2);
-  dot(g, rgb(HAIR, 12), 1, 3, 2, 1); dot(g, rgb(HAIR, 12), 5, 3, 2, 1); // eyebrows
-  dot(g, '#fff', 1, 4); dot(g, '#2d5fa8', 2, 4); dot(g, '#2d5fa8', 5, 4); dot(g, '#fff', 6, 4); // eyes
-  dot(g, rgb(SK, -24), 3, 5, 2, 1); // nose
-  dot(g, '#9a5a48', 2, 6, 4, 1); // mouth
-});
-const headSide = frontLeft => pixMat(8, 8, g => { // frontLeft: which edge of the texture faces forward
-  fillN(g, 8, 8, SK, 10);
-  const X = i => frontLeft ? i : 7 - i;
-  for (let i = 0; i < 8; i++) { dot(g, rgb(HAIR, n()), X(i), 0); dot(g, rgb(HAIR, n()), X(i), 1); }
-  for (let i = 4; i < 8; i++) for (let y = 2; y < (i > 5 ? 7 : 5); y++) dot(g, rgb(HAIR, n()), X(i), y);
-  dot(g, rgb(SK, -28), X(3), 4, 1, 2); // ear
-});
-const hairAll = pixMat(8, 8, g => fillN(g, 8, 8, HAIR, 18));
-const headMats = [headSide(true), headSide(false), hairAll, pixMat(8, 8, g => fillN(g, 8, 8, SK, 10)), headFront(), hairAll];
-const shirtSide = (w, h, front) => pixMat(w, h, g => {
-  fillN(g, w, h, SHIRT, 22); dot(g, rgb(SHIRT, -30), 0, h - 1, w, 1); // darker hem
-  if (front) { dot(g, rgb(SK), 2, 0, 4, 1); dot(g, rgb(SK), 3, 1, 2, 1); dot(g, '#ffd23f', 5, 3, 2, 2); dot(g, '#b8901f', 6, 4); } // v-neck + gold badge
-});
-const bodyMats = [shirtSide(4, 12), shirtSide(4, 12), shirtSide(8, 4), pixMat(8, 4, g => fillN(g, 8, 4, PANTS, 18)), shirtSide(8, 12, true), shirtSide(8, 12)];
-const armSide = pixMat(4, 12, g => { fillN(g, 4, 12, SK, 10); fillN(g, 4, 3, SHIRT, 22); dot(g, rgb(SHIRT, -30), 0, 3, 4, 1); });
-const armMats = [armSide, armSide, pixMat(4, 4, g => fillN(g, 4, 4, SHIRT, 22)), pixMat(4, 4, g => fillN(g, 4, 4, SK, 14)), armSide, armSide];
-const legSide = pixMat(4, 12, g => { fillN(g, 4, 12, PANTS, 18); for (let x = 0; x < 4; x++) { dot(g, rgb(SHOE, n()), x, 10); dot(g, rgb(SHOE, n()), x, 11); } });
-const legMats = [legSide, legSide, pixMat(4, 4, g => fillN(g, 4, 4, PANTS, 18)), pixMat(4, 4, g => fillN(g, 4, 4, SHOE, 14)), legSide, legSide];
-
-const U = 1 / 16; // one skin pixel
-const part = (w, h, d, mats) => new THREE.Mesh(new THREE.BoxGeometry(w * U, h * U, d * U), mats);
+// your character, built from your saved look (js/character.js). ◀ ▶ under it flips through the presets
+let lookI = Math.max(0, PRESETS.findIndex(p => JSON.stringify(p.look) === JSON.stringify(prof.look)));
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
-const torso = part(8, 12, 4, bodyMats); torso.position.y = 18 * U; hero.add(torso);
-const headPiv = new THREE.Group(); headPiv.position.y = 24 * U; hero.add(headPiv);
-const heroHead = part(8, 8, 8, headMats); heroHead.position.y = 4 * U; headPiv.add(heroHead);
-const limb = (x, y, mats, dy) => { const p = new THREE.Group(); p.position.set(x * U, y * U, 0); const m = part(4, 12, 4, mats); m.position.y = dy * U; p.add(m); hero.add(p); return p; };
-const armL = limb(-6, 22, armMats, -4), armR = limb(6, 22, armMats, -4); // armL = your right arm (on the left of the screen)
-limb(-2, 12, legMats, -6); limb(2, 12, legMats, -6);
+let torso, headPiv, armL, armR; // armL = the arm on the left of the screen when it faces you
+function dressHero() {
+  hero.clear();
+  const ch = buildChar(prof.look ?? PRESETS[lookI].look, 1 / 16);
+  hero.add(ch.g); torso = ch.body; headPiv = ch.headPiv; armL = ch.armR; armR = ch.armL;
+  $('lookName').textContent = PRESETS[lookI].name;
+}
+function pickLook(step) {
+  lookI = (lookI + step + PRESETS.length) % PRESETS.length;
+  prof.look = PRESETS[lookI].look; saveProf(); dressHero(); sfx('ui');
+}
+$('lookPrev').onclick = () => pickLook(-1); $('lookNext').onclick = () => pickLook(1);
+$('lookPick').addEventListener('pointerdown', e => e.stopPropagation()); // clicking the arrows shouldn't start spinning him
+dressHero();
 
 const REST = .45; // default 3/4 view
 let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, mNX = 0, mNY = 0;

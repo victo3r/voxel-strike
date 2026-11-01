@@ -150,6 +150,10 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #lobbyBtns button:hover{background:#5a3f22}
 #stage{flex:1;position:relative;cursor:grab;touch-action:none}
 #stage:active{cursor:grabbing}
+#lookPick{position:absolute;left:50%;bottom:3%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;cursor:default}
+#lookPick button{font:bold 18px monospace;width:40px;height:36px;background:rgba(18,48,54,.85);color:#fff;border:3px solid #2a5a60;cursor:pointer;box-shadow:3px 3px 0 #000}
+#lookPick button:hover{border-color:#ffd23f}
+#lookName{min-width:120px;text-align:center;font:bold 16px monospace;letter-spacing:2px;color:#fff;text-shadow:2px 2px 0 #000}
 @media (max-width:700px){
   #lobby{flex-direction:column}#stage{order:-1;flex:none;height:40vh}
   #lobbyPanel{width:100%;flex:1;background:rgba(3,16,22,.9);padding:12px 16px}
