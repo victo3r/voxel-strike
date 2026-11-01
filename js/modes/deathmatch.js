@@ -4,7 +4,7 @@
 // lead = how far ahead of a moving target it aims. aimErr = random wobble on each shot, in radians.
 // dmgMul = bot guns do this much of their normal damage (to you and to other bots).
 // moveErr = extra wobble when the target is running (at full speed), so strafing really does make it miss more.
-const BOT = { hp: 100, speed: 5, react: .45, turn: 8, lead: .05, aimErr: .025, moveErr: .045, dmgMul: .5, respawn: 1.5 };
+const BOT = { hp: 100, speed: 5, react: .45, turn: 8, lead: .05, aimErr: .025, moveErr: .045, dmgMul: .9, respawn: 1.5 };
 const SNIPE_T = .9; // a sniper bot lines up its shot this long before it fires
 const MATCH_T = 240, YOU_RESPAWN = 3, JOIN_T = 60; // match length (s), your respawn wait (s), bots finish joining by this time (s)
 let BOT_COUNT = 3; // fill the lobby: 3 bots on small maps like the yard, 7 on bigger ones (set in setupMode from the map)

@@ -48,7 +48,7 @@ function update(dt) {
     vm.rotation.set(-kick * .9, kick * .5, 0);
   } else {
     vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob - (reloading > 0 ? .15 : 0), -.55 + kick * .08);
-    vm.rotation.set(kick * .25 + (reloading > 0 ? -.6 : 0), 0, 0);
+    vm.rotation.set(kick * .25 * (1 - adsT * .85) + (reloading > 0 ? -.6 : 0), 0, 0); // much less muzzle climb while aiming so the gun doesn't cover the crosshair
   }
   if ((crossT -= dt) <= 0) $('cross').style.setProperty('--c', '#fff');
   }

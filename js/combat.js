@@ -76,7 +76,7 @@ function fireRocket(w) {
   rockets.push({ m, dir: fwd.clone(), life: 3, dmg: w.dmg, smoke: 0 });
 }
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, how fast it falls
-const FLARE_R = 2.5, FLARE_SPLASH = 25; // splash radius and most splash damage. Never hurts you, and the direct-hit target doesn't take it too
+const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and most splash damage. Never hurts you, and the direct-hit target doesn't take it too
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
 function fireFlare(w) {
   camera.getWorldDirection(fwd);

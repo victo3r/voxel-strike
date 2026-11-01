@@ -1,5 +1,7 @@
 const zombies = [];
 let wave = 0, toSpawn = 0, spawnT = 0, waveWait = 1.5, kills = 0, coins = 0;
+// gun damage is tuned for deathmatch, so zombie hp is scaled by ZHP to keep waves playing the same
+const ZHP = .56;
 // hp is a multiplier on the wave's base zombie hp; coins are per kill (headshots add 2 more)
 const ZTYPES = {
   walker: { hp: 1,   speed: () => Math.min(1.8 + wave * .15, 4.5), scale: 1,    dmg: 10, atk: 1,   coins: 2, shirt: shirtTex },
@@ -40,7 +42,7 @@ function makeZombie(x, z, type) {
     const band = box(.56, .12, .56, gold); band.position.y = 1.91; g.add(band);
     for (const sx of [-.2, 0, .2]) { const sp = box(.1, .16, .1, gold); sp.position.set(sx, 2.05, .23); g.add(sp); }
   }
-  const hp = (60 + wave * 18) * T.hp;
+  const hp = (60 + wave * 18) * T.hp * ZHP;
   const zz = { g, parts, mats, tankMat, pivL, pivR,
     type, hp, maxHp: hp, speed: T.speed(), dmg: Math.round(T.dmg * (1 + wave * .05)), atkRate: T.atk, coins: T.coins, scale: T.scale,
     r: .3 * T.scale, reach: Math.max(1.1, 1.1 * T.scale), t: Math.random() * 6, atk: 0, flash: 0, dead: 0,
@@ -97,7 +99,7 @@ const booms = [];
 function explode(z) {
   if (z.boomed) return;
   z.boomed = true; z.dead ||= .0001; z.g.visible = false;
-  blast(z.g.position.clone().setY(1), BLAST, 120 + wave * 25, z.dmg, z);
+  blast(z.g.position.clone().setY(1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
 function blast(p, R, zDmg, pDmg, skip) {
@@ -117,7 +119,7 @@ const SHOP = [
   { gun: 'shotgun', price: 40, desc: '9 pellets, close range' },
   { gun: 'ar', price: 90, desc: 'full auto, 30 mag' },
   { gun: 'eradicator', price: 280, desc: '120 round bullet hose' },
-  { gun: 'sniper', price: 140, desc: '150 dmg, aim to scope' },
+  { gun: 'sniper', price: 140, desc: `${BASE[gi('sniper')].dmg} dmg, aim to scope` },
   { gun: 'flame', price: 200, desc: 'burns everything in front of you' },
   { gun: 'flare', price: 120, desc: 'one fiery shot that sets them on fire' },
   { gun: 'rocket', price: 450, desc: 'big splash damage, don\'t fire point blank' },

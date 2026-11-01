@@ -9,17 +9,17 @@ const CAT_I = Object.fromEntries(CATS.map(([k], i) => [k, i]));
 // inf = never runs out of ammo (just the knife)
 // unlock = account level you need before you can buy it in the armory. price = its armory price in account coins
 const BASE = [
-  { id: 'voxel', name: 'Voxel Gun', cat: 'backup', start: true, free: true, dmg: 34, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3, vol: .25, cut: 2200 },
-  { id: 'shotgun', name: 'Shotgun', cat: 'primary', start: true, dmg: 16, rate: .75, mag: 6, reload: 1.6, pellets: 9, spread: .07, auto: false, color: 0x6b4a2b, len: .6, vol: .45, cut: 900 },
-  { id: 'ar', name: 'Assault Rifle', cat: 'primary', start: true, dmg: 22, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55, vol: .2, cut: 2600 },
-  { id: 'sniper', name: 'Sniper Rifle', cat: 'sniper', start: true, dmg: 150, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, vol: .5, cut: 3200, scope: true },
-  { id: 'eradicator', name: 'Eradicator', cat: 'primary', unlock: 12, price: 450, dmg: 14, rate: .05, mag: 120, reload: 2.6, pellets: 1, spread: .012, auto: true, color: 0x777777, len: .7, vol: .18, cut: 2000 },
-  { id: 'knife', name: 'Combat Knife', cat: 'melee', start: true, free: true, inf: true, melee: true, dmg: 60, rate: .4, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xd8dde3, len: .3, vol: .1, cut: 3500, model: 'knife' },
+  { id: 'voxel', name: 'Voxel Gun', cat: 'backup', start: true, free: true, dmg: 20, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3, vol: .25, cut: 2200 },
+  { id: 'shotgun', name: 'Shotgun', cat: 'primary', start: true, dmg: 10, rate: .75, mag: 6, reload: 1.6, pellets: 9, spread: .07, auto: false, color: 0x6b4a2b, len: .6, vol: .45, cut: 900 },
+  { id: 'ar', name: 'Assault Rifle', cat: 'primary', start: true, dmg: 12, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55, vol: .2, cut: 2600 },
+  { id: 'sniper', name: 'Sniper Rifle', cat: 'sniper', start: true, dmg: 80, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, vol: .5, cut: 3200, scope: true },
+  { id: 'eradicator', name: 'Eradicator', cat: 'primary', unlock: 12, price: 450, dmg: 9, rate: .05, mag: 120, reload: 2.6, pellets: 1, spread: .012, auto: true, color: 0x777777, len: .7, vol: .18, cut: 2000 },
+  { id: 'knife', name: 'Combat Knife', cat: 'melee', start: true, free: true, inf: true, melee: true, dmg: 35, rate: .4, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xd8dde3, len: .3, vol: .1, cut: 3500, model: 'knife' },
   // flamethrower: short cone that hits everything in front of you and sets it on fire. mag = fuel
-  { id: 'flame', name: 'Flamethrower', cat: 'special', start: true, flame: true, dmg: 9, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, vol: .05, cut: 600, model: 'flame' },
-  { id: 'rocket', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, rocket: true, dmg: 220, rate: 1.1, mag: 4, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, vol: .4, cut: 700, model: 'rocket' },
+  { id: 'flame', name: 'Flamethrower', cat: 'special', start: true, flame: true, dmg: 5, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, vol: .05, cut: 600, model: 'flame' },
+  { id: 'rocket', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, rocket: true, dmg: 150, rate: 1.1, mag: 4, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, vol: .4, cut: 700, model: 'rocket' },
   // flare gun: burn = damage per quarter second, burnT = seconds
-  { id: 'flare', name: 'Flare Gun', cat: 'premium', start: true, flare: true, dmg: 70, burn: 5, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, vol: .3, cut: 1400, model: 'flare' },
+  { id: 'flare', name: 'Flare Gun', cat: 'premium', start: true, flare: true, dmg: 40, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, vol: .3, cut: 1400, model: 'flare' },
 ];
 const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
 const gi = id => W_ID[id]; // weapon id -> its index in BASE/WEAPONS
