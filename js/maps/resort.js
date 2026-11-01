@@ -32,6 +32,22 @@ const rectMinus = ([x0, x1, z0, z1], [h0, h1, k0, k1]) =>
   [[x0, x1, z0, k0], [x0, x1, k1, z1], [x0, h0, k0, k1], [h1, x1, k0, k1]].filter(([a, b, c, d]) => b - a > .01 && d - c > .01);
 const plain = c => lam({ color: c });
 
+// --- grass over most of the map, with a strip of beach round the walls (wider on the sea side) ---
+const GR = [-34, 19, -34, 34], gw = GR[1] - GR[0], gd = GR[3] - GR[2];
+const drawGrass = g => {
+  noise(g, [104, 168, 72], 20);
+  for (let i = 0; i < 6; i++) { g.fillStyle = ['rgba(55,105,35,.5)', 'rgba(175,215,115,.5)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 2); }
+};
+flatPlane(gw, gd, decal({ map: tex(drawGrass, gw, gd) }), (GR[0] + GR[1]) / 2, .01, (GR[2] + GR[3]) / 2);
+// a ragged edge one block wide along each side, so the grass doesn't end in a straight line. The top of the texture faces the grass
+function grassEdge(len, x, z, rot) {
+  const t = tex(g => { drawGrass(g); for (let i = 0; i < 16; i++) { const d = 2 + (Math.random() * 10 | 0); g.clearRect(i, d, 1, 16 - d); } }, len, 1);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(len, 1), decal({ map: t, alphaTest: .5 }));
+  p.rotation.set(-Math.PI / 2, 0, rot); p.position.set(x, .01, z); add(p);
+}
+grassEdge(gw, (GR[0] + GR[1]) / 2, GR[3] + .5, 0); grassEdge(gw, (GR[0] + GR[1]) / 2, GR[2] - .5, Math.PI);
+grassEdge(gd, GR[1] + .5, (GR[2] + GR[3]) / 2, Math.PI / 2); grassEdge(gd, GR[0] - .5, (GR[2] + GR[3]) / 2, -Math.PI / 2);
+
 // --- the sea ---
 const WET = SHORE - 4;
 flatPlane(SHORE - WET + 1, G * 2, decal({ map: tex(g => noise(g, [204, 182, 136], 12), 2, G) }), (WET + SHORE + 1) / 2, .012, 0);
@@ -48,119 +64,137 @@ const foam = flatPlane(1.4, G * 2, new THREE.MeshBasicMaterial({ transparent: tr
 }, 1, G) }), SHORE, .07, 0);
 
 // --- the lighthouse ---
-// Three floors and a gallery on top, each joined by a flight of stairs that climbs one wall and turns a corner per floor.
-// Local coords: u = x - LX, v = z - LZ. The walls are 7 wide outside, 6 inside.
-const LX = 31, LZ = -31, LH = 4; // centre, height of each floor
+// Four floors and a gallery on top. The stairs wind up round the inside walls, half a floor per wall,
+// with a landing in each corner, so every floor has its stairs on two walls and a hole above them.
+// Local coords: u = x - LX, v = z - LZ (north is -v). The inside splits into a 3x3 grid: corners, a strip along each wall, the middle.
+const LX = 29, LZ = -31, LH = 3.6, FLOORS = 4, HALF = LH / 2, RUNS = FLOORS * 2;
+const LO = 2.8, LI = 2.3, CELL = 1.1, GA = 3.6; // half-widths: outside of the walls, inside, gallery. CELL = stair width
+const GY = FLOORS * LH; // gallery floor
 const paint = rgb => lam({ map: tex(g => { noise(g, rgb, 12); g.fillStyle = 'rgba(0,0,0,.07)'; for (const y of [3, 7, 11, 15]) g.fillRect(0, y, 16, 1); for (const [x, y] of [[4, 0], [12, 4], [4, 8], [12, 12]]) g.fillRect(x, y, 1, 3); }) });
 const white = paint([240, 238, 232]), red = paint([200, 52, 44]);
 const plank = lam({ map: tex(g => { noise(g, [150, 108, 66], 18); g.fillStyle = 'rgba(60,35,15,.45)'; for (const y of [0, 4, 8, 12]) g.fillRect(0, y, 16, 1); g.fillRect(5, 1, 1, 3); g.fillRect(11, 5, 1, 3); g.fillRect(3, 9, 1, 3); g.fillRect(13, 13, 1, 3); }) });
 const ironMat = plain(0x3a3f45);
 const lh = (u0, u1, v0, v1, bot, top, m, cover = true) => addSlab(LX + (u0 + u1) / 2, LZ + (v0 + v1) / 2, u1 - u0, v1 - v0, bot, top, m, cover);
-const LEVEL_MAT = [white, red, white];
-// openings in each wall: [centre along the wall, width, bottom, top] (heights from that floor)
-const DOOR = [1, 1.6, 0, 2.5], WIN = c => [c, 1.2, 1, 2.3];
-const WALLS = [
-  { N: [WIN(0)], E: [WIN(0)], S: [WIN(-2), DOOR], W: [] },
-  { N: [WIN(0)], E: [WIN(0)], S: [WIN(-1.5), WIN(1.5)], W: [] },
-  { N: [], E: [], S: [WIN(-1.5), WIN(1.5)], W: [WIN(-1.2), WIN(1.2)] },
-];
-WALLS.forEach((walls, k) => {
-  const y0 = k * LH, y1 = y0 + LH - (k === 2 ? .3 : 0), m = LEVEL_MAT[k];
-  for (const side of ['N', 'S', 'E', 'W']) {
-    const ns = side === 'N' || side === 'S', end = ns ? 3.5 : 3; // N and S run the full width so they cover the corners
+const LEVEL_MAT = [white, red, white, red];
+const G3 = [-LI, -LI + CELL, LI - CELL, LI], E0 = LI - CELL;
+const cellR = (i, j) => [G3[i], G3[i + 1], G3[j], G3[j + 1]];
+const SIDES = ['W', 'N', 'E', 'S'];
+const CORNER = [cellR(0, 2), cellR(0, 0), cellR(2, 0), cellR(2, 2)]; // SW, NW, NE, SE
+const EDGE = [cellR(0, 1), cellR(1, 0), cellR(2, 1), cellR(1, 2)];   // along the W, N, E, S walls
+// stair run j climbs along wall j % 4 from corner j % 4 to corner (j + 1) % 4, from height j * HALF to (j + 1) * HALF
+const RUN = [{ ax: 'z', a: E0, b: -E0 }, { ax: 'x', a: -E0, b: E0 }, { ax: 'z', a: -E0, b: E0 }, { ax: 'x', a: E0, b: -E0 }];
+
+// walls. Openings: [centre along the wall, width, bottom, top] (heights from that floor).
+// Each floor gets a window in the middle of every wall except the one its upper stair run climbs past
+const DOOR = [0, 1.4, 0, 2.4], WIN = [0, 1, 1, 2.3];
+for (let k = 0; k < FLOORS; k++) {
+  const y0 = k * LH, y1 = y0 + LH - (k === FLOORS - 1 ? .3 : 0), m = LEVEL_MAT[k % LEVEL_MAT.length];
+  SIDES.forEach((side, w) => {
+    const holes = k === 0 && side === 'S' ? [DOOR] : w === (2 * k + 1) % 4 ? [] : [WIN];
+    const end = side === 'N' || side === 'S' ? LO : LI; // N and S run the full width so they cover the corners
     const piece = (a0, a1, b, t) => {
       if (a1 - a0 < .01 || t - b < .01) return;
-      if (side === 'N') lh(a0, a1, -3.5, -3, b, t, m); else if (side === 'S') lh(a0, a1, 3, 3.5, b, t, m);
-      else if (side === 'W') lh(-3.5, -3, a0, a1, b, t, m); else lh(3, 3.5, a0, a1, b, t, m);
+      if (side === 'N') lh(a0, a1, -LO, -LI, b, t, m); else if (side === 'S') lh(a0, a1, LI, LO, b, t, m);
+      else if (side === 'W') lh(-LO, -LI, a0, a1, b, t, m); else lh(LI, LO, a0, a1, b, t, m);
     };
     let a = -end;
-    for (const [c, w, ob, ot] of walls[side]) {
-      piece(a, c - w / 2, y0, y1); piece(c - w / 2, c + w / 2, y0, y0 + ob); piece(c - w / 2, c + w / 2, y0 + ot, y1); a = c + w / 2;
+    for (const [c, ow, ob, ot] of holes) {
+      piece(a, c - ow / 2, y0, y1); piece(c - ow / 2, c + ow / 2, y0, y0 + ob); piece(c - ow / 2, c + ow / 2, y0 + ot, y1); a = c + ow / 2;
     }
     piece(a, end, y0, y1);
-  }
-});
-// stairs: flight k goes from floor k to floor k + 1 along one wall. r = [u0, u1, v0, v1], the slope rises from a to b along ax.
-const FLIGHTS = [
-  { r: [-3, -1.7, -1.7, 1.7], ax: 'z', a: 1.7, b: -1.7 },  // west wall, heading north
-  { r: [-1.7, 1.7, -3, -1.7], ax: 'x', a: -1.7, b: 1.7 },  // north wall, heading east
-  { r: [1.7, 3, -1.7, 1.7], ax: 'z', a: -1.7, b: 1.7 },    // east wall, heading south, up through the hatch
-];
-const STEPS = 10, stairMat = lam({ map: tex(g => { noise(g, [120, 84, 50], 16); g.fillStyle = 'rgba(40,22,10,.5)'; g.fillRect(0, 0, 16, 2); }) });
-FLIGHTS.forEach((f, k) => {
-  const [u0, u1, v0, v1] = f.r, bot = k * LH, o = f.ax === 'x' ? LX : LZ;
-  // you collide with a smooth slope (so you walk straight up), the steps are just what you see
-  building.solids.push({ mesh: null, minX: LX + u0, maxX: LX + u1, minZ: LZ + v0, maxZ: LZ + v1, bot, top: bot + LH, ramp: { ax: f.ax, a: o + f.a, b: o + f.b } });
-  for (let j = 0; j < STEPS; j++) {
-    const p0 = f.a + (f.b - f.a) * j / STEPS, p1 = f.a + (f.b - f.a) * (j + 1) / STEPS, lo = Math.min(p0, p1), hi = Math.max(p0, p1), h = LH * (j + 1) / STEPS;
+  });
+}
+// stairs. You collide with a smooth slope (so you walk straight up), the steps are just what you see
+const STEPS = 6, stairMat = lam({ map: tex(g => { noise(g, [120, 84, 50], 16); g.fillStyle = 'rgba(40,22,10,.5)'; g.fillRect(0, 0, 16, 2); }) });
+for (let j = 0; j < RUNS; j++) {
+  const [u0, u1, v0, v1] = EDGE[j % 4], f = RUN[j % 4], fl = Math.floor(j / 2) * LH, bot = j * HALF, o = f.ax === 'x' ? LX : LZ;
+  const rect = { mesh: null, minX: LX + u0, maxX: LX + u1, minZ: LZ + v0, maxZ: LZ + v1 };
+  building.solids.push({ ...rect, bot, top: bot + HALF, ramp: { ax: f.ax, a: o + f.a, b: o + f.b } });
+  if (bot > fl) building.solids.push({ ...rect, bot: fl, top: bot }); // filled in underneath, so you can't walk under the upper run
+  for (let s = 0; s < STEPS; s++) {
+    const p0 = f.a + (f.b - f.a) * s / STEPS, p1 = f.a + (f.b - f.a) * (s + 1) / STEPS, lo = Math.min(p0, p1), hi = Math.max(p0, p1);
+    const h = bot + HALF * (s + 1) / STEPS - fl;
     const m = f.ax === 'z' ? tbox(u1 - u0, h, hi - lo, stairMat) : tbox(hi - lo, h, v1 - v0, stairMat);
-    m.position.set(LX + (f.ax === 'z' ? (u0 + u1) / 2 : (lo + hi) / 2), bot + h / 2, LZ + (f.ax === 'z' ? (lo + hi) / 2 : (v0 + v1) / 2));
+    m.position.set(LX + (f.ax === 'z' ? (u0 + u1) / 2 : (lo + hi) / 2), fl + h / 2, LZ + (f.ax === 'z' ? (lo + hi) / 2 : (v0 + v1) / 2));
     add(m); building.cover.push(m);
   }
-});
-// floors 1 and 2, and the gallery deck on top, each with a hole over the stairs coming up to it
-for (let k = 1; k <= 3; k++) {
-  const outer = k < 3 ? [-3, 3, -3, 3] : [-4.5, 4.5, -4.5, 4.5];
-  for (const [u0, u1, v0, v1] of rectMinus(outer, FLIGHTS[k - 1].r)) lh(u0, u1, v0, v1, k * LH - .3, k * LH, k < 3 ? plank : ironMat);
+  if (j % 2 === 0) { const [c0, c1, d0, d1] = CORNER[(j + 1) % 4]; lh(c0, c1, d0, d1, fl, fl + HALF, stairMat); } // the landing halfway up
 }
-flatPlane(6, 6, decal({ map: tex(g => { noise(g, [150, 145, 135], 14); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, 3, 3) }), LX, .02, LZ);
-const GY = 3 * LH; // gallery floor
-for (const s of [-1, 1]) for (let i = -3; i <= 3; i += 1.5) { // brackets under the overhang
-  const b1 = box(.9, .5, .25, ironMat); b1.position.set(LX + s * 3.95, GY - .55, LZ + i); add(b1);
-  const b2 = box(.25, .5, .9, ironMat); b2.position.set(LX + i, GY - .55, LZ + s * 3.95); add(b2);
+// floors 1 to 3 and the gallery deck. Floor k has a hole over the two runs (and the landing) that come up to it
+const holeOf = k => [EDGE[(2 * k + 2) % 4], EDGE[(2 * k + 3) % 4], CORNER[(2 * k + 3) % 4]];
+for (let k = 1; k <= FLOORS; k++) {
+  const hole = holeOf(k), cells = [];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { const c = cellR(i, j); if (!hole.some(h => h.every((x, n) => x === c[n]))) cells.push(c); }
+  if (k === FLOORS) cells.push(...rectMinus([-GA, GA, -GA, GA], [-LI, LI, -LI, LI]));
+  for (const [u0, u1, v0, v1] of cells) lh(u0, u1, v0, v1, k * LH - .3, k * LH, k < FLOORS ? plank : ironMat);
+}
+flatPlane(LI * 2, LI * 2, decal({ map: tex(g => { noise(g, [150, 145, 135], 14); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, LI, LI) }), LX, .02, LZ);
+for (const s of [-1, 1]) for (let i = -2.4; i <= 2.41; i += 1.2) { // brackets under the overhang
+  const b1 = box(.8, .5, .25, ironMat); b1.position.set(LX + s * (LO + .4), GY - .55, LZ + i); add(b1);
+  const b2 = box(.25, .5, .8, ironMat); b2.position.set(LX + i, GY - .55, LZ + s * (LO + .4)); add(b2);
 }
 // railing: drawn about waist high, but the invisible part goes higher so you can't jump off. Bullets go over it
 for (const s of [-1, 1]) {
-  building.solids.push({ mesh: null, minX: LX - 4.5, maxX: LX + 4.5, minZ: LZ + s * 4.5 - .15, maxZ: LZ + s * 4.5 + .15, bot: GY, top: GY + 1.9 });
-  building.solids.push({ mesh: null, minX: LX + s * 4.5 - .15, maxX: LX + s * 4.5 + .15, minZ: LZ - 4.5, maxZ: LZ + 4.5, bot: GY, top: GY + 1.9 });
+  building.solids.push({ mesh: null, minX: LX - GA, maxX: LX + GA, minZ: LZ + s * GA - .15, maxZ: LZ + s * GA + .15, bot: GY, top: GY + 1.9 });
+  building.solids.push({ mesh: null, minX: LX + s * GA - .15, maxX: LX + s * GA + .15, minZ: LZ - GA, maxZ: LZ + GA, bot: GY, top: GY + 1.9 });
   for (const y of [GY + .5, GY + 1]) {
-    const r1 = box(9, .07, .07, ironMat); r1.position.set(LX, y, LZ + s * 4.45); add(r1);
-    const r2 = box(.07, .07, 9, ironMat); r2.position.set(LX + s * 4.45, y, LZ); add(r2);
+    const r1 = box(GA * 2, .07, .07, ironMat); r1.position.set(LX, y, LZ + s * (GA - .05)); add(r1);
+    const r2 = box(.07, .07, GA * 2, ironMat); r2.position.set(LX + s * (GA - .05), y, LZ); add(r2);
   }
-  for (let i = -4.45; i <= 4.46; i += 1.1125) {
-    const p1 = box(.08, 1, .08, ironMat); p1.position.set(LX + i, GY + .5, LZ + s * 4.45); add(p1);
-    const p2 = box(.08, 1, .08, ironMat); p2.position.set(LX + s * 4.45, GY + .5, LZ + i); add(p2);
+  for (let i = 0; i <= 8; i++) {
+    const q = -GA + .05 + i * (GA * 2 - .1) / 8;
+    const p1 = box(.08, 1, .08, ironMat); p1.position.set(LX + q, GY + .5, LZ + s * (GA - .05)); add(p1);
+    const p2 = box(.08, 1, .08, ironMat); p2.position.set(LX + s * (GA - .05), GY + .5, LZ + q); add(p2);
   }
 }
-// lantern room: a red base, glass all round (you can shoot through it, not walk through it), a red roof
-lh(-1.3, 1.3, -1.3, 1.3, GY, GY + .6, red);
-building.solids.push({ mesh: null, minX: LX - 1.3, maxX: LX + 1.3, minZ: LZ - 1.3, maxZ: LZ + 1.3, bot: GY + .6, top: GY + 2.4 });
-const glass = box(2.5, 1.8, 2.5, new THREE.MeshLambertMaterial({ color: 0xcdeeff, transparent: true, opacity: .3, depthWrite: false }));
+// lantern room in the middle: a red base, glass all round (you can shoot through it, not walk through it)
+const LR = 1.1;
+lh(-LR, LR, -LR, LR, GY, GY + .6, red);
+building.solids.push({ mesh: null, minX: LX - LR, maxX: LX + LR, minZ: LZ - LR, maxZ: LZ + LR, bot: GY + .6, top: GY + 2.4 });
+const glass = box(LR * 2 - .1, 1.8, LR * 2 - .1, new THREE.MeshLambertMaterial({ color: 0xcdeeff, transparent: true, opacity: .3, depthWrite: false }));
 glass.position.set(LX, GY + 1.5, LZ); add(glass);
-for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = box(.1, 1.8, .1, ironMat); p.position.set(LX + sx * 1.26, GY + 1.5, LZ + sz * 1.26); add(p); }
-const capM = box(2.9, .2, 2.9, ironMat); capM.position.set(LX, GY + 2.5, LZ); add(capM);
-const roofM = new THREE.Mesh(new THREE.ConeGeometry(2.05, 1.3, 4), red); roofM.rotation.y = Math.PI / 4; roofM.position.set(LX, GY + 3.25, LZ); add(roofM);
-const knob = box(.25, .35, .25, ironMat); knob.position.set(LX, GY + 4, LZ); add(knob);
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = box(.1, 1.8, .1, ironMat); p.position.set(LX + sx * (LR - .04), GY + 1.5, LZ + sz * (LR - .04)); add(p); }
+const CY = GY + 2.9; // underside of the canopy
+const chimney = box(1.3, CY - GY - 2.4, 1.3, ironMat); chimney.position.set(LX, (GY + 2.4 + CY) / 2, LZ); add(chimney);
+// the canopy: a red roof over the whole gallery, held up by a post in each corner
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(LX + sx * (GA - .12), LZ + sz * (GA - .12), .16, .16, GY, CY, ironMat);
+const CW = GA + .3;
+addSlab(LX, LZ, CW * 2, CW * 2, CY, CY + .25, red);
+const roofM = new THREE.Mesh(new THREE.ConeGeometry(CW * Math.SQRT2, 2.2, 4), red); roofM.rotation.y = Math.PI / 4; roofM.position.set(LX, CY + .25 + 1.1, LZ); add(roofM);
+const knob = box(.3, .45, .3, ironMat); knob.position.set(LX, CY + .25 + 2.2 + .15, LZ); add(knob);
 const LAMP_Y = GY + 1.4;
 const lampM = box(.7, .7, .7, new THREE.MeshLambertMaterial({ color: 0xfff0b0, emissive: 0xffd060, emissiveIntensity: 1.3 })); lampM.position.set(LX, LAMP_Y, LZ); add(lampM);
 const lampHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffe9a0, transparent: true, opacity: .7, blending: THREE.AdditiveBlending, depthWrite: false }));
-lampHalo.scale.setScalar(3.2); lampHalo.position.set(LX, LAMP_Y, LZ); add(lampHalo);
+lampHalo.scale.setScalar(2.8); lampHalo.position.set(LX, LAMP_Y, LZ); add(lampHalo);
 
 // rocks round the point it stands on (kept clear of the door on the south side)
 const rockMat = lam({ map: tex(g => { noise(g, [128, 122, 112], 30); g.fillStyle = 'rgba(70,60,50,.5)'; for (let i = 0; i < 8; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }) });
-for (const [x, z, w, d, h] of [[28, -36.5, 3, 2.5, 1.2], [32, -37, 3.5, 2.2, 1.6], [35.5, -35, 2.6, 3, 1.4], [37.5, -31, 2.4, 3.2, 1.1],
-  [36.5, -27.5, 2, 2, .8], [39.5, -34, 2.2, 2.4, .7], [25.5, -36, 1.8, 1.6, .9], [38.5, -38.5, 3, 2.6, 1.8], [34, -39.5, 2.4, 2, 1]]) addBlock(x, z, w, d, h, rockMat);
+for (const [x, z, w, d, h] of [[26, -36.5, 3, 2.5, 1.2], [30, -37, 3.5, 2.2, 1.6], [33.5, -35, 2.6, 3, 1.4], [35.5, -31, 2.4, 3.2, 1.1],
+  [34.5, -27.5, 2, 2, .8], [37.5, -34, 2.2, 2.4, .7], [23.5, -36, 1.8, 1.6, .9], [36.5, -38.5, 3, 2.6, 1.8], [32, -39.5, 2.4, 2, 1]]) addBlock(x, z, w, d, h, rockMat);
 
-// how bots and zombies get between the floors: the door, then the corner landings at each end of the stairs
-const C = [[-2.35, 2.35], [-2.35, -2.35], [2.35, -2.35], [2.35, 2.35]].map(([u, v]) => ({ x: LX + u, z: LZ + v })); // flight k runs C[k] -> C[k + 1]
-const DOOR_IN = { x: LX + 1, z: LZ + 2.2 }, DOOR_OUT = { x: LX + 1, z: LZ + 4.8 };
+// how bots and zombies get between the floors: the door, then round the corners.
+// Stop j is corner j % 4 at height j * HALF: even j = on floor j / 2, odd j = the landing halfway up
+const CN = CORNER.map(([u0, u1, v0, v1]) => ({ x: LX + (u0 + u1) / 2, z: LZ + (v0 + v1) / 2 }));
+const stop = j => CN[j % 4];
+const DOOR_IN = { x: LX, z: LZ + 1.6 }, DOOR_OUT = { x: LX, z: LZ + LO + 1.4 };
 const inRect = (p, [u0, u1, v0, v1]) => p.x > LX + u0 && p.x < LX + u1 && p.z > LZ + v0 && p.z < LZ + v1;
-const rampOf = p => FLIGHTS.findIndex((f, k) => inRect(p, f.r) && p.y > k * LH + .15 && p.y < (k + 1) * LH - .15);
-function placeOf(p) { // -1 = outside, 0-3 = that floor of the lighthouse, k + .5 = on the stairs above floor k
-  const r = rampOf(p); if (r >= 0) return r + .5;
-  if (p.y > 2) return inRect(p, [-4.7, 4.7, -4.7, 4.7]) ? Math.min(3, Math.max(1, Math.round(p.y / LH))) : -1;
-  return inRect(p, [-3, 3, -3, 3]) ? 0 : -1;
+function placeOf(p) { // -1 = outside, j = at stop j's floor or landing, j + .5 = on stair run j
+  const g = GA + .2;
+  if (!inRect(p, p.y > GY - 1 ? [-g, g, -g, g] : [-LI, LI, -LI, LI])) return -1;
+  for (let j = 0; j < RUNS; j++) if (inRect(p, EDGE[j % 4]) && p.y > j * HALF + .1 && p.y < (j + 1) * HALF + .05) return j + .5;
+  for (let j = 1; j < RUNS; j += 2) if (inRect(p, CORNER[j % 4]) && Math.abs(p.y - j * HALF) < .3) return j;
+  return Math.max(0, Math.min(FLOORS, Math.round(p.y / LH))) * 2;
 }
 const near = (p, q) => Math.hypot(p.x - q.x, p.z - q.z) < .9;
 // from p, which spot to walk to next to get to where t is, or null if it can just head straight there
 M.nav = (p, t) => {
   const a = placeOf(p), b = placeOf(t);
   if (a === b) return null;
-  if (a % 1) { const k = a - .5; return b > a ? C[k + 1] : C[k]; } // on the stairs: keep going up or down
-  if (a === -1) return inRect(p, [.1, 1.9, 2.9, 5.7]) ? DOOR_IN : DOOR_OUT;
-  if (b > a) return near(p, C[a]) ? C[a + 1] : C[a];
+  if (a === -1) return inRect(p, [-.6, .6, LI - .2, LO + 1.9]) ? DOOR_IN : DOOR_OUT;
+  if (a % 1) return b > a ? stop(a + .5) : stop(a - .5); // on the stairs: keep going up or down
+  if (b > a) return near(p, stop(a)) ? stop(a + 1) : stop(a);
   if (a === 0) return near(p, DOOR_IN) ? DOOR_OUT : DOOR_IN;
-  return near(p, C[a]) ? C[a - 1] : C[a];
+  return near(p, stop(a)) ? stop(a - 1) : stop(a);
 };
 
 // --- the pool: a raised deck with a step all round, a ledge inside so you can climb out anywhere ---
@@ -233,11 +267,16 @@ function hut(x, z, face) { // face = which way the door looks: [dx, dz]
     w.position.set(x + face[0] * 1.61 + (face[0] ? 0 : s * 1), 1.6, z + face[1] * 1.61 + (face[0] ? s * 1 : 0)); add(w);
   }
 }
-hut(-33, 30, [1, 0]); hut(-33, -31, [1, 0]); hut(6, 35, [0, -1]);
+hut(-37.5, 30, [1, 0]); hut(-37.5, -31, [1, 0]); hut(6, 38.2, [0, -1]);
 
-// --- volleyball court ---
+// --- volleyball court: a sand pit in the grass with a low wooden border ---
+const PIT = [.5, 15.5, 16.5, 27.5];
+flatPlane(PIT[1] - PIT[0], PIT[3] - PIT[2], decal({ map: tex(g => noise(g, [226, 206, 156], 16), PIT[1] - PIT[0], PIT[3] - PIT[2]) }), 8, .016, 22);
+for (const [w, d, x, z] of [[15.2, .2, 8, PIT[2]], [15.2, .2, 8, PIT[3]], [.2, 11.2, PIT[0], 22], [.2, 11.2, PIT[1], 22]]) {
+  const b = box(w, .12, d, wood); b.position.set(x, .06, z); add(b);
+}
 const lineMat = decal({ color: 0xffffff });
-for (const [w, d, x, z] of [[12, .12, 8, 18], [12, .12, 8, 26], [.12, 8, 2, 22], [.12, 8, 14, 22]]) flatPlane(w, d, lineMat, x, .015, z);
+for (const [w, d, x, z] of [[12, .12, 8, 18], [12, .12, 8, 26], [.12, 8, 2, 22], [.12, 8, 14, 22]]) flatPlane(w, d, lineMat, x, .022, z);
 for (const z of [18, 26]) addSlab(8, z, .15, .15, 0, 2.6, plain(0xdcdcdc));
 const net = new THREE.Mesh(new THREE.PlaneGeometry(8, 1), seeThru(tex(g => { g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 16, 2); for (let i = 0; i < 16; i += 4) { g.fillRect(i, 0, 1, 16); g.fillRect(0, i, 16, 1); } }, 8, 1)));
 net.rotation.y = Math.PI / 2; net.position.set(8, 2, 22); add(net);
@@ -276,7 +315,7 @@ const yWin = box(6.05, .5, 3.05, plain(0x1b2a3a)); yWin.position.set(yx - .8, 2.
 const yTop = box(3.4, 1, 2.4, hullWhite); yTop.position.set(yx - 1.5, 3.3, yz); add(yTop);
 const yMast = box(.12, 2.4, .12, ironMat); yMast.position.set(yx - 1.5, 5, yz); add(yMast);
 // an old rowboat turned upside down on the sand
-for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) addSlab(16, 30, w, d, y0, y1, lam({ map: tex(g => { noise(g, [150, 62, 40], 16); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 7, 16, 1); }) }), true, 1);
+for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) addSlab(16, 38.5, w, d, y0, y1, lam({ map: tex(g => { noise(g, [150, 62, 40], 16); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 7, 16, 1); }) }), true, 1);
 
 // --- the hotel behind the west wall (scenery) ---
 const hotelMat = lam({ map: tex(g => {
@@ -350,6 +389,15 @@ building.cover.push(inst(unit, trunkMat, trunksIn)); // bullets stop on the trun
 inst(unit, trunkMat, trunksOut); inst(frondGeo, frondMat, fronds); inst(unit, plain(0xffffff), nuts);
 
 addCrates(M.crates);
+
+// grass tufts on the lawn (not in the volleyball pit)
+const tufts = [];
+for (let tries = 0; tufts.length < 450 && tries < 6000; tries++) {
+  const x = GR[0] + rnd() * gw, z = GR[2] + rnd() * gd;
+  if (x > PIT[0] - .5 && x < PIT[1] + .5 && z > PIT[2] - .5 && z < PIT[3] + .5 || !free(x, z, .4)) continue;
+  const s = .6 + rnd() * .6; tufts.push([x, 0, z, 1.1 * s, .8 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
+}
+grassTufts(tufts);
 
 // --- sky ---
 const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9aa8b8, fog: false });
