@@ -247,21 +247,21 @@ const SOUNDS = {
 
   // ---- getting hit. These play from whoever got hit, so a far-away hit is barely audible ----
   // a short, strained "hgh!" pushed out of the chest, the mouth closing toward "uhm"
-  hurt: [.4, .75, s => {
+  hurt: [.25, .5, s => {
     s.impact(0);
-    s.voice({ t: .005, h: .02, d: .15, f0: 135, fpk: 185, pk: .2, f1: 110, rough: .3, rough2: .55, breath: .35, tail: .06,
+    s.voice({ t: .005, h: .015, d: .1, f0: 135, fpk: 185, pk: .2, f1: 110, rough: .3, rough2: .55, breath: .35, tail: .03,
       fm2: [[480, 100, 1], [1050, 110, .45], [2300, 150, .18], [3300, 240, .08], [3750, 280, .05]] });
   }],
-  hurtHead: [.45, .8, s => { // same grunt, sharper, with a hard crack on top
+  hurtHead: [.3, .55, s => { // same grunt, sharper, with a hard crack on top
     s.impact(0); s.clack({ f: 1300, d: .012, v: .7, body: .7 }); s.hiss({ ft: 'bandpass', f: 3200, q: 1.2, d: .02, v: .5 });
-    s.voice({ t: .01, h: .012, d: .15, f0: 150, fpk: 205, pk: .15, f1: 115, rough: .35, rough2: .6, breath: .4, tail: .06, v: .9,
+    s.voice({ t: .01, h: .01, d: .1, f0: 150, fpk: 205, pk: .15, f1: 115, rough: .35, rough2: .6, breath: .4, tail: .03, v: .9,
       fm2: [[480, 100, 1], [1050, 110, .45], [2300, 150, .18], [3300, 240, .08], [3750, 280, .05]] });
   }],
   armorHit: [.3, .55, s => { s.clack({ f: 1100, d: .02, v: 1, body: .8 }); s.hiss({ ft: 'bandpass', f: 2800, q: 1.3, d: .03, v: .45 }); }], // bullet into a plate
   // a groan that strains up, breaks into a rough fry, and fades out on a last breath ("aAAghh...hhh")
-  die: [1.2, .8, s => {
+  die: [.65, .55, s => {
     s.impact(0);
-    s.voice({ t: .005, h: .03, d: .55, f0: 140, fpk: 200, pk: .12, f1: 75, rough: .2, rough2: .85, breath: .45, tail: .28,
+    s.voice({ t: .005, h: .02, d: .35, f0: 140, fpk: 200, pk: .12, f1: 75, rough: .2, rough2: .85, breath: .45, tail: .12,
       fm: [[750, 100, 1], [1180, 110, .55], [2500, 150, .22], [3400, 230, .1], [3800, 270, .06]],
       fm2: [[520, 120, 1], [1000, 130, .4], [2350, 170, .15], [3300, 260, .06], [3750, 300, .04]] });
   }],
