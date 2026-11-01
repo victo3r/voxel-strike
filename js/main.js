@@ -5,7 +5,7 @@ function update(dt) {
   const mx = held('right') - held('left'), mz = held('back') - held('fwd');
   const lx = held('lookR') - held('lookL'), ly = held('lookU') - held('lookD');
   if (lx || ly) {
-    const ls = 2.4 * dt * camera.fov / 75;
+    const ls = 2.4 * sens.keys * dt * camera.fov / 75;
     P.yaw -= lx * ls; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ly * ls));
   }
   if (mx || mz) {

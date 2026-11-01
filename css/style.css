@@ -43,6 +43,8 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #bindList{grid-template-columns:minmax(100px,190px) minmax(70px,150px) minmax(70px,150px)}
 #items{grid-template-columns:repeat(3,minmax(0,210px))}
 #bindX{position:fixed;top:8px;right:8px;z-index:11}
+#sensList{display:grid;grid-template-columns:minmax(100px,190px) minmax(120px,240px) 60px;gap:6px 10px;margin:12px 12px 4px;align-items:center;font-size:17px}
+#sensList input{accent-color:#ffd23f;width:100%;cursor:pointer}#sensList b{color:#ffd23f}
 #hotbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px}
 .slot{position:relative;width:84px;height:58px;box-sizing:border-box;background:rgba(0,0,0,.45);border:3px solid #555;display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .15s}
 .slot.on{border-color:#ffd23f;background:rgba(70,50,10,.65);transform:translateY(-6px)}
@@ -158,6 +160,6 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 }
 @media (max-height:620px),(max-width:620px){
   #shop h1{font-size:36px}#binds h1{font-size:28px}#menu p{font-size:14px;margin:3px}#menu #msg{font-size:22px}
-  #bindList{font-size:13px;gap:3px 6px;margin:6px}#binds button{font-size:12px;padding:3px 6px}
+  #bindList,#sensList{font-size:13px;gap:3px 6px;margin:6px}#binds button{font-size:12px;padding:3px 6px}
   #shop button{font-size:14px;padding:6px}#items{gap:6px;margin:6px}#banner{font-size:36px}
 }

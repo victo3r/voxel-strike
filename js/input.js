@@ -18,7 +18,17 @@ const copyBinds = b => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, 
 let binds = copyBinds(DEFAULT_BINDS);
 try { const saved = JSON.parse(localStorage.getItem('voxelstrike-binds')); if (saved) for (const k in binds) if (Array.isArray(saved[k])) binds[k] = [saved[k][0] ?? '', saved[k][1] ?? '']; } catch {}
 const saveBinds = () => { try { localStorage.setItem('voxelstrike-binds', JSON.stringify(binds)); } catch {} };
-const held = a => binds[a].some(c => c && keys[c]);
+// sensitivity multipliers: mouse/trackpad look and arrow-key look, 1 = default speed
+const DEFAULT_SENS = { mouse: 1, keys: 1 };
+let sens = { ...DEFAULT_SENS };
+try { const s = JSON.parse(localStorage.getItem('voxelstrike-sens')); if (s) for (const k in sens) if (s[k] > 0) sens[k] = s[k]; } catch {}
+const saveSens = () => { try { localStorage.setItem('voxelstrike-sens', JSON.stringify(sens)); } catch {} };
+function renderSens() {
+  for (const k in sens) { $('sens_' + k).value = sens[k]; $('sensV_' + k).textContent = sens[k].toFixed(2) + '×'; }
+}
+for (const k in sens) $('sens_' + k).addEventListener('input', e => { sens[k] = +e.target.value; saveSens(); renderSens(); });
+renderSens();
+const held = a =>binds[a].some(c => c && keys[c]);
 const isBind = (a, code) => binds[a].includes(code);
 function nice(code) {
   if (!code) return '—';
@@ -49,7 +59,7 @@ $('bindList').addEventListener('mousedown', e => {
 });
 $('ctrlBtn').addEventListener('click', e => { e.stopPropagation(); rebinding = null; renderBinds(); $('binds').style.display = 'flex'; });
 $('bindDone').addEventListener('click', () => { rebinding = null; $('binds').style.display = 'none'; });
-$('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); renderHelp(); renderBinds(); });
+$('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); sens = { ...DEFAULT_SENS }; saveSens(); renderSens(); renderHelp(); renderBinds(); });
 renderHelp();
 const closeBinds = () => { rebinding = null; $('binds').style.display = 'none'; };
 $('bindX').addEventListener('click', closeBinds);
@@ -80,7 +90,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys[e.code] = false);
 addEventListener('mousedown', e => {
   const code = 'Mouse' + e.button;
-  if (rebinding) { if (!e.target.closest('#bindReset,#bindDone,#bindX')) { e.preventDefault(); assign(code); } return; }
+  if (rebinding) { if (!e.target.closest('#bindReset,#bindDone,#bindX,#sensList')) { e.preventDefault(); assign(code); } return; }
   if (chatting) { e.preventDefault(); return; } // clicking while typing doesn't shoot or steal focus from the chat box
   keys[code] = true; press(code);
 });
@@ -88,9 +98,9 @@ addEventListener('mouseup', e => keys['Mouse' + e.button] = false);
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('mousemove', e => {
   if (!locked) return;
-  const sens = .0022 * camera.fov / 75; // slower aim when zoomed
-  P.yaw -= e.movementX * sens;
-  P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch - e.movementY * sens));
+  const s = .0022 * sens.mouse * camera.fov / 75; // slower aim when zoomed
+  P.yaw -= e.movementX * s;
+  P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch - e.movementY * s));
 });
 let wheelT = 0;
 addEventListener('wheel', e => {
