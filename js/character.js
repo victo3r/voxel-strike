@@ -22,14 +22,17 @@ const EYE_COLS = { blue: [45, 95, 168], brown: [92, 58, 34], green: [60, 124, 70
 // how far the hair comes down, in rows from the top of each column.
 // front: column 0 = left edge as you look at the face. side: column 0 = the front edge. back: left to right from behind.
 // body: rows of hair hanging down the back of the body (long hair).
+// Faces meet without a jump: front[0] and front[7] equal side[0], back[0] and back[7] equal side[7] (seamHair enforces it).
 const HAIRSTYLES = {
-  short: { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 5, 6, 6], back: [7, 8, 8, 8, 8, 8, 8, 7] },
-  buzz:  { front: [2, 1, 1, 1, 1, 1, 1, 2], side: [2, 2, 2, 2, 3, 3, 3, 4], back: [5, 6, 6, 6, 6, 6, 6, 5], thin: true },
-  side:  { front: [3, 3, 3, 3, 3, 2, 2, 3], side: [3, 3, 3, 4, 4, 4, 5, 5], back: [6, 6, 6, 6, 6, 6, 6, 6], part: 2 },
-  curly: { front: [3, 2, 3, 2, 2, 3, 2, 3], side: [4, 3, 4, 4, 5, 5, 6, 6], back: [7, 7, 7, 7, 7, 7, 7, 7], curls: true },
+  short: { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 5, 6, 6], back: [6, 7, 8, 8, 8, 8, 7, 6] },
+  buzz:  { front: [2, 1, 1, 1, 1, 1, 1, 2], side: [2, 2, 2, 2, 3, 3, 3, 4], back: [4, 5, 5, 5, 5, 5, 5, 4], thin: true },
+  side:  { front: [3, 3, 3, 3, 3, 2, 2, 3], side: [3, 3, 3, 4, 4, 4, 5, 5], back: [5, 6, 6, 6, 6, 6, 6, 5], part: 2 },
+  curly: { front: [3, 2, 3, 2, 2, 3, 2, 3], side: [3, 3, 4, 4, 5, 5, 6, 6], back: [6, 7, 7, 7, 7, 7, 7, 6], curls: true },
   long:  { front: [8, 3, 2, 2, 2, 2, 3, 8], side: [8, 8, 8, 8, 8, 8, 8, 8], back: [8, 8, 8, 8, 8, 8, 8, 8], body: [5, 6, 6, 6, 6, 6, 6, 5] },
-  bob:   { front: [7, 3, 3, 3, 3, 3, 3, 7], side: [7, 6, 6, 6, 7, 7, 7, 7], back: [8, 8, 8, 8, 8, 8, 8, 8] },
+  bob:   { front: [7, 3, 3, 3, 3, 3, 3, 7], side: [7, 6, 6, 6, 7, 7, 7, 7], back: [7, 8, 8, 8, 8, 8, 8, 7] },
 };
+const seamHair = H => { H.front[0] = H.front[7] = H.side[0]; H.back[0] = H.back[7] = H.side[7]; };
+Object.values(HAIRSTYLES).forEach(seamHair);
 
 // the 8 starting looks (picked in the lobby, more detail in the customizer later)
 const PRESETS = [
@@ -165,9 +168,10 @@ function paintSkin(g, L, rnd) {
   }
   if (L.top === 'hoodie') {
     for (let x = 1; x < 7; x++) for (let y = 7; y < 10; y++) at(BF, x, y, shadeC(TOP, y === 7 ? -30 : -14), 14); // front pocket
-    for (let y = 1; y < 4; y++) { at(BF, 3, y, TOP2, 8); at(BF, 4, y, TOP2, 8); } // strings
+    for (let y = 1; y < 4; y++) { at(BF, 2, y, y === 3 ? shadeC(TOP2, -30) : TOP2, 8); at(BF, 5, y, y === 3 ? shadeC(TOP2, -30) : TOP2, 8); } // strings, darker tips
     at(BF, 3, 0, SK, 8); at(BF, 4, 0, SK, 8);
-    for (let x = 0; x < 8; x++) { at(BB, x, 0, shadeC(TOP, 18), 12); at(BB, x, 1, shadeC(TOP, 14), 12); at(BB, x, 2, shadeC(TOP, -20), 10); } // hood folded down
+    const hood = [shadeC(TOP, 18), shadeC(TOP, 14), shadeC(TOP, -20)]; // folded down, carried round onto the column of each side next to the back
+    hood.forEach((col, y) => { for (let x = 0; x < 8; x++) at(BB, x, y, col, 12); at(body.right, 0, y, col, 12); at(body.left, 3, y, col, 12); });
   }
   if (L.top === 'jacket') {
     for (let y = 0; y < 10; y++) for (let x = 2; x < 6; x++) at(BF, x, y, TOP2, 12); // the shirt under it
@@ -175,7 +179,12 @@ function paintSkin(g, L, rnd) {
     at(BF, 1, 0, shadeC(TOP, 22)); at(BF, 6, 0, shadeC(TOP, 22)); at(BF, 1, 1, shadeC(TOP, 22)); at(BF, 6, 1, shadeC(TOP, 22)); // collar
   }
   if (L.extra === 'badge') { at(BF, 5, 3, [255, 210, 63]); at(BF, 6, 3, [255, 210, 63]); at(BF, 5, 4, [255, 210, 63]); at(BF, 6, 4, [184, 144, 31]); }
-  if (H.body) for (let x = 0; x < 8; x++) for (let y = 0; y < H.body[x]; y++) hairPx(BB, x, y, y === H.body[x] - 1);
+  if (H.body) {
+    for (let x = 0; x < 8; x++) for (let y = 0; y < H.body[x]; y++) hairPx(BB, x, y, y === H.body[x] - 1);
+    // the back's edge columns carry on round the corner onto the side column next to the back
+    for (let y = 0; y < H.body[0]; y++) hairPx(body.left, 3, y, y === H.body[0] - 1);
+    for (let y = 0; y < H.body[7]; y++) hairPx(body.right, 0, y, y === H.body[7] - 1);
+  }
 
   // ---- arms ----
   const sleeve = { tee: 4, long: 11, tank: 0, hoodie: 11, jacket: 11 }[L.top] ?? 4;
