@@ -1,9 +1,9 @@
 // Every person in the game (the lobby character, bots, later the customizer) is built here from a "look".
-// Proportions are Minecraft's, in skin pixels: head 8x8x8, body 8x12x4, legs 4x12x4, arms 4x12x4 (3 wide when slim).
+// Proportions are Minecraft's, in skin pixels: head 8x8x8, body 8x12x4, legs 4x12x4, arms 4x12x4.
 // The texture is one 64x64 skin laid out like a Minecraft skin, so a hand-drawn skin image could be swapped in later.
 //
-// look = { skin: 0-5, girl, slim, eyes, hair, hairC, top, topC, top2, bottom, bottomC, shoes, shoeC, extra }
-//   hair:   short | buzz | side | curly | long | ponytail | bun
+// look = { skin: 0-5, girl, eyes, hair, hairC, top, topC, top2, bottom, bottomC, shoes, shoeC, extra }
+//   hair:   short | buzz | side | curly | long | bob
 //   top:    tee | long | tank | hoodie | jacket   (top2 = the shirt under the jacket, or the hoodie strings)
 //   bottom: pants | shorts      shoes: sneakers | boots | plain
 //   extra:  null | glasses | stubble | beard | freckles | headband | badge
@@ -16,24 +16,23 @@ const EYE_COLS = { blue: [45, 95, 168], brown: [92, 58, 34], green: [60, 124, 70
 // front: column 0 = left edge as you look at the face. side: column 0 = the front edge. back: left to right from behind.
 // body: rows of hair hanging down the back of the body (long hair).
 const HAIRSTYLES = {
-  short:    { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 5, 6, 6], back: [6, 6, 6, 6, 6, 6, 6, 6] },
-  buzz:     { front: [2, 1, 1, 1, 1, 1, 1, 2], side: [2, 2, 2, 2, 3, 3, 3, 4], back: [4, 4, 4, 4, 4, 4, 4, 4], thin: true },
-  side:     { front: [3, 3, 3, 3, 3, 2, 2, 3], side: [3, 3, 3, 4, 4, 4, 5, 5], back: [5, 5, 5, 5, 5, 5, 5, 5], part: 2 },
-  curly:    { front: [3, 2, 3, 2, 2, 3, 2, 3], side: [4, 3, 4, 4, 5, 5, 6, 6], back: [6, 6, 6, 6, 6, 6, 6, 6], curls: true },
-  long:     { front: [8, 3, 2, 2, 2, 2, 3, 8], side: [8, 8, 8, 8, 8, 8, 8, 8], back: [8, 8, 8, 8, 8, 8, 8, 8], body: [5, 6, 6, 6, 6, 6, 6, 5] },
-  ponytail: { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 4, 4, 5, 6, 7], back: [8, 8, 8, 8, 8, 8, 8, 8], piece: 'tail' },
-  bun:      { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 4, 5, 5], back: [6, 6, 6, 6, 6, 6, 6, 6], piece: 'bun' },
+  short: { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 5, 6, 6], back: [7, 7, 7, 7, 7, 7, 7, 7] },
+  buzz:  { front: [2, 1, 1, 1, 1, 1, 1, 2], side: [2, 2, 2, 2, 3, 3, 3, 4], back: [5, 5, 5, 5, 5, 5, 5, 5], thin: true },
+  side:  { front: [3, 3, 3, 3, 3, 2, 2, 3], side: [3, 3, 3, 4, 4, 4, 5, 5], back: [6, 6, 6, 6, 6, 6, 6, 6], part: 2 },
+  curly: { front: [3, 2, 3, 2, 2, 3, 2, 3], side: [4, 3, 4, 4, 5, 5, 6, 6], back: [7, 7, 7, 7, 7, 7, 7, 7], curls: true },
+  long:  { front: [8, 3, 2, 2, 2, 2, 3, 8], side: [8, 8, 8, 8, 8, 8, 8, 8], back: [8, 8, 8, 8, 8, 8, 8, 8], body: [5, 6, 6, 6, 6, 6, 6, 5] },
+  bob:   { front: [7, 3, 3, 3, 3, 3, 3, 7], side: [7, 6, 6, 6, 7, 7, 7, 7], back: [8, 8, 8, 8, 8, 8, 8, 8] },
 };
 
 // the 8 starting looks (picked in the lobby, more detail in the customizer later)
 const PRESETS = [
   { name: 'CLASSIC', look: { skin: 2, eyes: 'blue', hair: 'short', hairC: 'dark', top: 'tee', topC: 0x1c9e98, bottom: 'pants', bottomC: 0x2c3e80, shoes: 'plain', shoeC: 0x3a3a40, extra: 'badge' } },
   { name: 'HOODIE', look: { skin: 1, eyes: 'brown', hair: 'short', hairC: 'black', top: 'hoodie', topC: 0x33363d, top2: 0xdddddd, bottom: 'pants', bottomC: 0x3d5a8c, shoes: 'sneakers', shoeC: 0xb8342c } },
-  { name: 'PONYTAIL', look: { skin: 0, girl: true, eyes: 'green', hair: 'ponytail', hairC: 'blonde', top: 'tee', topC: 0xd4577a, bottom: 'pants', bottomC: 0x3f5f99, shoes: 'sneakers', shoeC: 0xf0f0f0 } },
+  { name: 'BOB', look: { skin: 0, girl: true, eyes: 'green', hair: 'bob', hairC: 'blonde', top: 'tee', topC: 0xd4577a, bottom: 'pants', bottomC: 0x3f5f99, shoes: 'sneakers', shoeC: 0xf0f0f0 } },
   { name: 'JACKET', look: { skin: 3, eyes: 'brown', hair: 'side', hairC: 'brown', top: 'jacket', topC: 0x5a3a24, top2: 0xe6e6e6, bottom: 'pants', bottomC: 0x2e2e34, shoes: 'boots', shoeC: 0x4a3020, extra: 'stubble' } },
   { name: 'LONG HAIR', look: { skin: 4, girl: true, eyes: 'dark', hair: 'long', hairC: 'black', top: 'long', topC: 0x6a4fb0, bottom: 'pants', bottomC: 0x2a2f3a, shoes: 'plain', shoeC: 0x26262a } },
   { name: 'CURLY', look: { skin: 5, eyes: 'dark', hair: 'curly', hairC: 'black', top: 'tank', topC: 0xe8c33a, bottom: 'shorts', bottomC: 0x3a4a5a, shoes: 'sneakers', shoeC: 0x2a2a2e } },
-  { name: 'BUN', look: { skin: 1, girl: true, eyes: 'blue', hair: 'bun', hairC: 'auburn', top: 'hoodie', topC: 0x4f8a5a, top2: 0xf2f2f2, bottom: 'shorts', bottomC: 0x2f3440, shoes: 'sneakers', shoeC: 0xe8e8e8, extra: 'glasses' } },
+  { name: 'GLASSES', look: { skin: 1, girl: true, eyes: 'blue', hair: 'curly', hairC: 'auburn', top: 'hoodie', topC: 0x4f8a5a, top2: 0xf2f2f2, bottom: 'shorts', bottomC: 0x2f3440, shoes: 'sneakers', shoeC: 0xe8e8e8, extra: 'glasses' } },
   { name: 'BEARD', look: { skin: 2, eyes: 'green', hair: 'buzz', hairC: 'ginger', top: 'long', topC: 0x8a2e2e, bottom: 'pants', bottomC: 0x4b4033, shoes: 'boots', shoeC: 0x3a2618, extra: 'beard' } },
 ];
 
@@ -57,7 +56,6 @@ const PARTS = {
   head: [0, 0, 8, 8, 8], body: [16, 16, 8, 12, 4],
   legR: [0, 16, 4, 12, 4], legL: [16, 48, 4, 12, 4], armR: [40, 16, 4, 12, 4], armL: [32, 48, 4, 12, 4],
 };
-const HAIR_SPOT = [56, 16, 8, 16], TIE_SPOT = [0, 0, 8, 8]; // spare skin space: plain hair for the ponytail/bun, and the hair-tie color
 
 const skinCache = new Map();
 function skinTexture(look) {
@@ -74,7 +72,7 @@ function skinTexture(look) {
 function paintSkin(g, L, rnd) {
   const SK = SKIN_TONES[L.skin ?? 2], HC = HAIR_COLS[L.hairC] ?? HAIR_COLS.dark, EYE = EYE_COLS[L.eyes] ?? EYE_COLS.blue;
   const TOP = hexRGB(L.topC ?? 0x1c9e98), TOP2 = hexRGB(L.top2 ?? 0xe6e6e6), BOT = hexRGB(L.bottomC ?? 0x2c3e80), SHOE = hexRGB(L.shoeC ?? 0x3a3a40);
-  const H = HAIRSTYLES[L.hair] ?? HAIRSTYLES.short, slim = L.slim ?? !!L.girl, aw = slim ? 3 : 4;
+  const H = HAIRSTYLES[L.hair] ?? HAIRSTYLES.short;
   const px = (x, y, col, v = 0) => { const k = (rnd() - .5) * v; g.fillStyle = `rgb(${col[0] + k | 0},${col[1] + k | 0},${col[2] + k | 0})`; g.fillRect(x, y, 1, 1); };
   const fill = ([x0, y0, w, h], col, v) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px(x0 + x, y0 + y, col, v); };
   const at = (r, x, y, col, v) => { if (x >= 0 && y >= 0 && x < r[2] && y < r[3]) px(r[0] + x, r[1] + y, col, v); };
@@ -146,7 +144,7 @@ function paintSkin(g, L, rnd) {
   // ---- arms ----
   const sleeve = { tee: 4, long: 11, tank: 0, hoodie: 11, jacket: 11 }[L.top] ?? 4;
   for (const p of ['armR', 'armL']) {
-    const r = regions(PARTS[p][0], PARTS[p][1], aw, 12, 4);
+    const r = regions(PARTS[p][0], PARTS[p][1], 4, 12, 4);
     for (const f of ['front', 'back', 'left', 'right']) for (let y = 0; y < 12; y++) for (let x = 0; x < r[f][2]; x++) {
       if (y < sleeve) at(r[f], x, y, y === sleeve - 1 && sleeve > 0 ? shadeC(TOP, -26) : TOP, 20);
       else at(r[f], x, y, SK, 10);
@@ -176,13 +174,11 @@ function paintSkin(g, L, rnd) {
     for (let c = 0; c < 3; c++) sideFront(c, 4, fr);
   }
   if (L.extra === 'stubble' || L.extra === 'beard') {
-    const beard = L.extra === 'beard', col = beard ? HC : mixC(SK, HC, .45);
-    for (let y = beard ? 5 : 6; y < 8; y++) for (let x = 0; x < 8; x++) {
-      if (y === 6 && x > 1 && x < 6) continue; // keep the mouth
-      if (y === 5 && x > 0 && x < 7) { if (beard && (x === 2 || x === 5)) at(F, x, y, col, 10); continue; } // mustache ends
-      if (beard || rnd() < .7) at(F, x, y, col, 10);
-    }
-    for (let c = 0; c < (beard ? 3 : 2); c++) for (let y = 5; y < 8; y++) sideFront(c, y, col, 10);
+    // solid, low-noise shapes: the jaw corners beside the mouth, the whole chin row, and the jaw on each side
+    const beard = L.extra === 'beard', col = beard ? mixC(HC, SK, .15) : mixC(SK, HC, .3);
+    for (const x of [0, 1, 6, 7]) at(F, x, 6, col, 4);
+    for (let x = 0; x < 8; x++) at(F, x, 7, col, 4);
+    for (let c = 0; c < (beard ? 3 : 2); c++) { sideFront(c, 7, col, 4); if (beard) sideFront(c, 6, col, 4); }
   }
   if (L.extra === 'freckles') for (const [x, y] of [[1, 5], [2, 6], [5, 5], [6, 6], [0, 5], [7, 5]]) at(F, x, y, shadeC(SK, -32), 6);
   if (L.extra === 'headband') {
@@ -190,10 +186,6 @@ function paintSkin(g, L, rnd) {
     for (let x = 0; x < 8; x++) { at(F, x, 2, band, 10); at(head.back, x, 2, band, 10); }
     for (let c = 0; c < 8; c++) sideFront(c, 2, band, 10);
   }
-
-  // spare spots used by the ponytail / bun pieces
-  for (let y = 0; y < HAIR_SPOT[3]; y++) for (let x = 0; x < HAIR_SPOT[2]; x++) px(HAIR_SPOT[0] + x, HAIR_SPOT[1] + y, x % 3 === 1 ? shadeC(HC, -8) : HC, 16);
-  fill(TIE_SPOT, shadeC(HC, -30), 6); // the tie: hair bunched tight, so a bit darker
 }
 
 // a box whose faces show the given parts of the skin. BoxGeometry face order: +x, -x, +y, -y, +z, -z.
@@ -210,30 +202,21 @@ function skinBox(w, h, d, U, faces) {
   return geo;
 }
 const partBox = (w, h, d, u, v, U) => { const R = regions(u, v, w, h, d); return skinBox(w, h, d, U, [R.left, R.right, R.top, R.bottom, R.front, R.back]); };
-const spotBox = (w, h, d, U, [x, y]) => skinBox(w, h, d, U, [[x, y, d, h], [x, y, d, h], [x, y, w, d], [x, y, w, d], [x, y, w, h], [x, y, w, h]]);
 
 // U = size of one skin pixel in world units (1/16 = 2 blocks tall).
 // Returns the group plus the pivots you animate: headPiv (neck), armR/armL (shoulders), legR/legL (hips).
 // parts = the meshes bullets can hit; mats = materials to flash when hurt.
 function buildChar(look, U = 1 / 16) {
-  const mat = lam({ map: skinTexture(look) }), H = HAIRSTYLES[look.hair] ?? HAIRSTYLES.short;
-  const slim = look.slim ?? !!look.girl, aw = slim ? 3 : 4;
+  const mat = lam({ map: skinTexture(look) });
   const g = new THREE.Group();
   const mesh = (geo, parent, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x * U, y * U, z * U); parent.add(m); return m; };
   const body = mesh(partBox(8, 12, 4, 16, 16, U), g, 0, 18, 0);
   const headPiv = new THREE.Group(); headPiv.position.y = 24 * U; g.add(headPiv);
   const head = mesh(partBox(8, 8, 8, 0, 0, U), headPiv, 0, 4, 0); head.userData.head = true;
   const pivot = (x, y) => { const p = new THREE.Group(); p.position.set(x * U, y * U, 0); g.add(p); return p; };
-  const ax = 4 + aw / 2;
-  const armR = pivot(-ax, 22), armL = pivot(ax, 22), legR = pivot(-2, 12), legL = pivot(2, 12);
-  const armRM = mesh(partBox(aw, 12, 4, 40, 16, U), armR, 0, -4, 0), armLM = mesh(partBox(aw, 12, 4, 32, 48, U), armL, 0, -4, 0);
+  const armR = pivot(-6, 22), armL = pivot(6, 22), legR = pivot(-2, 12), legL = pivot(2, 12);
+  const armRM = mesh(partBox(4, 12, 4, 40, 16, U), armR, 0, -4, 0), armLM = mesh(partBox(4, 12, 4, 32, 48, U), armL, 0, -4, 0);
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
-  if (H.piece === 'tail') { // hangs from a tie on the back of the head, swinging out a little
-    const piv = new THREE.Group(); piv.position.set(0, 5 * U, -4.4 * U); piv.rotation.x = .3; headPiv.add(piv);
-    mesh(spotBox(2.4, 1, 2, U, TIE_SPOT), piv, 0, 0, -.6);
-    mesh(spotBox(3, 7, 2, U, HAIR_SPOT), piv, 0, -3.8, -.8);
-  }
-  if (H.piece === 'bun') mesh(spotBox(4, 3, 3, U, HAIR_SPOT), headPiv, 0, 6.4, -5);
   return { g, head, headPiv, body, armR, armL, legR, legL, parts: [head, body, armRM, armLM, legRM, legLM], mats: [mat] };
 }
 
@@ -249,7 +232,7 @@ function randomLook(seedStr, topC) {
   const top = pick(['tee', 'tee', 'long', 'hoodie', 'jacket', 'tank']), bottomC = pick([0x2c3e80, 0x3d5a8c, 0x2e2e34, 0x4b4033, 0x3a4a5a, 0x55606a]);
   return {
     skin: r() * 6 | 0, girl, eyes: pick(Object.keys(EYE_COLS)),
-    hair: girl ? pick(['long', 'long', 'ponytail', 'ponytail', 'bun', 'curly', 'short']) : pick(['short', 'short', 'buzz', 'side', 'side', 'curly']),
+    hair: girl ? pick(['long', 'long', 'bob', 'bob', 'curly', 'side']) : pick(['short', 'short', 'buzz', 'side', 'side', 'curly']),
     hairC: pick(['black', 'black', 'dark', 'dark', 'brown', 'brown', 'auburn', 'ginger', 'blonde']),
     top, topC, top2: top === 'jacket' ? (dark(topC) ? 0xe6e6e6 : 0x2a2a30) : 0xeeeeee,
     bottom: r() < .3 ? 'shorts' : 'pants', bottomC,
