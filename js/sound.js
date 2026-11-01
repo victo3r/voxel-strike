@@ -74,15 +74,21 @@ function kit(c, seed) {
       if (pk) for (let i = 0; i < o.length; i++) o[i] *= v / pk;
       const src = c.createBufferSource(); src.buffer = b; src.connect(out); src.start(t);
     },
-    // two metal parts hitting: a noise tick plus a few short out-of-tune rings. body = the weight behind it (a dull noisy thud, not a tone)
+    // two parts of a gun hitting: a sharp noise tick colored by a few heavily damped resonances around f.
+    // They die out within a few ms so it reads as a click/clack, not a ringing glass or bell. d = how long the tick rattles.
+    // body = the weight behind it (a dull noisy thud, not a tone)
     clack({ t = 0, f = 2400, d = .02, v = .8, body = 0 }) {
-      const modes = [1, 1.52, 2.17, 2.94, 3.81].map((k, i) => [f * k * (.96 + r() * .08), 1 / (1 + i * .7), r() * 6.28, d / (1 + i * .35)]);
-      s.draw(t, d * 5 + .04, o => {
+      const tau = Math.min(d * .12, .0025);
+      const res = [[1, 1], [.55, .8], [1.8, .4]].map(([k, A]) => {
+        const R = Math.exp(-1 / (tau * SR)), w = 6.2832 * f * k * (.93 + r() * .14) / SR;
+        return { A: A * (1 - R) * 2 * Math.sin(w), c1: 2 * R * Math.cos(w), c2: -R * R, y1: 0, y2: 0 };
+      });
+      s.draw(t, d * 3 + .05 + body * .03, o => {
         let lp = 0, lp2 = 0;
         for (let i = 0; i < o.length; i++) {
-          const x = i / SR, w = r() * 2 - 1;
-          let y = w * Math.exp(-x / .0015) * .9;
-          for (const [fr, a, ph, dd] of modes) y += a * Math.sin(6.2832 * fr * x + ph) * Math.exp(-x / dd);
+          const x = i / SR, w = r() * 2 - 1, ex = w * (Math.exp(-x / .0006) + .08 * Math.exp(-x / (d * .4)));
+          let y = ex * .5;
+          for (const q of res) { const yy = ex + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A * 6; }
           if (body) { lp += (w - lp) * .06; lp2 += (lp - lp2) * .06; y += body * lp2 * 8 * Math.exp(-x / .012); }
           o[i] = y;
         }
@@ -100,21 +106,40 @@ function kit(c, seed) {
         }
       }, v);
     },
-    // a short vocal grunt: a buzzing voice through vowel resonances, pitch sliding f0 -> f1
-    voice({ t = 0, d = .18, f0 = 170, f1 = 120, v = 1, fm = [[640, 80, 1], [1190, 90, .5], [2390, 120, .22]], breath = .25 }) {
-      s.draw(t, d * 1.6 + .05, o => {
-        const res = fm.map(([F, B, A]) => ({ A, c1: 2 * Math.exp(-Math.PI * B / SR) * Math.cos(2 * Math.PI * F / SR), c2: -Math.exp(-2 * Math.PI * B / SR), y1: 0, y2: 0 }));
-        let ph = 0, prev = 0, jit = 0;
+    // a human grunt or groan. A buzzing voice goes through the mouth's vowel resonances (fm = [freq, width, level]),
+    // which slide toward fm2 as the mouth closes. h = the breathy "h" before the voice starts. Pitch rises from f0 to fpk
+    // (the effort), then falls to f1. rough = growl/strain (every other vocal-cord cycle is weaker), rough2 = how rough it ends.
+    // tail = the breath let out after
+    voice({ t = 0, d = .18, f0 = 150, fpk = 190, pk = .15, f1 = 115, v = 1, h = .015, rough = .25, rough2 = rough, breath = .3, tail = .08,
+      fm = [[640, 90, 1], [1190, 100, .5], [2390, 140, .22], [3300, 220, .1], [3750, 260, .06]], fm2 = fm }) {
+      s.draw(t, h + d + tail + .06, o => {
+        const res = fm.map(() => ({ y1: 0, y2: 0 }));
+        let ph = 0, prev = 0, jit = 0, amp = 1, cyc = 0, lo = 0;
         for (let i = 0; i < o.length; i++) {
-          const x = i / SR, p = Math.min(1, x / d);
-          jit += (r() * 2 - 1 - jit) * .01;
-          ph = (ph + f0 * (f1 / f0) ** p * (1 + jit * .04) / SR) % 1;
-          const g = ph < .45 ? Math.sin(Math.PI * ph / .45) ** 2 : 0, dg = g - prev; prev = g;
-          const env = Math.min(1, x / .012) * (x < d * .5 ? 1 : Math.exp(-(x - d * .5) / (d * .25)));
-          const src = (dg * 20 + (r() * 2 - 1) * breath * (x < .025 ? 1.5 : .5)) * env;
+          const x = i / SR - h, p = Math.max(0, Math.min(1, x / d));
+          let g = 0;
+          if (x >= 0) {
+            const f = p < pk ? f0 + (fpk - f0) * p / pk : fpk * (f1 / fpk) ** ((p - pk) / (1 - pk));
+            jit += (r() * 2 - 1 - jit) * .03;
+            ph += f * (1 + jit * .08) / SR;
+            if (ph >= 1) { ph -= 1; cyc++; amp = (1 - r() * .35) * (cyc % 2 ? 1 - (rough + (rough2 - rough) * p) : 1); }
+            g = ph < .55 ? Math.sin(Math.PI * ph / .55) ** 2 * amp : 0;
+          }
+          const dg = g - prev; prev = g;
+          const venv = x < 0 ? 0 : Math.min(1, x / .006) * (x < d * .45 ? 1 : Math.exp(-(x - d * .45) / (d * .22)));
+          const w = r() * 2 - 1;
+          const asp = x < 0 ? Math.min(1, (x + h) / .004) * .8 : 0; // the "h" before it
+          const out = x > d * .5 ? .45 * Math.exp(-(x - d * .5) / tail) * Math.min(1, (x - d * .5) / .03) : 0; // breathing out after
+          const src = dg * 22 * venv + w * (breath * venv * (.3 + g) + (asp + out) * breath);
           let y = 0;
-          for (const q of res) { const yy = src + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A; }
-          o[i] = y;
+          fm.forEach(([F, B, A], k) => {
+            const [F2, B2, A2] = fm2[k], q = res[k];
+            const Fx = F + (F2 - F) * p, Bx = B + (B2 - B) * p, Ax = A + (A2 - A) * p;
+            const R = Math.exp(-Math.PI * Bx / SR), yy = src + 2 * R * Math.cos(6.2832 * Fx / SR) * q.y1 - R * R * q.y2;
+            q.y2 = q.y1; q.y1 = yy; y += yy * Ax;
+          });
+          lo += (y - lo) * .55; // take the harsh top off, so it sounds like a chest and not a speaker
+          o[i] = lo;
         }
       }, v);
     },
@@ -221,13 +246,25 @@ const SOUNDS = {
   r_flare: [1.3, .45, s => { s.latch(.1); s.shell(.6); s.latch(1.0); }],
 
   // ---- getting hit. These play from whoever got hit, so a far-away hit is barely audible ----
-  hurt: [.35, .75, s => { s.impact(0); s.voice({ t: .01, d: .17, f0: 175, f1: 125 }); }], // a thud and an "uhh"
-  hurtHead: [.4, .8, s => { // same, plus a bright "tink"
-    s.impact(0); s.voice({ t: .01, d: .17, f0: 185, f1: 130, v: .9 });
-    s.tone({ f: 1800, d: .22, v: .5 }); s.tone({ f: 2700, d: .14, v: .3 });
+  // a short, strained "hgh!" pushed out of the chest, the mouth closing toward "uhm"
+  hurt: [.4, .75, s => {
+    s.impact(0);
+    s.voice({ t: .005, h: .02, d: .15, f0: 135, fpk: 185, pk: .2, f1: 110, rough: .3, rough2: .55, breath: .35, tail: .06,
+      fm2: [[480, 100, 1], [1050, 110, .45], [2300, 150, .18], [3300, 240, .08], [3750, 280, .05]] });
   }],
-  armorHit: [.35, .55, s => { s.ring({ f: 900, d: .28, v: .7 }); s.hiss({ ft: 'highpass', f: 5000, d: .04, v: .5 }); }],
-  die: [.9, .8, s => { s.impact(0); s.voice({ t: .01, d: .5, f0: 165, f1: 85, breath: .4, fm: [[600, 90, 1], [1000, 100, .5], [2400, 140, .2]] }); }], // a falling groan
+  hurtHead: [.45, .8, s => { // same grunt, sharper, with a hard crack on top
+    s.impact(0); s.clack({ f: 1300, d: .012, v: .7, body: .7 }); s.hiss({ ft: 'bandpass', f: 3200, q: 1.2, d: .02, v: .5 });
+    s.voice({ t: .01, h: .012, d: .15, f0: 150, fpk: 205, pk: .15, f1: 115, rough: .35, rough2: .6, breath: .4, tail: .06, v: .9,
+      fm2: [[480, 100, 1], [1050, 110, .45], [2300, 150, .18], [3300, 240, .08], [3750, 280, .05]] });
+  }],
+  armorHit: [.3, .55, s => { s.clack({ f: 1100, d: .02, v: 1, body: .8 }); s.hiss({ ft: 'bandpass', f: 2800, q: 1.3, d: .03, v: .45 }); }], // bullet into a plate
+  // a groan that strains up, breaks into a rough fry, and fades out on a last breath ("aAAghh...hhh")
+  die: [1.2, .8, s => {
+    s.impact(0);
+    s.voice({ t: .005, h: .03, d: .55, f0: 140, fpk: 200, pk: .12, f1: 75, rough: .2, rough2: .85, breath: .45, tail: .28,
+      fm: [[750, 100, 1], [1180, 110, .55], [2500, 150, .22], [3400, 230, .1], [3800, 270, .06]],
+      fm2: [[520, 120, 1], [1000, 130, .4], [2350, 170, .15], [3300, 260, .06], [3750, 300, .04]] });
+  }],
 
   // ---- kills (only for yours) ----
   kill: [.45, .55, s => { s.tone({ f: 120, f2: 60, d: .1, v: .8 }); s.tone({ type: 'triangle', f: 1046, t: .02, d: .3, v: .6 }); s.tone({ f: 2093, t: .02, d: .15, v: .2 }); }],
@@ -250,9 +287,9 @@ const SOUNDS = {
     s.hiss({ ft: 'highpass', f: 8000, a: .05, d: .35, v: .15 });
   }],
   pickAmmo: [.45, .6, s => { s.magOut(0); s.magIn(.14); }],
-  pickArmor: [.75, .65, s => { // metal armor clanking on
-    s.ring({ f: 420, d: .5, v: .7, ratios: [1, 2.4, 3.9, 5.6] }); s.ring({ f: 690, t: .07, d: .4, v: .5 });
-    s.hiss({ ft: 'bandpass', f: 3000, d: .05, v: .5 }); s.tone({ f: 110, f2: 70, d: .1, v: .5 });
+  pickArmor: [.5, .65, s => { // a strap pulled tight, then the plates settling on
+    s.scrape({ d: .1, f: 900, v: .4 });
+    s.clack({ t: .1, f: 900, d: .025, v: 1, body: 1 }); s.clack({ t: .19, f: 1300, d: .015, v: .55, body: .5 });
   }],
 
   // ---- zombies ----
@@ -265,7 +302,7 @@ const SOUNDS = {
     s.hiss({ f: 600, a: .1, d: 1, v: .5 });
   }],
   bossCharge: [.6, .7, s => { s.tone({ type: 'sawtooth', f: 60, f2: 130, a: .05, d: .4, v: .8, lp: 600 }); s.hiss({ ft: 'bandpass', f: 300, f2: 900, a: .05, d: .4, v: .6 }); }],
-  bonk: [.5, .6, s => { s.tone({ f: 420, f2: 200, d: .3, v: .8 }); s.ring({ f: 600, d: .3, v: .4 }); }],
+  bonk: [.4, .6, s => { s.tone({ f: 420, f2: 200, d: .2, v: .7 }); s.clack({ f: 800, d: .02, v: .8, body: 1 }); }],
   smash: [.5, .8, s => { s.tone({ f: 120, f2: 40, d: .3, v: 1 }); s.hiss({ f: 1000, f2: 100, d: .3, v: .8 }); }],
 
   // ---- menus and match events ----
@@ -280,6 +317,8 @@ const SOUNDS = {
   levelUp: [.9, .5, s => { s.arp(0, [523, 784, 1046, 1568, 2093], { gap: .045, d: .4, v: .4 }); s.hiss({ ft: 'highpass', f: 7000, t: .15, a: .05, d: .5, v: .2 }); }],
 };
 
+// small close-up sounds (gun handling, voices, steps) get much less of the shared echo, so clicks don't smear into a ringing room
+const CLOSE = /^(r_|dry$|equip$|pick|hurt|die$|armorHit$|step|land$|ui$|slash$)/;
 // render every recipe into a buffer, scaled so its loudest point is the same for all of them
 const soundsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [len, v, build]], i) => {
   const c = new OfflineAudioContext(1, Math.ceil(SR * len), SR);
@@ -287,7 +326,7 @@ const soundsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [len, v
   const buf = await c.startRendering(), d = buf.getChannelData(0);
   let peak = 0; for (let k = 0; k < d.length; k++) peak = Math.max(peak, Math.abs(d[k]));
   if (peak > 0) for (let k = 0; k < d.length; k++) d[k] /= peak;
-  BUF[name] = { buf, v };
+  BUF[name] = { buf, v, echo: CLOSE.test(name) ? .2 : 1 };
 }));
 soundsReady.catch(e => console.warn('sound setup failed', e));
 
@@ -317,7 +356,7 @@ function sfx(name, { at = null, v = 1, rate = 1, far = 60 } = {}) {
   if (cut < 19000) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.max(600, cut); n = n.connect(lp); }
   if (pan) { const p = ac.createStereoPanner(); p.pan.value = pan; n = n.connect(p); }
   n.connect(bus);
-  const sg = ac.createGain(); sg.gain.value = send; n.connect(sg).connect(verbIn);
+  const sg = ac.createGain(); sg.gain.value = send * BUF[name].echo; n.connect(sg).connect(verbIn);
   src.start();
   return src;
 }
