@@ -52,10 +52,11 @@ function makeZombie(x, z, type) {
 }
 function spawnZombie(type = pickType()) {
   const r0 = .3 * ZTYPES[type].scale;
-  for (let tries = 0; tries < 40; tries++) {
-    const side = Math.random() * 4 | 0, r = (Math.random() * 2 - 1) * (A - 2), e = A - 1.5;
-    const x = side === 0 ? -e : side === 1 ? e : r, z = side === 2 ? -e : side === 3 ? e : r;
-    if (!blocked(x, z, r0, 0) && Math.hypot(x - P.pos.x, z - P.pos.z) > 10) return makeZombie(x, z, type);
+  for (let tries = 0; tries < 80; tries++) {
+    let x, z;
+    if (MAP.water) { x = (Math.random() * 2 - 1) * (A - 2); z = (Math.random() * 2 - 1) * (A - 2); } // the edges are sea: anywhere on dry land
+    else { const side = Math.random() * 4 | 0, r = (Math.random() * 2 - 1) * (A - 2), e = A - 1.5; x = side === 0 ? -e : side === 1 ? e : r; z = side === 2 ? -e : side === 3 ? e : r; }
+    if (!blocked(x, z, r0, 0) && !overWater(x, z, 0) && Math.hypot(x - P.pos.x, z - P.pos.z) > (MAP.water ? 14 : 10)) return makeZombie(x, z, type);
   }
 }
 // quiet = burn damage: small orange sparks, no red flash or hit marker
@@ -97,6 +98,23 @@ function hurtPlayer(d, pierce = false, by = null, head = false) {
   $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
   if (P.hp <= 0 && mode === 'dm') { P.hp = 0; youDown(by); return; }
   if (P.hp <= 0 && !dead) { P.hp = 0; dead = true; saveBest(); document.exitPointerLock(); }
+}
+// fell into deep water: a splash, then you're out, whatever your HP and armor
+function splash(at) { burst(at.clone().setY(at.y + .3), 0xd8f2fa, 14); }
+function drownYou() {
+  if (respawnT > 0 || matchOver || dead) return;
+  sfx('splash'); splash(P.pos);
+  P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = 0;
+  if (mode === 'dm') { youDown(null); return; }
+  dead = true; saveBest(); document.exitPointerLock();
+}
+// a bot or zombie in the water. A zombie counts as your kill (you lured it in). A bot's death goes to nobody
+function drownZombie(z) {
+  if (z.dead) return;
+  sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position);
+  if (z.type === 'bot') { z.hp = 0; z.dead = .0001; botDown(z, null, false, true); return; }
+  if (z.type === 'exploder') z.boomed = true; // the water puts its fuse out
+  hurtZombie(z, z.hp + 1, z.g.position.clone(), false, true);
 }
 // high score: best wave reached, ties go to more kills. Saved in the browser like your keybinds.
 let best = { wave: 0, kills: 0 }, newBest = false;

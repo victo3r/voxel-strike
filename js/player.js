@@ -61,6 +61,16 @@ function slideOut(pos, nx, nz, r, h) {
   if (blocked(tx, tz, r, pos.y, pos) || groundAt(tx, tz, r, pos.y) > pos.y + .001) return false;
   pos.x = tx; pos.z = tz; return true;
 }
+// deep water (MAP.water): nobody can swim, so whoever ends up in it drowns. Only your middle counts, so you can stand right at the edge
+const inWater = (x, z, feet) => !!MAP.water?.(x, z, feet);
+// walkTo for bots and zombies: they won't step into water themselves, or jump over it (they check where they'd land)
+const overWater = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, 0, feet));
+function walkDry(pos, nx, nz, r, grounded) {
+  const ox = pos.x, oy = pos.y, oz = pos.z, lag = pos.lag;
+  if (!walkTo(pos, nx, nz, r, grounded)) return false;
+  if (!overWater(pos.x, pos.z, pos.y) || overWater(ox, oz, oy)) return true;
+  pos.x = ox; pos.y = oy; pos.z = oz; pos.lag = lag; return false;
+}
 // gravity for bots and zombies, the same as yours: walking off an edge they fall, but they stay on their feet down stairs.
 // A positive vy is a jump in progress, a negative one a fall.
 function settle(o, dt) {

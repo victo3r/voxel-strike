@@ -555,13 +555,14 @@ for (let i = 0; i < 16; i++) {
   const c2 = box(w * .55, 2.5, d * .6, cloudMat); c2.position.set(x + (rnd() - .5) * w * .3, y + 2.4, z + (rnd() - .5) * d * .3); add(c2);
 }
 
-// footsteps: wading in the pool or the sea, the sand and the lawn on the ground
+// the water is deep: your middle over the pool below the deck, or over the sea at ground level (not on the pier or a boat)
+M.water = (x, z, feet) => feet < .8 && x > POOL[0] && x < POOL[1] && z > POOL[2] && z < POOL[3] || feet < .1 && kindAt(x, z) === SEA;
+// footsteps: the sand and the lawn on the ground
 M.surfAt = (x, z, y, base, s) => {
-  if (y < .8 && x > POOL[0] && x < POOL[1] && z > POOL[2] && z < POOL[3]) return 'water';
   if (s) return base;
   if (Math.abs(x - LX) < LI && Math.abs(z - LZ) < LI) return 'stone'; // the lighthouse's ground floor
   if (x > PIT[0] && x < PIT[1] && z > PIT[2] && z < PIT[3]) return 'sand';
-  const k = kindAt(x, z); return k === SEA ? 'water' : k === GRASS ? 'grass' : 'sand';
+  return kindAt(x, z) === GRASS ? 'grass' : 'sand';
 };
 M.tick = () => {
   const t = performance.now() / 1000;

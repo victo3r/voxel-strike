@@ -127,7 +127,7 @@ function spawnSpot(skip) {
   let best = null, bestD = -1;
   for (let tries = 0; tries < 60; tries++) {
     const x = (Math.random() * 2 - 1) * (A - 2), z = (Math.random() * 2 - 1) * (A - 2);
-    if (blocked(x, z, .45, 0) || MAP.land && !MAP.land(x, z)) continue; // not in the sea on the island map
+    if (blocked(x, z, .45, 0) || MAP.land && !MAP.land(x, z) || overWater(x, z, 0)) continue; // not in the sea or the pool
     const d = others.length ? Math.min(...others.map(o => Math.hypot(x - o.x, z - o.z))) : 99;
     if (d > bestD) { bestD = d; best = [x, z]; }
   }
@@ -160,11 +160,11 @@ function makeBot(rec) {
   zombies.push(b); rec.b = b;
   return b;
 }
-// a bot died (called from hurtZombie). by = the bot that killed it, or null if it was you
-function botDown(b, by, head) {
+// a bot died (called from hurtZombie). by = the bot that killed it, or null if it was you. nobody = it drowned, no credit
+function botDown(b, by, head, nobody = false) {
   b.tag.visible = false; b.flashM.visible = false; b.rec.wait = BOT.respawn + 1.5; // its body takes 1.5s to fall
-  sfx('die', { at: b.g.position, far: 40 });
-  scoreKill(by ? by.rec : youRec, b.rec, head);
+  if (!nobody) sfx('die', { at: b.g.position, far: 40 });
+  scoreKill(nobody ? null : by ? by.rec : youRec, b.rec, head);
 }
 // you died in deathmatch (called from hurtPlayer). by = the bot that got you, or nothing if it was your own rocket
 function youDown(by) {
@@ -313,8 +313,8 @@ function updateBot(b, dt) {
   if (ml > .05) {
     const s = BOT.speed * dt / ml; mx *= s; mz *= s;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
-    if (!walkTo(pos, pos.x + mx, pos.z, b.r, grounded)) bump = true;
-    if (!walkTo(pos, pos.x, pos.z + mz, b.r, grounded)) bump = true;
+    if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded)) bump = true;
+    if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded)) bump = true;
     if (bump && sees) b.strafe = -b.strafe;
     if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) {
       b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1;
@@ -329,6 +329,7 @@ function updateBot(b, dt) {
   } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; }
   const air = b.vy < -6;
   settle(b, dt);
+  if (inWater(pos.x, pos.z, pos.y)) { drownZombie(b); return; }
   if (air && !b.vy) sfx('land_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)), { at: pos, far: 22, v: .7 });
 
   if (b.hp < b.maxHp) for (const p of pads) {

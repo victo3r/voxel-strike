@@ -16,7 +16,7 @@ function startMap(id, def) {
   return building;
 }
 const add = (...objs) => building.root.add(...objs);
-// what a material sounds like to walk on: 'grass', 'sand', 'wood', 'stone', 'metal' or 'water'. Solids built from it pick it up
+// what a material sounds like to walk on: 'grass', 'sand', 'wood', 'stone' or 'metal'. Solids built from it pick it up
 const surf = (m, s) => { m.userData.surf = s; return m; };
 function addBlock(x, z, w, d, h, m) { // a solid box you can stand on; stops bullets
   const mesh = box(w, h, d, m); mesh.position.set(x, h / 2, z); add(mesh);

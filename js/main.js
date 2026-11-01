@@ -28,6 +28,7 @@ function update(dt) {
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
   if (!wasAir && P.vy <= 0 && sticks(prevY - gy, P.onRamp)) P.pos.y = gy; // walking down stairs: stay on your feet. Off anything else you fall
   if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; } else P.onGround = false;
+  if (inWater(P.pos.x, P.pos.z, P.pos.y)) drownYou();
   easeLag(P.pos, dt);
   camera.position.set(P.pos.x, P.pos.y + 1.6 - (P.pos.lag || 0), P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
@@ -94,6 +95,7 @@ function update(dt) {
     }
     if (z.type === 'bot') { updateBot(z, dt); continue; }
     settle(z, dt);
+    if (inWater(z.g.position.x, z.g.position.z, z.g.position.y)) { drownZombie(z); continue; }
     const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = P.pos.y - z.g.position.y;
     const way = MAP.nav?.(z.g.position, P.pos); // a different floor of a building: head for the stairs first
     const wx = way ? way.x - z.g.position.x : dx, wz = way ? way.z - z.g.position.z : dz, wd = Math.hypot(wx, wz) || .001;
@@ -158,8 +160,8 @@ function update(dt) {
         if (od < (z.r + o.r) * 1.15 && od > 0) { vx += ox / od; vz += oz / od; }
       }
       const s = spd * dt, nx = z.g.position.x + vx * s, nz = z.g.position.z + vz * s;
-      walkTo(z.g.position, nx, z.g.position.z, z.r, !z.vy); // no climbing ledges in mid-air
-      walkTo(z.g.position, z.g.position.x, nz, z.r, !z.vy);
+      walkDry(z.g.position, nx, z.g.position.z, z.r, !z.vy); // no climbing ledges in mid-air
+      walkDry(z.g.position, z.g.position.x, nz, z.r, !z.vy);
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
     } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.type === 'boss' ? 3.5 : 2.2)) { // the boss can reach you on tall crates

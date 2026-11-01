@@ -116,7 +116,7 @@ function kit(c, seed) {
       }, v);
     },
     // a hollow knock: noise hitting a few low resonances that die out over tau (wood, a metal deck). Low and short, so it doesn't ring
-    knock({ t = 0, f = 300, tau = .02, v = .8, parts = [[1, 1], [1.58, .55], [2.37, .3]] }) {
+    knock({ t = 0, f = 300, tau = .02, v = .8, parts = [[1, 1], [1.58, .55], [2.37, .3]], grit = .15 }) {
       const res = parts.map(([k, A]) => {
         const R = Math.exp(-1 / (tau * SR * (1 - .25 * Math.log2(k)))), w = 6.2832 * f * k * (.96 + r() * .08) / SR;
         return { A: A * (1 - R), c1: 2 * R * Math.cos(w), c2: -R * R, y1: 0, y2: 0 };
@@ -124,9 +124,26 @@ function kit(c, seed) {
       s.draw(t, tau * 6 + .02, o => {
         for (let i = 0; i < o.length; i++) {
           const x = i / SR, ex = (r() * 2 - 1) * Math.exp(-x / .0012);
-          let y = ex * .15;
+          let y = ex * grit; // grit = how much of the raw hit you hear on top of the knock
           for (const q of res) { const yy = ex + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A * 4; }
           o[i] = y;
+        }
+      }, v);
+    },
+    // a board creaking under weight: wood sticking and slipping, a tiny tick each time, faster from f to f2,
+    // ringing through the board's low resonances. Swells in and out over d
+    creak({ t = 0, d = .16, f = 100, f2 = f * 1.3, v = .4, res = [520, 1150, 2100] }) {
+      const rs = res.map((F, k) => { const R = Math.exp(-Math.PI * F * .12 / SR); return { A: (1 - R) / (1 + k * .7), c1: 2 * R * Math.cos(6.2832 * F / SR), c2: -R * R, y1: 0, y2: 0 }; });
+      s.draw(t, d + .02, o => {
+        let ph = 1, jit = 0;
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR, p = Math.min(1, x / d);
+          jit += (r() * 2 - 1 - jit) * .02;
+          ph += f * (f2 / f) ** p * (1 + jit * .6) / SR;
+          let ex = 0; if (ph >= 1) { ph -= 1; ex = .5 + r() * .5; }
+          let y = 0;
+          for (const q of rs) { const yy = ex + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A; }
+          o[i] = y * Math.sin(Math.PI * p) ** .6;
         }
       }, v);
     },
@@ -374,21 +391,27 @@ const FOOT = {
   },
   metal(s, t, k, w) { // a dull clunk on an iron deck
     s.thud({ t, d: .035, f: 150 * k, v: .7 * w });
-    s.knock({ t, f: 520 * k, tau: .03, v: .8 * w, parts: [[1, 1], [2.03, .45], [2.9, .4], [4.2, .2]] });
-    s.clack({ t, f: 1900 * k, d: .008, v: .35 * w });
-  },
-  water(s, t, k, w) { // a splash with some bubbling
-    s.hiss({ t, ft: 'bandpass', f: 500 * k, f2: 2000 * k, q: 1.2, a: .02, d: .16, v: .7 * w });
-    s.crunch({ t, a: .01, d: .14, dens: .012, lo: 300 * k, hi: 1800 * k, v: .8 * w });
-    s.thud({ t, d: .06, f: 100, v: .5 * w });
+    s.knock({ t, f: 520 * k, tau: .03, v: .8 * w, grit: .04, parts: [[1, 1], [2.03, .45], [2.9, .4], [4.2, .2]] });
+    s.clack({ t, f: 1500 * k, d: .006, v: .12 * w });
   },
 };
+// creaks under the boards: [step, other foot, landing]. Each sounds a little different, but the same every time
+const CREAK = [{ t: .05, d: .17, f: 88, f2: 122, v: .3 }, { t: .055, d: .13, f: 125, f2: 100, v: .24 }, { t: .04, d: .24, f: 76, f2: 108, v: .34 }];
+const AFTER = { wood: (s, n) => s.creak(CREAK[n]) };
 for (const [surf, foot] of Object.entries(FOOT)) {
-  const toe = surf === 'water' ? .08 : .05; // heel, then the rest of the foot rolling down
-  SOUNDS['step_' + surf] = [.32, .38, s => { foot(s, 0, 1, 1); foot(s, toe, 1.08, .45); }];
-  SOUNDS['step_' + surf + '2'] = [.32, .38, s => { foot(s, 0, .93, 1); foot(s, toe + .006, 1, .45); }];
-  SOUNDS['land_' + surf] = [.42, .55, s => { s.thud({ d: .09, f: 110, v: 1 }); foot(s, 0, .9, 1.3); foot(s, .022, .97, 1); }]; // both feet, nearly together
+  const toe = .05, after = AFTER[surf] || (() => {}); // heel, then the rest of the foot rolling down
+  SOUNDS['step_' + surf] = [.32, .38, s => { foot(s, 0, 1, 1); foot(s, toe, 1.08, .45); after(s, 0); }];
+  SOUNDS['step_' + surf + '2'] = [.32, .38, s => { foot(s, 0, .93, 1); foot(s, toe + .006, 1, .45); after(s, 1); }];
+  SOUNDS['land_' + surf] = [.38, .5, s => { s.thud({ d: .04, f: 170, v: .55 }); foot(s, 0, .95, 1.1); foot(s, .022, 1, .85); after(s, 2); }]; // both feet, nearly together
 }
+// falling into deep water: the slap, the spray coming back down, and bubbles rising after
+SOUNDS.splash = [1.1, .8, s => {
+  s.thud({ d: .07, f: 130, v: .7 });
+  s.hiss({ ft: 'lowpass', f: 5500, f2: 1500, a: .002, d: .07, v: .9 });
+  s.hiss({ ft: 'bandpass', f: 2600, f2: 700, q: .8, a: .02, d: .42, v: .65, sweep: .5 });
+  s.crunch({ t: .03, a: .02, d: .32, dens: .02, lo: 900, hi: 6500, v: .5 });
+  for (let i = 0; i < 16; i++) { const t = .04 + s.r() ** 1.5 * .75, f = 380 + s.r() * 900; s.tone({ f, f2: f * 1.7, t, a: .003, d: .03 + s.r() * .05, v: .22 * (1 - t * .9) }); }
+}];
 const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
 // small close-up sounds (gun handling, voices, steps) get much less of the shared echo, so clicks don't smear into a ringing room
