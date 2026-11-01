@@ -518,7 +518,16 @@ const tufts = [];
 for (let tries = 0; tufts.length < 600 && tries < 9000; tries++) {
   const x = -O + rnd() * N, z = -O + rnd() * N;
   if (kindAt(x, z) !== GRASS || x > PIT[0] - .5 && x < PIT[1] + .5 && z > PIT[2] - .5 && z < PIT[3] + .5 || !free(x, z, .4)) continue;
-  const s = .6 + rnd() * .6; tufts.push([x, hAt(x, z), z, 1.1 * s, .8 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
+  const s = .6 + rnd() * .6, h = hAt(x, z), hw = .55 * s, i0 = ci(x), j0 = ci(z);
+  // the tuft can face any way, so it reaches hw out in every direction. Skip it if that would hang off a terrace or poke into one
+  let edge = false;
+  for (let b = -1; b <= 1 && !edge; b++) for (let a = -1; a <= 1; a++) {
+    const i = i0 + a, j = j0 + b, nx = i - O, nz = j - O;
+    if (inGrid(i, j) && H[at(i, j)] === h && kind[at(i, j)] === GRASS) continue;
+    if (Math.hypot(Math.max(nx - x, 0, x - nx - 1), Math.max(nz - z, 0, z - nz - 1)) < hw) { edge = true; break; }
+  }
+  if (edge) continue;
+  tufts.push([x, h, z, 1.1 * s, .8 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
 }
 grassTufts(tufts);
 

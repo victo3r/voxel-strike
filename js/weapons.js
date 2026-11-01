@@ -77,11 +77,13 @@ function renderHotbar() {
 const vm = new THREE.Group(); camera.add(vm); vm.position.set(.32, -.3, -.55);
 const flashMesh = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 }));
 const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
-function place(mesh, x, y, z) { mesh.position.set(x, y, z); vm.add(mesh); return mesh; }
+let into = vm; // the group the gun models below are being built into (your viewmodel, or a bot's hands)
+function place(mesh, x, y, z) { mesh.position.set(x, y, z); into.add(mesh); return mesh; }
 let gunSpin = null, gunSpinV = 0; // the eradicator's barrel cluster, and how fast it's spinning
-// viewmodels: guns point down -z, the hand sits near z = 0. Each one returns where its muzzle is,
-// plus where the gold upgrade bands go (z spots and the band's width/height)
-const P_ = (w, h, d, mat, x, y, z) => place(box(w, h, d, mat), x, y, z);
+// gun models: guns point down -z, the hand sits near z = 0. Each one returns where its muzzle is,
+// plus where the gold upgrade bands go (z spots and the band's width/height).
+// A piece with no material (c.skin on a bot, which holds the gun with its own arms) is left out
+const P_ = (w, h, d, mat, x, y, z) => mat ? place(box(w, h, d, mat), x, y, z) : new THREE.Object3D();
 const GUN_MODELS = {
   voxel(c) {
     P_(.08, .07, .3, c.mat(0x666666), 0, .02, -.15); // slide
@@ -149,12 +151,12 @@ const GUN_MODELS = {
     P_(.04, .03, .03, dk, 0, .09, -.03); P_(.04, .03, .03, dk, 0, .09, -.21);
     P_(.1, .13, .15, c.mat(0x5a5a2a), -.13, -.03, -.08); // ammo box
     P_(.03, .03, .1, c.mat(0xc9a43a), -.08, .02, -.16); // belt
-    gunSpin = new THREE.Group(); gunSpin.position.set(0, 0, -.47); vm.add(gunSpin);
+    const spin = c.spin = new THREE.Group(); spin.position.set(0, 0, -.47); into.add(spin);
     for (let k = 0; k < 6; k++) {
       const a = k / 6 * Math.PI * 2, b = box(.03, .03, .46, c.dark);
-      b.position.set(Math.cos(a) * .045, Math.sin(a) * .045, 0); gunSpin.add(b);
+      b.position.set(Math.cos(a) * .045, Math.sin(a) * .045, 0); spin.add(b);
     }
-    for (const z of [-.12, .16]) { const r = box(.14, .14, .03, dk); r.position.z = z; gunSpin.add(r); }
+    for (const z of [-.12, .16]) { const r = box(.14, .14, .03, dk); r.position.z = z; spin.add(r); }
     P_(.06, .06, .06, dk, 0, 0, -.25); // spindle
     P_(.07, .16, .08, dk, 0, -.15, -.02).rotation.x = .3; // grip
     P_(.15, .15, .15, c.skin, 0, -.18, .02);
@@ -175,48 +177,53 @@ const GUN_MODELS = {
     return { muzzle: [0, -.9], bands: [-.18, -.52], band: [.18, .18] };
   },
 };
-function buildGun() {
-  const w = WEAPONS[cur]; vm.clear(); gunSpin = null;
-  const m = lam({ color: w.color }), dark = lam({ color: 0x1e1e1e }), skin = lam({ color: 0xe0ac7a });
-  flashMesh.visible = false;
+// builds gun i's model into group g with `stars` gold upgrade bands, the same model in your hands and a bot's.
+// hand = false leaves the hand cube out. Returns { muzzle: [y, z], spin } (spin = the eradicator's barrels)
+const gunMats = {};
+function makeGun(i, g, stars, hand = true) {
+  const w = WEAPONS[i]; into = g;
+  const mat = col => gunMats[col] ??= lam({ color: col });
+  const glow = col => gunMats['g' + col] ??= new THREE.MeshBasicMaterial({ color: col });
+  const dark = mat(0x1e1e1e), skin = hand ? mat(0xe0ac7a) : null, gold = gunMats.gold ??= lam({ color: 0xffcc22, emissive: 0x553300 });
+  let out;
   const custom = GUN_MODELS[w.id];
   if (custom) {
-    const mats = {}, c = {
-      dark, skin,
-      mat: col => mats[col] ??= lam({ color: col }),
-      glow: col => mats['g' + col] ??= new THREE.MeshBasicMaterial({ color: col }),
-    };
-    const { muzzle: [my, mz], bands, band: [bw, bh] } = custom(c);
-    flashMesh.position.set(0, my, mz - .04); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight);
-    const gold = lam({ color: 0xffcc22, emissive: 0x553300 }); // one gold band per upgrade
-    for (let s = 0; s < lvl[cur]; s++) P_(bw, bh, .035, gold, 0, 0, bands[s]);
-    return;
+    const c = { dark, skin, mat, glow, spin: null };
+    const { muzzle, bands, band: [bw, bh] } = custom(c);
+    for (let s = 0; s < stars; s++) P_(bw, bh, .035, gold, 0, 0, bands[s]); // one gold band per upgrade
+    out = { muzzle, spin: c.spin };
+  } else if (w.model === 'knife') { // handle, guard, blade pointing forward
+    P_(.05, .07, .16, mat(0x5a3a1a), 0, 0, -.02);
+    P_(.14, .03, .04, mat(0x888888), 0, 0, -.12);
+    P_(.025, .08, .32, gunMats.blade ??= lam({ color: w.color, emissive: 0x222222 }), 0, .005, -.3);
+    P_(.14, .14, .14, skin, 0, -.03, 0);
+    out = { muzzle: [0, -.42], spin: null };
+  } else {
+    const thick = w.model === 'flare' ? .12 : .1;
+    P_(thick, thick + .02, w.len, mat(w.color), 0, 0, -w.len / 2);
+    if (w.model !== 'flare') P_(.05, .05, .2, dark, 0, .02, -w.len - .1); // barrel (the flare gun's fat muzzle is its own barrel)
+    if (w.model === 'flare') { // fat dark muzzle with the glowing flare sitting inside it
+      P_(.17, .17, .1, dark, 0, .01, -w.len - .02);
+      P_(.08, .08, .02, glow(0xffaa33), 0, .01, -w.len - .075);
+    }
+    P_(.08, .18, .1, dark, 0, -.12, -.06).rotation.x = .25; // grip
+    P_(.15, .15, .15, skin, 0, -.16, .02); // hand
+    if (w.model === 'flame') { // red fuel tank under the gun and a little pilot flame at the tip
+      P_(.13, .2, .22, mat(0xcc3333), 0, -.15, -.32);
+      P_(.04, .04, .04, glow(0xffaa33), 0, .06, -w.len - .2);
+    }
+    for (let s = 0; s < stars; s++) P_(thick + .01, thick + .03, .04, gold, 0, 0, -w.len * (.35 + s * .3));
+    out = { muzzle: [.02, -w.len - .21], spin: null };
   }
-  if (w.model === 'knife') { // handle, guard, blade pointing forward
-    place(box(.05, .07, .16, lam({ color: 0x5a3a1a })), 0, 0, -.02);
-    place(box(.14, .03, .04, lam({ color: 0x888888 })), 0, 0, -.12);
-    place(box(.025, .08, .32, lam({ color: w.color, emissive: 0x222222 })), 0, .005, -.3);
-    place(box(.14, .14, .14, skin), 0, -.03, 0);
-    return;
-  }
-  const thick = w.model === 'flare' ? .12 : .1;
-  place(box(thick, thick + .02, w.len, m), 0, 0, -w.len / 2);
-  place(box(.05, .05, .2, dark), 0, .02, -w.len - .1).visible = w.model !== 'flare'; // barrel (the flare gun's fat muzzle is its own barrel)
-  if (w.model === 'flare') { // fat dark muzzle with the glowing flare sitting inside it
-    place(box(.17, .17, .1, dark), 0, .01, -w.len - .02);
-    place(box(.08, .08, .02, new THREE.MeshBasicMaterial({ color: 0xffaa33 })), 0, .01, -w.len - .075);
-  }
-  place(box(.08, .18, .1, dark), 0, -.12, -.06).rotation.x = .25; // grip
-  place(box(.15, .15, .15, skin), 0, -.16, .02); // hand
-  if (w.model === 'flame') { // red fuel tank under the gun and a little pilot flame at the tip
-    place(box(.13, .2, .22, lam({ color: 0xcc3333 })), 0, -.15, -.32);
-    place(box(.04, .04, .04, new THREE.MeshBasicMaterial({ color: 0xffaa33 })), 0, .06, -w.len - .2);
-  }
-  flashMesh.position.set(0, .02, -w.len - .25);
-  flashLight.position.copy(flashMesh.position);
-  vm.add(flashMesh, flashLight);
-  const gold = lam({ color: 0xffcc22, emissive: 0x553300 }); // one gold band per upgrade
-  for (let s = 0; s < lvl[cur]; s++) place(box(thick + .01, thick + .03, .04, gold), 0, 0, -w.len * (.35 + s * .3));
+  into = vm;
+  return out;
+}
+function buildGun() {
+  vm.clear(); flashMesh.visible = false;
+  const { muzzle: [my, mz], spin } = makeGun(cur, vm, lvl[cur]);
+  gunSpin = spin;
+  if (WEAPONS[cur].melee) return;
+  flashMesh.position.set(0, my, mz - .04); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight);
 }
 function cycle(d) { let s = slotOf(cur); do s = (s + d + CATS.length) % CATS.length; while (slotGun[s] < 0); equip(slotGun[s]); }
 function selectSlot(s) {

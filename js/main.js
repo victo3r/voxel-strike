@@ -26,9 +26,10 @@ function update(dt) {
   const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
   if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } } // bumped your head
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
-  if (!wasAir && P.vy <= 0 && prevY - gy <= STEP) P.pos.y = gy; // walking down stairs or off a low ledge: stay on your feet
-  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land'); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; } else P.onGround = false;
-  camera.position.set(P.pos.x, P.pos.y + 1.6, P.pos.z);
+  if (!wasAir && P.vy <= 0 && sticks(prevY - gy, P.onRamp)) P.pos.y = gy; // walking down stairs: stay on your feet. Off anything else you fall
+  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land'); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; } else P.onGround = false;
+  easeLag(P.pos, dt);
+  camera.position.set(P.pos.x, P.pos.y + 1.6 - (P.pos.lag || 0), P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
   if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33; stepAlt = !stepAlt; sfx(P.pos.y > .05 ? 'stepCrate' : stepAlt ? 'step' : 'step2', { v: .7 }); } }
   else stepT = .08; // first step comes right after you start moving
@@ -80,6 +81,7 @@ function update(dt) {
 
   for (let i = zombies.length - 1; i >= 0; i--) {
     const z = zombies[i];
+    easeLag(z.g.position, dt);
     if (z.dead) {
       z.dead += dt; z.g.rotation.x = -Math.min(z.dead * 4, Math.PI / 2);
       if (z.dead > 1.5) { scene.remove(z.g); zombies.splice(i, 1); }
@@ -156,8 +158,8 @@ function update(dt) {
         if (od < (z.r + o.r) * 1.15 && od > 0) { vx += ox / od; vz += oz / od; }
       }
       const s = spd * dt, nx = z.g.position.x + vx * s, nz = z.g.position.z + vz * s;
-      walkTo(z.g.position, nx, z.g.position.z, z.r, true);
-      walkTo(z.g.position, z.g.position.x, nz, z.r, true);
+      walkTo(z.g.position, nx, z.g.position.z, z.r, !z.vy); // no climbing ledges in mid-air
+      walkTo(z.g.position, z.g.position.x, nz, z.r, !z.vy);
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
     } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.type === 'boss' ? 3.5 : 2.2)) { // the boss can reach you on tall crates
@@ -234,5 +236,9 @@ const clock = new THREE.Clock();
   const live = !dead && !shopOpen && !matchOver;
   if (live) update(dt);
   soundTick(dt, live);
+  // bots and zombies are drawn a little low for a moment after stepping up a ledge, so they climb it smoothly
+  const lagged = zombies.filter(z => z.g.position.lag), realY = lagged.map(z => z.g.position.y);
+  for (const z of lagged) z.g.position.y -= z.g.position.lag;
   renderer.render(scene, camera);
+  lagged.forEach((z, k) => z.g.position.y = realY[k]);
 })();

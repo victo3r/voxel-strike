@@ -133,6 +133,7 @@ function spawnSpot(skip) {
   }
   return best ?? [0, 0];
 }
+const FLASH_MAT = new THREE.MeshBasicMaterial({ color: 0xffdd55 });
 function makeBot(rec) {
   const [x, z] = spawnSpot();
   const keys = Object.keys(BOT_GUNS), gun = gi(keys[Math.random() * keys.length | 0]), W = BASE[gun];
@@ -142,14 +143,16 @@ function makeBot(rec) {
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
   for (const a of [ch.armR, ch.armL]) { aim.add(a); a.position.y = 0; }
   ch.armR.rotation.set(-Math.PI / 2, 0, .2); ch.armL.rotation.set(-Math.PI / 2, 0, -.85);
-  const gunM = box(.09, .13, W.len, lam({ color: W.color })); gunM.position.set(-4 * u, -1.5 * u, 9 * u + W.len / 2);
-  const flashM = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 })); flashM.position.set(-4 * u, -1.5 * u, 9 * u + W.len + .05); flashM.visible = false;
-  aim.add(gunM, flashM);
+  // the same gun model you see in your own hands, turned to point forward out of the bot's hands
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin } = makeGun(gun, gunM, 0, false);
+  gunM.rotation.y = Math.PI; gunM.position.set(-4 * u, .5 * u, 10 * u);
+  const flashM = box(.14, .14, .14, FLASH_MAT); flashM.position.set(0, my, mz - .04); flashM.visible = false;
+  gunM.add(flashM); aim.add(gunM);
   const tag = new THREE.Sprite(rec.tag); tag.scale.set(rec.tagW, .25, 1); tag.position.y = 2.25;
   g.add(tag); scene.add(g);
   const yaw = Math.atan2(-x, -z);
   g.rotation.y = yaw;
-  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, flashM, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
+  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, flashM, spin, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun, ammo: W.mag, reload: 0, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
@@ -170,7 +173,7 @@ function youDown(by) {
 }
 function respawnYou() {
   const [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { vy: 0, kx: 0, kz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0 }); P.pos.set(x, groundAt(x, z, .35, 0), z);
+  Object.assign(P, { vy: 0, kx: 0, kz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   cancelReload(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
@@ -277,6 +280,7 @@ function updateBot(b, dt) {
   b.g.rotation.y = b.aimYaw; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
   b.cd -= dt; b.muzzle -= dt; b.flashM.visible = b.muzzle > 0;
+  if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels, like yours
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   const ready = sees && b.seeT >= BOT.react && b.reload <= 0;
   b.aimT = ready && sniper ? b.aimT + dt : 0;

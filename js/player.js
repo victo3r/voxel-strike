@@ -9,7 +9,21 @@ function topAt(s, x, z, r) {
   return Math.max(h(c - r), h(c + r));
 }
 function blocked(x, z, r, feet) { return solids.some(s => overlaps(s, x, z, r) && feet < topAt(s, x, z, r) - 0.05 && feet + BODY > (s.bot || 0)); }
-function groundAt(x, z, r, feet) { let g = 0; for (const s of solids) if (overlaps(s, x, z, r)) { const t = topAt(s, x, z, r); if (t <= feet + 0.05) g = Math.max(g, t); } return g; }
+let groundRamp = false; // set by groundAt: whether the floor it found is a stair slope
+function groundAt(x, z, r, feet) {
+  let g = 0; groundRamp = false;
+  for (const s of solids) if (overlaps(s, x, z, r)) {
+    const t = topAt(s, x, z, r);
+    if (t > feet + 0.05 || t < g) continue;
+    if (t > g) { g = t; groundRamp = !!s.ramp; } else if (s.ramp) groundRamp = true;
+  }
+  return g;
+}
+// walking down stairs keeps you on your feet. Off any other edge you fall, unless the drop is too small to notice
+const sticks = (drop, wasRamp) => drop <= STEP && (groundRamp || wasRamp || drop < .06);
+// stepping up a ledge moves you up at once, but what you see (your camera, a bot's body) catches up over a moment.
+// pos.lag = how far below the real height it's drawn right now
+function easeLag(pos, dt) { if (pos.lag) { pos.lag *= Math.exp(-14 * dt); if (pos.lag < .005) pos.lag = 0; } }
 // lowest ceiling between feet+BODY and feet+BODY+rise, or Infinity
 function ceilingAt(x, z, r, feet, rise) { let c = Infinity; for (const s of solids) { const b = s.bot || 0; if (b > feet + BODY - .1 && b < feet + BODY + rise && overlaps(s, x, z, r)) c = Math.min(c, b); } return c; }
 // move a walker (you, a bot, a zombie) to nx, nz. Walks up anything up to STEP high if it's standing on something.
@@ -17,18 +31,18 @@ function walkTo(pos, nx, nz, r, grounded) {
   if (!blocked(nx, nz, r, pos.y)) { pos.x = nx; pos.z = nz; return true; }
   if (!grounded) return false;
   const up = groundAt(nx, nz, r, pos.y + STEP);
-  if (up > pos.y && !blocked(nx, nz, r, up)) { pos.x = nx; pos.z = nz; pos.y = up; return true; }
+  if (up > pos.y && !blocked(nx, nz, r, up)) { if (!groundRamp) pos.lag = Math.min(STEP * 1.5, (pos.lag || 0) + up - pos.y); pos.x = nx; pos.z = nz; pos.y = up; return true; }
   return false;
 }
-// gravity for bots and zombies: drop to the floor, snapping down stairs instead of falling off each step.
-// A positive vy is a jump in progress.
+// gravity for bots and zombies, the same as yours: walking off an edge they fall, but they stay on their feet down stairs.
+// A positive vy is a jump in progress, a negative one a fall.
 function settle(o, dt) {
   const p = o.g.position, gy = groundAt(p.x, p.z, o.r, p.y);
-  if (!o.vy && p.y - gy <= STEP) { p.y = gy; return; }
+  if (!o.vy && sticks(p.y - gy, o.onRamp)) { p.y = gy; o.onRamp = groundRamp; return; }
   const prev = p.y;
   o.vy = (o.vy || 0) - 25 * dt; p.y = Math.max(gy, p.y + o.vy * dt);
   if (o.vy > 0) { const c = ceilingAt(p.x, p.z, o.r, prev, p.y - prev); if (p.y + BODY > c) { p.y = c - BODY; o.vy = -.01; } }
-  if (p.y === gy) o.vy = 0;
+  if (p.y === gy) { o.vy = 0; o.onRamp = groundRamp; }
 }
 
 // max HP is always 100. Armor is a second health bar that soaks damage before HP does (unless the damage pierces)
