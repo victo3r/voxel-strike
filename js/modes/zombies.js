@@ -100,7 +100,7 @@ function hurtPlayer(d, pierce = false, by = null, head = false) {
   if (P.hp <= 0 && !dead) { P.hp = 0; dead = true; saveBest(); document.exitPointerLock(); }
 }
 // fell into deep water: a splash, then you're out, whatever your HP and armor
-function splash(at) { burst(at.clone().setY(at.y + .3), 0xd8f2fa, 14); }
+function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 14); } // at the surface, you've already gone under
 function drownYou() {
   if (respawnT > 0 || matchOver || dead) return;
   sfx('splash'); splash(P.pos);

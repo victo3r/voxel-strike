@@ -130,20 +130,21 @@ function kit(c, seed) {
         }
       }, v);
     },
-    // a board creaking under weight: wood sticking and slipping, a tiny tick each time, faster from f to f2,
-    // ringing through the board's low resonances. Swells in and out over d
-    creak({ t = 0, d = .16, f = 100, f2 = f * 1.3, v = .4, res = [520, 1150, 2100] }) {
-      const rs = res.map((F, k) => { const R = Math.exp(-Math.PI * F * .12 / SR); return { A: (1 - R) / (1 + k * .7), c1: 2 * R * Math.cos(6.2832 * F / SR), c2: -R * R, y1: 0, y2: 0 }; });
-      s.draw(t, d + .02, o => {
+    // a board creaking under weight: the wood sticks and slips, an uneven tick each time (some slips skipped, some bigger),
+    // at f to f2 ticks a second. Each tick rings the board's narrow, uneven resonances (res = [freq, width]).
+    // The ticks are too fast and too ragged, and the ringing too high and narrow, to sound like a voice. Swells in and out over d
+    creak({ t = 0, d = .12, f = 420, f2 = f * 1.25, v = .3, res = [[1380, 45], [2270, 60], [3610, 90]] }) {
+      const rs = res.map(([F, bw], k) => { const R = Math.exp(-Math.PI * bw / SR); return { A: (1 - R) / (1 + k * .5), c1: 2 * R * Math.cos(6.2832 * F / SR), c2: -R * R, y1: 0, y2: 0 }; });
+      s.draw(t, d + .06, o => {
         let ph = 1, jit = 0;
         for (let i = 0; i < o.length; i++) {
           const x = i / SR, p = Math.min(1, x / d);
-          jit += (r() * 2 - 1 - jit) * .02;
-          ph += f * (f2 / f) ** p * (1 + jit * .6) / SR;
-          let ex = 0; if (ph >= 1) { ph -= 1; ex = .5 + r() * .5; }
+          jit += (r() * 2 - 1 - jit) * .08;
+          ph += f * (f2 / f) ** p * (1 + jit * 1.2) / SR;
+          let ex = 0; if (ph >= 1) { ph -= 1; if (r() > .25) ex = (r() < .15 ? 1.6 : .4 + r() * .6) * (r() < .5 ? 1 : -1); }
           let y = 0;
           for (const q of rs) { const yy = ex + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A; }
-          o[i] = y * Math.sin(Math.PI * p) ** .6;
+          o[i] = y * (x < d ? Math.sin(Math.PI * p) ** .8 : 0);
         }
       }, v);
     },
@@ -396,7 +397,9 @@ const FOOT = {
   },
 };
 // creaks under the boards: [step, other foot, landing]. Each sounds a little different, but the same every time
-const CREAK = [{ t: .05, d: .17, f: 88, f2: 122, v: .3 }, { t: .055, d: .13, f: 125, f2: 100, v: .24 }, { t: .04, d: .24, f: 76, f2: 108, v: .34 }];
+const CREAK = [{ t: .045, d: .11, f: 380, f2: 470, v: .16 },
+  { t: .05, d: .09, f: 460, f2: 400, v: .13, res: [[1520, 50], [2490, 65], [3880, 95]] },
+  { t: .035, d: .16, f: 340, f2: 430, v: .2, res: [[1290, 45], [2120, 60], [3420, 90]] }];
 const AFTER = { wood: (s, n) => s.creak(CREAK[n]) };
 for (const [surf, foot] of Object.entries(FOOT)) {
   const toe = .05, after = AFTER[surf] || (() => {}); // heel, then the rest of the foot rolling down

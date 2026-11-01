@@ -19,7 +19,7 @@ function blocked(x, z, r, feet, from) {
 // set by groundAt: whether the floor it found is a stair slope, and the solid it is (null = the map's ground)
 let groundRamp = false, groundSolid = null;
 function groundAt(x, z, r, feet) {
-  let g = 0; groundRamp = false; groundSolid = null;
+  let g = MAP.floor ? MAP.floor(x, z) : 0; groundRamp = false; groundSolid = null; // the map's ground is at 0, except where it says (deep water)
   for (const s of solids) if (overlaps(s, x, z, r)) {
     const t = topAt(s, x, z, r);
     if (t > feet + 0.05 || t < g) continue;
