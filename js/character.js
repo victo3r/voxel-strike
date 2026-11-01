@@ -89,11 +89,11 @@ function paintSkin(g, L, rnd) {
   const head = regions(...PARTS.head.slice(0, 2), 8, 8, 8);
   for (const f of ['front', 'back', 'left', 'right']) fill(head[f], SK, 10);
   // underside of the head (row 0 = chin, row 7 = back of the head, column 0 = the character's right):
-  // shaded jaw, a darker neck in the middle, and hair wherever a style reaches the bottom edge
+  // the lighting already darkens downward faces a lot, so this is painted lighter than the face with only a faint neck patch
   const HB = head.bottom;
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
     const neck = x >= 2 && x <= 5 && y >= 2 && y <= 6;
-    at(HB, x, y, shadeC(SK, neck ? -30 : (x === 0 || x === 7 || y === 0) ? -8 : -16), 8);
+    at(HB, x, y, shadeC(SK, neck ? 4 : 16), 8);
   }
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) hairPx(head.top, x, y, false);
   if (H.part !== undefined) for (let y = 0; y < 8; y++) at(head.top, H.part, y, shadeC(HC, -22), 6); // the parting line, a darker strand rather than bare scalp
