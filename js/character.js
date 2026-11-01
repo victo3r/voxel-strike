@@ -16,7 +16,7 @@ const EYE_COLS = { blue: [45, 95, 168], brown: [92, 58, 34], green: [60, 124, 70
 // front: column 0 = left edge as you look at the face. side: column 0 = the front edge. back: left to right from behind.
 // body: rows of hair hanging down the back of the body (long hair).
 const HAIRSTYLES = {
-  short: { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 5, 6, 6], back: [7, 7, 7, 7, 7, 7, 7, 7] },
+  short: { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 5, 6, 6], back: [7, 8, 8, 8, 8, 8, 8, 7] },
   buzz:  { front: [2, 1, 1, 1, 1, 1, 1, 2], side: [2, 2, 2, 2, 3, 3, 3, 4], back: [5, 5, 5, 5, 5, 5, 5, 5], thin: true },
   side:  { front: [3, 3, 3, 3, 3, 2, 2, 3], side: [3, 3, 3, 4, 4, 4, 5, 5], back: [6, 6, 6, 6, 6, 6, 6, 6], part: 2 },
   curly: { front: [3, 2, 3, 2, 2, 3, 2, 3], side: [4, 3, 4, 4, 5, 5, 6, 6], back: [7, 7, 7, 7, 7, 7, 7, 7], curls: true },
@@ -88,7 +88,7 @@ function paintSkin(g, L, rnd) {
   const head = regions(...PARTS.head.slice(0, 2), 8, 8, 8);
   for (const f of ['front', 'back', 'left', 'right', 'bottom']) fill(head[f], SK, 10);
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) hairPx(head.top, x, y, false);
-  if (H.part !== undefined) for (let y = 0; y < 8; y++) at(head.top, H.part, y, shadeC(SK, -10), 8); // the parting line
+  if (H.part !== undefined) for (let y = 0; y < 8; y++) at(head.top, H.part, y, shadeC(HC, -22), 6); // the parting line, a darker strand rather than bare scalp
   for (let x = 0; x < 8; x++) {
     for (let y = 0; y < H.front[x]; y++) hairPx(head.front, x, y, y === H.front[x] - 1);
     for (let y = 0; y < H.back[x]; y++) hairPx(head.back, x, y, y === H.back[x] - 1);
@@ -100,9 +100,9 @@ function paintSkin(g, L, rnd) {
 
   // face
   const F = head.front, open = (x, y) => H.front[x] <= y;
-  if (L.girl) {
-    if (open(1, 3)) at(F, 1, 3, [40, 30, 30]); if (open(6, 3)) at(F, 6, 3, [40, 30, 30]); // lashes
-    if (open(2, 3)) at(F, 2, 3, shadeC(HC, 10)); if (open(5, 3)) at(F, 5, 3, shadeC(HC, 10)); // thin brows
+  if (L.girl) { // soft brows, and only where there's a skin row between them and the hair so they don't merge into bangs
+    const brow = mixC(shadeC(HC, -20), SK, .4);
+    for (const [a, b] of [[1, 2], [5, 6]]) if (H.front[a] <= 2 && H.front[b] <= 2) { at(F, a, 3, brow, 4); at(F, b, 3, brow, 4); }
   } else for (const x of [1, 2, 5, 6]) if (open(x, 3)) at(F, x, 3, shadeC(HC, -6), 6); // brows
   at(F, 1, 4, [250, 250, 250]); at(F, 2, 4, EYE); at(F, 5, 4, EYE); at(F, 6, 4, [250, 250, 250]);
   at(F, 3, 5, shadeC(SK, L.girl ? -14 : -24)); at(F, 4, 5, shadeC(SK, L.girl ? -14 : -24)); // nose
@@ -174,11 +174,19 @@ function paintSkin(g, L, rnd) {
     for (let c = 0; c < 3; c++) sideFront(c, 4, fr);
   }
   if (L.extra === 'stubble' || L.extra === 'beard') {
-    // solid, low-noise shapes: the jaw corners beside the mouth, the whole chin row, and the jaw on each side
-    const beard = L.extra === 'beard', col = beard ? mixC(HC, SK, .15) : mixC(SK, HC, .3);
-    for (const x of [0, 1, 6, 7]) at(F, x, 6, col, 4);
-    for (let x = 0; x < 8; x++) at(F, x, 7, col, 4);
-    for (let c = 0; c < (beard ? 3 : 2); c++) { sideFront(c, 7, col, 4); if (beard) sideFront(c, 6, col, 4); }
+    // jaw corners beside the mouth, the chin row, and the jaw on each side, thinning out toward the ear.
+    // Light strand texture: a few pixels a shade darker or lighter, not random speckle.
+    const beard = L.extra === 'beard', col = beard ? mixC(HC, SK, .15) : mixC(SK, HC, .3), fade = mixC(col, SK, .5);
+    const bpx = (put, col) => { const r = rnd(); put(r < .2 ? shadeC(col, -10) : r > .85 ? shadeC(col, 8) : col); };
+    for (const x of [0, 1, 6, 7]) bpx(c => at(F, x, 6, c, 8), col);
+    for (let x = 0; x < 8; x++) bpx(c => at(F, x, 7, c, 8), col);
+    if (beard) for (const x of [0, 7]) at(F, x, 5, fade, 6); // soft top edge at the cheeks
+    // side jaw, front edge -> ear: full rows near the chin, thinner and lighter toward the back
+    const jaw = beard ? [[5, 6, 7], [6, 7], [6, 7], [7]] : [[6, 7], [7], [7]];
+    jaw.forEach((rows, c) => rows.forEach((y, i) => {
+      const last = c === jaw.length - 1 || (i === 0 && rows.length > 1 && y === 5);
+      bpx(k => sideFront(c, y, k, 8), last ? fade : col);
+    }));
   }
   if (L.extra === 'freckles') for (const [x, y] of [[1, 5], [2, 6], [5, 5], [6, 6], [0, 5], [7, 5]]) at(F, x, y, shadeC(SK, -32), 6);
   if (L.extra === 'headband') {
