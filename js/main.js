@@ -196,7 +196,7 @@ function update(dt) {
     const hit = ray2.intersectObjects(shotTargets(), false)[0];
     if (hit || r.life <= 0) {
       scene.remove(r.m); rockets.splice(i, 1);
-      blast(hit ? hit.point.clone() : r.m.position.clone(), ROCKET_R, r.dmg, ROCKET_SELF);
+      blast(hit ? hit.point.clone() : r.m.position.clone(), ROCKET_R, r.dmg, ROCKET_SELF, null, true);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);

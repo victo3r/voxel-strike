@@ -66,7 +66,7 @@ function flame(w) {
     zz.burn = BURN_T; zz.burnDmg = w.dmg * .6;
   }
 }
-const ROCKET_SPD = 32, ROCKET_R = 4, ROCKET_SELF = 35; // speed, blast radius, most damage it can do to you
+const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 35; // speed, blast radius, most damage it can do to you
 const rockets = [];
 function fireRocket(w) {
   camera.getWorldDirection(fwd);

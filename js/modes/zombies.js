@@ -145,7 +145,7 @@ function explode(z) {
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
-function blast(p, R, zDmg, pDmg, skip) {
+function blast(p, R, zDmg, pDmg, skip, flat) { // flat: zombies/bots take full damage anywhere in the radius
   burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
@@ -154,7 +154,7 @@ function blast(p, R, zDmg, pDmg, skip) {
   for (const o of zombies) {
     if (o === skip || o.dead) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-    if (od < R) hurtZombie(o, zDmg * (1 - od / R * .5), c, false);
+    if (od < R) hurtZombie(o, flat ? zDmg : zDmg * (1 - od / R * .5), c, false);
   }
 }
 
