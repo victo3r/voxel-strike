@@ -22,6 +22,20 @@ function addBlock(x, z, w, d, h, m) { // a solid box you can stand on; stops bul
   building.cover.push(mesh);
   return mesh;
 }
+// a box whose texture repeats every k units instead of stretching over the whole face
+function tbox(w, h, d, m, k = 1) {
+  const geo = new THREE.BoxGeometry(w, h, d), uv = geo.attributes.uv.array;
+  const size = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]; // +x, -x, +y, -y, +z, -z
+  for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const j = (f * 4 + i) * 2; uv[j] *= size[f][0] / k; uv[j + 1] *= size[f][1] / k; }
+  return new THREE.Mesh(geo, m);
+}
+// a solid box from height bot up to top, so it can float (upper floors, the wall above a window, stairs)
+function addSlab(x, z, w, d, bot, top, m, cover = true, k = 1) {
+  const mesh = tbox(w, top - bot, d, m, k); mesh.position.set(x, (bot + top) / 2, z); add(mesh);
+  building.solids.push({ mesh, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, bot, top });
+  if (cover) building.cover.push(mesh);
+  return mesh;
+}
 // a solid area with no mesh of its own (tree trunks drawn by an instanced mesh, invisible walls)
 const addSolid = (x, z, w, d, top) => building.solids.push({ mesh: null, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top });
 // invisible wall: stops players and zombies (even jumping off a tall crate) but bullets go through

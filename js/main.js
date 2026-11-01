@@ -12,19 +12,21 @@ function update(dt) {
   if (mx || mz) {
     const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * dt / len;
     const dx = (mx * c + mz * s) * sp, dz = (-mx * s + mz * c) * sp;
-    if (!blocked(P.pos.x + dx, P.pos.z, .35, P.pos.y)) P.pos.x += dx;
-    if (!blocked(P.pos.x, P.pos.z + dz, .35, P.pos.y)) P.pos.z += dz;
+    walkTo(P.pos, P.pos.x + dx, P.pos.z, .35, P.onGround);
+    walkTo(P.pos, P.pos.x, P.pos.z + dz, .35, P.onGround);
   }
   if (P.kx || P.kz) { // knockback from the boss, fades out quickly
     const kx = P.kx * dt, kz = P.kz * dt;
-    if (!blocked(P.pos.x + kx, P.pos.z, .35, P.pos.y)) P.pos.x += kx;
-    if (!blocked(P.pos.x, P.pos.z + kz, .35, P.pos.y)) P.pos.z += kz;
+    walkTo(P.pos, P.pos.x + kx, P.pos.z, .35, false);
+    walkTo(P.pos, P.pos.x, P.pos.z + kz, .35, false);
     const f = Math.exp(-5 * dt); P.kx *= f; P.kz *= f;
     if (Math.abs(P.kx) + Math.abs(P.kz) < .2) P.kx = P.kz = 0;
   }
   if (held('jump') && P.onGround) { P.vy = 9; P.onGround = false; }
   const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
+  if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } } // bumped your head
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
+  if (!wasAir && P.vy <= 0 && prevY - gy <= STEP) P.pos.y = gy; // walking down stairs or off a low ledge: stay on your feet
   if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land'); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; } else P.onGround = false;
   camera.position.set(P.pos.x, P.pos.y + 1.6, P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
@@ -85,14 +87,17 @@ function update(dt) {
     }
     if (z.burn > 0) { // on fire: takes damage every quarter second until it burns out
       z.burn -= dt;
-      if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.scale * 1.2), false, true); }
+      if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true); }
       if (z.dead) continue;
     }
     if (z.type === 'bot') { updateBot(z, dt); continue; }
-    const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz);
-    z.g.rotation.y = Math.atan2(dx, dz);
+    settle(z, dt);
+    const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = P.pos.y - z.g.position.y;
+    const way = MAP.nav?.(z.g.position, P.pos); // a different floor of a building: head for the stairs first
+    const wx = way ? way.x - z.g.position.x : dx, wz = way ? way.z - z.g.position.z : dz, wd = Math.hypot(wx, wz) || .001;
+    z.g.rotation.y = Math.atan2(wx, wz);
     // exploders stop, swell and blink when they get close, then blow up. Run!
-    if (z.type === 'exploder' && z.fuse <= 0 && dist < 1.8) { z.fuse = FUSE; z.beepT = 0; }
+    if (z.type === 'exploder' && z.fuse <= 0 && dist < 1.8 && Math.abs(dy) < 2.5) { z.fuse = FUSE; z.beepT = 0; }
     if (z.fuse > 0) {
       z.fuse -= dt;
       z.g.scale.setScalar(z.scale * (1 + (FUSE - z.fuse) * .6));
@@ -123,40 +128,39 @@ function update(dt) {
         z.charging -= dt; z.glow = 0x660000;
         z.g.rotation.y = Math.atan2(z.cdx, z.cdz);
         const s = CHARGE_SPD * dt, nx = z.g.position.x + z.cdx * s, nz = z.g.position.z + z.cdz * s;
-        if (blocked(nx, nz, z.r, 0)) {
-          z.charging = 0; z.stun = 1.8; sfx('bonk', { at: z.g.position, far: 60 }); burst(z.g.position.clone().setY(1.5), 0xaa8855, 10);
+        if (!walkTo(z.g.position, nx, nz, z.r, true)) {
+          z.charging = 0; z.stun = 1.8; sfx('bonk', { at: z.g.position, far: 60 }); burst(z.g.position.clone().setY(z.g.position.y + 1.5), 0xaa8855, 10);
         } else {
-          z.g.position.x = nx; z.g.position.z = nz;
           z.t += dt * CHARGE_SPD * 1.5;
           z.pivL.rotation.x = Math.sin(z.t) * .8; z.pivR.rotation.x = -Math.sin(z.t) * .8;
         }
         const pd = Math.hypot(P.pos.x - z.g.position.x, P.pos.z - z.g.position.z);
-        if (!z.hitP && pd < z.reach && P.pos.y < 3.5) {
+        if (!z.hitP && pd < z.reach && dy > -1 && dy < 3.5) {
           z.hitP = true; hurtPlayer(Math.round(z.dmg * 1.5));
           P.kx = z.cdx * 16; P.kz = z.cdz * 16; P.vy = Math.max(P.vy, 6); P.onGround = false;
           sfx('smash');
         }
         hold = true;
         if (z.charging <= 0) z.atk = .6; // short pause before it can swing again
-      } else if ((z.chargeT -= dt) <= 0 && dist > 4 && dist < 22) {
+      } else if ((z.chargeT -= dt) <= 0 && dist > 4 && dist < 22 && !way) {
         z.wind = WIND; z.chargeT = Math.max(2.5, 5 - wave * .1) + Math.random() * 1.5;
         sfx('bossRoar', { at: z.g.position, far: 80 });
       }
     }
     if (hold) { /* boss is winding up, charging or dazed */ }
-    else if (dist > z.reach) {
-      let vx = dx / dist, vz = dz / dist;
+    else if (way || dist > z.reach) {
+      let vx = wx / wd, vz = wz / wd;
       for (const o of zombies) { // keep them from stacking into one blob
         if (o === z || o.dead) continue;
         const ox = z.g.position.x - o.g.position.x, oz = z.g.position.z - o.g.position.z, od = Math.hypot(ox, oz);
         if (od < (z.r + o.r) * 1.15 && od > 0) { vx += ox / od; vz += oz / od; }
       }
       const s = spd * dt, nx = z.g.position.x + vx * s, nz = z.g.position.z + vz * s;
-      if (!blocked(nx, z.g.position.z, z.r, 0)) z.g.position.x = nx;
-      if (!blocked(z.g.position.x, nz, z.r, 0)) z.g.position.z = nz;
+      walkTo(z.g.position, nx, z.g.position.z, z.r, true);
+      walkTo(z.g.position, z.g.position.x, nz, z.r, true);
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
-    } else if ((z.atk -= dt) <= 0 && P.pos.y < (z.type === 'boss' ? 3.5 : 2.2)) { // the boss can reach you on tall crates
+    } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.type === 'boss' ? 3.5 : 2.2)) { // the boss can reach you on tall crates
       z.atk = z.atkRate; sfx('zAttack', { at: z.g.position, far: 30, rate: z.type === 'brute' || z.type === 'boss' ? .7 : 1 }); hurtPlayer(z.dmg);
     }
     z.flash -= dt;

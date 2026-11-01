@@ -113,7 +113,7 @@ const booms = [];
 function explode(z) {
   if (z.boomed) return;
   z.boomed = true; z.dead ||= .0001; z.g.visible = false;
-  blast(z.g.position.clone().setY(1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
+  blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
 function blast(p, R, zDmg, pDmg, skip) {
@@ -124,7 +124,7 @@ function blast(p, R, zDmg, pDmg, skip) {
   if (pd < R && !dead && pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)));
   for (const o of zombies) {
     if (o === skip || o.dead) continue;
-    const c = o.g.position.clone().setY(o.scale), od = c.distanceTo(p);
+    const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
     if (od < R) hurtZombie(o, zDmg * (1 - od / R * .5), c, false);
   }
 }

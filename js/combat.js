@@ -56,7 +56,7 @@ function flame(w) {
   }
   for (const zz of zombies) {
     if (zz.dead) continue;
-    const c = zz.g.position.clone().setY(zz.scale * 1.1), to = c.clone().sub(camera.position), d = to.length(), along = to.dot(fwd);
+    const c = zz.g.position.clone().setY(zz.g.position.y + zz.scale * 1.1), to = c.clone().sub(camera.position), d = to.length(), along = to.dot(fwd);
     if (along <= 0 || along > w.range) continue;
     const off = Math.sqrt(Math.max(0, d * d - along * along)); // how far it is from the middle of the cone
     if (off > .5 + along * .15 + zz.r) continue;
@@ -102,7 +102,7 @@ function updateFlares(dt) {
       }
       for (const o of zombies) {
         if (o === zz || o.dead) continue;
-        const c = o.g.position.clone().setY(o.scale), od = c.distanceTo(p);
+        const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
         if (od < FLARE_R + o.r) hurtZombie(o, Math.round(FLARE_SPLASH * (1 - Math.min(1, od / FLARE_R) * .6)), c, false);
       }
       continue;

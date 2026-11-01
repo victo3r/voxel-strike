@@ -152,7 +152,7 @@ function makeBot(rec) {
   const b = { g, head: ch.head, headPiv: ch.headPiv, aim, flashM, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun, ammo: W.mag, reload: 0, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
-    strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0 };
+    strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
   b.parts.forEach(p => p.userData.zombie = b);
   zombies.push(b); rec.b = b;
   return b;
@@ -252,7 +252,7 @@ function botFire(b, W, dist) {
 
 function updateBot(b, dt) {
   const W = BASE[b.gun], keep = BOT_GUNS[W.id], pos = b.g.position, sniper = !!W.scope;
-  eye.set(pos.x, 1.6, pos.z);
+  eye.set(pos.x, pos.y + 1.6, pos.z);
   b.hitByT -= dt;
   if ((b.scanT -= dt) <= 0 || !b.tgt || !tAlive(b.tgt)) {
     b.scanT = .3;
@@ -271,7 +271,7 @@ function updateBot(b, dt) {
   if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
   b.lpx = tp.x; b.lpz = tp.z;
   const tx = dx + b.pvx * BOT.lead, tz = dz + b.pvz * BOT.lead;
-  const wantYaw = Math.atan2(tx, tz), wantPitch = Math.atan2(tp.y + 1.1 - 1.6, Math.hypot(tx, tz)), k = Math.min(1, dt * BOT.turn);
+  const wantYaw = Math.atan2(tx, tz), wantPitch = Math.atan2(tp.y + 1.1 - pos.y - 1.6, Math.hypot(tx, tz)), k = Math.min(1, dt * BOT.turn);
   b.aimYaw += Math.atan2(Math.sin(wantYaw - b.aimYaw), Math.cos(wantYaw - b.aimYaw)) * k;
   b.aimPitch += (wantPitch - b.aimPitch) * k;
   b.g.rotation.y = b.aimYaw; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
@@ -292,7 +292,10 @@ function updateBot(b, dt) {
   }
   const pad = !sees && b.hp < b.maxHp ? nearPad(pos, b.hp <= PAD_LOW ? PAD_FAR : PAD_NEAR) : null;
   let gx = dx, gz = dz, gd = dist;
-  if (pad) { gx = pad.x - pos.x; gz = pad.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; }
+  // a target on another floor it can't see: take the stairs (MAP.nav gives the next spot on the way)
+  const way = !pad && !sees ? MAP.nav?.(pos, tp) : pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : null;
+  if (way) { gx = way.x - pos.x; gz = way.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; side = 0; }
+  else if (pad) { gx = pad.x - pos.x; gz = pad.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; }
   else if (dist < 1.5) radial = -1;
   if (b.detour > 0) { b.detour -= dt; side = b.detourDir; radial *= .3; } // stuck on a crate: sidestep around it
   const ux = gx / gd, uz = gz / gd;
@@ -305,19 +308,27 @@ function updateBot(b, dt) {
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
     const s = BOT.speed * dt / ml; mx *= s; mz *= s;
-    const ox = pos.x, oz = pos.z; let bump = false;
-    if (!blocked(pos.x + mx, pos.z, b.r, 0)) pos.x += mx; else bump = true;
-    if (!blocked(pos.x, pos.z + mz, b.r, 0)) pos.z += mz; else bump = true;
+    const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
+    if (!walkTo(pos, pos.x + mx, pos.z, b.r, grounded)) bump = true;
+    if (!walkTo(pos, pos.x, pos.z + mz, b.r, grounded)) bump = true;
     if (bump && sees) b.strafe = -b.strafe;
-    if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) { b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1; }
+    if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) {
+      b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1;
+      if (!b.vy && Math.random() < .4) b.jumpT = 0; // sometimes tries hopping over what it's stuck on
+    }
+    // hops now and then like a player, more often mid-fight. Not while a sniper is lining up a shot
+    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? 1.5 + Math.random() * 3.5 : 4 + Math.random() * 8; b.vy = 9; }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // a footstep each time a leg swings through
-    if (ph !== b.stepPh) { b.stepPh = ph; sfx(ph ? 'step' : 'step2', { at: pos, far: 22, v: .8 }); }
+    if (ph !== b.stepPh) { b.stepPh = ph; if (!b.vy) sfx(ph ? 'step' : 'step2', { at: pos, far: 22, v: .8 }); }
   } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; }
+  const air = b.vy < -6;
+  settle(b, dt);
+  if (air && !b.vy) sfx('land', { at: pos, far: 22, v: .7 });
 
   if (b.hp < b.maxHp) for (const p of pads) {
-    if (p.item && p.type === 'health' && Math.hypot(pos.x - p.x, pos.z - p.z) < 1) {
+    if (p.item && p.type === 'health' && Math.hypot(pos.x - p.x, pos.z - p.z) < 1 && pos.y < 1.5) {
       b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK); clearPad(p); p.t = RESPAWN + Math.random() * 10;
       sfx('pickHealth', { at: pos, far: 25, v: .7 });
       break;
