@@ -19,7 +19,7 @@ const BASE = [
   { id: 'flame', name: 'Flamethrower', cat: 'special', start: true, flame: true, dmg: 9, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, vol: .05, cut: 600, model: 'flame' },
   { id: 'rocket', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, rocket: true, dmg: 220, rate: 1.1, mag: 4, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, vol: .4, cut: 700, model: 'rocket' },
   // flare gun: burn = damage per quarter second, burnT = seconds
-  { id: 'flare', name: 'Flare Gun', cat: 'premium', start: true, flare: true, dmg: 45, burn: 4, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, vol: .3, cut: 1400, model: 'flare' },
+  { id: 'flare', name: 'Flare Gun', cat: 'premium', start: true, flare: true, dmg: 70, burn: 5, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, vol: .3, cut: 1400, model: 'flare' },
 ];
 const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
 const gi = id => W_ID[id]; // weapon id -> its index in BASE/WEAPONS
@@ -78,10 +78,120 @@ const vm = new THREE.Group(); camera.add(vm); vm.position.set(.32, -.3, -.55);
 const flashMesh = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 }));
 const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
 function place(mesh, x, y, z) { mesh.position.set(x, y, z); vm.add(mesh); return mesh; }
+let gunSpin = null, gunSpinV = 0; // the eradicator's barrel cluster, and how fast it's spinning
+// viewmodels: guns point down -z, the hand sits near z = 0. Each one returns where its muzzle is,
+// plus where the gold upgrade bands go (z spots and the band's width/height)
+const P_ = (w, h, d, mat, x, y, z) => place(box(w, h, d, mat), x, y, z);
+const GUN_MODELS = {
+  voxel(c) {
+    P_(.08, .07, .3, c.mat(0x666666), 0, .02, -.15); // slide
+    P_(.081, .015, .3, c.mat(0x8a8a8a), 0, .05, -.15);
+    P_(.075, .045, .26, c.dark, 0, -.035, -.13); // frame
+    P_(.04, .04, .02, c.glow(0x2ee6d6), 0, .02, -.305); // teal emitter in the muzzle
+    for (const z of [-.08, -.14, -.2]) P_(.085, .025, .025, c.glow(0x2ee6d6), 0, .02, z); // teal cubes down the side
+    P_(.03, .02, .02, c.dark, 0, .065, -.03); P_(.02, .02, .02, c.dark, 0, .065, -.28); // sights
+    P_(.02, .045, .07, c.dark, 0, -.075, -.1); // trigger guard
+    P_(.07, .17, .08, c.dark, 0, -.11, -.01).rotation.x = .2; // grip
+    P_(.14, .14, .14, c.skin, 0, -.15, .02);
+    return { muzzle: [.02, -.32], bands: [-.11, -.22], band: [.09, .11] };
+  },
+  shotgun(c) {
+    const wood = c.mat(0x7a5232), steel = c.mat(0x4a4a4a);
+    P_(.08, .09, .14, wood, 0, -.04, .04); // stock
+    P_(.1, .1, .2, steel, 0, 0, -.12); // receiver
+    P_(.05, .05, .52, c.dark, 0, .025, -.46); // barrel
+    P_(.045, .045, .38, steel, 0, -.03, -.41); // mag tube
+    P_(.085, .075, .18, wood, 0, -.035, -.42); // pump
+    for (const z of [-.37, -.42, -.47]) P_(.087, .01, .02, c.mat(0x4e3420), 0, -.035, z); // pump grooves
+    P_(.02, .02, .02, c.mat(0xd8d8d8), 0, .06, -.7); // bead sight
+    P_(.06, .04, .02, c.dark, 0, .025, -.72); // muzzle ring
+    P_(.07, .14, .08, wood, 0, -.1, -.06).rotation.x = .3; // grip
+    P_(.14, .14, .14, c.skin, 0, -.14, 0);
+    return { muzzle: [.025, -.74], bands: [-.08, -.17], band: [.11, .11] };
+  },
+  ar(c) {
+    const body = c.mat(0x3d4d3d), dk = c.mat(0x2a352a);
+    P_(.07, .1, .16, dk, 0, -.02, .07); // stock
+    P_(.09, .1, .3, body, 0, 0, -.15); // receiver
+    P_(.04, .03, .26, c.dark, 0, .065, -.15); // top rail
+    for (const z of [-.06, -.12, -.18, -.24]) P_(.045, .012, .02, c.mat(0x111111), 0, .082, z);
+    P_(.08, .08, .22, dk, 0, -.005, -.41); // handguard
+    for (const z of [-.34, -.41, -.48]) P_(.082, .02, .03, c.dark, 0, .005, z); // vents
+    P_(.035, .035, .14, c.dark, 0, .01, -.59); // barrel
+    P_(.05, .05, .05, c.dark, 0, .01, -.68); // muzzle brake
+    P_(.02, .06, .02, c.dark, 0, .06, -.5); // front sight post
+    P_(.06, .16, .08, c.dark, 0, -.12, -.2).rotation.x = .25; // mag
+    P_(.07, .15, .08, dk, 0, -.1, -.02).rotation.x = .3; // grip
+    P_(.14, .14, .14, c.skin, 0, -.14, .02);
+    return { muzzle: [.01, -.71], bands: [-.09, -.21], band: [.1, .11] };
+  },
+  sniper(c) {
+    const wood = c.mat(0x4a3220), blk = c.mat(0x1a1a1a);
+    P_(.08, .11, .2, wood, 0, -.03, .06); // stock
+    P_(.06, .03, .1, wood, 0, .04, .05); // cheek rest
+    P_(.085, .08, .36, blk, 0, 0, -.21); // body
+    P_(.08, .05, .2, wood, 0, -.06, -.33); // forend
+    P_(.035, .035, .56, c.dark, 0, .01, -.66); // barrel
+    P_(.055, .055, .07, c.dark, 0, .01, -.96); // suppressor tip
+    P_(.065, .065, .32, c.mat(0x2a2a2a), 0, .1, -.2); // scope tube
+    P_(.08, .08, .04, c.dark, 0, .1, -.05); P_(.08, .08, .04, c.dark, 0, .1, -.37); // scope bells
+    P_(.06, .06, .01, c.glow(0x66ccff), 0, .1, -.392); // lens
+    P_(.03, .05, .03, c.dark, 0, .055, -.1); P_(.03, .05, .03, c.dark, 0, .055, -.3); // mounts
+    P_(.06, .02, .02, c.mat(0x888888), .06, .02, -.05); // bolt handle
+    P_(.07, .15, .08, wood, 0, -.1, -.02).rotation.x = .3; // grip
+    P_(.14, .14, .14, c.skin, 0, -.14, .02);
+    return { muzzle: [.01, -1], bands: [-.15, -.27], band: [.095, .09] };
+  },
+  eradicator(c) {
+    const steel = c.mat(0x777777), dk = c.mat(0x3a3a3a);
+    P_(.17, .17, .26, steel, 0, 0, -.1); // housing
+    P_(.04, .05, .2, dk, 0, .12, -.12); // carry handle
+    P_(.04, .03, .03, dk, 0, .09, -.03); P_(.04, .03, .03, dk, 0, .09, -.21);
+    P_(.1, .13, .15, c.mat(0x5a5a2a), -.13, -.03, -.08); // ammo box
+    P_(.03, .03, .1, c.mat(0xc9a43a), -.08, .02, -.16); // belt
+    gunSpin = new THREE.Group(); gunSpin.position.set(0, 0, -.47); vm.add(gunSpin);
+    for (let k = 0; k < 6; k++) {
+      const a = k / 6 * Math.PI * 2, b = box(.03, .03, .46, c.dark);
+      b.position.set(Math.cos(a) * .045, Math.sin(a) * .045, 0); gunSpin.add(b);
+    }
+    for (const z of [-.12, .16]) { const r = box(.14, .14, .03, dk); r.position.z = z; gunSpin.add(r); }
+    P_(.06, .06, .06, dk, 0, 0, -.25); // spindle
+    P_(.07, .16, .08, dk, 0, -.15, -.02).rotation.x = .3; // grip
+    P_(.15, .15, .15, c.skin, 0, -.18, .02);
+    return { muzzle: [0, -.72], bands: [-.06, -.16], band: [.18, .18] };
+  },
+  rocket(c) {
+    const olive = c.mat(0x66784c), dk = c.mat(0x3a4630);
+    P_(.17, .17, .8, olive, 0, 0, -.4); // tube
+    P_(.21, .21, .08, dk, 0, 0, -.8); // front flare
+    P_(.2, .2, .06, dk, 0, 0, .0); // rear ring
+    P_(.12, .12, .02, c.dark, 0, 0, -.841); // tube mouth
+    P_(.09, .09, .06, c.mat(0xaa3333), 0, 0, -.83); P_(.05, .05, .04, c.mat(0xcc4444), 0, 0, -.865); // rocket tip
+    P_(.03, .02, .5, c.mat(0xc9a43a), 0, -.089, -.4); // yellow warning stripe
+    P_(.06, .07, .14, c.dark, -.04, .13, -.3); P_(.05, .05, .01, c.glow(0xff5544), -.04, .135, -.371); // sight + red lens
+    P_(.07, .14, .08, c.dark, 0, -.15, -.45).rotation.x = .2; // front grip
+    P_(.08, .18, .1, c.dark, 0, -.14, -.08).rotation.x = .25; // grip
+    P_(.15, .15, .15, c.skin, 0, -.18, -.02);
+    return { muzzle: [0, -.9], bands: [-.18, -.52], band: [.18, .18] };
+  },
+};
 function buildGun() {
-  const w = WEAPONS[cur]; vm.clear();
+  const w = WEAPONS[cur]; vm.clear(); gunSpin = null;
   const m = lam({ color: w.color }), dark = lam({ color: 0x1e1e1e }), skin = lam({ color: 0xe0ac7a });
   flashMesh.visible = false;
+  const custom = GUN_MODELS[w.id];
+  if (custom) {
+    const mats = {}, c = {
+      dark, skin,
+      mat: col => mats[col] ??= lam({ color: col }),
+      glow: col => mats['g' + col] ??= new THREE.MeshBasicMaterial({ color: col }),
+    };
+    const { muzzle: [my, mz], bands, band: [bw, bh] } = custom(c);
+    flashMesh.position.set(0, my, mz - .04); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight);
+    const gold = lam({ color: 0xffcc22, emissive: 0x553300 }); // one gold band per upgrade
+    for (let s = 0; s < lvl[cur]; s++) P_(bw, bh, .035, gold, 0, 0, bands[s]);
+    return;
+  }
   if (w.model === 'knife') { // handle, guard, blade pointing forward
     place(box(.05, .07, .16, lam({ color: 0x5a3a1a })), 0, 0, -.02);
     place(box(.14, .03, .04, lam({ color: 0x888888 })), 0, 0, -.12);
@@ -89,9 +199,9 @@ function buildGun() {
     place(box(.14, .14, .14, skin), 0, -.03, 0);
     return;
   }
-  const thick = w.model === 'rocket' ? .17 : w.model === 'flare' ? .12 : .1;
+  const thick = w.model === 'flare' ? .12 : .1;
   place(box(thick, thick + .02, w.len, m), 0, 0, -w.len / 2);
-  place(box(.05, .05, .2, dark), 0, .02, -w.len - .1).visible = w.model !== 'rocket' && w.model !== 'flare'; // barrel (rocket tube and flare gun are their own barrels)
+  place(box(.05, .05, .2, dark), 0, .02, -w.len - .1).visible = w.model !== 'flare'; // barrel (the flare gun's fat muzzle is its own barrel)
   if (w.model === 'flare') { // fat dark muzzle with the glowing flare sitting inside it
     place(box(.17, .17, .1, dark), 0, .01, -w.len - .02);
     place(box(.08, .08, .02, new THREE.MeshBasicMaterial({ color: 0xffaa33 })), 0, .01, -w.len - .075);
@@ -101,10 +211,6 @@ function buildGun() {
   if (w.model === 'flame') { // red fuel tank under the gun and a little pilot flame at the tip
     place(box(.13, .2, .22, lam({ color: 0xcc3333 })), 0, -.15, -.32);
     place(box(.04, .04, .04, new THREE.MeshBasicMaterial({ color: 0xffaa33 })), 0, .06, -w.len - .2);
-  }
-  if (w.model === 'rocket') { // rocket poking out the front of the tube
-    place(box(.1, .1, .1, lam({ color: 0xaa3333 })), 0, 0, -w.len - .03);
-    place(box(.06, .06, .1, dark), 0, .12, -.3); // sight
   }
   flashMesh.position.set(0, .02, -w.len - .25);
   flashLight.position.copy(flashMesh.position);

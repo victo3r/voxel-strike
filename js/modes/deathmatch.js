@@ -366,9 +366,4 @@ function setupMode() {
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
-  const tab = binds.board.filter(Boolean).map(nice).join('/') || 'the scoreboard key';
-  const tips = mode === 'dm'
-    ? [`Free-for-all, up to ${BOT_COUNT + 1} players. More bots join in the first minute. Highest score wins`, `Headshots and kill streaks score extra. Hold ${tab} for the leaderboard`]
-    : ['Kill zombies for coins, then spend them in the shop after each wave', 'Grab health, ammo and armor pickups from the pads around the map'];
-  $('tip1').textContent = tips[0]; $('tip2').textContent = tips[1];
 }

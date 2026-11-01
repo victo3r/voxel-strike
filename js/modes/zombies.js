@@ -91,7 +91,7 @@ function saveBest() {
   if (newBest) { best = { wave, kills }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
   showBest();
 }
-const showBest = () => $('best').textContent = $('lobbyBest').textContent = best.wave ? `BEST: wave ${best.wave} · ${best.kills} kills` : '';
+const showBest = () => $('lobbyBest').textContent =best.wave ? `BEST: wave ${best.wave} · ${best.kills} kills` : '';
 showBest();
 const booms = [];
 function explode(z) {

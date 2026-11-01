@@ -133,13 +133,12 @@ for (let i = 0; i < 45; i++) {
 
 const SK = [214, 163, 124], HAIR = [74, 48, 28], SHIRT = [28, 158, 152], PANTS = [44, 62, 128], SHOE = [58, 58, 64];
 const n = () => (Math.random() - .5) * 18;
-const headFront = blink => pixMat(8, 8, g => {
+const headFront = () => pixMat(8, 8, g => {
   fillN(g, 8, 8, SK, 10);
   for (let x = 0; x < 8; x++) { dot(g, rgb(HAIR, n()), x, 0); dot(g, rgb(HAIR, n()), x, 1); }
   dot(g, rgb(HAIR, n()), 0, 2); dot(g, rgb(HAIR, n()), 7, 2); dot(g, rgb(HAIR, n()), 1, 2);
   dot(g, rgb(HAIR, 12), 1, 3, 2, 1); dot(g, rgb(HAIR, 12), 5, 3, 2, 1); // eyebrows
-  if (blink) { dot(g, rgb(SK, -35), 1, 4, 2, 1); dot(g, rgb(SK, -35), 5, 4, 2, 1); }
-  else { dot(g, '#fff', 1, 4); dot(g, '#2d5fa8', 2, 4); dot(g, '#2d5fa8', 5, 4); dot(g, '#fff', 6, 4); }
+  dot(g, '#fff', 1, 4); dot(g, '#2d5fa8', 2, 4); dot(g, '#2d5fa8', 5, 4); dot(g, '#fff', 6, 4); // eyes
   dot(g, rgb(SK, -24), 3, 5, 2, 1); // nose
   dot(g, '#9a5a48', 2, 6, 4, 1); // mouth
 });
@@ -151,8 +150,7 @@ const headSide = frontLeft => pixMat(8, 8, g => { // frontLeft: which edge of th
   dot(g, rgb(SK, -28), X(3), 4, 1, 2); // ear
 });
 const hairAll = pixMat(8, 8, g => fillN(g, 8, 8, HAIR, 18));
-const faceOpen = headFront(false), faceBlink = headFront(true);
-const headMats = [headSide(true), headSide(false), hairAll, pixMat(8, 8, g => fillN(g, 8, 8, SK, 10)), faceOpen, hairAll];
+const headMats = [headSide(true), headSide(false), hairAll, pixMat(8, 8, g => fillN(g, 8, 8, SK, 10)), headFront(), hairAll];
 const shirtSide = (w, h, front) => pixMat(w, h, g => {
   fillN(g, w, h, SHIRT, 22); dot(g, rgb(SHIRT, -30), 0, h - 1, w, 1); // darker hem
   if (front) { dot(g, rgb(SK), 2, 0, 4, 1); dot(g, rgb(SK), 3, 1, 2, 1); dot(g, '#ffd23f', 5, 3, 2, 2); dot(g, '#b8901f', 6, 4); } // v-neck + gold badge
@@ -174,7 +172,7 @@ const armL = limb(-6, 22, armMats, -4), armR = limb(6, 22, armMats, -4); // armL
 limb(-2, 12, legMats, -6); limb(2, 12, legMats, -6);
 
 const REST = .45; // default 3/4 view
-let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, blinkT = 3, mNX = 0, mNY = 0;
+let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, mNX = 0, mNY = 0;
 const heroScreen = { x: innerWidth * .7, y: innerHeight / 2 };
 const stage = $('stage');
 stage.addEventListener('pointerdown', e => { dragX = e.clientX; spinV = 0; stage.setPointerCapture(e.pointerId); });
@@ -216,9 +214,6 @@ function updateLobby(dt) {
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   headPiv.rotation.y += (Math.max(-.9, Math.min(.9, rel)) - headPiv.rotation.y) * Math.min(1, dt * 6);
   headPiv.rotation.x += (-mNY * .45 - headPiv.rotation.x) * Math.min(1, dt * 6);
-  blinkT -= dt;
-  headMats[4] = blinkT < 0 ? faceBlink : faceOpen; heroHead.material = headMats;
-  if (blinkT < -.13) blinkT = 2 + Math.random() * 3;
   for (const f of flies) {
     f.m.position.set(f.x + Math.sin(t * f.s * .7 + f.p) * .6, f.y + Math.sin(t * f.s + f.p * 2) * .35, f.z + Math.cos(t * f.s * .5 + f.p) * .6);
     f.m.material.opacity = .2 + .8 * Math.max(0, Math.sin(t * f.s * 2 + f.p));

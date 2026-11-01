@@ -27,11 +27,7 @@ function nice(code) {
     ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl', AltLeft: 'L Alt', AltRight: 'R Alt' };
   return named[code] ?? code.replace(/^Key|^Digit/, '');
 }
-function renderHelp() {
-  const b = a => binds[a].filter(Boolean).map(nice).join('/') || '—';
-  $('help').textContent = `${b('fwd')}${b('left')}${b('back')}${b('right')} move · ${b('jump')} jump · ${b('shoot')} shoot · ${b('aim')} aim/scope · ${b('reload')} reload · ${b('lookL')}${b('lookR')}${b('lookU')}${b('lookD')} look · ${[1, 2, 3, 4, 5, 6].map(n => b('slot' + n)).join('')} or ${b('next')}/${b('prev')} switch weapons${mode === 'zombies' ? ' (press a slot again to flip between guns you bought in it)' : ''} · hold ${b('board')} leaderboard (deathmatch)`;
-  renderHotbar();
-}
+const renderHelp = () => renderHotbar(); // the hotbar shows each slot's key, so it redraws when binds change
 let rebinding = null; // { a: action, s: slot }
 function renderBinds() {
   $('bindList').innerHTML = ACTIONS.map(([a, label]) => `<span>${label}</span>` + [0, 1].map(s =>
@@ -116,14 +112,15 @@ document.addEventListener('pointerlockchange', () => {
   if (!locked) {
     // the menu doesn't pause: the match keeps running behind it
     for (const k in keys) keys[k] = false;
-    $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}You died on wave ${wave} with ${kills} kills.` : '';
-    $('go').textContent = dead ? '[ CLICK TO TRY AGAIN ]' : '[ CLICK TO GO BACK IN ]';
+    // zombie waves death: the title says so, and clicking the background starts a new run
+    $('menuTitle').textContent = dead ? 'YOU DIED' : 'MENU';
+    $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : '';
     $('armBtn').style.display = mode === 'dm' ? '' : 'none'; // zombie waves has its own shop between waves
     renderHelp();
   }
 });
 // if the browser refuses to re-lock the mouse, show the menu so you can click back in
-document.addEventListener('pointerlockerror', () => { if (!shopOpen && !inLobby && !matchOver) { $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex'; } });
+document.addEventListener('pointerlockerror', () => { if (!shopOpen && !inLobby && !matchOver) { $('menuTitle').textContent = 'MENU'; $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex'; } });
 
 function showLobby(on) {
   inLobby = on;

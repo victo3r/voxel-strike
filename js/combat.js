@@ -7,6 +7,7 @@ function shoot() {
   if (w.melee) return stab(w);
   if (ammo[cur] <= 0) { if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
   ammo[cur]--; cd = w.rate;
+  if (gunSpin) gunSpinV = 30;
   if (w.flame) flame(w);
   else {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3;
@@ -74,13 +75,14 @@ function fireRocket(w) {
   m.position.copy(camera.position).addScaledVector(fwd, .6); m.lookAt(tmp.copy(m.position).add(fwd)); scene.add(m);
   rockets.push({ m, dir: fwd.clone(), life: 3, dmg: w.dmg, smoke: 0 });
 }
-const FLARE_SPD = 30, FLARE_DROP = 6; // speed, how fast it falls
+const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, how fast it falls
+const FLARE_R = 2.5, FLARE_SPLASH = 25; // splash radius and most splash damage. Never hurts you, and the direct-hit target doesn't take it too
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
 function fireFlare(w) {
   camera.getWorldDirection(fwd);
   const m = box(.14, .14, .14, flareMat);
   m.position.copy(camera.position).addScaledVector(fwd, .6); scene.add(m);
-  flares.push({ m, v: fwd.clone().multiplyScalar(FLARE_SPD), life: 2.5, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0 });
+  flares.push({ m, v: fwd.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0 });
 }
 function updateFlares(dt) {
   for (let i = flares.length - 1; i >= 0; i--) {
@@ -91,12 +93,17 @@ function updateFlares(dt) {
     if (hit || f.life <= 0) {
       scene.remove(f.m); flares.splice(i, 1);
       const p = hit ? hit.point : f.m.position;
-      burst(p, 0xffaa33, 10); burst(p, 0xff4a1a, 6);
+      burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8);
       const zz = hit?.object.userData.zombie;
       if (zz && !zz.dead) {
         const head = !!hit.object.userData.head;
         hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head);
         if (!zz.dead) { zz.burn = Math.max(zz.burn || 0, f.burnT); zz.burnDmg = Math.max(zz.burnDmg || 0, f.burn); }
+      }
+      for (const o of zombies) {
+        if (o === zz || o.dead) continue;
+        const c = o.g.position.clone().setY(o.scale), od = c.distanceTo(p);
+        if (od < FLARE_R + o.r) hurtZombie(o, Math.round(FLARE_SPLASH * (1 - Math.min(1, od / FLARE_R) * .6)), c, false);
       }
       continue;
     }

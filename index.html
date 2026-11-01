@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=24">
+<link id="css" rel="stylesheet" href="css/style.css?v=25">
 </head>
 <body>
 <div id="hud">
@@ -33,13 +33,9 @@
   <div id="stage"></div>
 </div>
 <div id="menu">
+  <h1 id="menuTitle">MENU</h1>
   <p id="msg"></p>
-  <p id="best" style="color:#ffd23f"></p>
-  <p id="help"></p>
-  <p id="tip1"></p>
-  <p id="tip2"></p>
-  <p id="go" style="color:#ffd23f;margin-top:20px">[ CLICK TO GO BACK IN ]</p>
-  <div><button id="armBtn">ARMORY</button> <button id="ctrlBtn">CONTROLS</button> <button id="lobbyBtn">EXIT GAME</button></div>
+  <div id="menuBtns"><button id="armBtn">ARMORY</button><button id="ctrlBtn">CONTROLS</button><button id="lobbyBtn">EXIT GAME</button></div>
 </div>
 <div id="armory">
   <button id="armX">✕ CLOSE</button>
@@ -75,7 +71,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 24;
+const V = 25;
 const FILES = ['js/core.js', 'js/profile.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js','js/player.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js'];
 for (const src of FILES) {
