@@ -85,6 +85,7 @@ function update(dt) {
     easeLag(z.g.position, dt);
     if (z.dead) {
       z.dead += dt; z.g.rotation.x = -Math.min(z.dead * 4, Math.PI / 2);
+      if (z.drowned) { const p = z.g.position; p.y = Math.max(MAP.floor?.(p.x, p.z) ?? 0, p.y - 1.8 * dt); } // sinks to the bottom
       if (z.dead > 1.5) { scene.remove(z.g); zombies.splice(i, 1); }
       continue;
     }
@@ -232,6 +233,7 @@ const clock = new THREE.Clock();
 (function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), .05);
+  drownTick(dt);
   if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; }
   // the game keeps running while the menu is open (it isn't a pause). Only the zombie-waves shop and death screen stop it,
   // and with the mouse unlocked your keys are released, so you just stand there

@@ -9,14 +9,15 @@ const M = MAPS.resort, RA = M.half, rnd = seeded(777);
 const G = 200;
 const LX = 29, LZ = -31; // the lighthouse
 const HUTS = [[-34, 27, [1, 0]], [-34, -27, [1, 0]], [6, 36, [0, -1]]];
-// the sea and the pool are really deep: their floor is SEA_D below the ground, and you sink into them
-const SEA_D = 3, POOL = [-24, -12, -5, 5], POOL_Y = .7; // POOL_Y = the pool's water level
+// the sea gets deeper in steps away from the shore, down to SEA_D out by the edge of the map. You sink into it and the pool
+const SEA_D = 3, POOL = [-24, -12, -5, 5], POOL_Y = .7, POOL_F = -1.5; // the pool's water level and floor
 const inPool = (x, z, r = 0) => x + r > POOL[0] && x - r < POOL[1] && z + r > POOL[2] && z - r < POOL[3];
-// the sea floor
-addGround(G, lam({ map: tex(g => {
+const drawSeabed = g => {
   noise(g, [200, 182, 136], 16);
   for (let i = 0; i < 7; i++) { g.fillStyle = ['rgba(150,125,85,.45)', 'rgba(235,225,195,.5)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
-}, G * 2, G * 2) })).position.y = -SEA_D;
+};
+// the deepest part of the sea floor, under everything
+addGround(G, lam({ map: tex(drawSeabed, G * 2, G * 2) })).position.y = -SEA_D;
 addWall(0, -RA, RA * 2 + .3, .3); addWall(0, RA, RA * 2 + .3, .3);
 addWall(-RA, 0, .3, RA * 2 + .3); addWall(RA, 0, .3, RA * 2 + .3);
 
@@ -48,6 +49,7 @@ const N = 84, O = 42, LAND_Y = .06, WATER_Y = .035; // cell i covers x from i - 
 const ci = x => Math.floor(x + O), inGrid = (i, j) => i >= 0 && j >= 0 && i < N && j < N, at = (i, j) => j * N + i;
 const SEA = 0, WETS = 1, SAND = 2, GRASS = 3;
 const kind = new Uint8Array(N * N), H = new Float32Array(N * N), dSea = new Int16Array(N * N);
+const SF = new Float32Array(N * N); // the sea floor's height in each sea cell (0 on land)
 const isLand = (x, z) => ((x + 3.5) / 37) ** 4 + ((z - .5) / 40) ** 4 <= 1 + .12 * vnoise(x, z, .12, 1) || Math.hypot(x - LX, z - LZ) < 7.5 + vnoise(x, z, .3, 2);
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (isLand(i - O + .5, j - O + .5)) kind[at(i, j)] = GRASS;
 const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -60,6 +62,16 @@ const seaAt = (i, j) => !inGrid(i, j) || kind[at(i, j)] === SEA;
     for (const [a, b] of D4) { const n = at(i + a, j + b); if (!seaAt(i + a, j + b) && !dSea[n]) { dSea[n] = dSea[at(i, j)] + 1; q.push([i + a, j + b]); } }
   }
 }
+{ // the sea floor: 1 block down for the first 2 cells off the shore, 2 for the next 3, then SEA_D
+  const dL = new Int16Array(N * N), q = [];
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (!kind[at(i, j)] && D4.some(([a, b]) => !seaAt(i + a, j + b))) { dL[at(i, j)] = 1; q.push([i, j]); }
+  for (let k = 0; k < q.length; k++) {
+    const [i, j] = q[k];
+    for (const [a, b] of D4) { const n = at(i + a, j + b); if (inGrid(i + a, j + b) && seaAt(i + a, j + b) && !dL[n]) { dL[n] = dL[at(i, j)] + 1; q.push([i + a, j + b]); } }
+  }
+  for (let c = 0; c < N * N; c++) if (!kind[c]) SF[c] = !dL[c] ? -SEA_D : dL[c] <= 2 ? -1 : dL[c] <= 5 ? -2 : -SEA_D;
+}
+const seaFloor = (i, j) => inGrid(i, j) ? SF[at(i, j)] : -SEA_D;
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   const c = at(i, j), x = i - O + .5, z = j - O + .5;
   if (!kind[c]) continue;
@@ -124,25 +136,33 @@ const drawSand = g => {
   for (let i = 0; i < 7; i++) { g.fillStyle = ['rgba(170,140,95,.45)', 'rgba(255,245,215,.6)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
 };
 const lawn = tex(drawGrass);
-// flat ground, drawn just above the sea so the water stops at the shore, and the shore dropping down to the sea floor.
-// Not under the pool, which is a hole. In chunks, because bullets hit it
+// flat ground, drawn just above the sea so the water stops at the shore, the shore dropping down to the sea floor,
+// and the sea floor's steps. Not under the pool, which is a hole. In chunks, because bullets hit it
 {
   const wet = tex(g => noise(g, [198, 176, 130], 12));
   const mats = [decal({ map: wet, vertexColors: true }), decal({ map: tex(drawSand), vertexColors: true }), decal({ map: lawn, vertexColors: true }),
-    lam({ vertexColors: true, map: tex(g => { noise(g, [176, 156, 112], 16); g.fillStyle = 'rgba(120,100,70,.4)'; for (const y of [3, 9, 14]) g.fillRect(0, y, 16, 1); }) })];
+    lam({ vertexColors: true, map: tex(g => { noise(g, [176, 156, 112], 16); g.fillStyle = 'rgba(120,100,70,.4)'; for (const y of [3, 9, 14]) g.fillRect(0, y, 16, 1); }) }),
+    lam({ vertexColors: true, map: tex(drawSeabed) })];
   const CH = 14;
+  // the side of cell (x0, z0) facing (a, b), from y0 up to y1
+  const side = (quads, x0, z0, a, b, y0, y1) => {
+    const ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0, v = y1 - y0;
+    quads.push([3, a ? [[ex, y0, z0, 0, 0, .6], [ex, y0, z0 + 1, 1, 0, .6], [ex, y1, z0 + 1, 1, v], [ex, y1, z0, 0, v]]
+      : [[x0, y0, ez, 0, 0, .6], [x0 + 1, y0, ez, 1, 0, .6], [x0 + 1, y1, ez, 1, v], [x0, y1, ez, 0, v]], [a, 0, b]]);
+  };
   for (let cj = 0; cj < N; cj += CH) for (let cii = 0; cii < N; cii += CH) {
     const quads = [];
     for (let j = cj; j < cj + CH; j++) for (let i = cii; i < cii + CH; i++) {
       const c = at(i, j), x0 = i - O, z0 = j - O;
-      if (!kind[c] || inPool(x0 + .5, z0 + .5)) continue;
-      if (!H[c]) quads.push(topQuad(kind[c] - 1, x0, z0, LAND_Y, 0));
-      for (const [a, b] of D4) {
-        if (!seaAt(i + a, j + b)) continue;
-        const ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0, y0 = -SEA_D, y1 = LAND_Y, v = SEA_D + LAND_Y;
-        quads.push([3, a ? [[ex, y0, z0, 0, 0, .6], [ex, y0, z0 + 1, 1, 0, .6], [ex, y1, z0 + 1, 1, v], [ex, y1, z0, 0, v]]
-          : [[x0, y0, ez, 0, 0, .6], [x0 + 1, y0, ez, 1, 0, .6], [x0 + 1, y1, ez, 1, v], [x0, y1, ez, 0, v]], [a, 0, b]]);
+      if (!kind[c]) { // a sea cell: its step of the sea floor, and the drop to any deeper step next to it
+        if (SF[c] <= -SEA_D) continue;
+        quads.push(topQuad(4, x0, z0, SF[c], 0));
+        for (const [a, b] of D4) if (seaAt(i + a, j + b) && seaFloor(i + a, j + b) < SF[c]) side(quads, x0, z0, a, b, seaFloor(i + a, j + b), SF[c]);
+        continue;
       }
+      if (inPool(x0 + .5, z0 + .5)) continue;
+      if (!H[c]) quads.push(topQuad(kind[c] - 1, x0, z0, LAND_Y, 0));
+      for (const [a, b] of D4) if (seaAt(i + a, j + b)) side(quads, x0, z0, a, b, seaFloor(i + a, j + b), LAND_Y);
     }
     if (quads.length) building.cover.push(cellMesh(quads, mats));
   }
@@ -345,7 +365,7 @@ M.nav = (p, t) => {
   return near(p, stop(a)) ? stop(a - 1) : stop(a);
 };
 
-// --- the pool: a raised deck with a step all round, and a deep hole in the middle. Fall in and you drown ---
+// --- the pool: a raised deck with a step all round, and a hole in the middle 2.5 blocks deep. Fall in and you drown ---
 const tile = surf(lam({ map: tex(g => { noise(g, [234, 226, 208], 9); g.fillStyle = '#c8bca6'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(8, 0, 1, 16); }) }), 'stone');
 const drawPoolTile = g => { noise(g, [72, 172, 214], 10); g.fillStyle = '#e4f4fb'; for (const i of [0, 4, 8, 12]) { g.fillRect(0, i, 16, 1); g.fillRect(i, 0, 1, 16); } };
 const poolTile = surf(lam({ map: tex(drawPoolTile) }), 'stone');
@@ -354,8 +374,8 @@ const DECK_Y = 1;
 rectMinus(DECK, POOL_O).forEach(r => rectSlab(r, 0, DECK_Y, tile, true, 2));
 rectMinus(DECK_STEP, DECK).forEach(r => rectSlab(r, 0, .5, tile, true, 2));
 // the pool's walls: blue tiles from the floor up to just under the water, deck tiles above that
-rectMinus(POOL_O, POOL).forEach(r => { rectSlab(r, -SEA_D, POOL_Y - .1, poolTile, true, 2); rectSlab(r, POOL_Y - .1, DECK_Y, tile, true, 2); });
-flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], decal({ map: tex(drawPoolTile, (POOL[1] - POOL[0]) / 2, (POOL[3] - POOL[2]) / 2) }), (POOL[0] + POOL[1]) / 2, -SEA_D + .01, 0);
+rectMinus(POOL_O, POOL).forEach(r => { rectSlab(r, POOL_F, POOL_Y - .1, poolTile, true, 2); rectSlab(r, POOL_Y - .1, DECK_Y, tile, true, 2); });
+flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], decal({ map: tex(drawPoolTile, (POOL[1] - POOL[0]) / 2, (POOL[3] - POOL[2]) / 2) }), (POOL[0] + POOL[1]) / 2, POOL_F + .01, 0);
 const poolWater = flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], waterMat([95, 205, 235], .6, 4, 3), (POOL[0] + POOL[1]) / 2, POOL_Y, 0);
 
 // loungers and umbrellas. y0 = what they stand on, along = 'x' or 'z' (which way they lie), dir = which end the back is at
@@ -573,7 +593,7 @@ for (let i = 0; i < 16; i++) {
 }
 
 // the ground under your middle: the sea and the pool go down to their floor, so you drop in when you step off the edge
-M.floor = (x, z) => inPool(x, z) || kindAt(x, z) === SEA ? -SEA_D : 0;
+M.floor = (x, z) => inPool(x, z) ? POOL_F : kindAt(x, z) === SEA ? seaFloor(ci(x), ci(z)) : 0;
 // you've gone under once you're half a block below the water
 M.water = (x, z, feet) => inPool(x, z) ? feet < POOL_Y - .5 : kindAt(x, z) === SEA && feet < WATER_Y - .5;
 // footsteps: the sand and the lawn on the ground

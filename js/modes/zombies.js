@@ -104,14 +104,25 @@ function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 
 function drownYou() {
   if (respawnT > 0 || matchOver || dead) return;
   sfx('splash'); splash(P.pos);
-  P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = 0;
+  P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = 0; P.drowned = true;
   if (mode === 'dm') { youDown(null); return; }
   dead = true; saveBest(); document.exitPointerLock();
+}
+// after you drown you keep sinking to the bottom, and the screen goes blue once your eyes are under. Called every frame
+let underTint = null;
+function drownTick(dt) {
+  if (!underTint) { underTint = document.createElement('div'); underTint.style.cssText = 'position:fixed;inset:0;background:#1a6c9c;opacity:.5;pointer-events:none;display:none'; $('hit').before(underTint); }
+  const show = !!P.drowned && !inLobby;
+  if (show) {
+    P.pos.y = Math.max(MAP.floor?.(P.pos.x, P.pos.z) ?? 0, P.pos.y - 1.8 * dt);
+    camera.position.y = P.pos.y + .35;
+  }
+  underTint.style.display = show && inWater(P.pos.x, P.pos.z, camera.position.y - .5) ? 'block' : 'none';
 }
 // a bot or zombie in the water. A zombie counts as your kill (you lured it in). A bot's death goes to nobody
 function drownZombie(z) {
   if (z.dead) return;
-  sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position);
+  sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position); z.drowned = true;
   if (z.type === 'bot') { z.hp = 0; z.dead = .0001; botDown(z, null, false, true); return; }
   if (z.type === 'exploder') z.boomed = true; // the water puts its fuse out
   hurtZombie(z, z.hp + 1, z.g.position.clone(), false, true);

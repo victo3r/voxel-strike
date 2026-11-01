@@ -173,7 +173,7 @@ function youDown(by) {
 }
 function respawnYou() {
   const [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { vy: 0, kx: 0, kz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, vy: 0, kx: 0, kz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   cancelReload(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
