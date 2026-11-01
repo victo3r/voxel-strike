@@ -24,7 +24,7 @@ const EYE_COLS = { blue: [45, 95, 168], brown: [92, 58, 34], green: [60, 124, 70
 // body: rows of hair hanging down the back of the body (long hair).
 const HAIRSTYLES = {
   short: { front: [3, 2, 2, 2, 2, 2, 2, 3], side: [3, 3, 3, 3, 4, 5, 6, 6], back: [7, 8, 8, 8, 8, 8, 8, 7] },
-  buzz:  { front: [2, 1, 1, 1, 1, 1, 1, 2], side: [2, 2, 2, 2, 3, 3, 3, 4], back: [5, 5, 5, 5, 5, 5, 5, 5], thin: true },
+  buzz:  { front: [2, 1, 1, 1, 1, 1, 1, 2], side: [2, 2, 2, 2, 3, 3, 3, 4], back: [5, 6, 6, 6, 6, 6, 6, 5], thin: true },
   side:  { front: [3, 3, 3, 3, 3, 2, 2, 3], side: [3, 3, 3, 4, 4, 4, 5, 5], back: [6, 6, 6, 6, 6, 6, 6, 6], part: 2 },
   curly: { front: [3, 2, 3, 2, 2, 3, 2, 3], side: [4, 3, 4, 4, 5, 5, 6, 6], back: [7, 7, 7, 7, 7, 7, 7, 7], curls: true },
   long:  { front: [8, 3, 2, 2, 2, 2, 3, 8], side: [8, 8, 8, 8, 8, 8, 8, 8], back: [8, 8, 8, 8, 8, 8, 8, 8], body: [5, 6, 6, 6, 6, 6, 6, 5] },
