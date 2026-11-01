@@ -163,10 +163,11 @@ const CLOTH = [0xf0f0f0, 0x9a9aa2, 0x55606a, 0x33363d, 0x1c1c20, 0xb8342c, 0x8a2
   0x4f8a5a, 0x2a5a3a, 0x1c9e98, 0x3d5a8c, 0x2c3e80, 0x6a4fb0, 0x5a3a24, 0x4b4033];
 const hexCss = n => '#' + n.toString(16).padStart(6, '0');
 const C_ROWS = [
-  { label: 'BODY', key: 'girl', opts: [[false, 'BOY'], [true, 'GIRL']] },
   { label: 'SKIN', key: 'skin', swatch: SKIN_TONES.map((c, i) => [i, `rgb(${c})`]) },
   { label: 'EYES', key: 'eyes', swatch: Object.entries(EYE_COLS).map(([k, c]) => [k, `rgb(${c})`]) },
   { label: 'EYE SIZE', key: 'bigEyes', opts: [[false, 'NORMAL'], [true, 'BIG']], off: (v, L) => v && !bigEyesFit(L) },
+  { label: 'BROWS', key: 'brows', opts: [['none', 'NONE'], ['soft', 'SOFT'], ['full', 'FULL']], get: browsOf },
+  { label: 'MOUTH', key: 'mouth', opts: [['small', 'SMALL'], ['wide', 'WIDE']], get: mouthOf },
   { label: 'HAIR', key: 'hair', cycle: [['short', 'SHORT'], ['buzz', 'BUZZ'], ['side', 'SIDE PART'], ['curly', 'CURLY'], ['long', 'LONG'], ['bob', 'BOB']] },
   { label: 'HAIR COLOR', key: 'hairC', swatch: Object.entries(HAIR_COLS).map(([k, c]) => [k, `rgb(${c})`]) },
   { label: 'TOP', key: 'top', cycle: [['tee', 'T-SHIRT'], ['long', 'LONG SLEEVE'], ['tank', 'TANK TOP'], ['hoodie', 'HOODIE'], ['jacket', 'JACKET']] },

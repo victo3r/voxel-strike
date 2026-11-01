@@ -9,6 +9,11 @@
 //   extra:  null | glasses | stubble | beard | freckles | headband | badge
 //   bigEyes: 2x2 eyes instead of 1 row tall (only drawn when the row above the eyes is free)
 //   bandC: headband colour (older looks fall back to top2)
+//   mouth:  small | wide        brows: none | soft | full
+//   girl only picks what bots tend to roll, and the mouth/brows when a look doesn't set them
+
+const mouthOf = L => L.mouth ?? (L.girl ? 'small' : 'wide');
+const browsOf = L => L.brows ?? (L.girl ? 'soft' : 'full');
 
 const SKIN_TONES = [[247, 214, 186], [232, 190, 152], [214, 163, 124], [184, 128, 90], [140, 92, 60], [94, 62, 42]];
 const HAIR_COLS = { black: [34, 29, 29], dark: [64, 42, 26], brown: [104, 70, 40], auburn: [124, 56, 34], ginger: [186, 94, 46], blonde: [212, 176, 104] };
@@ -120,17 +125,16 @@ function paintSkin(g, L, rnd) {
   // face
   const F = head.front, open = (x, y) => H.front[x] <= y;
   // 2x2 eyes take row 3 too, so they only go where that row is clear of hair and glasses; brows move up a row if there's room
-  const tall = L.bigEyes && bigEyesFit(L);
-  if (tall) {
-    if (!L.girl) for (const x of [1, 2, 5, 6]) if (open(x, 2)) at(F, x, 2, shadeC(HC, -6), 6);
-    at(F, 1, 3, [240, 240, 240]); at(F, 2, 3, shadeC(EYE, -22)); at(F, 5, 3, shadeC(EYE, -22)); at(F, 6, 3, [240, 240, 240]);
-  } else if (L.girl) { // soft brows, and only where there's a skin row between them and the hair so they don't merge into bangs
-    const brow = mixC(shadeC(HC, -20), SK, .4);
-    for (const [a, b] of [[1, 2], [5, 6]]) if (H.front[a] <= 2 && H.front[b] <= 2) { at(F, a, 3, brow, 4); at(F, b, 3, brow, 4); }
-  } else for (const x of [1, 2, 5, 6]) if (open(x, 3)) at(F, x, 3, shadeC(HC, -6), 6); // brows
+  const tall = L.bigEyes && bigEyesFit(L), brows = browsOf(L), small = mouthOf(L) === 'small';
+  const br = tall ? 2 : 3; // brows sit just above the eyes
+  if (tall) { at(F, 1, 3, [240, 240, 240]); at(F, 2, 3, shadeC(EYE, -22)); at(F, 5, 3, shadeC(EYE, -22)); at(F, 6, 3, [240, 240, 240]); }
+  if (brows !== 'none') { // soft = faint, part-way to the skin tone
+    const brow = brows === 'soft' ? mixC(shadeC(HC, -20), SK, .4) : shadeC(HC, -6);
+    for (const x of [1, 2, 5, 6]) if (open(x, br)) at(F, x, br, brow, brows === 'soft' ? 4 : 6);
+  }
   at(F, 1, 4, [250, 250, 250]); at(F, 2, 4, EYE); at(F, 5, 4, EYE); at(F, 6, 4, [250, 250, 250]);
-  at(F, 3, 5, shadeC(SK, L.girl ? -14 : -24)); at(F, 4, 5, shadeC(SK, L.girl ? -14 : -24)); // nose
-  if (L.girl) { at(F, 3, 6, mixC(SK, [196, 72, 92], .55)); at(F, 4, 6, mixC(SK, [196, 72, 92], .55)); }
+  at(F, 3, 5, shadeC(SK, small ? -14 : -24)); at(F, 4, 5, shadeC(SK, small ? -14 : -24)); // nose
+  if (small) { at(F, 3, 6, mixC(SK, [196, 72, 92], .55)); at(F, 4, 6, mixC(SK, [196, 72, 92], .55)); }
   else for (let x = 2; x < 6; x++) at(F, x, 6, mixC(SK, [120, 48, 42], .5));
 
   // ---- body: top on rows 0-9, belt/waist on 10-11 ----
