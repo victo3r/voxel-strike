@@ -273,8 +273,10 @@ function updateLobby(dt) {
   armL.rotation.x = Math.sin(t * 1.1) * .05; armR.rotation.x = -Math.sin(t * 1.1) * .05;
   torso.scale.z = 1 + Math.sin(t * 1.6) * .02;
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
-  headPiv.rotation.y += (Math.max(-.9, Math.min(.9, rel)) - headPiv.rotation.y) * Math.min(1, dt * 6);
-  headPiv.rotation.x += (-mNY * .45 - headPiv.rotation.x) * Math.min(1, dt * 6);
+  // fade the head back to center as the cursor moves behind the body, so it never flips across at ±180°
+  const away = Math.abs(rel), look = away < 1.2 ? 1 : Math.max(0, 1 - (away - 1.2) / 1.4);
+  headPiv.rotation.y += (Math.sign(rel) * Math.min(.9, away) * look - headPiv.rotation.y) * Math.min(1, dt * 6);
+  headPiv.rotation.x += (-mNY * .45 * look - headPiv.rotation.x) * Math.min(1, dt * 6);
   for (const f of flies) {
     f.m.position.set(f.x + Math.sin(t * f.s * .7 + f.p) * .6, f.y + Math.sin(t * f.s + f.p * 2) * .35, f.z + Math.cos(t * f.s * .5 + f.p) * .6);
     f.m.material.opacity = .2 + .8 * Math.max(0, Math.sin(t * f.s * 2 + f.p));
