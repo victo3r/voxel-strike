@@ -34,7 +34,7 @@ const plain = c => lam({ color: c });
 
 // --- the sea ---
 const WET = SHORE - 4;
-flatPlane(SHORE - WET + 1, G * 2, decal({ map: tex(g => noise(g, [176, 150, 106], 14), 2, G) }), (WET + SHORE + 1) / 2, .012, 0);
+flatPlane(SHORE - WET + 1, G * 2, decal({ map: tex(g => noise(g, [204, 182, 136], 12), 2, G) }), (WET + SHORE + 1) / 2, .012, 0);
 const waterMat = (rgb, op, rx, ry) => new THREE.MeshLambertMaterial({ transparent: true, opacity: op, depthWrite: false, map: tex(g => {
   noise(g, rgb, 14); g.fillStyle = 'rgba(255,255,255,.3)'; for (let i = 0; i < 5; i++) g.fillRect(Math.random() * 14 | 0, Math.random() * 16 | 0, 3, 1);
 }, rx, ry) });
@@ -135,9 +135,7 @@ const LAMP_Y = GY + 1.4;
 const lampM = box(.7, .7, .7, new THREE.MeshLambertMaterial({ color: 0xfff0b0, emissive: 0xffd060, emissiveIntensity: 1.3 })); lampM.position.set(LX, LAMP_Y, LZ); add(lampM);
 const lampHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffe9a0, transparent: true, opacity: .7, blending: THREE.AdditiveBlending, depthWrite: false }));
 lampHalo.scale.setScalar(3.2); lampHalo.position.set(LX, LAMP_Y, LZ); add(lampHalo);
-const beam = new THREE.Group(); beam.position.set(LX, LAMP_Y, LZ); add(beam);
-const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: .12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-for (const s of [-1, 1]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(.3, 2.2, 34, 10, 1, true), beamMat); b.rotation.z = s * Math.PI / 2; b.position.x = s * 17.6; beam.add(b); }
+
 // rocks round the point it stands on (kept clear of the door on the south side)
 const rockMat = lam({ map: tex(g => { noise(g, [128, 122, 112], 30); g.fillStyle = 'rgba(70,60,50,.5)'; for (let i = 0; i < 8; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }) });
 for (const [x, z, w, d, h] of [[28, -36.5, 3, 2.5, 1.2], [32, -37, 3.5, 2.2, 1.6], [35.5, -35, 2.6, 3, 1.4], [37.5, -31, 2.4, 3.2, 1.1],
@@ -367,7 +365,6 @@ M.tick = () => {
   shallow.material.map.offset.set(t * .03, t * .015); deep.material.map.offset.set(t * .02, t * .01);
   poolWater.material.map.offset.set(t * .04, t * .025);
   foam.position.x = SHORE + Math.sin(t * .7) * .7; foam.material.opacity = .55 + Math.sin(t * .7 + 1.2) * .2;
-  beam.rotation.y = t * .55;
   lampHalo.material.opacity = .55 + Math.sin(t * 2) * .1;
 };
 }
