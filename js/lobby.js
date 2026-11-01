@@ -13,6 +13,8 @@ lobbyScene.fog = new THREE.Fog(0x173f37, 16, 62);
 lobbyScene.add(new THREE.HemisphereLight(0xcff6e8, 0x1d2f1a, 1));
 const lKey = new THREE.DirectionalLight(0xfff0d8, 1.6); lKey.position.set(-4, 8, 7); lobbyScene.add(lKey);
 const lRim = new THREE.DirectionalLight(0x5ff5e6, 1.4); lRim.position.set(3, 4, -6); lobbyScene.add(lRim);
+// light bouncing up off the grass, so faces pointing down (under the chin, arms, hands) aren't pitch black
+const lBounce = new THREE.DirectionalLight(0xd8e8c0, .9); lBounce.position.set(-1, -5, 6); lobbyScene.add(lBounce);
 
 const rgb = ([r, g, b], k = 0) => `rgb(${r + k | 0},${g + k | 0},${b + k | 0})`;
 const dot = (g, col, x, y, w = 1, h = 1) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
