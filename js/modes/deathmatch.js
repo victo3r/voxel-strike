@@ -10,6 +10,10 @@ const BOT = { hp: 100, speed: 6, react: .45, turn: 8, lead: .05, aimErr: .025, m
 // and only turns on someone else who's shooting it once they've done SWITCH_DMG damage within a couple of seconds.
 const LOSE_T = 2.5, SWITCH_DMG = 40;
 const SNIPE_T = .9; // a sniper bot lines up its shot this long before it fires
+// health pads: a hurt bot that can't see its target walks to a stocked health pad within PAD_NEAR,
+// or within PAD_FAR once it's down to PAD_LOW HP. It also grabs any health pad it walks over while hurt.
+// Bots skip ammo pads (they never run out of spare ammo) and there's no armor in deathmatch.
+const PAD_LOW = 60, PAD_NEAR = 8, PAD_FAR = 30;
 const MATCH_T = 240, YOU_RESPAWN = 3, JOIN_T = 60; // match length (s), your respawn wait (s), bots finish joining by this time (s)
 let BOT_COUNT = 3; // fill the lobby: 3 bots on small maps like the yard, 7 on bigger ones (set in setupMode from the map)
 // score: every kill is worth KILL_PTS, a headshot kill adds HEAD_PTS.
@@ -215,6 +219,16 @@ function pickTarget(b) {
   return enemies.sort((a, c) => d(a) - d(c))[0];
 }
 
+function nearPad(pos, range) {
+  let best = null, bestD = range;
+  for (const p of pads) {
+    if (!p.item || p.type !== 'health') continue;
+    const d = Math.hypot(p.x - pos.x, p.z - pos.z);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return best;
+}
+
 function botFire(b, W, dist) {
   b.ammo--; b.muzzle = .05;
   if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
@@ -287,9 +301,12 @@ function updateBot(b, dt) {
     if ((b.strafeT -= dt) <= 0) { b.strafeT = .4 + Math.random() * 1.1; b.strafe = Math.random() < .15 ? 0 : Math.random() < .5 ? -1 : 1; }
     side = b.strafe * (sniper && b.aimT > 0 ? .3 : 1);
   }
-  if (dist < 1.5) radial = -1;
+  const pad = !sees && b.hp < b.maxHp ? nearPad(pos, b.hp <= PAD_LOW ? PAD_FAR : PAD_NEAR) : null;
+  let gx = dx, gz = dz, gd = dist;
+  if (pad) { gx = pad.x - pos.x; gz = pad.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; }
+  else if (dist < 1.5) radial = -1;
   if (b.detour > 0) { b.detour -= dt; side = b.detourDir; radial *= .3; } // stuck on a crate: sidestep around it
-  const ux = dx / dist, uz = dz / dist;
+  const ux = gx / gd, uz = gz / gd;
   let mx = ux * radial + uz * side, mz = uz * radial - ux * side;
   for (const o of zombies) {
     if (o === b || o.dead) continue;
@@ -307,6 +324,13 @@ function updateBot(b, dt) {
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
   } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; }
+
+  if (b.hp < b.maxHp) for (const p of pads) {
+    if (p.item && p.type === 'health' && Math.hypot(pos.x - p.x, pos.z - p.z) < 1) {
+      b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK); clearPad(p); p.t = RESPAWN + Math.random() * 10;
+      break;
+    }
+  }
 
   b.flash -= dt;
   const e = b.flash > 0 ? 0x880000 : b.burn > 0 ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : 0;
