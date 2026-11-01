@@ -6,10 +6,9 @@ const lvBonus = lv => 5 * (lv - 1); // coins for reaching level lv: 5 at level 2
 // guns: weapon id -> stars (1-3) for unlockable guns you own. Starters aren't listed, everyone has them.
 // loadout: category -> weapon id, the one gun per category you take into a match (missing = that category's starter)
 // v = save format version, so later changes can upgrade old saves instead of wiping them
-// (the save key still says pgog from the old name; renaming it would wipe everyone's progress)
 let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {} }; // xp = progress toward the next level
-try { const s = JSON.parse(localStorage.getItem('pgog-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout } }; } catch {}
-const saveProf = () => { try { localStorage.setItem('pgog-profile', JSON.stringify(prof)); } catch {} };
+try { const s = JSON.parse(localStorage.getItem('voxelstrike-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout } }; } catch {}
+const saveProf = () => { try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {} };
 
 // adds XP and coins, levels up as many times as it fills (each level-up pays its coin bonus).
 // Returns { ups: levels gained, bonus: level-up coins paid }

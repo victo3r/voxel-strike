@@ -86,11 +86,11 @@ function hurtPlayer(d, pierce = false, by = null) {
 }
 // high score: best wave reached, ties go to more kills. Saved in the browser like your keybinds.
 let best = { wave: 0, kills: 0 }, newBest = false;
-try { best = JSON.parse(localStorage.getItem('pgog-best')) ?? best; } catch {}
+try { best = JSON.parse(localStorage.getItem('voxelstrike-best')) ?? best; } catch {}
 function saveBest() {
   if (mode !== 'zombies') return; // the best score is for zombie waves only
   newBest = wave > best.wave || (wave === best.wave && kills > best.kills);
-  if (newBest) { best = { wave, kills }; try { localStorage.setItem('pgog-best', JSON.stringify(best)); } catch {} }
+  if (newBest) { best = { wave, kills }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
   showBest();
 }
 const showBest = () => $('best').textContent = $('lobbyBest').textContent = best.wave ? `BEST: wave ${best.wave} · ${best.kills} kills` : '';

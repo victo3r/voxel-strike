@@ -18,8 +18,8 @@ const DEFAULT_BINDS = {
 };
 const copyBinds = b => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, [...v]]));
 let binds = copyBinds(DEFAULT_BINDS);
-try { const saved = JSON.parse(localStorage.getItem('pgog-binds')); if (saved) for (const k in binds) if (Array.isArray(saved[k])) binds[k] = [saved[k][0] ?? '', saved[k][1] ?? '']; } catch {}
-const saveBinds = () => { try { localStorage.setItem('pgog-binds', JSON.stringify(binds)); } catch {} };
+try { const saved = JSON.parse(localStorage.getItem('voxelstrike-binds')); if (saved) for (const k in binds) if (Array.isArray(saved[k])) binds[k] = [saved[k][0] ?? '', saved[k][1] ?? '']; } catch {}
+const saveBinds = () => { try { localStorage.setItem('voxelstrike-binds', JSON.stringify(binds)); } catch {} };
 const held = a => binds[a].some(c => c && keys[c]);
 const isBind = (a, code) => binds[a].includes(code);
 function nice(code) {
