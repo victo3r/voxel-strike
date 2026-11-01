@@ -133,23 +133,103 @@ for (let i = 0; i < 45; i++) {
   lobbyScene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: .8 })));
 }
 
-// your character, built from your saved look (js/character.js). ◀ ▶ under it flips through the presets
-let lookI = Math.max(0, PRESETS.findIndex(p => JSON.stringify(p.look) === JSON.stringify(prof.look)));
+// your character, built from your saved look (js/character.js). ◀ ▶ under it flips through the presets,
+// plus your own CUSTOM look (prof.myLook) once you've made one in the customizer
+if (!prof.look) prof.look = { ...PRESETS[0].look };
+// compares looks by their settings, ignoring key order and unset/false keys
+const lookKey = l => JSON.stringify(Object.keys(l).sort().filter(k => l[k] != null && l[k] !== false).map(k => [k, l[k]]));
+const isPreset = l => PRESETS.some(p => lookKey(p.look) === lookKey(l));
+const lookChoices = () => prof.myLook && !isPreset(prof.myLook) ? [...PRESETS, { name: 'CUSTOM', look: prof.myLook }] : PRESETS;
+const lookIndex = () => { const k = lookKey(prof.look); return lookChoices().findIndex(p => lookKey(p.look) === k); };
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
-let torso, headPiv, armL, armR; // armL = the arm on the left of the screen when it faces you
+let heroCh, torso, headPiv, armL, armR; // armL = the arm on the left of the screen when it faces you
 function dressHero() {
+  if (heroCh) heroCh.dispose();
   hero.clear();
-  const ch = buildChar(prof.look ?? PRESETS[lookI].look, 1 / 16);
-  hero.add(ch.g); torso = ch.body; headPiv = ch.headPiv; armL = ch.armR; armR = ch.armL;
-  $('lookName').textContent = PRESETS[lookI].name;
+  heroCh = buildChar(prof.look, 1 / 16, true);
+  hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
+  $('lookName').textContent = lookChoices()[lookIndex()]?.name ?? 'CUSTOM';
 }
 function pickLook(step) {
-  lookI = (lookI + step + PRESETS.length) % PRESETS.length;
-  prof.look = PRESETS[lookI].look; saveProf(); dressHero(); sfx('ui');
+  const list = lookChoices(), i = Math.max(0, lookIndex());
+  prof.look = { ...list[(i + step + list.length) % list.length].look }; saveProf(); dressHero(); sfx('ui');
 }
 $('lookPrev').onclick = () => pickLook(-1); $('lookNext').onclick = () => pickLook(1);
 $('lookPick').addEventListener('pointerdown', e => e.stopPropagation()); // clicking the arrows shouldn't start spinning him
 dressHero();
+
+// ---- customizer: replaces the lobby panel while it's open, the character updates as you change things ----
+const CLOTH = [0xf0f0f0, 0x9a9aa2, 0x55606a, 0x33363d, 0x1c1c20, 0xb8342c, 0x8a2e2e, 0xd4577a, 0xe07a2c, 0xe8c33a,
+  0x4f8a5a, 0x2a5a3a, 0x1c9e98, 0x3d5a8c, 0x2c3e80, 0x6a4fb0, 0x5a3a24, 0x4b4033];
+const hexCss = n => '#' + n.toString(16).padStart(6, '0');
+const C_ROWS = [
+  { label: 'BODY', key: 'girl', opts: [[false, 'BOY'], [true, 'GIRL']] },
+  { label: 'SKIN', key: 'skin', swatch: SKIN_TONES.map((c, i) => [i, `rgb(${c})`]) },
+  { label: 'EYES', key: 'eyes', swatch: Object.entries(EYE_COLS).map(([k, c]) => [k, `rgb(${c})`]) },
+  { label: 'EYE SIZE', key: 'bigEyes', opts: [[false, 'NORMAL'], [true, 'BIG']], off: (v, L) => v && !bigEyesFit(L) },
+  { label: 'HAIR', key: 'hair', cycle: [['short', 'SHORT'], ['buzz', 'BUZZ'], ['side', 'SIDE PART'], ['curly', 'CURLY'], ['long', 'LONG'], ['bob', 'BOB']] },
+  { label: 'HAIR COLOR', key: 'hairC', swatch: Object.entries(HAIR_COLS).map(([k, c]) => [k, `rgb(${c})`]) },
+  { label: 'TOP', key: 'top', cycle: [['tee', 'T-SHIRT'], ['long', 'LONG SLEEVE'], ['tank', 'TANK TOP'], ['hoodie', 'HOODIE'], ['jacket', 'JACKET']] },
+  { label: 'TOP COLOR', key: 'topC', cloth: 0x1c9e98 },
+  { label: 'SHIRT', key: 'top2', cloth: 0xe6e6e6, show: L => L.top === 'jacket' },
+  { label: 'STRINGS', key: 'top2', cloth: 0xe6e6e6, show: L => L.top === 'hoodie' },
+  { label: 'BOTTOM', key: 'bottom', opts: [['pants', 'PANTS'], ['shorts', 'SHORTS']] },
+  { label: 'BOTTOM COLOR', key: 'bottomC', cloth: 0x2c3e80 },
+  { label: 'SHOES', key: 'shoes', cycle: [['sneakers', 'SNEAKERS'], ['boots', 'BOOTS'], ['plain', 'PLAIN']] },
+  { label: 'SHOE COLOR', key: 'shoeC', cloth: 0x3a3a40 },
+  { label: 'EXTRA', key: 'extra', cycle: [[null, 'NONE'], ['glasses', 'GLASSES'], ['stubble', 'STUBBLE'], ['beard', 'BEARD'], ['freckles', 'FRECKLES'], ['headband', 'HEADBAND'], ['badge', 'BADGE']] },
+  { label: 'BAND COLOR', key: 'bandC', cloth: 0xd23a3a, show: L => L.extra === 'headband', get: L => L.bandC ?? L.top2 },
+];
+const DEFAULTS = { girl: false, skin: 2, eyes: 'blue', bigEyes: false, hair: 'short', hairC: 'dark', top: 'tee', bottom: 'pants', shoes: 'plain', extra: null };
+const custVal = (row, L) => (row.get ? row.get(L) : L[row.key]) ?? row.cloth ?? DEFAULTS[row.key];
+const enc = v => encodeURIComponent(JSON.stringify(v));
+function renderCust() {
+  const L = prof.look;
+  $('custRows').innerHTML = C_ROWS.filter(r => !r.show || r.show(L)).map(r => {
+    const v = custVal(r, L), i = C_ROWS.indexOf(r);
+    let ctl;
+    if (r.opts) ctl = r.opts.map(([o, n]) => `<button data-r="${i}" data-v="${enc(o)}" class="${o === v ? 'sel' : ''}" ${r.off?.(o, L) ? 'disabled title="Needs a hairstyle that leaves the brow row clear, and no glasses"' : ''}>${n}</button>`).join('');
+    else if (r.cycle) ctl = `<button data-r="${i}" data-step="-1">◀</button><span class="cyc">${(r.cycle.find(([o]) => o === v) ?? r.cycle[0])[1]}</span><button data-r="${i}" data-step="1">▶</button>`;
+    else {
+      const list = r.swatch ?? CLOTH.map(c => [c, hexCss(c)]), mine = list.some(([o]) => o === v);
+      ctl = list.map(([o, css]) => `<button class="sw${o === v ? ' sel' : ''}" data-r="${i}" data-v="${enc(o)}" style="background:${css}"></button>`).join('')
+        + (r.swatch ? '' : `<input type="color" data-r="${i}" value="${hexCss(v)}" class="${mine ? '' : 'sel'}" title="Any color">`);
+    }
+    return `<span class="ck">${r.label}</span><div class="cv">${ctl}</div>`;
+  }).join('');
+}
+function setLook(row, v, redraw = true) {
+  prof.look = { ...prof.look, [row.key]: v };
+  prof.myLook = { ...prof.look };
+  saveProf(); dressHero();
+  if (redraw) { renderCust(); sfx('ui'); }
+}
+$('custRows').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const row = C_ROWS[+b.dataset.r];
+  if (b.dataset.step) {
+    const k = row.cycle.findIndex(([o]) => o === custVal(row, prof.look)), n = row.cycle.length;
+    setLook(row, row.cycle[(Math.max(0, k) + +b.dataset.step + n) % n][0]);
+  } else setLook(row, JSON.parse(decodeURIComponent(b.dataset.v)));
+});
+// dragging the color picker updates the character live; the rows only redraw once you let go
+$('custRows').addEventListener('input', e => { if (e.target.type === 'color') setLook(C_ROWS[+e.target.dataset.r], parseInt(e.target.value.slice(1), 16), false); });
+$('custRows').addEventListener('change', e => { if (e.target.type === 'color') renderCust(); });
+$('custRand').onclick = () => {
+  const L = randomLook(String(Math.random()), CLOTH[Math.random() * CLOTH.length | 0]);
+  prof.look = L; prof.myLook = { ...L }; saveProf(); dressHero(); renderCust(); sfx('ui');
+};
+const custOpen = () => $('custPanel').style.display === 'flex';
+function showCust(on) {
+  $('custPanel').style.display = on ? 'flex' : 'none';
+  $('lobbyPanel').style.display = on ? 'none' : '';
+  $('lookPick').style.display = on ? 'none' : '';
+  if (on) renderCust();
+  sfx('ui');
+}
+$('lookEdit').onclick = () => showCust(true);
+$('custDone').onclick = () => showCust(false);
+addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && custOpen()) showCust(false); });
 
 const REST = .45; // default 3/4 view
 let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, mNX = 0, mNY = 0;

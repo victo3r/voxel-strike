@@ -8,6 +8,7 @@
 //   bottom: pants | shorts      shoes: sneakers | boots | plain
 //   extra:  null | glasses | stubble | beard | freckles | headband | badge
 //   bigEyes: 2x2 eyes instead of 1 row tall (only drawn when the row above the eyes is free)
+//   bandC: headband colour (older looks fall back to top2)
 
 const SKIN_TONES = [[247, 214, 186], [232, 190, 152], [214, 163, 124], [184, 128, 90], [140, 92, 60], [94, 62, 42]];
 const HAIR_COLS = { black: [34, 29, 29], dark: [64, 42, 26], brown: [104, 70, 40], auburn: [124, 56, 34], ginger: [186, 94, 46], blonde: [212, 176, 104] };
@@ -58,17 +59,21 @@ const PARTS = {
   legR: [0, 16, 4, 12, 4], legL: [16, 48, 4, 12, 4], armR: [40, 16, 4, 12, 4], armL: [32, 48, 4, 12, 4],
 };
 
+function makeSkin(look) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  paintSkin(c.getContext('2d'), look, charRng(strSeed(JSON.stringify(look))));
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 const skinCache = new Map();
 function skinTexture(look) {
   const key = JSON.stringify(look);
-  if (skinCache.has(key)) return skinCache.get(key);
-  const c = document.createElement('canvas'); c.width = c.height = 64;
-  paintSkin(c.getContext('2d'), look, charRng(strSeed(key)));
-  const t = new THREE.CanvasTexture(c);
-  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter; t.colorSpace = THREE.SRGBColorSpace;
-  skinCache.set(key, t);
-  return t;
+  if (!skinCache.has(key)) skinCache.set(key, makeSkin(look));
+  return skinCache.get(key);
 }
+// 2x2 eyes need row 3 of the face clear of hair, and no glasses
+const bigEyesFit = L => L.extra !== 'glasses' && [1, 2, 5, 6].every(x => (HAIRSTYLES[L.hair] ?? HAIRSTYLES.short).front[x] <= 3);
 
 function paintSkin(g, L, rnd) {
   const SK = SKIN_TONES[L.skin ?? 2], HC = HAIR_COLS[L.hairC] ?? HAIR_COLS.dark, EYE = EYE_COLS[L.eyes] ?? EYE_COLS.blue;
@@ -115,7 +120,7 @@ function paintSkin(g, L, rnd) {
   // face
   const F = head.front, open = (x, y) => H.front[x] <= y;
   // 2x2 eyes take row 3 too, so they only go where that row is clear of hair and glasses; brows move up a row if there's room
-  const tall = L.bigEyes && L.extra !== 'glasses' && [1, 2, 5, 6].every(x => open(x, 3));
+  const tall = L.bigEyes && bigEyesFit(L);
   if (tall) {
     if (!L.girl) for (const x of [1, 2, 5, 6]) if (open(x, 2)) at(F, x, 2, shadeC(HC, -6), 6);
     at(F, 1, 3, [240, 240, 240]); at(F, 2, 3, shadeC(EYE, -22)); at(F, 5, 3, shadeC(EYE, -22)); at(F, 6, 3, [240, 240, 240]);
@@ -231,7 +236,7 @@ function paintSkin(g, L, rnd) {
   }
   if (L.extra === 'freckles') for (const [x, y] of [[1, 5], [2, 6], [5, 5], [6, 6], [0, 5], [7, 5]]) at(F, x, y, shadeC(SK, -32), 6);
   if (L.extra === 'headband') {
-    const band = hexRGB(L.top2 ?? 0xd23a3a);
+    const band = hexRGB(L.bandC ?? L.top2 ?? 0xd23a3a);
     for (let x = 0; x < 8; x++) { at(F, x, 2, band, 10); at(head.back, x, 2, band, 10); }
     for (let c = 0; c < 8; c++) sideFront(c, 2, band, 10);
   }
@@ -255,8 +260,10 @@ const partBox = (w, h, d, u, v, U) => { const R = regions(u, v, w, h, d); return
 // U = size of one skin pixel in world units (1/16 = 2 blocks tall).
 // Returns the group plus the pivots you animate: headPiv (neck), armR/armL (shoulders), legR/legL (hips).
 // parts = the meshes bullets can hit; mats = materials to flash when hurt.
-function buildChar(look, U = 1 / 16) {
-  const mat = lam({ map: skinTexture(look) });
+// own = give it its own texture instead of the shared cached one (the lobby character, rebuilt on every customizer change),
+// so dispose() can free everything
+function buildChar(look, U = 1 / 16, own = false) {
+  const mat = lam({ map: own ? makeSkin(look) : skinTexture(look) });
   const g = new THREE.Group();
   const mesh = (geo, parent, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x * U, y * U, z * U); parent.add(m); return m; };
   const body = mesh(partBox(8, 12, 4, 16, 16, U), g, 0, 18, 0);
@@ -266,7 +273,9 @@ function buildChar(look, U = 1 / 16) {
   const armR = pivot(-6, 22), armL = pivot(6, 22), legR = pivot(-2, 12), legL = pivot(2, 12);
   const armRM = mesh(partBox(4, 12, 4, 40, 16, U), armR, 0, -4, 0), armLM = mesh(partBox(4, 12, 4, 32, 48, U), armL, 0, -4, 0);
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
-  return { g, head, headPiv, body, armR, armL, legR, legL, parts: [head, body, armRM, armLM, legRM, legLM], mats: [mat] };
+  const parts = [head, body, armRM, armLM, legRM, legLM];
+  const dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); };
+  return { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], dispose };
 }
 
 // a random look from a seed (bots: the seed is their name, so the same name always looks the same)
