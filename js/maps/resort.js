@@ -9,10 +9,12 @@ startMap('resort', {
 {
 const M = MAPS.resort, RA = M.half, rnd = seeded(777);
 const G = 200;
-const SHORE = 33.5; // where the sand meets the sea. You can wade out to the edge of the map
+const LX = 29, LZ = -31; // the lighthouse
+const HUTS = [[-34, 27, [1, 0]], [-34, -27, [1, 0]], [6, 36, [0, -1]]];
+// the sea floor. You can wade out to the edge of the map
 addGround(G, lam({ map: tex(g => {
-  noise(g, [226, 206, 156], 16);
-  for (let i = 0; i < 7; i++) { g.fillStyle = ['rgba(170,140,95,.45)', 'rgba(255,245,215,.6)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
+  noise(g, [200, 182, 136], 16);
+  for (let i = 0; i < 7; i++) { g.fillStyle = ['rgba(150,125,85,.45)', 'rgba(235,225,195,.5)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
 }, G * 2, G * 2) }));
 addWall(0, -RA, RA * 2 + .3, .3); addWall(0, RA, RA * 2 + .3, .3);
 addWall(-RA, 0, .3, RA * 2 + .3); addWall(RA, 0, .3, RA * 2 + .3);
@@ -32,42 +34,168 @@ const rectMinus = ([x0, x1, z0, z1], [h0, h1, k0, k1]) =>
   [[x0, x1, z0, k0], [x0, x1, k1, z1], [x0, h0, k0, k1], [h1, x1, k0, k1]].filter(([a, b, c, d]) => b - a > .01 && d - c > .01);
 const plain = c => lam({ color: c });
 
-// --- grass over most of the map, with a strip of beach round the walls (wider on the sea side) ---
-const GR = [-34, 19, -34, 34], gw = GR[1] - GR[0], gd = GR[3] - GR[2];
+// --- the island: a grid of 1x1 cells over the whole map. Each is sea, wet sand, sand or grass, and grass can be raised into hills ---
+// Hills go up in half-block terraces, at most half a block between any two touching cells (diagonals too),
+// so you, bots and zombies can walk up them anywhere without jumping.
+const hash = (i, j, s) => { let h = (i * 374761393 + j * 668265263 + s * 982451653) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
+const vnoise = (x, z, f, s) => { // smooth noise, -1 to 1
+  x *= f; z *= f; const i = Math.floor(x), j = Math.floor(z), u = x - i, v = z - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+  const a = hash(i, j, s), b = hash(i + 1, j, s), c = hash(i, j + 1, s), d = hash(i + 1, j + 1, s);
+  return (a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv) * 2 - 1;
+};
+const N = 84, O = 42, LAND_Y = .06, WATER_Y = .035; // cell i covers x from i - O to i - O + 1
+const ci = x => Math.floor(x + O), inGrid = (i, j) => i >= 0 && j >= 0 && i < N && j < N, at = (i, j) => j * N + i;
+const SEA = 0, WETS = 1, SAND = 2, GRASS = 3;
+const kind = new Uint8Array(N * N), H = new Float32Array(N * N), dSea = new Int16Array(N * N);
+const isLand = (x, z) => ((x + 3.5) / 37) ** 4 + ((z - .5) / 40) ** 4 <= 1 + .12 * vnoise(x, z, .12, 1) || Math.hypot(x - LX, z - LZ) < 7.5 + vnoise(x, z, .3, 2);
+for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (isLand(i - O + .5, j - O + .5)) kind[at(i, j)] = GRASS;
+const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const seaAt = (i, j) => !inGrid(i, j) || kind[at(i, j)] === SEA;
+{ // how many cells to the sea, for the beach
+  const q = [];
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (kind[at(i, j)] && D4.some(([a, b]) => seaAt(i + a, j + b))) { dSea[at(i, j)] = 1; q.push([i, j]); }
+  for (let k = 0; k < q.length; k++) {
+    const [i, j] = q[k];
+    for (const [a, b] of D4) { const n = at(i + a, j + b); if (!seaAt(i + a, j + b) && !dSea[n]) { dSea[n] = dSea[at(i, j)] + 1; q.push([i + a, j + b]); } }
+  }
+}
+for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+  const c = at(i, j), x = i - O + .5, z = j - O + .5;
+  if (!kind[c]) continue;
+  // the beach is wider on the east side, where the pier and the loungers are
+  kind[c] = dSea[c] === 1 ? WETS : dSea[c] <= 3 + 1.5 * vnoise(x, z, .15, 3) || x > 18.5 + 2 * vnoise(x, z, .1, 4) ? SAND : GRASS;
+}
+// hills: [x, z, radius, height]. Kept off everything built on the ground, the pads and the crates
+const HILLS = [[-28, -22, 10, 5], [-24, 25, 10, 5.5], [12, -26, 8, 4], [0, -6, 5.5, 2.5]];
+const KEEP_R = [[-28, -8, -9, 9, 2], [-4.5, 4.5, -21, -14.5, 2.5], [.5, 15.5, 16.5, 27.5, 2], ...HUTS.map(([x, z]) => [x - 1.6, x + 1.6, z - 1.6, z + 1.6, 2])];
+const KEEP_C = [...M.pads.map(([x, z]) => [x, z, 3]), ...M.crates.map(([x, z]) => [x, z, 2.2])];
+for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+  const c = at(i, j), x0 = i - O, z0 = j - O, x = x0 + .5, z = z0 + .5;
+  if (kind[c] !== GRASS) continue;
+  if (KEEP_R.some(([a, b, e, f, m]) => x0 + 1 > a - m && x0 < b + m && z0 + 1 > e - m && z0 < f + m)) continue;
+  if (KEEP_C.some(([px, pz, r]) => Math.hypot(Math.max(x0 - px, 0, px - x0 - 1), Math.max(z0 - pz, 0, pz - z0 - 1)) < r)) continue;
+  let raw = 0;
+  for (const [hx, hz, r, h] of HILLS) { const d = Math.hypot(x - hx, z - hz); if (d < r) raw = Math.max(raw, h * (1 - (d / r) ** 2) + .25 * vnoise(x, z, .25, 5)); }
+  H[c] = Math.max(0, Math.floor(raw * 2) / 2);
+}
+for (let changed = true; changed;) { // no cell more than half a block above any of its 8 neighbours
+  changed = false;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const c = at(i, j); if (!H[c]) continue;
+    let lim = H[c];
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) lim = Math.min(lim, (inGrid(i + a, j + b) ? H[at(i + a, j + b)] : 0) + .5);
+    if (lim < H[c]) { H[c] = lim; changed = true; }
+  }
+}
+const kindAt = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? kind[at(i, j)] : SEA; };
+const hAt = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? H[at(i, j)] : 0; };
+M.land = (x, z) => kindAt(x, z) !== SEA;
+
+// meshes made of cell faces. quads: [material index, 4 corners [x, y, z, u, v], normal]
+function cellMesh(quads, mats) {
+  quads.sort((p, q) => p[0] - q[0]);
+  const pos = [], nor = [], uv = [], col = [], ind = [], geo = new THREE.BufferGeometry();
+  let start = 0;
+  quads.forEach(([m, vs, n], k) => {
+    const [a, b, c] = vs, cr = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])];
+    if (cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2] < 0) vs = [...vs].reverse(); // front face outwards
+    const base = pos.length / 3;
+    for (const v of vs) { pos.push(v[0], v[1], v[2]); nor.push(...n); uv.push(v[3], v[4]); const k = v[5] ?? 1; col.push(k, k, k); }
+    ind.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    if (k === quads.length - 1 || quads[k + 1][0] !== m) { geo.addGroup(start * 6, (k + 1 - start) * 6, m); start = k + 1; }
+  });
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(ind); geo.computeBoundingSphere(); geo.computeBoundingBox();
+  const mesh = new THREE.Mesh(geo, mats); add(mesh); return mesh;
+}
+// shading: a corner of a top face is darker for each of the 4 cells round it that's higher, so the foot of every step stands out
+const occ = (x, z, h) => { let n = 0; for (const [a, b] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { const i = x + O + a, j = z + O + b; if (inGrid(i, j) && H[at(i, j)] > h + .01) n++; } return 1 - .14 * n; };
+const topQuad = (m, x0, z0, y, h = y) => [m, [[x0, y, z0, 0, 1, occ(x0, z0, h)], [x0 + 1, y, z0, 1, 1, occ(x0 + 1, z0, h)], [x0 + 1, y, z0 + 1, 1, 0, occ(x0 + 1, z0 + 1, h)], [x0, y, z0 + 1, 0, 0, occ(x0, z0 + 1, h)]], [0, 1, 0]];
 const drawGrass = g => {
   noise(g, [104, 168, 72], 20);
   for (let i = 0; i < 6; i++) { g.fillStyle = ['rgba(55,105,35,.5)', 'rgba(175,215,115,.5)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 2); }
 };
-flatPlane(gw, gd, decal({ map: tex(drawGrass, gw, gd) }), (GR[0] + GR[1]) / 2, .01, (GR[2] + GR[3]) / 2);
-// a ragged edge one block wide along each side, so the grass doesn't end in a straight line. The top of the texture faces the grass
-function grassEdge(len, x, z, rot) {
-  const t = tex(g => { drawGrass(g); for (let i = 0; i < 16; i++) { const d = 2 + (Math.random() * 10 | 0); g.clearRect(i, d, 1, 16 - d); } }, len, 1);
-  const p = new THREE.Mesh(new THREE.PlaneGeometry(len, 1), decal({ map: t, alphaTest: .5 }));
-  p.rotation.set(-Math.PI / 2, 0, rot); p.position.set(x, .01, z); add(p);
+const drawSand = g => {
+  noise(g, [226, 206, 156], 16);
+  for (let i = 0; i < 7; i++) { g.fillStyle = ['rgba(170,140,95,.45)', 'rgba(255,245,215,.6)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
+};
+const lawn = tex(drawGrass);
+// flat ground, drawn just above the sea so the water stops at the shore. Bullets hit the sea floor under it
+{
+  const mats = [decal({ map: tex(g => noise(g, [198, 176, 130], 12)), vertexColors: true }), decal({ map: tex(drawSand), vertexColors: true }), decal({ map: lawn, vertexColors: true })], quads = [];
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const c = at(i, j); if (kind[c] && !H[c]) quads.push(topQuad(kind[c] - 1, i - O, j - O, LAND_Y, 0)); }
+  cellMesh(quads, mats);
 }
-grassEdge(gw, (GR[0] + GR[1]) / 2, GR[3] + .5, 0); grassEdge(gw, (GR[0] + GR[1]) / 2, GR[2] - .5, Math.PI);
-grassEdge(gd, GR[1] + .5, (GR[2] + GR[3]) / 2, Math.PI / 2); grassEdge(gd, GR[0] - .5, (GR[2] + GR[3]) / 2, -Math.PI / 2);
+// the hills, in chunks so a shot only has to check the chunks near it
+{
+  const mats = [lam({ map: lawn, vertexColors: true }), lam({ vertexColors: true, map: tex(g => {
+    noise(g, [128, 92, 60], 22); g.fillStyle = 'rgba(70,45,25,.4)'; for (let i = 0; i < 6; i++) g.fillRect(Math.random() * 16 | 0, 4 + Math.random() * 12 | 0, 2, 1);
+    for (let x = 0; x < 16; x++) { const d = 2 + (Math.random() * 3 | 0); for (let y = 0; y < d; y++) { g.fillStyle = `rgb(${96 + (x * 7 + y * 5) % 20},${160 + (x * 3) % 20},${66})`; g.fillRect(x, y, 1, 1); } }
+  }) })];
+  const CH = 14;
+  for (let cj = 0; cj < N; cj += CH) for (let cii = 0; cii < N; cii += CH) {
+    const quads = [];
+    for (let j = cj; j < cj + CH; j++) for (let i = cii; i < cii + CH; i++) {
+      const c = at(i, j), h = H[c], x0 = i - O, z0 = j - O;
+      if (!h) continue;
+      quads.push(topQuad(0, x0, z0, h));
+      for (const [a, b] of D4) {
+        const nh = inGrid(i + a, j + b) ? H[at(i + a, j + b)] : 0;
+        if (nh >= h) continue;
+        const v0 = 1 - (h - nh); // the top of the texture (the grass lip) at the top of the step
+        const ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0;
+        const lo = nh ? .78 : .72; // the bottom of a step is in shadow
+        const corners = a ? [[ex, nh, z0, 0, v0, lo], [ex, nh, z0 + 1, 1, v0, lo], [ex, h, z0 + 1, 1, 1], [ex, h, z0, 0, 1]]
+          : [[x0, nh, ez, 0, v0, lo], [x0 + 1, nh, ez, 1, v0, lo], [x0 + 1, h, ez, 1, 1], [x0, h, ez, 0, 1]];
+        quads.push([1, corners, [a, 0, b]]);
+      }
+    }
+    if (quads.length) building.cover.push(cellMesh(quads, mats));
+  }
+}
 
-// --- the sea ---
-const WET = SHORE - 4;
-flatPlane(SHORE - WET + 1, G * 2, decal({ map: tex(g => noise(g, [204, 182, 136], 12), 2, G) }), (WET + SHORE + 1) / 2, .012, 0);
+// --- the sea: clear turquoise round the island, deep blue further out ---
 const waterMat = (rgb, op, rx, ry) => new THREE.MeshLambertMaterial({ transparent: true, opacity: op, depthWrite: false, map: tex(g => {
   noise(g, rgb, 14); g.fillStyle = 'rgba(255,255,255,.3)'; for (let i = 0; i < 5; i++) g.fillRect(Math.random() * 14 | 0, Math.random() * 16 | 0, 3, 1);
 }, rx, ry) });
-const SHALLOW_W = 12;
-const shallow = flatPlane(SHALLOW_W, G * 2, waterMat([70, 200, 205], .55, SHALLOW_W / 3, G * 2 / 3), SHORE + SHALLOW_W / 2, .06, 0);
-const deepW = G - SHORE - SHALLOW_W;
-const deep = flatPlane(deepW, G * 2, waterMat([30, 125, 175], .93, deepW / 3, G * 2 / 3), SHORE + SHALLOW_W + deepW / 2, .06, 0);
-const foam = flatPlane(1.4, G * 2, new THREE.MeshBasicMaterial({ transparent: true, opacity: .75, depthWrite: false, alphaTest: .2, map: tex(g => {
-  g.clearRect(0, 0, 16, 16); g.fillStyle = '#ffffff';
-  for (let y = 0; y < 16; y++) { const w = 3 + (Math.random() * 6 | 0); g.fillRect(0, y, w, 1); if (Math.random() < .4) g.fillRect(w + 2, y, 2, 1); }
-}, 1, G) }), SHORE, .07, 0);
+// the shallows fade into the deep water over a few rings, so there's no hard line between them
+const REEF = 56, FADE = 3.5, RINGS = 8;
+const waters = [new THREE.Mesh(new THREE.CircleGeometry(REEF, 48), waterMat([70, 200, 205], .55, REEF * 2 / 3, REEF * 2 / 3))];
+for (let k = 1; k <= RINGS; k++) {
+  const f = k / (RINGS + 1), r0 = REEF + (k - 1) * FADE, r1 = r0 + FADE, mix = (a, b) => Math.round(a + (b - a) * f);
+  const g = new THREE.RingGeometry(r0, r1, 48, 1);
+  waters.push(new THREE.Mesh(g, waterMat([mix(70, 30), mix(200, 125), mix(205, 175)], .55 + (.93 - .55) * f, r1 * 2 / 3, r1 * 2 / 3)));
+}
+waters.push(new THREE.Mesh(new THREE.RingGeometry(REEF + RINGS * FADE, G * 1.5, 48, 1), waterMat([30, 125, 175], .93, G, G)));
+for (const w of waters) { w.rotation.x = -Math.PI / 2; w.position.set(-3, WATER_Y, 0); add(w); }
+// foam along every bit of shoreline, on the water side
+let foam;
+{
+  const quads = [], W = .6, y = WATER_Y + .01;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    if (!kind[at(i, j)]) continue;
+    const x0 = i - O, z0 = j - O;
+    for (const [a, b] of D4) {
+      if (!seaAt(i + a, j + b)) continue;
+      const e = a > 0 ? x0 + 1 : a < 0 ? x0 : b > 0 ? z0 + 1 : z0, s = a + b; // s: which way the sea is
+      quads.push([0, a ? [[e, y, z0, 0, 1], [e + s * W, y, z0, 0, 0], [e + s * W, y, z0 + 1, 1, 0], [e, y, z0 + 1, 1, 1]]
+        : [[x0, y, e, 0, 1], [x0, y, e + s * W, 0, 0], [x0 + 1, y, e + s * W, 1, 0], [x0 + 1, y, e, 1, 1]], [0, 1, 0]]);
+    }
+  }
+  foam = cellMesh(quads, [new THREE.MeshBasicMaterial({ transparent: true, opacity: .75, depthWrite: false, map: tex(g => {
+    g.clearRect(0, 0, 16, 16); g.fillStyle = '#ffffff';
+    for (let x = 0; x < 16; x++) { const h = 3 + (Math.random() * 7 | 0); g.fillRect(x, 0, 1, h); if (Math.random() < .4) g.fillRect(x, h + 2, 1, 2); }
+  }) })]);
+}
 
 // --- the lighthouse ---
 // Four floors and a gallery on top. The stairs wind up round the inside walls, half a floor per wall,
 // with a landing in each corner, so every floor has its stairs on two walls and a hole above them.
 // Local coords: u = x - LX, v = z - LZ (north is -v). The inside splits into a 3x3 grid: corners, a strip along each wall, the middle.
-const LX = 29, LZ = -31, LH = 3.6, FLOORS = 4, HALF = LH / 2, RUNS = FLOORS * 2;
+const LH = 3.6, FLOORS = 4, HALF = LH / 2, RUNS = FLOORS * 2;
 const LO = 2.8, LI = 2.3, CELL = 1.1, GA = 3.6; // half-widths: outside of the walls, inside, gallery. CELL = stair width
 const GY = FLOORS * LH; // gallery floor
 const paint = rgb => lam({ map: tex(g => { noise(g, rgb, 12); g.fillStyle = 'rgba(0,0,0,.07)'; for (const y of [3, 7, 11, 15]) g.fillRect(0, y, 16, 1); for (const [x, y] of [[4, 0], [12, 4], [4, 8], [12, 12]]) g.fillRect(x, y, 1, 3); }) });
@@ -128,7 +256,7 @@ for (let k = 1; k <= FLOORS; k++) {
   if (k === FLOORS) cells.push(...rectMinus([-GA, GA, -GA, GA], [-LI, LI, -LI, LI]));
   for (const [u0, u1, v0, v1] of cells) lh(u0, u1, v0, v1, k * LH - .3, k * LH, k < FLOORS ? plank : ironMat);
 }
-flatPlane(LI * 2, LI * 2, decal({ map: tex(g => { noise(g, [150, 145, 135], 14); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, LI, LI) }), LX, .02, LZ);
+flatPlane(LI * 2, LI * 2, decal({ map: tex(g => { noise(g, [150, 145, 135], 14); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, LI, LI) }), LX, LAND_Y + .01, LZ);
 for (const s of [-1, 1]) for (let i = -2.4; i <= 2.41; i += 1.2) { // brackets under the overhang
   const b1 = box(.8, .5, .25, ironMat); b1.position.set(LX + s * (LO + .4), GY - .55, LZ + i); add(b1);
   const b2 = box(.25, .5, .8, ironMat); b2.position.set(LX + i, GY - .55, LZ + s * (LO + .4)); add(b2);
@@ -163,6 +291,8 @@ addSlab(LX, LZ, CW * 2, CW * 2, CY, CY + .25, red);
 const roofM = new THREE.Mesh(new THREE.ConeGeometry(CW * Math.SQRT2, 2.2, 4), red); roofM.rotation.y = Math.PI / 4; roofM.position.set(LX, CY + .25 + 1.1, LZ); add(roofM);
 const knob = box(.3, .45, .3, ironMat); knob.position.set(LX, CY + .25 + 2.2 + .15, LZ); add(knob);
 const LAMP_Y = GY + 1.4;
+const stand = box(.36, LAMP_Y - .35 - (GY + .6), .36, ironMat); stand.position.set(LX, (GY + .6 + LAMP_Y - .35) / 2, LZ); add(stand); // the lamp sits on this
+const standTop = box(.56, .08, .56, ironMat); standTop.position.set(LX, LAMP_Y - .39, LZ); add(standTop);
 const lampM = box(.7, .7, .7, new THREE.MeshLambertMaterial({ color: 0xfff0b0, emissive: 0xffd060, emissiveIntensity: 1.3 })); lampM.position.set(LX, LAMP_Y, LZ); add(lampM);
 const lampHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffe9a0, transparent: true, opacity: .7, blending: THREE.AdditiveBlending, depthWrite: false }));
 lampHalo.scale.setScalar(2.8); lampHalo.position.set(LX, LAMP_Y, LZ); add(lampHalo);
@@ -206,7 +336,7 @@ const DECK_Y = 1;
 rectMinus(DECK, POOL).forEach(r => rectSlab(r, 0, DECK_Y, tile, true, 2));
 rectMinus(DECK_STEP, DECK).forEach(r => rectSlab(r, 0, .5, tile, true, 2));
 rectMinus(POOL, POOL_FLOOR).forEach(r => rectSlab(r, 0, .5, poolTile, true, 2));
-flatPlane(POOL_FLOOR[1] - POOL_FLOOR[0], POOL_FLOOR[3] - POOL_FLOOR[2], decal({ map: tex(drawPoolTile, (POOL_FLOOR[1] - POOL_FLOOR[0]) / 2, (POOL_FLOOR[3] - POOL_FLOOR[2]) / 2) }), (POOL_FLOOR[0] + POOL_FLOOR[1]) / 2, .02, 0);
+flatPlane(POOL_FLOOR[1] - POOL_FLOOR[0], POOL_FLOOR[3] - POOL_FLOOR[2], decal({ map: tex(drawPoolTile, (POOL_FLOOR[1] - POOL_FLOOR[0]) / 2, (POOL_FLOOR[3] - POOL_FLOOR[2]) / 2) }), (POOL_FLOOR[0] + POOL_FLOOR[1]) / 2, LAND_Y + .01, 0);
 const poolWater = flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], waterMat([95, 205, 235], .6, 4, 3), (POOL[0] + POOL[1]) / 2, .85, 0);
 
 // loungers and umbrellas. y0 = what they stand on, along = 'x' or 'z' (which way they lie), dir = which end the back is at
@@ -267,16 +397,16 @@ function hut(x, z, face) { // face = which way the door looks: [dx, dz]
     w.position.set(x + face[0] * 1.61 + (face[0] ? 0 : s * 1), 1.6, z + face[1] * 1.61 + (face[0] ? s * 1 : 0)); add(w);
   }
 }
-hut(-37.5, 30, [1, 0]); hut(-37.5, -31, [1, 0]); hut(6, 38.2, [0, -1]);
+for (const [x, z, face] of HUTS) hut(x, z, face);
 
 // --- volleyball court: a sand pit in the grass with a low wooden border ---
 const PIT = [.5, 15.5, 16.5, 27.5];
-flatPlane(PIT[1] - PIT[0], PIT[3] - PIT[2], decal({ map: tex(g => noise(g, [226, 206, 156], 16), PIT[1] - PIT[0], PIT[3] - PIT[2]) }), 8, .016, 22);
+flatPlane(PIT[1] - PIT[0], PIT[3] - PIT[2], decal({ map: tex(drawSand, PIT[1] - PIT[0], PIT[3] - PIT[2]) }), 8, LAND_Y + .01, 22);
 for (const [w, d, x, z] of [[15.2, .2, 8, PIT[2]], [15.2, .2, 8, PIT[3]], [.2, 11.2, PIT[0], 22], [.2, 11.2, PIT[1], 22]]) {
   const b = box(w, .12, d, wood); b.position.set(x, .06, z); add(b);
 }
 const lineMat = decal({ color: 0xffffff });
-for (const [w, d, x, z] of [[12, .12, 8, 18], [12, .12, 8, 26], [.12, 8, 2, 22], [.12, 8, 14, 22]]) flatPlane(w, d, lineMat, x, .022, z);
+for (const [w, d, x, z] of [[12, .12, 8, 18], [12, .12, 8, 26], [.12, 8, 2, 22], [.12, 8, 14, 22]]) flatPlane(w, d, lineMat, x, LAND_Y + .015, z);
 for (const z of [18, 26]) addSlab(8, z, .15, .15, 0, 2.6, plain(0xdcdcdc));
 const net = new THREE.Mesh(new THREE.PlaneGeometry(8, 1), seeThru(tex(g => { g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 16, 2); for (let i = 0; i < 16; i += 4) { g.fillRect(i, 0, 1, 16); g.fillRect(0, i, 16, 1); } }, 8, 1)));
 net.rotation.y = Math.PI / 2; net.position.set(8, 2, 22); add(net);
@@ -315,18 +445,7 @@ const yWin = box(6.05, .5, 3.05, plain(0x1b2a3a)); yWin.position.set(yx - .8, 2.
 const yTop = box(3.4, 1, 2.4, hullWhite); yTop.position.set(yx - 1.5, 3.3, yz); add(yTop);
 const yMast = box(.12, 2.4, .12, ironMat); yMast.position.set(yx - 1.5, 5, yz); add(yMast);
 // an old rowboat turned upside down on the sand
-for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) addSlab(16, 38.5, w, d, y0, y1, lam({ map: tex(g => { noise(g, [150, 62, 40], 16); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 7, 16, 1); }) }), true, 1);
-
-// --- the hotel behind the west wall (scenery) ---
-const hotelMat = lam({ map: tex(g => {
-  g.fillStyle = '#f2e6cf'; g.fillRect(0, 0, 16, 16);
-  g.fillStyle = '#5fa6c9'; g.fillRect(3, 4, 4, 6); g.fillRect(10, 4, 4, 6);
-  g.fillStyle = '#e0d2b4'; g.fillRect(0, 12, 16, 2);
-  g.fillStyle = '#c8b894'; g.fillRect(0, 15, 16, 1);
-}) });
-const hotel = tbox(14, 13, 72, hotelMat, 4); hotel.position.set(-57, 6.5, 0); add(hotel);
-const hotelRoof = box(15, .6, 73, plain(0xc06a4a)); hotelRoof.position.set(-57, 13.3, 0); add(hotelRoof);
-for (const z of [-30, 30]) { const wing = tbox(30, 10, 10, hotelMat, 4); wing.position.set(-58, 5, z + Math.sign(z) * 10); add(wing); }
+for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) addSlab(16, 35.5, w, d, y0, y1, lam({ map: tex(g => { noise(g, [150, 62, 40], 16); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 7, 16, 1); }) }), true, 1);
 
 // --- palm trees ---
 const trunkMat = lam({ map: tex(g => { noise(g, [158, 124, 84], 16); g.fillStyle = 'rgba(80,55,30,.55)'; for (const y of [0, 5, 10]) g.fillRect(0, y, 16, 2); }) });
@@ -352,53 +471,72 @@ function inst(geo, mat, list) { // like instanced(), but things can tip as well:
   m.computeBoundingSphere(); add(m); return m;
 }
 const trunksIn = [], trunksOut = [], fronds = [], nuts = [], palms = [];
-function palm(x, z, inside) {
-  const h = 5.5 + rnd() * 3, a = rnd() * 6.28, lean = .8 + rnd() * 1.6, n = 9, out = inside ? trunksIn : trunksOut;
+function palm(x, z, inside, y0 = 0) { // y0 = the height of the ground it grows from
+  const h = 5.5 + rnd() * 3, a = rnd() * 6.28, lean = .8 + rnd() * 1.6, n = 9, out = inside ? trunksIn : trunksOut, top = y0 + h;
   let tx = x, tz = z;
   for (let i = 0; i < n; i++) {
     const f = i / (n - 1), s = .6 - f * .2;
     tx = x + Math.cos(a) * lean * f * f; tz = z + Math.sin(a) * lean * f * f;
-    out.push([tx, h * (i + .5) / n, tz, s, h / n + .03, s, 0, 0, 0xffffff]);
+    out.push([tx, y0 + h * (i + .5) / n, tz, s, h / n + .03, s, 0, 0, 0xffffff]);
   }
   if (inside) addSolid(x, z, .7, .7, 99);
   const k = 8 + (rnd() * 3 | 0), spin = rnd() * 6.28, c = PALM_TINTS[rnd() * PALM_TINTS.length | 0];
   for (let i = 0; i < k; i++) {
     const ry = spin + i * 6.28 / k + (rnd() - .5) * .3, L1 = 1.4 + rnd() * .5, L2 = 1.5 + rnd() * .7, p1 = -.25 + rnd() * .3, p2 = .7 + rnd() * .4;
-    fronds.push([tx, h, tz, 1.1, 1, L1, p1, ry, c]);
-    const ex = tx + Math.sin(ry) * Math.cos(p1) * L1, ey = h - Math.sin(p1) * L1, ez = tz + Math.cos(ry) * Math.cos(p1) * L1;
+    fronds.push([tx, top, tz, 1.1, 1, L1, p1, ry, c]);
+    const ex = tx + Math.sin(ry) * Math.cos(p1) * L1, ey = top - Math.sin(p1) * L1, ez = tz + Math.cos(ry) * Math.cos(p1) * L1;
     fronds.push([ex, ey, ez, 1, 1, L2, p2, ry, c]);
   }
-  for (let i = 0; i < 3; i++) { const b = i * 2.1 + a; nuts.push([tx + Math.cos(b) * .3, h - .35, tz + Math.sin(b) * .3, .3, .3, .3, 0, 0, 0x6a4a28]); }
+  for (let i = 0; i < 3; i++) { const b = i * 2.1 + a; nuts.push([tx + Math.cos(b) * .3, top - .35, tz + Math.sin(b) * .3, .3, .3, .3, 0, 0, 0x6a4a28]); }
   palms.push([x, z]);
 }
 const padSpots = M.pads.map(([x, z]) => [x, z, 2.4]).concat(M.crates.map(([x, z]) => [x, z, 1.2]));
 const free = (x, z, r) => !building.solids.some(s => x + r > s.minX && x - r < s.maxX && z + r > s.minZ && z - r < s.maxZ)
   && padSpots.every(([px, pz, pr]) => Math.hypot(px - x, pz - z) > pr + r);
-for (let tries = 0, k = 0; k < 26 && tries < 4000; tries++) {
+// a palm needs dry land with the same height all round it, so the trunk doesn't stand on the edge of a step
+const flatDry = (x, z) => { const h = hAt(x, z); for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) { const k = kindAt(x + a, z + b); if (k < SAND || hAt(x + a, z + b) !== h) return false; } return true; };
+for (let tries = 0, k = 0; k < 30 && tries < 4000; tries++) {
   const x = (rnd() * 2 - 1) * (RA - 2), z = (rnd() * 2 - 1) * (RA - 2);
-  if (x > SHORE - 2 || Math.hypot(x, z) < 5 || !free(x, z, 1.4) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 5.5)) continue;
+  if (!flatDry(x, z) || Math.hypot(x, z) < 5 || !free(x, z, 1.4) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 5.5)) continue;
   if (Math.abs(x - LX) < 6.5 && Math.abs(z - LZ) < 6.5) continue; // not under the gallery
-  palm(x, z, true); k++;
+  palm(x, z, true, hAt(x, z)); k++;
 }
-for (let tries = 0, k = 0; k < 90 && tries < 6000; tries++) {
-  const x = -110 + rnd() * (SHORE - 2 + 110), z = (rnd() * 2 - 1) * 110;
-  if (Math.max(Math.abs(x), Math.abs(z)) < RA + 2.5 || (x < -48 && x > -74 && Math.abs(z) < 46) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 4.5)) continue;
-  palm(x, z, false); k++;
+// little islands out at sea, each with a few palms
+const isleMat = lam({ map: tex(drawSand, 6, 6) });
+for (const [x, z, r] of [[92, -48, 7], [-78, 74, 6], [-96, -36, 8], [34, 104, 5], [-30, -100, 6]]) {
+  const isle = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 2, .6, 12), isleMat); isle.position.set(x, .1, z); add(isle);
+  const n = 2 + (r > 6 ? 2 : 1);
+  for (let i = 0; i < n; i++) { const a = rnd() * 6.28, d = rnd() * (r - 2); palm(x + Math.cos(a) * d, z + Math.sin(a) * d, false, .4); }
 }
 building.cover.push(inst(unit, trunkMat, trunksIn)); // bullets stop on the trunks inside the map, not on the leaves
 inst(unit, trunkMat, trunksOut); inst(frondGeo, frondMat, fronds); inst(unit, plain(0xffffff), nuts);
 
 addCrates(M.crates);
 
-// grass tufts on the lawn (not in the volleyball pit)
+// grass tufts on the lawn and up the hills (not in the volleyball pit)
 const tufts = [];
-for (let tries = 0; tufts.length < 450 && tries < 6000; tries++) {
-  const x = GR[0] + rnd() * gw, z = GR[2] + rnd() * gd;
-  if (x > PIT[0] - .5 && x < PIT[1] + .5 && z > PIT[2] - .5 && z < PIT[3] + .5 || !free(x, z, .4)) continue;
-  const s = .6 + rnd() * .6; tufts.push([x, 0, z, 1.1 * s, .8 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
+for (let tries = 0; tufts.length < 600 && tries < 9000; tries++) {
+  const x = -O + rnd() * N, z = -O + rnd() * N;
+  if (kindAt(x, z) !== GRASS || x > PIT[0] - .5 && x < PIT[1] + .5 && z > PIT[2] - .5 && z < PIT[3] + .5 || !free(x, z, .4)) continue;
+  const s = .6 + rnd() * .6; tufts.push([x, hAt(x, z), z, 1.1 * s, .8 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
 }
 grassTufts(tufts);
 
+// the hills as solids you stand on: for each terrace height, the cells at least that high merged into rectangles.
+// Added last so the palms and tufts above could still be placed on them
+for (let L = .5; L <= 8; L += .5) {
+  const used = new Uint8Array(N * N), on = (i, j) => inGrid(i, j) && H[at(i, j)] >= L && !used[at(i, j)];
+  let any = false;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    if (!on(i, j)) continue;
+    any = true;
+    let w = 1; while (on(i + w, j)) w++;
+    let d = 1; while ((() => { for (let a = 0; a < w; a++) if (!on(i + a, j + d)) return false; return true; })()) d++;
+    for (let b = 0; b < d; b++) for (let a = 0; a < w; a++) used[at(i + a, j + b)] = 1;
+    building.solids.push({ mesh: null, minX: i - O, maxX: i - O + w, minZ: j - O, maxZ: j - O + d, top: L });
+  }
+  if (!any) break;
+}
 // --- sky ---
 const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9aa8b8, fog: false });
 for (let i = 0; i < 16; i++) {
@@ -410,9 +548,9 @@ for (let i = 0; i < 16; i++) {
 
 M.tick = () => {
   const t = performance.now() / 1000;
-  shallow.material.map.offset.set(t * .03, t * .015); deep.material.map.offset.set(t * .02, t * .01);
+  for (const w of waters) w.material.map.offset.set(t * .03, t * .015);
   poolWater.material.map.offset.set(t * .04, t * .025);
-  foam.position.x = SHORE + Math.sin(t * .7) * .7; foam.material.opacity = .55 + Math.sin(t * .7 + 1.2) * .2;
+  foam.material[0].opacity = .55 + Math.sin(t * .7 + 1.2) * .25;
   lampHalo.material.opacity = .55 + Math.sin(t * 2) * .1;
 };
 }

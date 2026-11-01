@@ -127,7 +127,7 @@ function spawnSpot(skip) {
   let best = null, bestD = -1;
   for (let tries = 0; tries < 60; tries++) {
     const x = (Math.random() * 2 - 1) * (A - 2), z = (Math.random() * 2 - 1) * (A - 2);
-    if (blocked(x, z, .45, 0)) continue;
+    if (blocked(x, z, .45, 0) || MAP.land && !MAP.land(x, z)) continue; // not in the sea on the island map
     const d = others.length ? Math.min(...others.map(o => Math.hypot(x - o.x, z - o.z))) : 99;
     if (d > bestD) { bestD = d; best = [x, z]; }
   }
