@@ -44,18 +44,18 @@ function armSync(i, how) {
 }
 $('armory').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
-  if (b.dataset.c) { armCat = b.dataset.c; beep(600, .05); }
+  if (b.dataset.c) { armCat = b.dataset.c; sfx('ui'); }
   else if (b.dataset.buy) {
     const i = +b.dataset.buy, w = BASE[i]; if (prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
     prof.coins -= w.price; prof.guns[w.id] = 1; prof.loadout[w.cat] = w.id; saveProf(); showProf();
-    armSync(i, 'buy'); beep(900, .12, 'triangle', .12);
+    armSync(i, 'buy'); sfx('buy');
   } else if (b.dataset.up) {
     const i = +b.dataset.up, p = upgPrice(i); if (prof.coins < p || gunStars(i) >= 3) return;
     prof.coins -= p; prof.guns[BASE[i].id]++; saveProf(); showProf();
-    armSync(i, 'up'); beep(1200, .2, 'triangle', .12);
+    armSync(i, 'up'); sfx('upgrade');
   } else if (b.dataset.eq) {
     const i = +b.dataset.eq; prof.loadout[BASE[i].cat] = BASE[i].id; saveProf();
-    armSync(i, 'eq'); beep(700, .06);
+    armSync(i, 'eq'); sfx('equip');
   } else if (b.id === 'armX') { closeArmory(); return; }
   renderArmory();
 });

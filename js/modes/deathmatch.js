@@ -96,7 +96,7 @@ function joinBot(j) {
   const r = { name: j.name, lang: j.lang, quiet: !!j.quiet, css: look.css, look: n, tag: tag.mat, tagW: tag.w,
     score: 0, kills: 0, deaths: 0, streak: 0, b: null, wait: .5 };
   recs.push(r);
-  if (MATCH_T - matchT > 1) { feed(`${nameTag(r)} joined`); beep(520, .1, 'triangle', .06); } // no message for the one that starts with you
+  if (MATCH_T - matchT > 1) { feed(`${nameTag(r)} joined`); sfx('join'); } // no message for the one that starts with you
 }
 const ranked = () => [...recs].sort((a, b) => b.score - a.score || b.kills - a.kills || a.deaths - b.deaths);
 const ord = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] ?? 'TH');
@@ -120,7 +120,7 @@ function scoreKill(killer, victim, head) {
     killer.score += pts;
     if (killer.you) {
       toast(`+${pts}${head ? ' HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#ffd23f');
-      beep(st ? 260 + Math.min(killer.streak, 20) * 20 : 180, .3, 'sawtooth', .12);
+      sfx(head || st ? 'killSpecial' : 'kill'); // any streak or headshot gets the special one
     }
   }
   feed(killer && killer !== victim ? `${nameTag(killer)} ${head ? '⌖' : '✖'} ${nameTag(victim)}` : `${nameTag(victim)} ✖`);
@@ -171,6 +171,7 @@ function makeBot(rec) {
 // a bot died (called from hurtZombie). by = the bot that killed it, or null if it was you
 function botDown(b, by, head) {
   b.tag.visible = false; b.flashM.visible = false; b.rec.wait = BOT.respawn + 1.5; // its body takes 1.5s to fall
+  sfx('die', { at: b.g.position, far: 40 });
   scoreKill(by ? by.rec : youRec, b.rec, head);
 }
 // you died in deathmatch (called from hurtPlayer). by = the bot that got you, or nothing if it was your own rocket
@@ -182,7 +183,7 @@ function respawnYou() {
   const [x, z] = spawnSpot(YOU_T);
   Object.assign(P, { vy: 0, kx: 0, kz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0 }); P.pos.set(x, groundAt(x, z, .35, 0), z);
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
-  reloading = 0; vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
+  cancelReload(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
 
 const eye = new THREE.Vector3(), aimV = new THREE.Vector3(), dirV = new THREE.Vector3(), hitV = new THREE.Vector3(), losDir = new THREE.Vector3();
@@ -234,9 +235,8 @@ function botFire(b, W, dist) {
   if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto guns: about as fast as a person clicks
   if (W.scope) b.aimT = 0;
-  if (b.ammo <= 0) b.reload = W.reload;
-  const youD0 = Math.hypot(P.pos.x - eye.x, P.pos.z - eye.z);
-  shotSound(W.vol * Math.max(.15, 1 - youD0 / 45), .15, W.cut);
+  sfx(W.id, { at: b.g.position, far: 100 });
+  if (b.ammo <= 0) { b.reload = W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); }
   const youUp = respawnT <= 0;
   pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25); // as wide as a bot's body
   const others = []; for (const z of zombies) if (z !== b && !z.dead) others.push(...z.parts); // shots can hit any bot in the way, not just its target
@@ -253,7 +253,7 @@ function botFire(b, W, dist) {
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45;
-      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b);
+      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head);
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
       if (!zz.dead) hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b);
@@ -323,11 +323,14 @@ function updateBot(b, dt) {
     if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) { b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1; }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
+    const ph = Math.sin(b.t) > 0; // a footstep each time a leg swings through
+    if (ph !== b.stepPh) { b.stepPh = ph; sfx(ph ? 'step' : 'step2', { at: pos, far: 22, v: .8 }); }
   } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; }
 
   if (b.hp < b.maxHp) for (const p of pads) {
     if (p.item && p.type === 'health' && Math.hypot(pos.x - p.x, pos.z - p.z) < 1) {
       b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK); clearPad(p); p.t = RESPAWN + Math.random() * 10;
+      sfx('pickHealth', { at: pos, far: 25, v: .7 });
       break;
     }
   }
@@ -356,7 +359,7 @@ function updateDM(dt) {
   for (const r of recs) if (!r.you && (!r.b || r.b.dead) && (r.wait -= dt) <= 0) makeBot(r); // bots come back after their body falls
   matchT -= dt;
   const sec = Math.max(0, Math.ceil(matchT));
-  if (sec <= 10 && sec !== lastSec && sec > 0) beep(880, .08, 'square', .08);
+  if (sec <= 10 && sec !== lastSec && sec > 0) sfx('tick');
   lastSec = sec;
   const place = ranked().indexOf(youRec) + 1;
   const top = `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div><div class="place">${ord(place)} OF ${recs.length}  ·  ${youRec.score} PTS  ·  ${youRec.kills} KILLS</div>`;
@@ -375,8 +378,8 @@ function endMatch() {
   $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ◆</span></div>`
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ◆</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
-  beep(place === 1 ? 880 : 330, .6, 'triangle', .15);
-  if (ups) setTimeout(() => beep(1040, .4, 'triangle', .14), 350);
+  sfx(place === 1 ? 'win' : 'lose');
+  if (ups) setTimeout(() => sfx('levelUp'), 700);
   document.exitPointerLock();
 }
 $('againBtn').addEventListener('click', () => { restart(); lockMouse(); });

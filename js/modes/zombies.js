@@ -67,22 +67,32 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
     if (zz.hitBy !== who || zz.hitByT <= 0) zz.hitDmg = 0;
     zz.hitBy = who; zz.hitByT = 2; zz.hitDmg += dmg;
   }
+  const big = zz.type === 'brute' || zz.type === 'boss';
   if (quiet) burst(point, 0xff7a1a, 2);
-  else { zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4); if (!by) setCross('#f44'); }
+  else {
+    zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4); if (!by) setCross('#f44');
+    // the hit sound comes from whoever got hit (zombies sound lower), so it's quiet when they're far away
+    hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
+  }
   if (zz.hp <= 0 && !zz.dead) {
     zz.dead = .0001;
     if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); }
     if (zz.type === 'bot') botDown(zz, by, head);
-    else if (zz.type === 'exploder') explode(zz); // shooting one still sets it off, so keep your distance
-    else if (zz.type === 'boss') { beep(60, .9, 'sawtooth', .2); banner(`BOSS DOWN!\n+${zz.coins} ◆`); }
-    else beep(zz.type === 'brute' ? 110 : 180, .3, 'sawtooth', .12);
+    else {
+      if (!by) sfx(head || zz.type === 'boss' ? 'killSpecial' : 'kill');
+      if (zz.type === 'exploder') explode(zz); // shooting one still sets it off, so keep your distance
+      else if (zz.type === 'boss') { sfx('bossRoar', { at: zz.g.position, far: 80, rate: .75 }); banner(`BOSS DOWN!\n+${zz.coins} ◆`); }
+      else sfx('zDie', { at: zz.g.position, far: 35, rate: big ? .7 : 1 });
+    }
   }
 }
-// pierce = damage that skips armor and hits HP directly. by = the deathmatch bot that shot you
-function hurtPlayer(d, pierce = false, by = null) {
+// pierce = damage that skips armor and hits HP directly. by = the deathmatch bot that shot you. head = it was a headshot
+function hurtPlayer(d, pierce = false, by = null, head = false) {
   if (respawnT > 0 || matchOver) return;
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;
+  hurtSfx(P, soak === d ? 'armorHit' : head ? 'hurtHead' : 'hurt');
+  if (P.hp <= 0) sfx('die');
   $('hit').style.background = soak === d ? '#c9ced6' : 'red'; // silver flash = armor took all of it
   $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
   if (P.hp <= 0 && mode === 'dm') { P.hp = 0; youDown(by); return; }
@@ -107,7 +117,7 @@ function explode(z) {
 }
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
 function blast(p, R, zDmg, pDmg, skip) {
-  burst(p, 0xff8800, 30); burst(p, 0x333333, 14); shotSound(.7, .6, 500);
+  burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
@@ -159,14 +169,14 @@ function buy(i) {
   coins -= price;
   if (isUpg(it)) { // star upgrade: also refills the mag to the new size
     const g = it.gun; lvl[g]++; applyLvl(g); ammo[g] = WEAPONS[g].mag;
-    if (g === cur) { reloading = 0; buildGun(); renderHotbar(); } else equip(g);
-    beep(1200, .2, 'triangle', .12);
+    if (g === cur) { cancelReload(); buildGun(); renderHotbar(); } else equip(g);
+    sfx('upgrade');
   }
   else if (it.gun !== undefined) { owned[it.gun] = true; reserve[it.gun] = resMax(it.gun); equip(it.gun); }
   if (it.heal) P.hp = Math.min(P.max, P.hp + it.heal);
   if (it.armor) { P.maxArmor = Math.min(ARMOR_CAP, P.maxArmor + it.armor); P.armor = P.maxArmor; armorBought++; }
   if (it.refill) WEAPONS.forEach((w, g) => { if (owned[g]) reserve[g] = resMax(g); });
-  beep(900, .12, 'triangle', .12); renderShop();
+  sfx('buy'); renderShop();
 }
 function openShop() { shopOpen = true; renderShop(); document.exitPointerLock(); }
 $('items').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) buy(+b.dataset.i); });

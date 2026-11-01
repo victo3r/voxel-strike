@@ -25,8 +25,11 @@ try { const s = JSON.parse(localStorage.getItem('voxelstrike-sens')); if (s) for
 const saveSens = () => { try { localStorage.setItem('voxelstrike-sens', JSON.stringify(sens)); } catch {} };
 function renderSens() {
   for (const k in sens) { $('sens_' + k).value = sens[k]; $('sensV_' + k).textContent = sens[k].toFixed(2) + '×'; }
+  $('vol').value = volume; $('volV').textContent = Math.round(volume * 100) + '%';
 }
 for (const k in sens) $('sens_' + k).addEventListener('input', e => { sens[k] = +e.target.value; saveSens(); renderSens(); });
+$('vol').addEventListener('input', e => { setVolume(+e.target.value); renderSens(); });
+$('vol').addEventListener('change', () => sfx('ui'));
 renderSens();
 const held = a =>binds[a].some(c => c && keys[c]);
 const isBind = (a, code) => binds[a].includes(code);
@@ -47,7 +50,7 @@ function assign(code) {
   const { a, s } = rebinding; rebinding = null;
   if (code !== null) {
     if (code) for (const k in binds) binds[k] = binds[k].map(c => c === code ? '' : c); // a key can only do one thing
-    binds[a][s] = code; saveBinds(); renderHelp(); beep(700, .05);
+    binds[a][s] = code; saveBinds(); renderHelp(); sfx('ui');
   }
   renderBinds();
 }
@@ -162,14 +165,14 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); s
 $('modes').addEventListener('click', e => {
   const b = e.target.closest('.mode'); if (!b || b.disabled) return;
   document.querySelectorAll('.mode').forEach(m => m.classList.toggle('sel', m === b));
-  mode = b.dataset.mode; beep(600, .05);
+  mode = b.dataset.mode; sfx('ui');
 });
 const markMap = () => document.querySelectorAll('.map').forEach(m => m.classList.toggle('sel', m.dataset.map === mapId));
 if (!MAPS[mapId]) mapId = 'yard';
 markMap();
 $('maps').addEventListener('click', e => {
   const b = e.target.closest('.map'); if (!b) return;
-  mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId); markMap(); beep(600, .05);
+  mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId); markMap(); sfx('ui');
 });
 // your name: saves when you click away or press Enter. Blank goes back to the old one. 🎲 rolls a random one.
 $('nameIn').value = myName;
@@ -177,7 +180,7 @@ const saveName = () => { $('nameIn').value = setMyName($('nameIn').value); };
 $('nameIn').addEventListener('change', saveName);
 $('nameIn').addEventListener('blur', saveName);
 $('nameIn').addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'NumpadEnter') $('nameIn').blur(); });
-$('nameDice').addEventListener('click', () => { $('nameIn').value = setMyName(newMyName(myName)); beep(600, .05); });
+$('nameDice').addEventListener('click', () => { $('nameIn').value = setMyName(newMyName(myName)); sfx('ui'); });
 document.addEventListener('pointerlockchange', () => { if (document.activeElement === $('nameIn')) $('nameIn').blur(); });
 $('lobbyCtrl').addEventListener('click', () => { rebinding = null; renderBinds(); $('binds').style.display = 'flex'; });
 showLobby(true);
@@ -192,7 +195,7 @@ function restart() {
   useMap(mapId); setupPads();
   Object.assign(P, { vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, kx: 0, kz: 0 }); P.pos.set(0, 0, 0);
   wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = '';
-  WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); reloading = 0; newBest = false;
+  WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); cancelReload(); soundsOff(); newBest = false;
   emptyPads();
   cur = gi('voxel'); resetSlots(); buildGun(); renderHotbar();
   setupMode();

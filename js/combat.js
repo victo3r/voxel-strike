@@ -11,7 +11,7 @@ function shoot() {
   if (w.flame) flame(w);
   else {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3;
-    shotSound(w.vol, .15, w.cut);
+    sfx(w.id);
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);
     else {
@@ -33,12 +33,12 @@ function shoot() {
 }
 // knife: a few short rays around the crosshair so you don't need pixel-perfect aim. Hits one zombie per swing
 function stab(w) {
-  cd = w.rate; kick = 1; shotSound(w.vol, .12, w.cut);
+  cd = w.rate; kick = 1; sfx('swing');
   const targets = shotTargets();
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
     const hit = ray2.intersectObjects(targets, false)[0], zz = hit?.object.userData.zombie;
-    if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head); beep(220, .06, 'square', .1); return; }
+    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx('slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head); return; }
     if (hit) return;
   }
 }
@@ -46,7 +46,7 @@ const BURN_T = 2.5; // how long a zombie keeps burning after you stop hitting it
 const flames = [], flameGeo = new THREE.BoxGeometry(.18, .18, .18);
 const flameMats = [0xffdd55, 0xff8a1a, 0xff4a1a].map(color => new THREE.MeshBasicMaterial({ color }));
 function flame(w) {
-  kick = .3; if (Math.random() < .35) shotSound(w.vol * 2, .12, w.cut);
+  kick = .3; flameHeld = .12; // keeps the fire sound going (sound.js)
   camera.getWorldDirection(fwd);
   flashMesh.getWorldPosition(tmp);
   for (let k = 0; k < 2; k++) {
@@ -93,7 +93,7 @@ function updateFlares(dt) {
     if (hit || f.life <= 0) {
       scene.remove(f.m); flares.splice(i, 1);
       const p = hit ? hit.point : f.m.position;
-      burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8);
+      burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8); sfx('flareHit', { at: p });
       const zz = hit?.object.userData.zombie;
       if (zz && !zz.dead) {
         const head = !!hit.object.userData.head;
@@ -158,7 +158,7 @@ function usePickup(type) {
     if (!got) return false;
     toast('+AMMO', '#ffd23f');
   }
-  beep(1000, .1, 'triangle', .12); return true;
+  sfx(type === 'health' ? 'pickHealth' : type === 'armor' ? 'pickArmor' : 'pickAmmo'); return true;
 }
 let toastT;
 function toast(text, color) { const t = $('toast'); t.textContent = text; t.style.color = color; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => t.style.opacity = 0, 900); }

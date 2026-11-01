@@ -1,3 +1,4 @@
+let stepT = 0, stepAlt = false; // footsteps: time until the next one, and which foot
 function update(dt) {
   const down = mode === 'dm' && dmDown(dt);
   const w = WEAPONS[cur];
@@ -22,16 +23,18 @@ function update(dt) {
     if (Math.abs(P.kx) + Math.abs(P.kz) < .2) P.kx = P.kz = 0;
   }
   if (held('jump') && P.onGround) { P.vy = 9; P.onGround = false; }
-  const prevY = P.pos.y; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
+  const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
-  if (P.pos.y <= gy) { P.pos.y = gy; P.vy = 0; P.onGround = true; } else P.onGround = false;
+  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land'); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; } else P.onGround = false;
   camera.position.set(P.pos.x, P.pos.y + 1.6, P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
+  if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33; stepAlt = !stepAlt; sfx(P.pos.y > .05 ? 'stepCrate' : stepAlt ? 'step' : 'step2', { v: .7 }); } }
+  else stepT = .08; // first step comes right after you start moving
 
   cd -= dt;
   if (w.auto && held('shoot')) shoot();
   aiming = held('aim');
-  if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; beep(500, .06); } }
+  if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * 8);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // eradicator barrels wind down after you stop firing
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
@@ -68,8 +71,8 @@ function update(dt) {
       wave++; toSpawn = Math.round(5 + wave * 2.5); spawnT = 0; waveWait = 3;
       const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!' };
       banner(`WAVE ${wave}` + (news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
-      beep(440, .4, 'triangle', .15);
-      if (wave % 5 === 0) { spawnZombie('boss'); beep(50, 1, 'sawtooth', .2); }
+      sfx('waveStart');
+      if (wave % 5 === 0) { spawnZombie('boss'); sfx('bossRoar', { v: .7 }); }
     }
   }
 
@@ -95,7 +98,7 @@ function update(dt) {
       z.g.scale.setScalar(z.scale * (1 + (FUSE - z.fuse) * .6));
       const blink = Math.sin(z.fuse * 40) > 0 ? 0xffffff : 0;
       z.mats.forEach(m => m.emissive.setHex(blink));
-      if ((z.beepT -= dt) <= 0) { z.beepT = .12; beep(1200, .05, 'square', .06); }
+      if ((z.beepT -= dt) <= 0) { z.beepT = .12; sfx('fuse', { at: z.g.position, far: 35 }); }
       if (z.fuse <= 0) explode(z);
       continue;
     }
@@ -114,14 +117,14 @@ function update(dt) {
         z.g.scale.setScalar(z.scale * (1 + (WIND - z.wind) * .1));
         if (z.wind <= 0) {
           z.charging = CHARGE_T; z.cdx = dx / (dist || 1); z.cdz = dz / (dist || 1); z.hitP = false;
-          z.g.scale.setScalar(z.scale); beep(40, .5, 'sawtooth', .25);
+          z.g.scale.setScalar(z.scale); sfx('bossCharge', { at: z.g.position, far: 70 });
         }
       } else if (z.charging > 0) {
         z.charging -= dt; z.glow = 0x660000;
         z.g.rotation.y = Math.atan2(z.cdx, z.cdz);
         const s = CHARGE_SPD * dt, nx = z.g.position.x + z.cdx * s, nz = z.g.position.z + z.cdz * s;
         if (blocked(nx, nz, z.r, 0)) {
-          z.charging = 0; z.stun = 1.8; beep(90, .35, 'square', .2); burst(z.g.position.clone().setY(1.5), 0xaa8855, 10);
+          z.charging = 0; z.stun = 1.8; sfx('bonk', { at: z.g.position, far: 60 }); burst(z.g.position.clone().setY(1.5), 0xaa8855, 10);
         } else {
           z.g.position.x = nx; z.g.position.z = nz;
           z.t += dt * CHARGE_SPD * 1.5;
@@ -131,13 +134,13 @@ function update(dt) {
         if (!z.hitP && pd < z.reach && P.pos.y < 3.5) {
           z.hitP = true; hurtPlayer(Math.round(z.dmg * 1.5));
           P.kx = z.cdx * 16; P.kz = z.cdz * 16; P.vy = Math.max(P.vy, 6); P.onGround = false;
-          beep(60, .3, 'sawtooth', .25);
+          sfx('smash');
         }
         hold = true;
         if (z.charging <= 0) z.atk = .6; // short pause before it can swing again
       } else if ((z.chargeT -= dt) <= 0 && dist > 4 && dist < 22) {
         z.wind = WIND; z.chargeT = Math.max(2.5, 5 - wave * .1) + Math.random() * 1.5;
-        beep(55, .8, 'sawtooth', .25);
+        sfx('bossRoar', { at: z.g.position, far: 80 });
       }
     }
     if (hold) { /* boss is winding up, charging or dazed */ }
@@ -154,7 +157,7 @@ function update(dt) {
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
     } else if ((z.atk -= dt) <= 0 && P.pos.y < (z.type === 'boss' ? 3.5 : 2.2)) { // the boss can reach you on tall crates
-      z.atk = z.atkRate; hurtPlayer(z.dmg); beep(z.type === 'brute' || z.type === 'boss' ? 70 : 120, .2, 'sawtooth', .15);
+      z.atk = z.atkRate; sfx('zAttack', { at: z.g.position, far: 30, rate: z.type === 'brute' || z.type === 'boss' ? .7 : 1 }); hurtPlayer(z.dmg);
     }
     z.flash -= dt;
     const e = z.flash > 0 ? 0x880000 : z.burn > 0 ? (Math.sin(performance.now() * .03 + i) > 0 ? 0x993300 : 0x441100) : z.glow;
@@ -221,9 +224,11 @@ const clock = new THREE.Clock();
 (function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), .05);
-  if (inLobby) { updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; }
+  if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; }
   // the game keeps running while the menu is open (it isn't a pause). Only the zombie-waves shop and death screen stop it,
   // and with the mouse unlocked your keys are released, so you just stand there
-  if (!dead && !shopOpen && !matchOver) update(dt);
+  const live = !dead && !shopOpen && !matchOver;
+  if (live) update(dt);
+  soundTick(dt, live);
   renderer.render(scene, camera);
 })();

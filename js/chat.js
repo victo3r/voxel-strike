@@ -83,7 +83,7 @@ $('chatIn').addEventListener('keydown', e => {
   if (e.code === 'Enter' || e.code === 'NumpadEnter') {
     e.preventDefault();
     const text = $('chatIn').value.replace(/\s+/g, ' ').trim().slice(0, 80);
-    if (text) { chatSay(youRec, text); botsHear(text); beep(900, .03, 'square', .03); }
+    if (text) { chatSay(youRec, text); botsHear(text); sfx('ui', { v: .5 }); }
     closeChat();
   } else if (e.code === 'Escape') { e.preventDefault(); closeChat(); }
 });
