@@ -9,7 +9,7 @@ const CAT_I = Object.fromEntries(CATS.map(([k], i) => [k, i]));
 // inf = never runs out of ammo (just the knife)
 // unlock = account level you need before you can buy it in the armory. price = its armory price in account coins
 const BASE = [
-  { id: 'voxel', name: 'Voxel Gun', cat: 'backup', start: true, free: true, dmg: 34, rate: .22, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3, vol: .25, cut: 2200 },
+  { id: 'voxel', name: 'Voxel Gun', cat: 'backup', start: true, free: true, dmg: 34, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3, vol: .25, cut: 2200 },
   { id: 'shotgun', name: 'Shotgun', cat: 'primary', start: true, dmg: 16, rate: .75, mag: 6, reload: 1.6, pellets: 9, spread: .07, auto: false, color: 0x6b4a2b, len: .6, vol: .45, cut: 900 },
   { id: 'ar', name: 'Assault Rifle', cat: 'primary', start: true, dmg: 22, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55, vol: .2, cut: 2600 },
   { id: 'sniper', name: 'Sniper Rifle', cat: 'sniper', start: true, dmg: 150, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, vol: .5, cut: 3200, scope: true },

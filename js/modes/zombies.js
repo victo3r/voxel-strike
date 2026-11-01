@@ -167,7 +167,7 @@ $('items').addEventListener('click', e => { const b = e.target.closest('button')
 $('next').addEventListener('click', () => {
   shopOpen = false; $('shop').style.display = 'none'; waveWait = 1;
   rerollPads(); // so pickups match what you own now (e.g. ammo once you have a 2nd gun, armor once you've bought some)
-  renderer.domElement.requestPointerLock()?.catch?.(() => {});
+  lockMouse();
 });
 function banner(text) { const b = $('banner'); b.textContent = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }
 let crossT = 0; function setCross(c) { $('cross').style.setProperty('--c', c); crossT = .08; }

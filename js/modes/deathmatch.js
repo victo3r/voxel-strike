@@ -344,7 +344,7 @@ function endMatch() {
   if (ups) setTimeout(() => beep(1040, .4, 'triangle', .14), 350);
   document.exitPointerLock();
 }
-$('againBtn').addEventListener('click', () => { restart(); renderer.domElement.requestPointerLock()?.catch?.(() => {}); });
+$('againBtn').addEventListener('click', () => { restart(); lockMouse(); });
 $('postLobby').addEventListener('click', () => { restart(); showLobby(true); });
 
 // deathmatch: a gun from your account, with its saved stars (prof.guns: id -> stars 1-3) and full ammo

@@ -96,11 +96,26 @@ addEventListener('mousedown', e => {
 });
 addEventListener('mouseup', e => keys['Mouse' + e.button] = false);
 addEventListener('contextmenu', e => e.preventDefault());
+// unadjustedMovement asks for raw mouse input, which avoids Chrome on Windows
+// sometimes reporting one huge fake movement (the camera "snap").
+// Browsers that don't support it (e.g. some Chromebooks) fall back to a normal lock.
+function lockMouse() {
+  const el = renderer.domElement;
+  let p;
+  try { p = el.requestPointerLock({ unadjustedMovement: true }); } catch { p = null; }
+  if (p?.catch) p.catch(() => el.requestPointerLock()?.catch?.(() => {}));
+  else if (!p && document.pointerLockElement !== el) el.requestPointerLock()?.catch?.(() => {});
+}
+let lastMove = 0;
 addEventListener('mousemove', e => {
   if (!locked) return;
+  const dx = e.movementX, dy = e.movementY, m = Math.hypot(dx, dy);
+  // drop a lone spike far bigger than the movement just before it (browser glitch, not a real flick)
+  if (m > 250 && m > lastMove * 8 + 60) { lastMove = m; return; } // only ever skips one event in a row
+  lastMove = m;
   const s = .0022 * sens.mouse * camera.fov / 75; // slower aim when zoomed
-  P.yaw -= e.movementX * s;
-  P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch - e.movementY * s));
+  P.yaw -= dx * s;
+  P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch - dy * s));
 });
 let wheelT = 0;
 addEventListener('wheel', e => {
@@ -112,7 +127,7 @@ addEventListener('wheel', e => {
 }, { passive: true });
 $('menu').addEventListener('click', () => {
   if (dead) restart();
-  renderer.domElement.requestPointerLock()?.catch?.(() => {});
+  lockMouse();
 });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
@@ -141,7 +156,7 @@ function showLobby(on) {
 }
 $('playBtn').addEventListener('click', () => {
   restart(); showLobby(false);
-  renderer.domElement.requestPointerLock()?.catch?.(() => {});
+  lockMouse();
 });
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); showLobby(true); });
 $('modes').addEventListener('click', e => {

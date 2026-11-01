@@ -24,7 +24,7 @@ function shoot() {
         const hit = ray.intersectObjects(targets, false)[0];
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
-        if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 2 : 1), hit.point, head); }
+        if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head); }
         else burst(hit.point, 0x999999, 2);
       }
     }
