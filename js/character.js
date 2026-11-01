@@ -7,6 +7,7 @@
 //   top:    tee | long | tank | hoodie | jacket   (top2 = the shirt under the jacket, or the hoodie strings)
 //   bottom: pants | shorts      shoes: sneakers | boots | plain
 //   extra:  null | glasses | stubble | beard | freckles | headband | badge
+//   bigEyes: 2x2 eyes instead of 1 row tall (only drawn when the row above the eyes is free)
 
 const SKIN_TONES = [[247, 214, 186], [232, 190, 152], [214, 163, 124], [184, 128, 90], [140, 92, 60], [94, 62, 42]];
 const HAIR_COLS = { black: [34, 29, 29], dark: [64, 42, 26], brown: [104, 70, 40], auburn: [124, 56, 34], ginger: [186, 94, 46], blonde: [212, 176, 104] };
@@ -28,7 +29,7 @@ const HAIRSTYLES = {
 const PRESETS = [
   { name: 'CLASSIC', look: { skin: 2, eyes: 'blue', hair: 'short', hairC: 'dark', top: 'tee', topC: 0x1c9e98, bottom: 'pants', bottomC: 0x2c3e80, shoes: 'plain', shoeC: 0x3a3a40, extra: 'badge' } },
   { name: 'HOODIE', look: { skin: 1, eyes: 'brown', hair: 'short', hairC: 'black', top: 'hoodie', topC: 0x33363d, top2: 0xdddddd, bottom: 'pants', bottomC: 0x3d5a8c, shoes: 'sneakers', shoeC: 0xb8342c } },
-  { name: 'BOB', look: { skin: 0, girl: true, eyes: 'green', hair: 'bob', hairC: 'blonde', top: 'tee', topC: 0xd4577a, bottom: 'pants', bottomC: 0x3f5f99, shoes: 'sneakers', shoeC: 0xf0f0f0 } },
+  { name: 'BOB', look: { skin: 0, girl: true, eyes: 'green', bigEyes: true, hair: 'bob', hairC: 'blonde', top: 'tee', topC: 0xd4577a, bottom: 'pants', bottomC: 0x3f5f99, shoes: 'sneakers', shoeC: 0xf0f0f0 } },
   { name: 'JACKET', look: { skin: 3, eyes: 'brown', hair: 'side', hairC: 'brown', top: 'jacket', topC: 0x5a3a24, top2: 0xe6e6e6, bottom: 'pants', bottomC: 0x2e2e34, shoes: 'boots', shoeC: 0x4a3020, extra: 'stubble' } },
   { name: 'LONG HAIR', look: { skin: 4, girl: true, eyes: 'dark', hair: 'long', hairC: 'black', top: 'long', topC: 0x6a4fb0, bottom: 'pants', bottomC: 0x2a2f3a, shoes: 'plain', shoeC: 0x26262a } },
   { name: 'CURLY', look: { skin: 5, eyes: 'dark', hair: 'curly', hairC: 'black', top: 'tank', topC: 0xe8c33a, bottom: 'shorts', bottomC: 0x3a4a5a, shoes: 'sneakers', shoeC: 0x2a2a2e } },
@@ -86,7 +87,14 @@ function paintSkin(g, L, rnd) {
 
   // ---- head ----
   const head = regions(...PARTS.head.slice(0, 2), 8, 8, 8);
-  for (const f of ['front', 'back', 'left', 'right', 'bottom']) fill(head[f], SK, 10);
+  for (const f of ['front', 'back', 'left', 'right']) fill(head[f], SK, 10);
+  // underside of the head (row 0 = chin, row 7 = back of the head, column 0 = the character's right):
+  // shaded jaw, a darker neck in the middle, and hair wherever a style reaches the bottom edge
+  const HB = head.bottom;
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+    const neck = x >= 2 && x <= 5 && y >= 2 && y <= 6;
+    at(HB, x, y, shadeC(SK, neck ? -30 : (x === 0 || x === 7 || y === 0) ? -8 : -16), 8);
+  }
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) hairPx(head.top, x, y, false);
   if (H.part !== undefined) for (let y = 0; y < 8; y++) at(head.top, H.part, y, shadeC(HC, -22), 6); // the parting line, a darker strand rather than bare scalp
   for (let x = 0; x < 8; x++) {
@@ -98,9 +106,20 @@ function paintSkin(g, L, rnd) {
     if (c === 3 && H.side[3] <= 4) { at(head.right, 4, 4, shadeC(SK, -26), 6); at(head.right, 4, 5, shadeC(SK, -26), 6); at(head.left, 3, 4, shadeC(SK, -26), 6); at(head.left, 3, 5, shadeC(SK, -26), 6); } // ears
   }
 
+  for (let i = 0; i < 8; i++) {
+    if (H.back[7 - i] >= 8) hairPx(HB, i, 7, false);
+    if (H.side[i] >= 8) { hairPx(HB, 0, i, false); hairPx(HB, 7, i, false); }
+    if (H.front[i] >= 8) hairPx(HB, i, 0, false);
+  }
+
   // face
   const F = head.front, open = (x, y) => H.front[x] <= y;
-  if (L.girl) { // soft brows, and only where there's a skin row between them and the hair so they don't merge into bangs
+  // 2x2 eyes take row 3 too, so they only go where that row is clear of hair and glasses; brows move up a row if there's room
+  const tall = L.bigEyes && L.extra !== 'glasses' && [1, 2, 5, 6].every(x => open(x, 3));
+  if (tall) {
+    if (!L.girl) for (const x of [1, 2, 5, 6]) if (open(x, 2)) at(F, x, 2, shadeC(HC, -6), 6);
+    at(F, 1, 3, [240, 240, 240]); at(F, 2, 3, shadeC(EYE, -22)); at(F, 5, 3, shadeC(EYE, -22)); at(F, 6, 3, [240, 240, 240]);
+  } else if (L.girl) { // soft brows, and only where there's a skin row between them and the hair so they don't merge into bangs
     const brow = mixC(shadeC(HC, -20), SK, .4);
     for (const [a, b] of [[1, 2], [5, 6]]) if (H.front[a] <= 2 && H.front[b] <= 2) { at(F, a, 3, brow, 4); at(F, b, 3, brow, 4); }
   } else for (const x of [1, 2, 5, 6]) if (open(x, 3)) at(F, x, 3, shadeC(HC, -6), 6); // brows
@@ -119,7 +138,15 @@ function paintSkin(g, L, rnd) {
       else at(r, x, y, y === 10 && !longTop ? shadeC(BOT, -30) : BOT, 14);
     }
   }
-  fill(body.top, L.top === 'tank' ? SK : TOP, 18); fill(body.bottom, BOT, 14);
+  // shoulders (row 0 = back, row 3 = front): neck in the middle, a seam along each shoulder
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 8; x++) {
+    const neck = x >= 2 && x <= 5 && y >= 1 && y <= 2, collar = x >= 2 && x <= 5 && !neck;
+    const tankSkin = L.top === 'tank' && x >= 2 && x <= 5;
+    at(body.top, x, y, neck ? shadeC(SK, -24) : tankSkin ? SK : collar ? shadeC(TOP, -18) : x === 0 || x === 7 ? shadeC(TOP, 10) : TOP, 12);
+  }
+  // seat of the pants (row 0 = front): darker centre seam and edges
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 8; x++)
+    at(body.bottom, x, y, x === 3 || x === 4 ? shadeC(BOT, -26) : x === 0 || x === 7 || y === 0 || y === 3 ? shadeC(BOT, -12) : BOT, 12);
   const BF = body.front, BB = body.back;
   if (L.top === 'tee' || L.top === 'long') { at(BF, 3, 0, SK, 8); at(BF, 4, 0, SK, 8); }
   if (L.top === 'tank') {
@@ -149,7 +176,11 @@ function paintSkin(g, L, rnd) {
       if (y < sleeve) at(r[f], x, y, y === sleeve - 1 && sleeve > 0 ? shadeC(TOP, -26) : TOP, 20);
       else at(r[f], x, y, SK, 10);
     }
-    fill(r.top, sleeve ? TOP : SK, 16); fill(r.bottom, SK, 10);
+    const sh = sleeve ? TOP : SK; // shoulder: lighter middle, darker rim
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) at(r.top, x, y, x % 3 && y % 3 ? shadeC(sh, 10) : shadeC(sh, -10), 10);
+    // fist from below (row 0 = front): knuckle row in front, finger creases, darker palm
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++)
+      at(r.bottom, x, y, y === 0 ? shadeC(SK, -6) : y === 1 ? shadeC(SK, x % 2 ? -26 : -16) : shadeC(SK, -20), 6);
   }
 
   // ---- legs ----
@@ -162,7 +193,13 @@ function paintSkin(g, L, rnd) {
       else at(r[f], x, y, SK, 10);
     }
     if (L.shoes === 'sneakers') { at(r.front, 1, 10, [235, 235, 235]); at(r.front, 2, 10, [235, 235, 235]); } // laces
-    fill(r.top, BOT, 14); fill(r.bottom, L.shoes === 'sneakers' ? [232, 232, 232] : shadeC(SHOE, -12), 8);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) at(r.top, x, y, x === 0 || x === 3 ? shadeC(BOT, -10) : BOT, 12);
+    // sole (row 0 = toe): rim around the edge, tread lines across, a heel block at the back
+    const sole = L.shoes === 'sneakers' ? [226, 226, 226] : shadeC(SHOE, -14);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      const rim = x === 0 || x === 3 || y === 0;
+      at(r.bottom, x, y, rim ? shadeC(sole, 10) : y === 3 ? shadeC(sole, -22) : y === 1 ? shadeC(sole, -14) : sole, 6);
+    }
   }
 
   // ---- extras painted on top ----
@@ -187,6 +224,10 @@ function paintSkin(g, L, rnd) {
       const last = c === jaw.length - 1 || (i === 0 && rows.length > 1 && y === 5);
       bpx(k => sideFront(c, y, k, 8), last ? fade : col);
     }));
+    // under the chin: the beard carries on underneath and fades out before the neck
+    const under = beard ? [8, 8, 6] : [8, 4];
+    under.forEach((w, y) => { for (let x = (8 - w) / 2; x < (8 + w) / 2; x++) bpx(k => at(HB, x, y, k, 8), y === under.length - 1 ? fade : col); });
+    for (let y = 0; y < jaw.length; y++) { bpx(k => at(HB, 0, y, k, 8), y === jaw.length - 1 ? fade : col); bpx(k => at(HB, 7, y, k, 8), y === jaw.length - 1 ? fade : col); }
   }
   if (L.extra === 'freckles') for (const [x, y] of [[1, 5], [2, 6], [5, 5], [6, 6], [0, 5], [7, 5]]) at(F, x, y, shadeC(SK, -32), 6);
   if (L.extra === 'headband') {
@@ -246,5 +287,6 @@ function randomLook(seedStr, topC) {
     bottom: r() < .3 ? 'shorts' : 'pants', bottomC,
     shoes: pick(['sneakers', 'sneakers', 'boots', 'plain']), shoeC: pick([0x2a2a2e, 0xe8e8e8, 0x4a3020, 0xb8342c, 0x3a3a40]),
     extra: r() < .35 ? pick(girl ? ['glasses', 'freckles', 'headband'] : ['glasses', 'stubble', 'beard', 'freckles']) : null,
+    bigEyes: r() < (girl ? .4 : .2),
   };
 }
