@@ -44,6 +44,11 @@ function update(dt) {
   kick = Math.max(0, kick - dt * 8);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // eradicator barrels wind down after you stop firing
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
+  if (gunRound) { // the rocket: gone once fired, slides back into the tube near the end of the reload
+    const k = reloading > 0 ? reloading / w.reload : 0;
+    gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
+    gunRound.position.z = reloading > 0 ? k / .4 * 8 * GPX : 0;
+  }
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
   const fov = 75 - adsT * (w.scope ? 57 : 20);
   if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }

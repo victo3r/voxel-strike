@@ -210,8 +210,9 @@ const FLASH_MAT = new THREE.MeshBasicMaterial({ color: 0xffdd55 });
 function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM) o.geometry.dispose(); }); }
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin } = makeGun(b.gun, gunM, 0, false);
-  gunM.rotation.y = Math.PI; gunM.position.set(-4 * u, .5 * u, 10 * u);
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, grip: [gy, gz] } = makeGun(b.gun, gunM, 0);
+  gunM.rotation.y = Math.PI; gunM.position.set(-4 * u, -gy, 9 * u + gz); // its right fist (near the end of the arm) closes round the grip
+  b.round = round;
   b.flashM ??= box(.14, .14, .14, FLASH_MAT);
   b.flashM.position.set(0, my, mz - .04); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
@@ -509,6 +510,7 @@ function updateBot(b, dt) {
   b.stab = Math.max(0, b.stab - dt); b.aim.position.z = b.stab * 1.3; // knife jab: arms shoot forward and come back
   if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels, like yours
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
+  if (b.round) b.round.visible = b.ammo > 0;
   // in range for this gun: knife = arm's reach, flamethrower = its flame, rocket = not close enough to blow itself up
   const inRange = W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.rocket ? dist > 4 : true;
   const ready = sees && b.seeT >= BOT.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;

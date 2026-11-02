@@ -6,7 +6,7 @@ const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
 const inMatch = () => !inLobby && pvp() && !matchOver;
 
 function gunStats(i) {
-  const w = BASE[i], L = Math.max(0, gunStars(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), mag = Math.round(w.mag * (1 + .25 * L));
+  const w = BASE[i], L = Math.max(0, gunStars(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), mag = magAt(w, L);
   const mob = w.mob && w.mob !== 1 ? ` · SPEED ${w.mob > 1 ? '+' : ''}${Math.round((w.mob - 1) * 100)}%` : '';
   if (w.melee) return `DMG ${dmg} · MELEE${mob}`;
   const L2 = Math.max(0, gunStars(i) - 1), rl = +(w.reload * (1 - .15 * L2)).toFixed(1);
@@ -28,9 +28,9 @@ const DESC = {
 // every stat for the details view, at the gun's current stars
 function gunSpecs(i) {
   const w = BASE[i], L = Math.max(0, gunStars(i) - 1), out = [];
-  const dmg = Math.round(w.dmg * (1 + .25 * L)), mag = Math.round(w.mag * (1 + .25 * L)), rl = +(w.reload * (1 - .15 * L)).toFixed(1);
+  const dmg = Math.round(w.dmg * (1 + .25 * L)), mag = magAt(w, L), rl = +(w.reload * (1 - .15 * L)).toFixed(1);
   out.push(['DAMAGE', w.pellets > 1 ? `${dmg} × ${w.pellets} PELLETS` : dmg]);
-  out.push([w.melee ? 'SWINGS' : 'FIRE RATE', (1 / w.rate).toFixed(w.rate < .2 ? 0 : 1) + ' / SEC']);
+  if (w.mag !== 1) out.push([w.melee ? 'SWINGS' : 'FIRE RATE', (1 / w.rate).toFixed(w.rate < .2 ? 0 : 1) + ' / SEC']); // one-shot guns fire once per reload
   if (!w.melee) out.push([w.flame ? 'FUEL' : 'MAGAZINE', mag], ['RELOAD', rl + 's']);
   if (!w.melee && !w.flame) out.push(['SPREAD', !w.spread ? 'NONE' : w.spread < .02 ? 'LOW' : 'WIDE']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);

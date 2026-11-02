@@ -195,7 +195,7 @@ function renderShop() {
     if (upg) {
       const g = it.gun, b = BASE[g], L = lvl[g] + 1;
       label = `<small class="cat">${CATS[slotOf(g)][1]}</small><br>${it.name} <span class="cat">${stars(g)}</span>`;
-      desc = done ? 'fully upgraded' : `dmg ${WEAPONS[g].dmg}→${Math.round(b.dmg * (1 + .25 * L))} · mag ${WEAPONS[g].mag}→${Math.round(b.mag * (1 + .25 * L))} · faster reload`;
+      desc = done ? 'fully upgraded' : `dmg ${WEAPONS[g].dmg}→${Math.round(b.dmg * (1 + .25 * L))} · mag ${WEAPONS[g].mag}→${magAt(b, L)} · faster reload`;
       cost = done ? 'MAXED' : 'UPGRADE ' + COIN + priceOf(it);
     }
     if (it.armor && done) { desc = `armor maxed at ${ARMOR_CAP}`; cost = 'MAXED'; }
