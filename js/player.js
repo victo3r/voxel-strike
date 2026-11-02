@@ -112,6 +112,10 @@ const ARMOR_CAP = 100; // most armor you can buy up to (4 shop buys)
 const P = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, onGround: true, kx: 0, kz: 0 }; // kx/kz = knockback
 const keys = {};
 let locked = false, dead = false, inLobby = true;
-let mode = 'zombies'; // which mode you picked in the lobby: 'zombies' or 'dm' (deathmatch)
+// which mode you picked in the lobby: 'zombies', 'dm' (deathmatch), 'team' (team fight), 'blitz' (free for all) or 'blitzTeam'.
+// Every mode but zombies is a match against bots, run by modes/deathmatch.js
+let mode = 'zombies';
+const pvp = () => mode !== 'zombies';
+const teamMode = () => mode === 'team' || mode === 'blitzTeam';
 let mapId = localStorage.getItem('voxelstrike-map') || 'yard';
 let respawnT = 0, matchOver = false; // deathmatch: seconds until you respawn (0 = alive), and whether the timer has run out

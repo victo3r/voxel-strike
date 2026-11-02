@@ -435,7 +435,7 @@ const PS = { x0: POOL[0], x1: POOL[0] + 4, z0: -1.25, z1: 1.25 }, PSTEPS = 5;
 building.solids.push({ mesh: null, minX: PS.x0, maxX: PS.x1, minZ: PS.z0, maxZ: PS.z1, bot: POOL_F, top: DECK_Y, ramp: { ax: 'x', a: PS.x1, b: PS.x0 }, surf: 'stone' });
 for (let s = 0; s < PSTEPS; s++) {
   const w = (PS.x1 - PS.x0) / PSTEPS, h = (DECK_Y - POOL_F) * (PSTEPS - s) / PSTEPS;
-  const m = tbox(w, h, PS.z1 - PS.z0, tile); m.position.set(PS.x0 + w * (s + .5), POOL_F + h / 2, 0); add(m); building.cover.push(m);
+  const m = tbox(w, h, PS.z1 - PS.z0, tile, 2); m.position.set(PS.x0 + w * (s + .5), POOL_F + h / 2, 0); add(m); building.cover.push(m);
 }
 const chrome = surf(plain(0xd6dde3), 'metal');
 for (const z of [PS.z0 - .12, PS.z1 + .12]) { // a handrail either side, curving over from the deck down onto the top step

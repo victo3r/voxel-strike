@@ -29,7 +29,26 @@ function tbox(w, h, d, m, k = 1) {
   const geo = new THREE.BoxGeometry(w, h, d), uv = geo.attributes.uv.array;
   const size = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]; // +x, -x, +y, -y, +z, -z
   for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const j = (f * 4 + i) * 2; uv[j] *= size[f][0] / k; uv[j + 1] *= size[f][1] / k; }
-  return new THREE.Mesh(geo, m);
+  const mesh = new THREE.Mesh(geo, m); mesh.userData.uvk = k; // bakeMap lines its texture up with the world grid
+  return mesh;
+}
+// Texture each face of a tbox from where it sits in the world instead of from its own corner, so neighbouring boxes
+// (deck slabs, pool walls, steps, floors) carry the same grid of tiles or planks across the joins.
+// Runs once per map, after everything's in place (bakeMap)
+const uvP = new THREE.Vector3(), uvN = new THREE.Vector3(), uvM = new THREE.Matrix3();
+function alignUV(o) {
+  const g = o.geometry, P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, k = o.userData.uvk;
+  uvM.getNormalMatrix(o.matrixWorld);
+  for (let i = 0; i < P.count; i++) {
+    uvP.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); uvN.fromBufferAttribute(N, i).applyMatrix3(uvM);
+    const ax = Math.abs(uvN.x), ay = Math.abs(uvN.y), az = Math.abs(uvN.z);
+    // walls facing x run along z, walls facing z run along x (both up the y), floors and ceilings take x and z.
+    // The sign flips keep the texture reading the right way round on the faces pointing the other way
+    if (ax >= ay && ax >= az) U.setXY(i, -Math.sign(uvN.x) * uvP.z / k, uvP.y / k);
+    else if (az >= ay) U.setXY(i, Math.sign(uvN.z) * uvP.x / k, uvP.y / k);
+    else U.setXY(i, uvP.x / k, -Math.sign(uvN.y) * uvP.z / k);
+  }
+  U.needsUpdate = true;
 }
 // a solid box from height bot up to top, so it can float (upper floors, the wall above a window, stairs)
 function addSlab(x, z, w, d, bot, top, m, cover = true, k = 1) {
@@ -97,6 +116,7 @@ function surfaceAt(x, z, r, feet) {
 // still get skipped. The originals are taken out of the scene but kept, with their positions, for bullets and line of sight
 function bakeMap(m) {
   m.root.updateMatrixWorld(true);
+  m.root.traverse(o => { if (o.isMesh && o.userData.uvk) alignUV(o); });
   const C = 20, groups = new Map(), sig = new Map(), bb = new THREE.Box3(), c = new THREE.Vector3();
   const shown = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
   const look = mt => { // materials made separately but looking the same can share a mesh

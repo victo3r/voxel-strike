@@ -14,8 +14,26 @@ const SNIPE_T = .9; // a sniper bot lines up its shot this long before it fires
 // or within PAD_FAR once it's down to PAD_LOW HP. It also grabs any health pad it walks over while hurt.
 // Bots skip ammo pads (they never run out of spare ammo) and there's no armor in deathmatch.
 const PAD_LOW = 60, PAD_NEAR = 8, PAD_FAR = 30;
-const MATCH_T = 240, YOU_RESPAWN = 3, JOIN_T = 60; // match length (s), your respawn wait (s), bots finish joining by this time (s)
-let BOT_COUNT = 3; // fill the lobby: 3 bots on small maps like the yard, 7 on bigger ones (set in setupMode from the map)
+// the rules for each match mode. t = match length (s), you = your respawn wait (s), bot = a bot's respawn wait after its angel
+// floats away (s), join = the other bots have all joined by this time (s), kills = ranked on kills only (no points),
+// team = blue vs red, players = most players (you included) on a small / medium / large map
+const RULES = {
+  dm:        { name: 'DEATHMATCH', t: 240, you: 3, bot: 1.5, join: 60, kills: false, team: false, players: { small: 4, medium: 8, large: 8 } },
+  team:      { name: 'TEAM FIGHT', t: 240, you: 3, bot: 1.5, join: 60, kills: true,  team: true,  players: { small: 4, medium: 8, large: 8 } },
+  blitz:     { name: 'BLITZ',      t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: false, players: { small: 4, medium: 6, large: 8 } },
+  blitzTeam: { name: 'TEAM BLITZ', t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: true,  players: { small: 4, medium: 6, large: 6 } },
+};
+const DIE_T = 1.5; // how long a body stays (the angel floating up and fading)
+let MR = RULES.dm, MATCH_T = 240, YOU_RESPAWN = 3, JOIN_T = 60; // set from RULES in setupMode
+let BOT_COUNT = 3; // fill the lobby: players for this mode and map size, minus you (set in setupMode)
+// teams: 0 = blue (yours), 1 = red. The bots are dealt out red, blue, red, blue... so a full lobby splits evenly
+const TEAMS = [
+  { name: 'BLUE', css: '#6aa8ff', shirts: [[40, 90, 190], [30, 70, 160], [60, 110, 210], [35, 100, 175]] },
+  { name: 'RED', css: '#ff6a6a', shirts: [[185, 40, 40], [160, 30, 35], [205, 60, 50], [175, 45, 30]] },
+];
+const teamOf = t => t === YOU_T || t?.you ? 0 : t?.rec ? t.rec.team : t?.team;
+// a and c are on the same team (so they can't hurt each other). Bots, you (YOU_T or null = you) or records
+function friendly(a, c) { a ??= YOU_T; c ??= YOU_T; return teamMode() && a !== c && teamOf(a) === teamOf(c); }
 // score: every kill is worth KILL_PTS, a headshot kill adds HEAD_PTS.
 // Streaks (kills in a row without dying) add a one-time bonus on the kill that reaches them.
 // Once you're past ACE, every kill that doesn't land on a named streak gets STREAK_PTS instead (so 65 instead of 50).
@@ -36,7 +54,16 @@ const REWARDS = {
   medium: [[40, 8], [30, 5], [30, 5], [15, 2]],  // 1st, 2nd, 3rd, everyone else
   large:  [[40, 8], [30, 5], [30, 5], [15, 2]],
 };
-const rewardFor = place => { const t = REWARDS[MAP.size]; return t[Math.min(place, t.length) - 1]; };
+// blitz is under half as long, so it pays about half
+const BLITZ_REWARDS = {
+  small:  [[15, 3], [8, 1]],
+  medium: [[20, 4], [15, 3], [15, 3], [8, 1]],
+  large:  [[20, 4], [15, 3], [15, 3], [8, 1]],
+};
+const rewardTable = () => (mode === 'blitz' || mode === 'blitzTeam' ? BLITZ_REWARDS : REWARDS)[MAP.size];
+const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t.length) - 1]; };
+// team modes: the winning team gets 1st place pay, a draw gets 2nd place pay, the losing team gets the bottom pay
+const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res === 0 ? t[1] : t[t.length - 1]; };
 // every bot gets a full loadout when it joins, one gun per category, and keeps it for the whole match (respawns too).
 // BOT_PICKS = what it can roll for each category (a name listed twice is twice as likely)
 const BOT_PICKS = {
@@ -99,22 +126,25 @@ function tagMat(name, css) { // name tag floating over its head, as wide as the 
 const YOU_T = { you: true }; // stands in for you whenever a bot is picking or tracking a target
 let recs = [], youRec = null, matchT = 0, killedBy = '', joins = [];
 function makeRecs() {
-  youRec = { name: myName, you: true, css: '#ffd23f', score: 0, kills: 0, deaths: 0, streak: 0 };
+  youRec = { name: myName, you: true, team: 0, css: '#ffd23f', score: 0, kills: 0, deaths: 0, streak: 0 };
   recs = [youRec]; joins = [];
   // bot 1 is there from the start with a NATO-alphabet name and never chats.
   // The others join spread across the first minute, a little randomly, with real-looking names (js/names.js).
   const next = nameMaker([myName]);
   for (let i = 0; i < BOT_COUNT; i++) {
-    const at = i === 0 ? 0 : Math.min(JOIN_T - 2, Math.max(5, JOIN_T * i / BOT_COUNT + (Math.random() - .5) * 10));
+    const at = i === 0 ? 0 : Math.min(JOIN_T - 2, Math.max(JOIN_T / 12,JOIN_T * i / BOT_COUNT + (Math.random() - .5) * JOIN_T / 6));
     const nm = i === 0 ? { name: defaultBotName(myName), lang: 'en', quiet: true } : next();
     joins.push({ i, at, ...nm });
   }
   joins.sort((a, b) => a.at - b.at);
 }
 function joinBot(j) {
-  const n = j.i % BOT_LOOKS.length, look = BOT_LOOKS[n], tag = tagMat(j.name, look.css);
+  // team modes: shirt and name in the team's color. Your teammates' name tags show through walls so you can find them
+  const team = teamMode() ? (j.i % 2 ? 0 : 1) : undefined, T = TEAMS[team];
+  const look = T ? { shirt: T.shirts[(j.i >> 1) % T.shirts.length], css: T.css } : BOT_LOOKS[j.i % BOT_LOOKS.length], tag = tagMat(j.name, look.css);
+  if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; }
   const [sr, sg, sb] = look.shirt;
-  const r = { name: j.name, lang: j.lang, quiet: !!j.quiet, css: look.css, look: randomLook(j.name, sr << 16 | sg << 8 | sb), tag: tag.mat, tagW: tag.w,
+  const r = { name: j.name, lang: j.lang, quiet: !!j.quiet, team, css: look.css, look: randomLook(j.name, sr << 16 | sg << 8 | sb), tag: tag.mat, tagW: tag.w,
     score: 0, kills: 0, deaths: 0, streak: 0, b: null, wait: .5, ...botLoadout() };
   recs.push(r);
   if (MATCH_T - matchT > 1) { feed(`${nameTag(r)} joined`); sfx('join'); } // no message for the one that starts with you
@@ -122,9 +152,19 @@ function joinBot(j) {
 const ranked = () => [...recs].sort((a, b) => b.score - a.score || b.kills - a.kills || a.deaths - b.deaths);
 const ord = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] ?? 'TH');
 const nameTag = r => `<b style="color:${r.css}">${r.name}</b>`;
+const teamKills = t => recs.reduce((s, r) => s + (r.team === t ? r.kills : 0), 0);
+// 1 = your team is ahead, 0 = level, -1 = behind
+const teamLead = () => Math.sign(teamKills(0) - teamKills(1));
 function boardHTML() {
-  const head = '<div class="r h"><span>#</span><span>PLAYER</span><span>SCORE</span><span>KILLS</span><span>DEATHS</span></div>';
-  return head + ranked().map((r, i) => `<div class="r${r.you ? ' you' : ''}"><span>${i + 1}</span><span style="color:${r.css}">${r.name}</span><span>${r.score}</span><span>${r.kills}</span><span>${r.deaths}</span></div>`).join('');
+  // kill-only modes drop the score column (score = kills there)
+  const cols = MR.kills ? ['KILLS', 'DEATHS'] : ['SCORE', 'KILLS', 'DEATHS'], cls = MR.kills ? 'lb k' : 'lb';
+  const head = `<div class="r h"><span>#</span><span>PLAYER</span>${cols.map(c => `<span>${c}</span>`).join('')}</div>`;
+  const row = (r, i) => `<div class="r${r.you ? ' you' : ''}"><span>${i + 1}</span><span style="color:${r.css}">${r.name}</span>${MR.kills ? '' : `<span>${r.score}</span>`}<span>${r.kills}</span><span>${r.deaths}</span></div>`;
+  $('board').className = $('postBoard').className = cls;
+  if (!MR.team) return head + ranked().map(row).join('');
+  // team modes: a header per team with its kill total, then its players. Your team first
+  return head + [0, 1].map(t => `<div class="r tm" style="color:${TEAMS[t].css}"><span></span><span>${TEAMS[t].name} TEAM</span><span>${teamKills(t)}</span>${MR.kills ? '<span></span>' : '<span></span><span></span>'}</div>`
+    + ranked().filter(r => r.team === t).map(row).join('')).join('');
 }
 function feed(html) {
   const d = document.createElement('div'); d.className = 'kf'; d.innerHTML = html; $('feed').append(d);
@@ -137,10 +177,11 @@ function scoreKill(killer, victim, head) {
   if (killer && killer !== victim) {
     killer.kills++; killer.streak++;
     const st = STREAKS[killer.streak];
-    const pts = KILL_PTS + (head ? HEAD_PTS : 0) + (st ? st[0] : killer.streak > STREAK_PTS_AFTER ? STREAK_PTS : 0);
+    // kill-only modes: a kill is a kill, headshots and streaks only get announced
+    const pts = MR.kills ? 1 : KILL_PTS + (head ? HEAD_PTS : 0) + (st ? st[0] : killer.streak > STREAK_PTS_AFTER ? STREAK_PTS : 0);
     killer.score += pts;
     if (killer.you) {
-      toast(`+${pts}${head ? ' HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#ffd23f');
+      toast(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#ffd23f');
       sfx(head || st ? 'killSpecial' : 'kill'); // any streak or headshot gets the special one
     }
   }
@@ -149,11 +190,12 @@ function scoreKill(killer, victim, head) {
   if (st) feed(`${nameTag(killer)} <b style="color:#ffd23f">${st[1]}!</b>`);
 }
 
-// spawning: somewhere open, as far from everyone else as it can find
-function spawnSpot(skip) {
+// spawning: somewhere open, as far from everyone else as it can find (in team modes, as far from the other team as it can).
+// who = YOU_T or the bot's record
+function spawnSpot(who) {
   const others = [];
-  if (skip !== YOU_T && respawnT <= 0) others.push(P.pos);
-  for (const z of zombies) if (z !== skip && !z.dead) others.push(z.g.position);
+  if (who !== YOU_T && respawnT <= 0 && !friendly(who, YOU_T)) others.push(P.pos);
+  for (const z of zombies) if (z.rec !== who && !z.dead && !friendly(who, z)) others.push(z.g.position);
   let best = null, bestD = -1;
   for (let tries = 0; tries < 60; tries++) {
     const x = (Math.random() * 2 - 1) * (A - 2), z = (Math.random() * 2 - 1) * (A - 2);
@@ -199,7 +241,7 @@ function botEquip(b, g) {
   if (!W.inf && b.ammo <= 0) { b.reload = SWAP_T + W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); } // picked up an empty one: reload it
 }
 function makeBot(rec) {
-  const [x, z] = spawnSpot();
+  const [x, z] = spawnSpot(rec);
   const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U;
   g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
   // both arms forward holding the gun, swung up and down with the aim from the shoulders
@@ -225,10 +267,47 @@ function makeBot(rec) {
 function botDown(b, by, head, nobody = false) {
   b.tag.visible = false; b.flashM.visible = false;
   if (b.fireOn > 0) { b.fireOn = 0; sfx('flameEnd', { at: b.g.position, far: 50 }); }
-  b.rec.wait = BOT.respawn + 1.5; // its body takes 1.5s to fall
+  b.rec.wait = MR.bot + DIE_T; // its angel floats away first
   if (!nobody) sfx('die', { at: b.g.position, far: 40 });
+  if (!b.drowned) angel(b); // one that drowned just sinks
   scoreKill(nobody ? null : by ? by.rec : youRec, b.rec, head);
 }
+// dying: the bot turns into a see-through angel (white glow, halo, wings, arms out) that floats up and fades away.
+// main.js moves it (angelTick) and takes it out after DIE_T
+const haloGeo = new THREE.TorusGeometry(4 * BOT_U, .5 * BOT_U, 6, 16), wingGeo = new THREE.BoxGeometry(1, 1, 1);
+function angel(b) {
+  const u = BOT_U;
+  if (b.gunM) b.gunM.visible = false;
+  b.aim.rotation.x = 0; b.aim.position.z = 0; b.g.rotation.x = b.g.rotation.z = 0;
+  b.aim.children.forEach(a => { if (a !== b.gunM) a.rotation.set(0, 0, 0); });
+  b.pivR.rotation.set(0, 0, 0); b.pivL.rotation.set(0, 0, 0); b.headPiv.rotation.x = -.25; // looking up
+  for (const m of b.mats) { m.transparent = true; m.opacity = .6; m.depthWrite = false; m.emissive.setHex(0x8a8a8a); m.needsUpdate = true; }
+  const glow = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false });
+  const haloMat = glow(0xffe27a, .95), wingMat = glow(0xffffff, .7), extra = [];
+  const halo = new THREE.Mesh(haloGeo, haloMat); halo.rotation.x = Math.PI / 2; halo.position.y = 34.5 * u;
+  b.g.add(halo); extra.push(halo);
+  // a wing on each side of its back: a long upper feather and a shorter one under it, tilted out and back
+  const wings = [-1, 1].map(s => {
+    const w = new THREE.Group(); w.position.set(s * 1.5 * u, 21 * u, -2.6 * u);
+    for (const [len, h, y] of [[14, 3.6, 0], [11, 3, -3.2], [7.5, 2.6, -6]]) {
+      const f = new THREE.Mesh(wingGeo, wingMat); f.scale.set(len * u, h * u, .6 * u); f.position.set(s * len * u / 2, y * u, 0); w.add(f);
+    }
+    w.rotation.set(0, s * .5, s * .25); b.g.add(w); extra.push(w);
+    return w;
+  });
+  b.angel = { wings, halo, mats: [haloMat, wingMat], extra, y0: b.g.position.y };
+}
+// called every frame for a dead bot with an angel. t = seconds since it died
+function angelTick(b, t) {
+  const a = b.angel, f = Math.min(1, t);
+  b.g.position.y = a.y0 + f * f * .4 + t * 1.6; // eases off the ground, then drifts up
+  a.wings.forEach((w, i) => w.rotation.y = (i ? 1 : -1) * (.5 + Math.sin(t * 14) * .35)); // flapping
+  a.halo.rotation.z = t * 3;
+  const o = Math.max(0, Math.min(1, (DIE_T - t) / (DIE_T - 1))); // fully there for a second, then fades out
+  for (const m of b.mats) m.opacity = .6 * o;
+  a.mats[0].opacity = .95 * o; a.mats[1].opacity = .7 * o;
+}
+function angelGone(b) { b.angel.mats.forEach(m => m.dispose()); b.angel = null; }
 // you died in deathmatch (called from hurtPlayer). by = the bot that got you, or nothing if it was your own rocket
 function youDown(by) {
   respawnT = YOU_RESPAWN; killedBy = by ? by.rec.name : ''; P.burn = 0;
@@ -260,8 +339,8 @@ function canSee(t) { // from the eye set up in updateBot: can it see the target'
 // else go hunting for the closest one.
 function pickTarget(b) {
   const pos = b.g.position, enemies = [];
-  if (respawnT <= 0) enemies.push(YOU_T);
-  for (const z of zombies) if (z !== b && !z.dead) enemies.push(z);
+  if (respawnT <= 0 && !friendly(b, YOU_T)) enemies.push(YOU_T);
+  for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) enemies.push(z);
   if (!enemies.length) return null;
   const d = t => Math.hypot(tPos(t).x - pos.x, tPos(t).z - pos.z);
   const shooter = b.hitBy && b.hitByT > 0 && b.hitBy !== b.tgt && tAlive(b.hitBy) && canSee(b.hitBy) ? b.hitBy : null;
@@ -287,7 +366,7 @@ function nearPad(pos, range) {
 
 // you on fire from a bot's flamethrower or flare: burn = damage every quarter second for t seconds
 function burnYou(t, burn, by) {
-  if (respawnT > 0) return;
+  if (respawnT > 0 || friendly(by, YOU_T)) return;
   P.burnDmg = P.burn > 0 ? Math.max(P.burnDmg, burn) : burn;
   P.burn = Math.max(P.burn || 0, t); P.burnBy = by; if (!(P.burnT > 0)) P.burnT = .25;
 }
@@ -318,8 +397,8 @@ function botFlame(b, W) {
     const v = dirV.clone().multiplyScalar(13).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(2.5));
     flames.push({ m, v, life: .45 });
   }
-  const hits = respawnT <= 0 ? [YOU_T] : [];
-  for (const z of zombies) if (z !== b && !z.dead) hits.push(z);
+  const hits = respawnT <= 0 && !friendly(b, YOU_T) ? [YOU_T] : [];
+  for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) hits.push(z);
   for (const o of hits) {
     const p = tPos(o), c = new THREE.Vector3(p.x, p.y + 1.1, p.z);
     coneV.subVectors(c, eye); const d = coneV.length(), along = coneV.dot(dirV);
@@ -349,9 +428,10 @@ function botFire(b, W, dist) {
     b.leadGuess = .6 + Math.random() * .6;
     return;
   }
-  const youUp = respawnT <= 0;
+  const youUp = respawnT <= 0 && !friendly(b, YOU_T);
   pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25); // as wide as a bot's body
-  const others = []; for (const z of zombies) if (z !== b && !z.dead) others.push(...z.parts); // shots can hit any bot in the way, not just its target
+  // shots can hit any enemy in the way, not just its target. Its teammates don't block them
+  const others = []; for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) others.push(...z.parts);
   // the sniper's listed spread is its unscoped hip-fire, but the bot lines up its shots, so it gets a tighter cone
   const walls = [ground, ...crateMeshes];
   for (let i = 0; i < W.pellets; i++) {
@@ -501,7 +581,10 @@ function dmDown(dt) {
   if (respawnT <= 0) { respawnYou(); return false; }
   adsT = 0; if (camera.fov !== 75) { camera.fov = 75; camera.updateProjectionMatrix(); }
   $('scope').style.display = 'none'; $('cross').style.display = 'none'; vm.visible = false;
-  camera.position.set(P.pos.x, P.pos.y + .35, P.pos.z); camera.rotation.set(P.pitch, P.yaw, .4);
+  // you float up like the bots' angels do, looking down at where you were. Drowned: you sink instead (drownTick)
+  const t = YOU_RESPAWN - respawnT, f = Math.min(1, t / 1.2);
+  if (P.drowned) { camera.position.set(P.pos.x, P.pos.y + .35, P.pos.z); camera.rotation.set(P.pitch, P.yaw, .4); }
+  else { camera.position.set(P.pos.x, P.pos.y + 1.6 + f * f * .5 + Math.min(t, 1.5) * 1.2, P.pos.z); camera.rotation.set(P.pitch + (-.9 - P.pitch) * f, P.yaw, 0); }
   const b = $('banner'); b.textContent = `${killedBy ? 'KILLED BY ' + killedBy : 'YOU DIED'}\n${Math.ceil(respawnT)}`; b.style.opacity = 1;
   return true;
 }
@@ -515,8 +598,10 @@ function updateDM(dt) {
   const sec = Math.max(0, Math.ceil(matchT));
   if (sec <= 10 && sec !== lastSec && sec > 0) sfx('tick');
   lastSec = sec;
-  const place = ranked().indexOf(youRec) + 1;
-  const top = `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div><div class="place">${ord(place)} OF ${recs.length}  ·  ${youRec.score} PTS  ·  ${youRec.kills} KILLS</div>`;
+  const place = ranked().indexOf(youRec) + 1, clock = `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div>`;
+  const top = clock + (MR.team
+    ? `<div class="teams"><b style="color:${TEAMS[0].css}">${TEAMS[0].name} ${teamKills(0)}</b>–<b style="color:${TEAMS[1].css}">${teamKills(1)} ${TEAMS[1].name}</b></div><div class="place">YOU: ${youRec.kills} KILLS</div>`
+    : `<div class="place">${ord(place)} OF ${recs.length}  ·  ${MR.kills ? '' : youRec.score + ' PTS  ·  '}${youRec.kills} KILLS</div>`);
   if (top !== lastTop) { $('top').innerHTML = lastTop = top; }
   const show = held('board');
   $('board').style.display = show ? 'grid' : 'none';
@@ -525,14 +610,16 @@ function updateDM(dt) {
 }
 function endMatch() {
   matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('banner').style.opacity = 0;
-  const place = ranked().indexOf(youRec) + 1;
-  $('postPlace').textContent = place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
+  const place = ranked().indexOf(youRec) + 1, lead = teamLead();
+  $('postSub').textContent = MR.name + ' OVER';
+  $('postPlace').textContent = MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
   $('postBoard').innerHTML = boardHTML();
-  const [xp, gold] = rewardFor(place), { ups, bonus } = grant(xp, gold);
+  const won = MR.team ? lead > 0 : place === 1;
+  const [xp, gold] = MR.team ? teamReward(lead) : rewardFor(place), { ups, bonus } = grant(xp, gold);
   $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ◆</span></div>`
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ◆</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
-  sfx(place === 1 ? 'win' : 'lose'); musicEnd();
+  sfx(won ? 'win' : 'lose'); musicEnd();
   if (ups) setTimeout(() => sfx('levelUp'), 700);
   document.exitPointerLock();
 }
@@ -548,15 +635,16 @@ function giveGun(g) {
 // called at the end of restart(): sets up whichever mode you picked in the lobby
 function setupMode() {
   matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = '';
-  BOT_COUNT = MAX_PLAYERS[MAP.size] - 1;
+  MR = RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join;
+  BOT_COUNT = MR.players[MAP.size] - 1;
   $('post').style.display = 'none'; $('board').style.display = 'none'; $('banner').style.opacity = 0; // clears "KILLED BY" if you left while dead
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
-  $('chat').style.display = mode === 'dm' ? '' : 'none';
-  if (mode === 'dm') {
+  $('chat').style.display = pvp() ? '' : 'none';
+  if (pvp()) {
     makeRecs(); matchT = MATCH_T;
     BASE.forEach((w, g) => { if (hasGun(g)) giveGun(g); });
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
-  musicMatch(mapId, mode);
+  musicMatch(mapId, pvp() ? 'dm' : mode); // every bot match uses the deathmatch music, timed to its own length
 }

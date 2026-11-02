@@ -3,7 +3,7 @@ const UPG = [.75, .9];
 let armCat = 'primary', armOpen = false;
 const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought yet (starters are always 0: no stars)
 const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
-const inMatch = () => !inLobby && mode === 'dm' && !matchOver;
+const inMatch = () => !inLobby && pvp() && !matchOver;
 
 function gunStats(i) {
   const w = BASE[i], L = Math.max(0, gunStars(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), mag = Math.round(w.mag * (1 + .25 * L));

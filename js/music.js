@@ -337,7 +337,8 @@ function muBar(S, t) {
   if (S.kind === 'dm') {
     if (!S.ended && !matchOver) {
       left = Math.round((matchT - (t - now)) / S.barDur); // bars left in the match, counting this one
-      if (left <= 0) S.ended = true; else b = Math.max(0, song.bpm - left);
+      S.total ??= left; // how many bars this match lasts (a 4 minute one is song.bpm bars, blitz is shorter), so every match starts at its intro
+      if (left <= 0) S.ended = true; else b = Math.max(0, S.total - left);
     }
     if (S.ended) { S.post = (S.post ?? -1) + 1; stage = S.post < 8 ? 'drop' : 'after'; b = song.bpm + S.post; }
     else if (b < 4) stage = 'intro'; else if (left <= 8) stage = 'build';

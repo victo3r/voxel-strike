@@ -1,6 +1,6 @@
 let stepT = 0, stepAlt = false; // footsteps: time until the next one, and which foot
 function update(dt) {
-  const down = mode === 'dm' && dmDown(dt);
+  const down = pvp() && dmDown(dt);
   const w = WEAPONS[cur];
   if (!down) {
   const mx = held('right') - held('left'), mz = held('back') - held('fwd');
@@ -62,7 +62,7 @@ function update(dt) {
   if ((crossT -= dt) <= 0) $('cross').style.setProperty('--c', '#fff');
   }
 
-  if (mode === 'dm') { updateDM(dt); if (matchOver) return; }
+  if (pvp()) { updateDM(dt); if (matchOver) return; }
 
   if (mode === 'zombies' && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = Math.max(.3, 1.5 - wave * .1); }
   if (mode === 'zombies' && toSpawn === 0 && zombies.length === 0) {
@@ -86,9 +86,11 @@ function update(dt) {
     const z = zombies[i];
     easeLag(z.g.position, dt);
     if (z.dead) {
-      z.dead += dt; z.g.rotation.x = -Math.min(z.dead * 4, Math.PI / 2);
+      z.dead += dt;
+      if (z.angel) angelTick(z, z.dead); // a bot: floats up as an angel (deathmatch.js)
+      else z.g.rotation.x = -Math.min(z.dead * 4, Math.PI / 2); // a zombie falls over
       if (z.drowned) { const p = z.g.position; p.y = Math.max(MAP.floor?.(p.x, p.z) ?? 0, p.y - 1.8 * dt); } // sinks to the bottom
-      if (z.dead > 1.5) { scene.remove(z.g); zombies.splice(i, 1); }
+      if (z.dead > 1.5) { if (z.angel) angelGone(z); scene.remove(z.g); zombies.splice(i, 1); }
       continue;
     }
     if (!(z.hp > 0)) { // safety net: still standing with no (or broken) health. Finish it off, credited to whoever hit it last
@@ -236,7 +238,7 @@ function update(dt) {
   const spare = reserve[cur] === Infinity ? '∞' : reserve[cur];
   $('ammo').textContent = `${w.name} ${stars(cur)}\n${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : ammo[cur] + ' / ' + spare}`;
   $('ammo').style.whiteSpace = 'pre';
-  if (mode !== 'dm') $('top').textContent = `WAVE ${wave}   ·   KILLS ${kills}   ·   ◆ ${coins}`; // deathmatch fills the top in updateDM
+  if (!pvp()) $('top').textContent = `WAVE ${wave}   ·   KILLS ${kills}   ·   ◆ ${coins}`; // deathmatch fills the top in updateDM
 }
 
 const clock = new THREE.Clock();

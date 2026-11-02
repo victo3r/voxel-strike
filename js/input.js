@@ -175,7 +175,7 @@ document.addEventListener('pointerlockchange', () => {
     // zombie waves death: the title says so, and clicking the background starts a new run
     $('menuTitle').textContent = dead ? 'YOU DIED' : 'MENU';
     $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : '';
-    $('armBtn').style.display = mode === 'dm' ? '' : 'none'; // zombie waves has its own shop between waves
+    $('armBtn').style.display = pvp() ? '' : 'none'; // zombie waves has its own shop between waves
     renderHelp();
   }
 });
@@ -192,24 +192,33 @@ function showLobby(on) {
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); showLobby(true); });
 
 // PLAY: pick a mode, then one of the maps that mode can be played on. Picking the map starts the match.
+// A mode with `sub` opens a second page to pick between its versions (Blitz: free for all or team) before the maps.
+// Player counts on the map cards come from RULES in modes/deathmatch.js
+const ALL_MAPS = ['yard', 'forest', 'resort'];
 const MODES = [
-  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Survive the waves, earn coins, beat the boss every 5 waves', maps: ['yard', 'forest', 'resort'] },
-  { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ['yard', 'forest', 'resort'] },
+  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Survive the waves, earn coins, beat the boss every 5 waves', maps: ALL_MAPS },
+  { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ALL_MAPS },
+  { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes, blue vs red. The team with the most kills wins', maps: ALL_MAPS },
+  { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds. Rack up as many kills as you can', sub: [
+    { id: 'blitz', name: 'FREE FOR ALL', title: 'BLITZ · FREE FOR ALL', desc: 'Everyone for themselves. Most kills wins', maps: ALL_MAPS },
+    { id: 'blitzTeam', name: 'TEAM', title: 'BLITZ · TEAM', desc: 'Blue vs red. The team with the most kills wins', maps: ALL_MAPS },
+  ] },
 ];
-const MAP_PLAYERS = { small: 4, medium: 8, large: 8 };
+const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : [m]); // the ones you can actually start
 if (!MAPS[mapId]) mapId = 'yard';
 const savedMode = localStorage.getItem('voxelstrike-mode');
-if (MODES.some(m => m.id === savedMode)) mode = savedMode;
-let pickMode = null; // null = choosing a mode, otherwise the mode whose maps are listed
+if (PLAY_MODES.some(m => m.id === savedMode)) mode = savedMode;
+let pickMode = null; // null = choosing a mode, a mode with sub = choosing its version, otherwise the mode whose maps are listed
 function renderPick() {
-  const m = MODES.find(m => m.id === pickMode);
-  $('pickTitle').textContent = m ? m.name : 'SELECT MODE';
-  $('pickBack').textContent = m ? '◀ MODES' : '◀ BACK';
+  const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
+  $('pickTitle').textContent = m ? m.title || m.name : group ? group.name : 'SELECT MODE';
+  $('pickBack').textContent = m || group ? '◀ ' + (m?.parent ? 'BLITZ' : 'MODES') : '◀ BACK';
   $('pickList').className = m ? 'maps' : 'modes';
+  const card = o => `<button data-mode="${o.id}" class="${o.id === mode || o.sub?.some(s => s.id === mode) ? 'sel' : ''}"><b>${o.name}</b><small>${o.desc}</small></button>`;
   $('pickList').innerHTML = m
-    ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1);
-        return `<button data-map="${id}" class="${id === mapId ? 'sel' : ''}"><b>${d.name.toUpperCase()}</b><small>${size}${m.id === 'dm' ? ` · ${MAP_PLAYERS[d.size]} players` : ''}</small></button>`; }).join('')
-    : MODES.map(o => `<button data-mode="${o.id}" class="${o.id === mode ? 'sel' : ''}"><b>${o.name}</b><small>${o.desc}</small></button>`).join('');
+    ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
+        return `<button data-map="${id}" class="${id === mapId ? 'sel' : ''}"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
+    : (group ? group.sub : MODES).map(card).join('');
 }
 const pickOpen = () => $('pick').style.display === 'flex';
 function showPick(on) {
@@ -219,12 +228,19 @@ function showPick(on) {
   if (on) { pickMode = null; renderPick(); }
 }
 $('playBtn').addEventListener('click', () => { showPick(true); sfx('ui'); });
-$('pickBack').addEventListener('click', () => { if (pickMode) { pickMode = null; renderPick(); } else showPick(false); sfx('ui'); });
+$('pickBack').addEventListener('click', () => {
+  if (pickMode) { pickMode = PLAY_MODES.find(m => m.id === pickMode)?.parent ?? null; renderPick(); } else showPick(false);
+  sfx('ui');
+});
 $('pickList').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.mode) {
-    mode = pickMode = b.dataset.mode; localStorage.setItem('voxelstrike-mode', mode);
-    if (!MODES.find(m => m.id === mode).maps.includes(mapId)) mapId = MODES.find(m => m.id === mode).maps[0];
+    pickMode = b.dataset.mode;
+    const m = PLAY_MODES.find(m => m.id === pickMode);
+    if (m) { // a mode you can play (not the Blitz page): remember it, then show its maps
+      mode = pickMode; localStorage.setItem('voxelstrike-mode', mode);
+      if (!m.maps.includes(mapId)) mapId = m.maps[0];
+    }
     renderPick(); sfx('ui'); return;
   }
   mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId);

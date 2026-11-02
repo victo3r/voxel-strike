@@ -107,6 +107,10 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 .lb span{padding:4px 6px}
 .lb .h span{color:#7fe3d8;font-size:11px;letter-spacing:2px}
 .lb .you span{background:rgba(255,210,63,.16)}
+.lb.k{grid-template-columns:40px minmax(90px,1fr) 62px 70px}
+.lb .tm span{font-weight:bold;padding-top:8px;border-bottom:2px solid currentColor}
+#top .teams{font-size:22px;color:#fff;margin-top:2px}
+#top .teams b{padding:0 6px}
 #board{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:none;width:min(440px,94vw)}
 #feed{position:absolute;right:14px;top:12px;text-align:right;font-size:15px}
 #feed .kf{margin-bottom:4px;background:rgba(0,0,0,.35);padding:2px 6px}
@@ -166,6 +170,10 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #pickList button.sel{border-color:#ffd23f}
 #pickList [data-mode=zombies]{background:linear-gradient(160deg,rgba(70,120,40,.92),rgba(18,40,20,.95))}
 #pickList [data-mode=dm]{background:linear-gradient(160deg,rgba(150,45,40,.92),rgba(40,14,14,.95))}
+#pickList [data-mode=team]{background:linear-gradient(135deg,rgba(40,90,190,.92) 0%,rgba(20,30,70,.95) 49%,rgba(70,16,16,.95) 51%,rgba(170,45,40,.92) 100%)}
+#pickList [data-mode=blitzMenu]{background:linear-gradient(160deg,rgba(235,160,30,.94),rgba(90,30,10,.95))}
+#pickList [data-mode=blitz]{background:linear-gradient(160deg,rgba(235,160,30,.94),rgba(110,30,20,.95))}
+#pickList [data-mode=blitzTeam]{background:linear-gradient(135deg,rgba(235,160,30,.94) 0%,rgba(40,80,170,.95) 55%,rgba(170,45,40,.92) 100%)}
 #pickList [data-map=yard]{background:linear-gradient(160deg,rgba(110,150,60,.92),rgba(60,48,30,.95))}
 #pickList [data-map=forest]{background:linear-gradient(160deg,rgba(30,90,80,.92),rgba(8,24,28,.95))}
 #pickList [data-map=resort]{background:linear-gradient(160deg,rgba(40,150,190,.92),rgba(200,170,100,.9))}

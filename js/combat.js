@@ -55,7 +55,7 @@ function flame(w) {
     flames.push({ m, v, life: .45 });
   }
   for (const zz of zombies) {
-    if (zz.dead) continue;
+    if (zz.dead || zz.type === 'bot' && friendly(null, zz)) continue; // team modes: your flames don't touch teammates
     const c = zz.g.position.clone().setY(zz.g.position.y + zz.scale * 1.1), to = c.clone().sub(camera.position), d = to.length(), along = to.dot(fwd);
     if (along <= 0 || along > w.range) continue;
     const off = Math.sqrt(Math.max(0, d * d - along * along)); // how far it is from the middle of the cone
@@ -144,7 +144,7 @@ function updateFlares(dt) {
       if (zz && !zz.dead) {
         const head = !!hit.object.userData.head;
         hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head, false, f.by);
-        if (!zz.dead) { zz.burn = Math.max(zz.burn || 0, f.burnT); zz.burnDmg = Math.max(zz.burnDmg || 0, f.burn); zz.burnBy = f.by; }
+        if (!zz.dead && !(zz.type === 'bot' && friendly(f.by, zz))) { zz.burn = Math.max(zz.burn || 0, f.burnT); zz.burnDmg = Math.max(zz.burnDmg || 0, f.burn); zz.burnBy = f.by; }
       }
       for (const o of zombies) {
         if (o === zz || o === f.by || o.dead) continue;

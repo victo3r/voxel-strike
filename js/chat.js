@@ -70,7 +70,7 @@ function botsHear(text) {
 }
 
 function openChat() {
-  if (chatting || mode !== 'dm' || matchOver) return;
+  if (chatting || !pvp() || matchOver) return;
   chatting = true; for (const k in keys) keys[k] = false;
   $('chat').classList.add('open'); $('chatIn').value = ''; $('chatIn').focus();
 }

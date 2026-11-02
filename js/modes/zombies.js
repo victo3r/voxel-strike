@@ -63,6 +63,7 @@ function spawnZombie(type = pickType()) {
 // by = the deathmatch bot doing the damage, or null if it's you
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
   if (!Number.isFinite(dmg)) return; // a bad number here would leave it with NaN health, and then nothing could ever kill it
+  if (zz.type === 'bot' && friendly(by, zz)) return; // team modes: no friendly fire
   zz.hp -= dmg;
   const dies = zz.hp <= 0 && !zz.dead;
   if (dies) zz.dead = .0001; // marked dead before the effects below, so a problem in a sound or particle can't leave it unkillable
@@ -91,14 +92,14 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
 }
 // pierce = damage that skips armor and hits HP directly. by = the deathmatch bot that shot you. head = it was a headshot
 function hurtPlayer(d, pierce = false, by = null, head = false) {
-  if (respawnT > 0 || matchOver) return;
+  if (respawnT > 0 || matchOver || by && friendly(by, YOU_T)) return; // by = null is your own rocket, that still hurts
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;
   hurtSfx(P, soak === d ? 'armorHit' : head ? 'hurtHead' : 'hurt');
   if (P.hp <= 0) sfx('die');
   $('hit').style.background = soak === d ? '#c9ced6' : 'red'; // silver flash = armor took all of it
   $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
-  if (P.hp <= 0 && mode === 'dm') { P.hp = 0; youDown(by); return; }
+  if (P.hp <= 0 && pvp()) { P.hp = 0; youDown(by); return; }
   if (P.hp <= 0 && !dead) { P.hp = 0; dead = true; saveBest(); document.exitPointerLock(); }
 }
 // fell into deep water: a splash, then you're out, whatever your HP and armor
@@ -107,7 +108,7 @@ function drownYou() {
   if (respawnT > 0 || matchOver || dead) return;
   sfx('splash'); splash(P.pos);
   P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0; P.drowned = true;
-  if (mode === 'dm') { youDown(null); return; }
+  if (pvp()) { youDown(null); return; }
   dead = true; saveBest(); document.exitPointerLock();
 }
 // after you drown you keep sinking to the bottom, and the screen goes blue once your eyes are under.
@@ -155,10 +156,10 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false) {
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
   if (pd < R && !dead && respawnT <= 0) {
     if (pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by);
-    if (rocket && respawnT <= 0 && !dead) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, !by);
+    if (rocket && respawnT <= 0 && !dead && !(by && friendly(by, YOU_T))) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, !by);
   }
   for (const o of zombies) {
-    if (o === skip || o.dead) continue;
+    if (o === skip || o.dead || o.type === 'bot' && friendly(by, o)) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
     if (od >= R) continue;
     hurtZombie(o, o === by ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
