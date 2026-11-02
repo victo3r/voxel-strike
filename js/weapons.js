@@ -88,29 +88,46 @@ const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
 let gunSpin = null, gunSpinV = 0; // the eradicator's barrel cluster, and how fast it's spinning
 let gunRound = null; // the rocket sitting in the launcher's tube, hidden while it's empty
 
-// gun models are pixel art: every size and spot in GUN_MODELS is in gun pixels (GPX world units each).
-// Guns point down -z with the grip near the origin. Every piece gets one texel of shading per pixel and a black edge
-const GPX = .02, EDGE = .007;
-const EDGE_MAT = new THREE.MeshBasicMaterial({ color: 0x050505, side: THREE.BackSide });
+// gun models are pixel art: every size and spot in GUN_MODELS is in gun pixels (GPX world units each, times the gun's GUN_SCALE).
+// Guns point down -z with the grip near the origin. Every piece gets one texel of shading per pixel,
+// and the outermost ring of pixels on each face is painted black, so the outline is part of the pixel art
+const GPX = .02, GUN_SCALE = { knife: .75 };
+let gpx = GPX; // pixel size of the gun being built
 let gunShade = null; // light grey speckle multiplied over every piece's color
 const shadeTex = () => gunShade ??= tex(g => {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = 228 + Math.random() * 27 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y, 1, 1); }
 });
+// aPix = where this spot is on its face and how big the face is, both in gun pixels. A pixel within 1 of the face's edge is black.
+// Sides 2 pixels thick or less keep their color across, or thin parts like barrels would be solid black
+function edgeMat(m) {
+  m.onBeforeCompile = s => {
+    s.vertexShader = 'attribute vec4 aPix;\nvarying vec4 vPix;\n' + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvPix = aPix;');
+    s.fragmentShader = 'varying vec4 vPix;\n' + s.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      vec2 pe = mix(vec2(9.), min(vPix.xy, vPix.zw - vPix.xy), step(2.5, vPix.zw));
+      if (min(pe.x, pe.y) < 1.) { diffuseColor.rgb = vec3(.025); totalEmissiveRadiance = vec3(0.); }`);
+  };
+  m.customProgramCacheKey = () => 'gunEdge';
+  return m;
+}
 // a box whose texture is stretched so one texel covers one gun pixel on every face (BoxGeometry face order: +x, -x, +y, -y, +z, -z)
 function pixBox(w, h, d) {
-  const geo = new THREE.BoxGeometry(w * GPX, h * GPX, d * GPX), uv = geo.attributes.uv;
+  const geo = new THREE.BoxGeometry(w * gpx, h * gpx, d * gpx), uv = geo.attributes.uv, pix = new Float32Array(24 * 4);
   const sz = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]], ox = Math.random() * 16 | 0, oy = Math.random() * 16 | 0;
-  for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, (uv.getX(i) * sz[f][0] + ox) / 16, (uv.getY(i) * sz[f][1] + oy) / 16); }
+  for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
+    const i = f * 4 + k, u = uv.getX(i) * sz[f][0], v = uv.getY(i) * sz[f][1];
+    pix.set([u, v, sz[f][0], sz[f][1]], i * 4); uv.setXY(i, (u + ox) / 16, (v + oy) / 16);
+  }
+  geo.setAttribute('aPix', new THREE.BufferAttribute(pix, 4));
   return geo;
 }
 function piece(parent, w, h, d, mat, x, y, z) {
   const m = new THREE.Mesh(pixBox(w, h, d), mat);
-  m.position.set(x * GPX, y * GPX, z * GPX); m.userData.dim = [w, h, d]; parent.add(m); return m;
+  m.position.set(x * gpx, y * gpx, z * gpx); m.userData.dim = [w, h, d]; parent.add(m); return m;
 }
 function mergeGeos(geos) {
-  const pos = [], nor = [], uv = [], idx = []; let n = 0;
+  const pos = [], nor = [], uv = [], pix = [], idx = []; let n = 0;
   for (const g of geos) {
-    pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array);
+    pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array); pix.push(...g.attributes.aPix.array);
     for (const i of g.index.array) idx.push(i + n);
     n += g.attributes.position.count; g.dispose();
   }
@@ -118,23 +135,20 @@ function mergeGeos(geos) {
   out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  out.setAttribute('aPix', new THREE.Float32BufferAttribute(pix, 4));
   out.setIndex(idx); return out;
 }
-// melts a group's pieces into one mesh per material, plus one inside-out black shell per piece for the edges,
-// so a whole gun is a handful of draw calls
+// melts a group's pieces into one mesh per material, so a whole gun is a handful of draw calls
 function bake(root) {
-  const byMat = new Map(), edges = [], e = 2 * EDGE;
+  const byMat = new Map();
   for (const m of [...root.children]) {
     if (!m.isMesh || !m.userData.dim) continue;
     m.updateMatrix();
-    const [w, h, d] = m.userData.dim;
-    edges.push(new THREE.BoxGeometry(w * GPX + e, h * GPX + e, d * GPX + e).applyMatrix4(m.matrix));
     if (!byMat.has(m.material)) byMat.set(m.material, []);
     byMat.get(m.material).push(m.geometry.applyMatrix4(m.matrix));
     root.remove(m);
   }
   for (const [mat, geos] of byMat) root.add(new THREE.Mesh(mergeGeos(geos), mat));
-  if (edges.length) root.add(new THREE.Mesh(mergeGeos(edges), EDGE_MAT));
 }
 
 // each model returns, in gun pixels: muzzle [y, z], grip [y, z] (right hand), fore [y, z] (left hand, null on one-handed guns),
@@ -148,11 +162,11 @@ const GUN_MODELS = {
     p(2, 2, 1, teal, 0, 1.5, -16.5); // emitter in the muzzle
     for (const z of [-4, -7, -10]) p(5, 1, 1, teal, 0, 1.5, z); // teal cubes down the sides
     p(2, 1, 1, dark, 0, 4.5, -1); p(1, 1, 1, dark, 0, 4.5, -15); // sights
-    p(1, 1, 4, dark, 0, -4.5, -4.5); p(1, 2, 1, dark, 0, -3, -7); // trigger guard
-    p(1, 2, 1, mat(0x555555), 0, -3, -4); // trigger
-    p(4, 3, 4, grip, 0, -3.5, 0); p(4, 3, 4, grip, 0, -6.5, 1); p(4, 2, 4, grip, 0, -9, 2); // grip, raked back in steps
-    p(4, 1, 5, dark, 0, -10.5, 2.5); // base of the grip
-    return { muzzle: [1.5, -17], grip: [-6, 1], fore: null, bands: [-5, -11], band: [5, 7, 1] };
+    p(1, 1, 4, dark, 0, -4.5, -7.5); p(1, 2, 1, dark, 0, -3, -9.5); // trigger guard
+    p(1, 2, 1, mat(0x555555), 0, -3, -7); // trigger
+    p(4, 3, 4, grip, 0, -3.5, -3.5); p(4, 3, 4, grip, 0, -6.5, -2.5); // short grip under the back of the slide, raked back a step
+    p(4, 1, 4, dark, 0, -8.5, -2.5); // base of the grip
+    return { muzzle: [1.5, -17], grip: [-5.5, -3], fore: null, bands: [-5.5, -8.5], band: [5, 7, 1] };
   },
   shotgun({ p, mat, dark }) {
     const wood = mat(0x7a5232), dwood = mat(0x4e3420), steel = mat(0x4a4a4a);
@@ -260,17 +274,18 @@ const GUN_MODELS = {
 // builds gun i's model into group g with `stars` gold upgrade bands: the same model in your hands, a bot's, and the armory.
 // Returns muzzle, grip and fore in world units ([y, z]), plus spin (the eradicator's barrels) and round (the loaded rocket)
 const gunMats = {};
-const gunMat = col => gunMats[col] ??= lam({ color: col, map: shadeTex() });
+const gunMat = col => gunMats[col] ??= edgeMat(lam({ color: col, map: shadeTex() }));
 function makeGun(i, g, stars) {
+  gpx = GPX * (GUN_SCALE[BASE[i].id] || 1);
   const c = { mat: gunMat, dark: gunMat(0x1e1e1e), glow: col => gunMats['g' + col] ??= new THREE.MeshBasicMaterial({ color: col }) };
   c.p = (...a) => piece(g, ...a);
   c.at = parent => (...a) => piece(parent, ...a);
-  c.sub = (x, y, z) => { const s = new THREE.Group(); s.position.set(x * GPX, y * GPX, z * GPX); g.add(s); return s; };
+  c.sub = (x, y, z) => { const s = new THREE.Group(); s.position.set(x * gpx, y * gpx, z * gpx); g.add(s); return s; };
   const m = GUN_MODELS[BASE[i].id](c);
-  const gold = gunMats.gold ??= lam({ color: 0xffcc22, emissive: 0x553300, map: shadeTex() }), [bw, bh, by] = m.band;
+  const gold = gunMats.gold ??= edgeMat(lam({ color: 0xffcc22, emissive: 0x553300, map: shadeTex() })), [bw, bh, by] = m.band;
   for (let s = 0; s < stars; s++) c.p(bw, bh, 2, gold, 0, by, m.bands[s]); // one gold band per upgrade
   for (const s of [g, m.spin, m.round]) if (s) bake(s);
-  const w = v => v && v.map(n => n * GPX);
+  const w = v => v && v.map(n => n * gpx);
   return { muzzle: w(m.muzzle), grip: w(m.grip), fore: w(m.fore), spin: m.spin ?? null, round: m.round ?? null };
 }
 

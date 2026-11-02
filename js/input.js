@@ -196,6 +196,7 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); s
 // A mode with `sub` opens a second page to pick between its versions (Blitz: free for all or team) before the maps.
 // Player counts on the map cards come from RULES in modes/deathmatch.js
 const ALL_MAPS = ['yard', 'forest', 'resort'];
+const V_MAPS = 1; // bump when the map pictures are retaken
 const MODES = [
   { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Survive the waves, earn coins, beat the boss every 5 waves', maps: ALL_MAPS },
   { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ALL_MAPS },
@@ -215,10 +216,11 @@ function renderPick() {
   $('pickTitle').textContent = m ? m.title || m.name : group ? group.name : 'SELECT MODE';
   $('pickBack').textContent = m || group ? '◀ ' + (m?.parent ? 'BLITZ' : 'MODES') : '◀ BACK';
   $('pickList').className = m ? 'maps' : 'modes';
-  const card = o => `<button data-mode="${o.id}"><b>${o.name}</b><small>${o.desc}</small></button>`;
+  const card = o => `<button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b><small>${o.desc}</small></button>`;
+  // map cards show a picture of the map (img/maps/, taken from above in the game itself)
   $('pickList').innerHTML = m
     ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
-        return `<button data-map="${id}"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
+        return `<button data-map="${id}" style="background-image:linear-gradient(transparent 45%,rgba(0,0,0,.72)),url('img/maps/${id}.jpg?v=${V_MAPS}')"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
     : (group ? group.sub : MODES).map(card).join('');
 }
 const pickOpen = () => $('pick').style.display === 'flex';
@@ -287,7 +289,57 @@ $('setIcon').src = pixIcon([
   '..XX.XXXX.XX..',
   '.....XXXX.....',
 ], ['#d8dde4', '#9aa3ae']);
-$('playIcon').src = pixIcon(Array.from({ length: 13 }, (_, y) => Array.from({ length: 11 }, (_, x) => x <= Math.min(y, 12 - y) * 1.7 ? 'X' : '.').join('')), ['#ffffff', '#d6f5d0']);
+// PLAY: a smooth triangle with rounded corners and a dark outline
+$('playIcon').src = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), pts = [[30, 16], [112, 64], [30, 112]], r = 14;
+  g.beginPath(); g.moveTo((pts[0][0] + pts[2][0]) / 2, (pts[0][1] + pts[2][1]) / 2);
+  for (let k = 0; k < 3; k++) { const a = pts[k], b = pts[(k + 1) % 3]; g.arcTo(a[0], a[1], b[0], b[1], r); }
+  g.closePath();
+  g.lineJoin = 'round'; g.lineWidth = 10; g.strokeStyle = 'rgba(0,0,0,.75)'; g.stroke();
+  const gr = g.createLinearGradient(0, 16, 0, 112); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#cdeed6'); g.fillStyle = gr; g.fill();
+  return c.toDataURL();
+})();
+
+// mode icons: pixel art with its black outline drawn in. pal maps each letter to a color, or to a function of (x, y) for split colors.
+// The bottom half is shaded a little darker
+function artIcon(rows, pal, scale = 8) {
+  const h = rows.length, w = Math.max(...rows.map(r => r.length)), c = document.createElement('canvas');
+  c.width = w * scale; c.height = h * scale;
+  const g = c.getContext('2d');
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let col = pal[rows[y][x]]; if (!col) continue;
+    if (typeof col === 'function') col = col(x, y, w, h);
+    g.fillStyle = col; g.fillRect(x * scale, y * scale, scale, scale);
+    if (col !== '#000' && y >= h / 2) { g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x * scale, y * scale, scale, scale); }
+  }
+  return c.toDataURL();
+}
+const BOLT_ICON = [
+  '....KKKKKK.', '...KyyyyyK.', '...KyyyyK..', '..KyyyyK...', '..KyyyKKKKK', '.KyyyyyyyyK',
+  '.KKKKKyyyK.', '.....KyyK..', '....KyyK...', '....KyK....', '...KyK.....', '...KK......',
+];
+const iconFigure = c => ['KKKKKKK', 'KhhhhhK', 'KsssssK', 'KsKsKsK', 'KsssssK', 'KKKKKKK', `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, 'KKKKKKK'];
+const TEAM_ICON = iconFigure('b').map((r, k) => r + '..' + iconFigure('r')[k]);
+const MODE_ICONS = {
+  zombies: artIcon([
+    'KKKKKKKKKKKKKKKK', 'KggdggggggggdggK', 'KgggggdgggggggdK', 'KdggggggggdggggK', 'KggggggggggggggK', 'KgKKKggggggKKKgK',
+    'KgKKKgdggggKKKgK', 'KgggggggggggdggK', 'KgggggKKKKgggggK', 'KggKKKKKKKKKKggK', 'KggKddddddddKggK', 'KggKKKKKKKKKKggK',
+    'KdggggggggggdggK', 'KgggdggggggggggK', 'KggggggdgggggggK', 'KKKKKKKKKKKKKKKK',
+  ], { K: '#000', g: '#5aa844', d: '#3d7d2e' }),
+  dm: artIcon([
+    '....KKKKKKKK....', '..KKWWWWWWWWKK..', '.KWWWWWWWWWWWWK.', 'KWWWWWWWWWWWWWGK', 'KWWWWWWWWWWWWWGK', 'KWWKKKKWWKKKKWGK',
+    'KWWKRRKWWKRRKWGK', 'KWWKKKKWWKKKKWGK', 'KWWWWWWKKWWWWWGK', '.KWWWWKKKKWWWGK.', '..KWWWWWWWWWGK..', '..KWKWKWKWKWGK..',
+    '..KWKWKWKWKWGK..', '...KKKKKKKKKK...',
+  ], { K: '#000', W: '#f0f0ea', G: '#b9bcc2', R: '#e0302a' }),
+  team: artIcon(TEAM_ICON, { K: '#000', h: '#5a3a1e', s: '#e8b48a', b: '#3d7ce6', r: '#e0453a' }),
+  blitzMenu: artIcon([
+    '.....KKKK.....', '.....KwwK.....', '...KKKKKKKK...', '..KwwwwwwwwK..', '.KwwwwKwwwwwK.', 'KwwwwwKwwwwwwK',
+    'KwwwwwKwwwwwwK', 'KwwwwwKKKKwwwK', 'KwwwwwwwwwwwwK', 'KwwwwwwwwwwwwK', '.KwwwwwwwwwwK.', '..KwwwwwwwwK..', '...KKKKKKKK...',
+  ], { K: '#000', w: '#fff3c4' }),
+  blitz: artIcon(BOLT_ICON, { K: '#000', y: '#ffd23a' }),
+  blitzTeam: artIcon(BOLT_ICON, { K: '#000', y: (x, y) => x + y < 11 ? '#3d7ce6' : '#e0453a' }),
+};
 showLobby(true);
 
 function restart() {
