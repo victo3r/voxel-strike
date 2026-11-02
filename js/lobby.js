@@ -200,10 +200,14 @@ function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
   heroCh = buildChar(prof.look, 1 / 16, true);
+  dressArmor(heroCh, heroArmorN = prof.armor | 0);
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
   $('lookName').textContent = lookChoices()[lookIndex()]?.name ?? 'CUSTOM';
 }
+// the armor he's wearing: yours, or the tier you're looking at in the armory
+let heroArmorN = 0;
+function heroArmor(n) { if (heroCh && n !== heroArmorN) { dressArmor(heroCh, heroArmorN = n); } }
 function pickLook(step) {
   const list = lookChoices(), i = Math.max(0, lookIndex());
   prof.look = { ...list[(i + step + list.length) % list.length].look }; saveProf(); dressHero(); sfx('ui');
@@ -329,7 +333,7 @@ function updateLobby(dt) {
   if (dragX === null) {
     spin += spinV * dt; spinV *= Math.exp(-4 * dt);
     if (performance.now() - lastDrag > 2500) {
-      const base = armOpen ? ARM_REST - hTurn : REST, rest = base + Math.round((spin - base) / (Math.PI * 2)) * Math.PI * 2;
+      const base = armOpen && holdKey ? ARM_REST - hTurn : REST, rest = base + Math.round((spin - base) / (Math.PI * 2)) * Math.PI * 2;
       spin += (rest - spin) * Math.min(1, dt * (armOpen ? 3 : 1.5));
     }
   }

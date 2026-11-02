@@ -97,13 +97,22 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 @media (max-width:900px){.slot{width:56px;height:42px}.slot img{width:48px;height:24px}.slot .c{display:none}.slot .k{font-size:10px}}
 
 /* armory: a blurred glass panel down the left side; the lobby camera slides over so your character stands on the right (lobby.js frameLobby) */
-#armory{position:fixed;left:0;top:0;bottom:0;width:min(640px,58vw);display:none;flex-direction:column;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);color:#fff;text-shadow:2px 2px 0 #000;z-index:9;overflow-y:auto;padding:16px 56px 18px 22px;box-sizing:border-box;animation:armIn .3s ease-out}
+#armory{position:fixed;left:0;top:0;bottom:0;width:min(720px,60vw);display:none;flex-direction:column;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);color:#fff;text-shadow:2px 2px 0 #000;z-index:9;overflow-y:auto;padding:16px 56px 18px 22px;box-sizing:border-box;animation:armIn .3s ease-out}
 @keyframes armIn{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
 #armory>*{flex-shrink:0}
 #armHead{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 #armory h1{font-size:40px;margin:0}
 #armInfo{display:flex;gap:18px;font-size:18px;font-weight:bold}#armInfo .pc{margin-left:0}
-#armTabs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:14px 0 12px}
+/* pages down the left (WEAPONS, WEAR), each page's sections along the top */
+#armBody{display:flex;gap:12px;align-items:flex-start;margin-top:14px}
+#armPages{display:flex;flex-direction:column;gap:6px;width:76px;flex-shrink:0;position:sticky;top:0}
+#armory #armPages button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 6px;color:var(--silver);font:bold 11px monospace;text-shadow:1px 1px 0 #000}
+#armory #armPages button.sel{background:var(--sel);color:#fff}
+#armPages img{width:60px;height:30px;image-rendering:pixelated}
+#armPages button.dim img{opacity:.5}
+#armMain{flex:1;min-width:0;display:flex;flex-direction:column}
+#armList .wd{grid-column:1/-1;margin:0 0 2px;font-size:13px;line-height:1.45;color:var(--silver)}
+#armTabs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:0 0 12px}
 #armory #armTabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0 4px;color:var(--silver);font:bold 11px monospace;text-shadow:1px 1px 0 #000}
 #armory #armTabs button.sel{background:var(--sel);color:#fff}
 #armTabs img{width:60px;height:30px;image-rendering:pixelated}
@@ -135,8 +144,8 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armList small{color:var(--silver);font-size:12px}
 #armory button{font-family:monospace}
 #armX{margin-left:auto;font:bold 15px monospace;padding:7px 10px}
-@media (max-height:620px),(max-width:620px){#armory h1{font-size:26px;text-shadow:3px 3px 0 var(--acc-dk)}#armTabs img{width:44px;height:22px}#armory #armTabs button{font-size:9px}#armList{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
-@media (max-width:700px){#armory{width:100%;-webkit-mask-image:none;mask-image:none;padding:12px 14px 100px}#armAct{left:50%!important;bottom:12px}}
+@media (max-height:620px),(max-width:620px){#armory h1{font-size:26px;text-shadow:3px 3px 0 var(--acc-dk)}#armTabs img,#armPages img{width:44px;height:22px}#armory #armTabs button,#armory #armPages button{font-size:9px}#armPages{width:60px}#armList{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+@media (max-width:700px){#armBody{flex-direction:column}#armPages{flex-direction:row;width:auto;align-self:stretch;position:static}#armory #armPages button{flex:1}#armMain{width:100%}#armory{width:100%;-webkit-mask-image:none;mask-image:none;padding:12px 14px 100px}#armAct{left:50%!important;bottom:12px}}
 
 /* match HUD + leaderboards */
 #top .clock{font-size:30px;color:#fff}

@@ -1,12 +1,13 @@
 // your account: level, XP, coins and unlocked guns, kept between matches (separate from the zombie-waves shop coins)
 // XP needed to go from level L to L+1: XP_BASE + XP_STEP * (L - 1). So 50 for level 2, 75 for level 3, 100 for level 4...
-const XP_BASE = 50, XP_STEP = 25, LV_MAX = 30;
+const XP_BASE = 50, XP_STEP = 25, LV_MAX = 50;
 const xpNeed = lv => XP_BASE + XP_STEP * (lv - 1);
-const lvBonus = lv => 5 * (lv - 1); // coins for reaching level lv: 5 at level 2, 10 at level 3 ... 145 at level 30
+const lvBonus = lv => 5 * (lv - 1); // coins for reaching level lv: 5 at level 2, 10 at level 3 ... 245 at level 50
 // guns: weapon id -> stars (1-3) for unlockable guns you own. Starters aren't listed, everyone has them.
 // loadout: category -> weapon id, the one gun per category you take into a match (missing = that category's starter)
+// armor: stars on your armor, 0 = none (js/armor.js ARMOR_TIERS)
 // v = save format version, so later changes can upgrade old saves instead of wiping them
-let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {} }; // xp = progress toward the next level
+let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, armor: 0 }; // xp = progress toward the next level
 try { const s = JSON.parse(localStorage.getItem('voxelstrike-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout } }; } catch {}
 let onSave = () => {}; // js/cloud.js sets this to upload the change when you're signed in
 const saveProf = () => { try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {} onSave(); };

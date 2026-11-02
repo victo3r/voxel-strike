@@ -364,8 +364,10 @@ function vmArm(left, box, dir, low = 0) { // low: aim that far down the box (0 =
   dir.normalize();
   const c = [box.c[0], box.c[1] - low * box.h[1], box.c[2]], t = fistOut(gunCells(cur), c, dir, 2.2 * ARM_U, .006);
   const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir);
+  const worn = matchArmor(); // your armor's bracer and shoulder guard, on the arm you can see
   for (let s = 0; s < 3; s++) { // more lengths behind the arm, so its end never shows on screen
     const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; m.userData.shared = true; piv.add(m);
+    if (worn && !s) { const a = new THREE.Mesh(armorGeo(left ? 'armL' : 'armR', ARM_U), armMats['armor' + worn] ??= armorMat(worn, null)); a.userData.shared = true; m.add(a); }
   }
   vm.add(piv);
 }

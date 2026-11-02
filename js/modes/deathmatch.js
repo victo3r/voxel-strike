@@ -12,7 +12,8 @@ const LOSE_T = 2.5, SWITCH_DMG = 40;
 const SNIPE_T = .9; // a sniper bot lines up its shot this long before it fires
 // health pads: a hurt bot that can't see its target walks to a stocked health pad within PAD_NEAR,
 // or within PAD_FAR once it's down to PAD_LOW HP. It also grabs any health pad it walks over while hurt.
-// Bots skip ammo pads (they never run out of spare ammo) and there's no armor in deathmatch.
+// Bots skip ammo pads (they never run out of spare ammo). Armor pads show up once you wear armor (js/armor.js), and bots
+// wear the same tier you do, so a bot with a dented armor bar grabs any armor pad it walks over.
 const PAD_LOW = 60, PAD_NEAR = 8, PAD_FAR = 30;
 // the rules for each match mode. t = match length (s), you = your respawn wait (s), bot = a bot's respawn wait after its angel
 // floats away (s), join = the other bots have all joined by this time (s), kills = ranked on kills only (no points),
@@ -250,7 +251,8 @@ function botEquip(b, g) {
 }
 function makeBot(rec) {
   const [x, z] = spawnSpot(rec);
-  const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U;
+  const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(matchArmor());
+  if (arm) dressArmor(ch, matchArmor(), teamMode() ? TEAMS[rec.team].shirts[0] : null);
   g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
   // both arms forward holding the gun, swung up and down with the aim from the shoulders
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
@@ -262,7 +264,7 @@ function makeBot(rec) {
   g.rotation.y = yaw;
   const mags = {}; for (const i of rec.load) mags[i] = BASE[i].mag; // every gun full on respawn
   const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
-    type: 'bot', hp: BOT.hp, maxHp: BOT.hp, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
+    type: 'bot', hp: BOT.hp, maxHp: BOT.hp, armor: arm ? arm.hp : 0, maxArmor: arm ? arm.hp : 0, dr: arm ? arm.dr : 0, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
   b.gun = pickGun(b, HUNT_D); b.ammo = mags[b.gun]; // spawns holding whatever it likes best for running into someone
@@ -577,12 +579,14 @@ function updateBot(b, dt) {
   if (inWater(pos.x, pos.z, pos.y)) { drownZombie(b); return; }
   if (air && !b.vy) sfx('land_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)), { at: pos, far: 22, v: .7 });
 
-  if (b.hp < b.maxHp) for (const p of pads) {
-    if (p.item && p.type === 'health' && Math.hypot(pos.x - p.x, pos.z - p.z) < 1 && pos.y < 1.5) {
-      b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK); clearPad(p); p.t = RESPAWN + Math.random() * 10;
-      sfx('pickHealth', { at: pos, far: 25, v: .7 });
-      break;
-    }
+  for (const p of pads) {
+    if (!p.item || Math.hypot(pos.x - p.x, pos.z - p.z) >= 1 || pos.y >= 1.5) continue;
+    if (p.type === 'health' && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK);
+    else if (p.type === 'armor' && b.armor < b.maxArmor) b.armor = Math.min(b.maxArmor, b.armor + ARMOR_PICK);
+    else continue;
+    sfx(p.type === 'health' ? 'pickHealth' : 'pickArmor', { at: pos, far: 25, v: .7 });
+    clearPad(p); p.t = RESPAWN + Math.random() * 10;
+    break;
   }
 
   b.flash -= dt;
@@ -657,7 +661,7 @@ function setupMode() {
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
   $('chat').style.display = pvp() ? '' : 'none';
   if (pvp()) {
-    makeRecs(); matchT = MATCH_T;
+    makeRecs(); matchT = MATCH_T; wearArmor();
     BASE.forEach((w, g) => { if (hasGun(g)) giveGun(g); });
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
     cur = slotGun[0]; buildGun(); renderHotbar();

@@ -43,8 +43,19 @@ function gunSpecs(i) {
 const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
 const isLocked = i => !hasGun(i) && prof.lv < (BASE[i].unlock ?? 0);
 const starTxt = i => BASE[i].start ? '' : '★'.repeat(gunStars(i)) + '☆'.repeat(3 - gunStars(i));
+// the armory's pages run down the left (the y axis). Each page has its own row of sections along the top (the x axis):
+// WEAPONS has the gun categories, WEAR has ARMOR (more things to wear can go in WEAR_CATS later)
+const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
+const WEAR_CATS = [['armor', 'ARMOR']];
+let armPage = 'weapons', wearCat = 'armor', armorPrev = 0; // armorPrev = the tier you clicked in the list, shown on your character
+const myArmor = () => prof.armor | 0;
+const pageIcon = p => p === 'weapons' ? SPRITES[loadoutGun('primary')] : ARMOR_SPRITES[Math.max(0, myArmor() - 1)];
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
+  $('armPages').innerHTML = PAGES.map(([p, label]) =>
+    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}${p === 'wear' && !myArmor() ? ' dim' : ''}"><img src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
+  if (armPage === 'wear') { renderWear(); return; }
+  heroArmor(myArmor());
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img src="${SPRITES[loadoutGun(c)]}"><span>${label}</span></button>`).join('');
   const eq = loadoutGun(armCat);
@@ -63,6 +74,7 @@ function renderArmory() {
 }
 // the buttons for the picked gun, under your character (in a match, under where he'd stand)
 function renderAct() {
+  if (armPage === 'wear') { renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
   let btns;
   if (isLocked(i)) btns = `<button disabled>🔒 UNLOCKS AT LVL ${w.unlock}</button>`;
@@ -86,6 +98,42 @@ function renderDetail() {
     `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div><p>${DESC[w.id] ?? ''}</p>` +
     `<div class="ds">${gunSpecs(i).map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
   pvShow(i);
+}
+
+// ---- WEAR page. ARMOR: one card per star. Click one to see it on your character; the button under him buys the next star
+const ARMOR_DESC = 'Worn in bot matches. Your armor bar fills every time you spawn and takes hits before your health. ' +
+  'Each star is a new armor, and from Amethyst on, each one also cuts the damage you take by 4% more. Bots wear the same armor you do.';
+const armorStat = T => `+${T.hp} ARMOR` + (T.dr ? ` · −${Math.round(T.dr * 100)}% DAMAGE` : '');
+function renderWear() {
+  const n = myArmor(), show = armorPrev || n || 1;
+  $('armTabs').innerHTML = WEAR_CATS.map(([c, label]) =>
+    `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img src="${ARMOR_SPRITES[Math.max(0, n - 1)]}"><span>${label}</span></button>`).join('');
+  $('armDet').style.display = 'none'; $('armList').style.display = '';
+  $('armList').innerHTML = `<p class="wd">${ARMOR_DESC}</p>` + ARMOR_TIERS.map((T, k) => {
+    const s = k + 1, locked = s > n && prof.lv < T.unlock;
+    const tag = s === n ? 'WEARING' : s < n ? 'OWNED' : locked ? `🔒 LVL ${T.unlock}` : COIN + T.price;
+    return `<div class="card${locked ? ' locked' : ''}${s === show ? ' sel' : ''}${s === n ? ' on' : ''}" data-tier="${s}"><span class="tag">${tag}</span>` +
+      `<img src="${ARMOR_SPRITES[k]}"><div class="cn">${T.name} <span class="st">${'★'.repeat(s)}</span></div><small>${armorStat(T)}</small></div>`;
+  }).join('');
+  heroArmor(show);
+  renderAct();
+  if (inLobby) heroGun(-1); // he puts the gun away and stands facing you, so you see the armor
+}
+function renderArmorAct() {
+  const n = myArmor(), next = armorOf(n + 1);
+  let btns;
+  if (!next) btns = '<button class="eq" disabled>MAXED</button>';
+  else if (prof.lv < next.unlock) btns = `<button disabled>🔒 ${n ? next.name.toUpperCase() + ' ' : ''}AT LVL ${next.unlock}</button>`;
+  else btns = `<button data-arm="1" ${prof.coins < next.price ? 'disabled' : ''}>${n ? '★'.repeat(n + 1) + ' ' + next.name.toUpperCase() : 'BUY'} ${COIN}${next.price}</button>`;
+  $('armAct').innerHTML = `<div class="an">${armorName(n)} <span class="st">${n ? armorStars(n) : ''}</span></div><div class="ab">${btns}</div>`;
+  placeAct();
+}
+// bought or upgraded armor during a match: it's on right away, and the new part of the bar comes filled
+function armorSync() {
+  if (!inMatch()) return;
+  const T = armorOf(myArmor()), gain = T.hp - P.maxArmor;
+  P.maxArmor = T.hp; P.dr = T.dr; P.armor = Math.min(P.maxArmor, P.armor + Math.max(0, gain));
+  buildGun(); // your arms show it
 }
 
 // ---- the spinning gun in the details view: its own little renderer, so it isn't blurred behind the panel ----
@@ -142,13 +190,21 @@ function armSync(i, how) {
 // click a card to pick it (your character holds it), click it again for its details
 $('armList').addEventListener('click', e => {
   const c = e.target.closest('.card'); if (!c) return;
+  if (c.dataset.tier) { armorPrev = +c.dataset.tier; sfx('ui'); renderArmory(); return; }
   const i = +c.dataset.i;
   if (i === armSel) armDet = true; else armSel = i;
   sfx('ui'); renderArmory();
 });
 function armClick(e) {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
-  if (b.dataset.c) { armCat = b.dataset.c; armDet = false; sfx('ui'); }
+  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armSel = -1; sfx('ui'); } }
+  else if (b.dataset.wc) { wearCat = b.dataset.wc; sfx('ui'); }
+  else if (b.dataset.arm) {
+    const n = myArmor(), T = armorOf(n + 1); if (!T || prof.coins < T.price || prof.lv < T.unlock) return;
+    prof.coins -= T.price; prof.armor = n + 1; armorPrev = n + 1; saveProf(); showProf();
+    armorSync(); sfx(n ? 'upgrade' : 'buy');
+  }
+  else if (b.dataset.c) { armCat = b.dataset.c; armDet = false; sfx('ui'); }
   else if (b.id === 'detBack') { armDet = false; sfx('ui'); }
   else if (b.dataset.buy) {
     const i = +b.dataset.buy, w = BASE[i]; if (prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
@@ -177,7 +233,7 @@ function armShow(on) {
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
 function openArmory() { armOpen = true; armDet = false; armSel = -1; armShow(true); renderArmory(); }
-function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); }
+function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; heroArmor(myArmor()); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // stopPropagation so the click doesn't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => {

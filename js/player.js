@@ -109,7 +109,7 @@ function settle(o, dt) {
 
 // max HP is always 100. Armor is a second health bar that soaks damage before HP does (unless the damage pierces)
 const ARMOR_CAP = 100; // most armor you can buy up to (4 shop buys)
-const P = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, onGround: true, kx: 0, kz: 0 }; // kx/kz = knockback
+const P = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, onGround: true, kx: 0, kz: 0 }; // kx/kz = knockback, dr = share of damage your worn armor takes off
 const keys = {};
 let locked = false, dead = false, inLobby = true;
 // which mode you picked in the lobby: 'zombies', 'dm' (deathmatch), 'team' (team fight), 'blitz' (free for all) or 'blitzTeam'.

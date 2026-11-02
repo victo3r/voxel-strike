@@ -246,8 +246,8 @@ function update(dt) {
     if (p.life <= 0 || p.m.position.y < 0) { scene.remove(p.m); parts.splice(i, 1); }
   }
 
-  $('hp').textContent = `♥ ${P.hp}`;
-  $('arm').textContent = P.maxArmor ? `⛨ ${P.armor}` : '';
+  $('hp').textContent = `♥ ${Math.ceil(P.hp)}`;
+  $('arm').textContent = P.maxArmor ? `⛨ ${Math.ceil(P.armor)}` : '';
   const spare = reserve[cur] === Infinity ? '∞' : reserve[cur];
   $('ammo').textContent = `${w.name} ${stars(cur)}\n${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : ammo[cur] + ' / ' + spare}`;
   $('ammo').style.whiteSpace = 'pre';

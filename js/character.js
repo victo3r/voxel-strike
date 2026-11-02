@@ -287,8 +287,10 @@ function buildChar(look, U = 1 / 16, own = false) {
   const armRM = mesh(partBox(4, 12, 4, 40, 16, U), armR, 0, -4, 0), armLM = mesh(partBox(4, 12, 4, 32, 48, U), armL, 0, -4, 0);
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
   const parts = [head, body, armRM, armLM, legRM, legLM];
-  const dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); };
-  return { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], dispose };
+  // ch.armor = the armor it's wearing (js/armor.js dressArmor), its pieces ride on the parts
+  const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null };
+  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); };
+  return ch;
 }
 
 // a random look from a seed (bots: the seed is their name, so the same name always looks the same)
