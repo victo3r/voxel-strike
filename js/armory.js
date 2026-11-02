@@ -104,7 +104,7 @@ function pvShow(i) {
   const key = i + ':' + gunStars(i);
   if (pv.key !== key) {
     pv.key = key;
-    pv.spin.traverse(o => o.geometry?.dispose()); pv.spin.clear();
+    pv.spin.clear(); // gun geometry is shared (makeGun), nothing to free
     const g = new THREE.Group(); makeGun(i, g, Math.max(0, gunStars(i) - 1), false);
     const box = new THREE.Box3().setFromObject(g), sph = box.getBoundingSphere(new THREE.Sphere());
     g.position.sub(sph.center); pv.spin.add(g);

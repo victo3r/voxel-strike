@@ -198,7 +198,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #playBtn{right:20px;bottom:20px;background:rgba(36,170,98,.82);box-shadow:inset 0 -6px 0 var(--acc-dk),inset 0 4px 0 rgba(143,240,182,.6),5px 5px 0 rgba(0,0,0,.45)}
 #playBtn:hover{background:rgba(52,200,118,.9)}
 #playBtn:active{box-shadow:inset 0 -6px 0 var(--acc-dk),inset 0 4px 0 rgba(143,240,182,.6),2px 2px 0 rgba(0,0,0,.45)}
-#playBtn img{width:44%}
+#playBtn img{width:54%;image-rendering:auto}
 #playBtn b{font-size:clamp(18px,3vmin,26px)}
 #lobbySet{right:20px;top:18px;width:clamp(48px,7vmin,64px)}
 #lobbySet img{width:62%}

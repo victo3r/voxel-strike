@@ -196,7 +196,7 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); s
 // A mode with `sub` opens a second page to pick between its versions (Blitz: free for all or team) before the maps.
 // Player counts on the map cards come from RULES in modes/deathmatch.js
 const ALL_MAPS = ['yard', 'forest', 'resort'];
-const V_MAPS = 1; // bump when the map pictures are retaken
+const V_MAPS = 2; // bump when the map pictures are retaken
 const MODES = [
   { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Survive the waves, earn coins, beat the boss every 5 waves', maps: ALL_MAPS },
   { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ALL_MAPS },
@@ -289,15 +289,14 @@ $('setIcon').src = pixIcon([
   '..XX.XXXX.XX..',
   '.....XXXX.....',
 ], ['#d8dde4', '#9aa3ae']);
-// PLAY: a smooth triangle with rounded corners and a dark outline
+// PLAY: a sharp-cornered triangle, drawn smooth (no pixel steps along its edges), with a thin dark green outline.
+// Drawn at 256 so it stays crisp on high-DPI screens
 $('playIcon').src = (() => {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const g = c.getContext('2d'), pts = [[30, 16], [112, 64], [30, 112]], r = 14;
-  g.beginPath(); g.moveTo((pts[0][0] + pts[2][0]) / 2, (pts[0][1] + pts[2][1]) / 2);
-  for (let k = 0; k < 3; k++) { const a = pts[k], b = pts[(k + 1) % 3]; g.arcTo(a[0], a[1], b[0], b[1], r); }
-  g.closePath();
-  g.lineJoin = 'round'; g.lineWidth = 10; g.strokeStyle = 'rgba(0,0,0,.75)'; g.stroke();
-  const gr = g.createLinearGradient(0, 16, 0, 112); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#cdeed6'); g.fillStyle = gr; g.fill();
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), pts = [[52, 22], [236, 128], [52, 234]];
+  g.beginPath(); g.moveTo(...pts[0]); g.lineTo(...pts[1]); g.lineTo(...pts[2]); g.closePath();
+  g.lineJoin = 'miter'; g.miterLimit = 10; g.lineWidth = 12; g.strokeStyle = '#0d4a28'; g.stroke();
+  const gr = g.createLinearGradient(0, 22, 0, 234); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#d4f2dd'); g.fillStyle = gr; g.fill();
   return c.toDataURL();
 })();
 
@@ -322,11 +321,10 @@ const BOLT_ICON = [
 const iconFigure = c => ['KKKKKKK', 'KhhhhhK', 'KsssssK', 'KsKsKsK', 'KsssssK', 'KKKKKKK', `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, 'KKKKKKK'];
 const TEAM_ICON = iconFigure('b').map((r, k) => r + '..' + iconFigure('r')[k]);
 const MODE_ICONS = {
-  zombies: artIcon([
-    'KKKKKKKKKKKKKKKK', 'KggdggggggggdggK', 'KgggggdgggggggdK', 'KdggggggggdggggK', 'KggggggggggggggK', 'KgKKKggggggKKKgK',
-    'KgKKKgdggggKKKgK', 'KgggggggggggdggK', 'KgggggKKKKgggggK', 'KggKKKKKKKKKKggK', 'KggKddddddddKggK', 'KggKKKKKKKKKKggK',
-    'KdggggggggggdggK', 'KgggdggggggggggK', 'KggggggdgggggggK', 'KKKKKKKKKKKKKKKK',
-  ], { K: '#000', g: '#5aa844', d: '#3d7d2e' }),
+  zombies: artIcon([ // a plain blocky zombie head: dark hair, two eyes, a flat mouth
+    'KKKKKKKKKKKK', 'KddddddddddK', 'KdgggddgggdK', 'KggggggggggK', 'KgKKggggKKgK', 'KgKKggggKKgK',
+    'KggggggggggK', 'KggggggggggK', 'KggKKKKKKggK', 'KggggggggggK', 'KggggggggggK', 'KKKKKKKKKKKK',
+  ], { K: '#000', g: '#5aa844', d: '#3d7d2e' }, 11),
   dm: artIcon([
     '....KKKKKKKK....', '..KKWWWWWWWWKK..', '.KWWWWWWWWWWWWK.', 'KWWWWWWWWWWWWWGK', 'KWWWWWWWWWWWWWGK', 'KWWKKKKWWKKKKWGK',
     'KWWKRRKWWKRRKWGK', 'KWWKKKKWWKKKKWGK', 'KWWWWWWKKWWWWWGK', '.KWWWWKKKKWWWGK.', '..KWWWWWWWWWGK..', '..KWKWKWKWKWGK..',

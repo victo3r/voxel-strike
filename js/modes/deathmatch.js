@@ -209,9 +209,11 @@ const FLASH_MAT = new THREE.MeshBasicMaterial({ color: 0xffdd55 });
 // put gun b.gun in the bot's hands: the same model you see in your own hands, turned to point forward out of its hands
 function holdGun(b) {
   const u = BOT_U;
-  if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM) o.geometry.dispose(); }); }
+  if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
   const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, grip: [gy, gz] } = makeGun(b.gun, gunM, 0);
-  gunM.rotation.y = Math.PI; gunM.position.set(-4 * u, -gy, 9 * u + gz); // its right fist (near the end of the arm) closes round the grip
+  // its right fist (near the end of the arm) closes round the grip. A shoulder gun sits out over its right shoulder, clear of its head
+  const sh = BASE[b.gun].shoulder;
+  gunM.rotation.y = Math.PI; gunM.position.set(sh ? -7.5 * u : -4 * u, -gy + (sh ? 2 * u : 0), 9 * u + gz);
   b.round = round;
   b.flashM ??= box(.14, .14, .14, FLASH_MAT);
   b.flashM.position.set(0, my, mz - .04); b.flashM.visible = false;

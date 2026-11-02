@@ -274,8 +274,8 @@ const partBox = (w, h, d, u, v, U) => { const R = regions(u, v, w, h, d); return
 // Returns the group plus the pivots you animate: headPiv (neck), armR/armL (shoulders), legR/legL (hips).
 // parts = the meshes bullets can hit; mats = materials to flash when hurt.
 // own = give it its own texture instead of the shared cached one (the lobby character, rebuilt on every customizer change),
-// so dispose() can free everything
-function buildChar(look, U = 1 / 16, own = false) {
+// so dispose() can free everything. elbows = split each arm into an upper and lower half; the elbow pivot is armR/armL.userData.elbow
+function buildChar(look, U = 1 / 16, own = false, elbows = false) {
   const mat = lam({ map: own ? makeSkin(look) : skinTexture(look) });
   const g = new THREE.Group();
   const mesh = (geo, parent, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x * U, y * U, z * U); parent.add(m); return m; };
@@ -284,9 +284,17 @@ function buildChar(look, U = 1 / 16, own = false) {
   const head = mesh(partBox(8, 8, 8, 0, 0, U), headPiv, 0, 4, 0); head.userData.head = true;
   const pivot = (x, y) => { const p = new THREE.Group(); p.position.set(x * U, y * U, 0); g.add(p); return p; };
   const armR = pivot(-6, 22), armL = pivot(6, 22), legR = pivot(-2, 12), legL = pivot(2, 12);
-  const armRM = mesh(partBox(4, 12, 4, 40, 16, U), armR, 0, -4, 0), armLM = mesh(partBox(4, 12, 4, 32, 48, U), armL, 0, -4, 0);
+  // an arm, or with elbows its top 6 rows and bottom 6 rows. The ends that meet at the elbow show the skin row next to the joint
+  const arm = (pv, u, v) => {
+    if (!elbows) return [mesh(partBox(4, 12, 4, u, v, U), pv, 0, -4, 0)];
+    const R = regions(u, v, 4, 12, 4), half = ([x, y, w], k) => [x, y + k * 6, w, 6], row = ([x, y, w], r) => [x, y + r, w, 1];
+    const up = mesh(skinBox(4, 6, 4, U, [half(R.left, 0), half(R.right, 0), R.top, row(R.front, 5), half(R.front, 0), half(R.back, 0)]), pv, 0, -1, 0);
+    const elb = new THREE.Group(); elb.position.y = -4 * U; pv.add(elb); pv.userData.elbow = elb;
+    return [up, mesh(skinBox(4, 6, 4, U, [half(R.left, 1), half(R.right, 1), row(R.front, 6), R.bottom, half(R.front, 1), half(R.back, 1)]), elb, 0, -3, 0)];
+  };
+  const armRM = arm(armR, 40, 16), armLM = arm(armL, 32, 48);
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
-  const parts = [head, body, armRM, armLM, legRM, legLM];
+  const parts = [head, body, ...armRM, ...armLM, legRM, legLM];
   const dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); };
   return { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], dispose };
 }

@@ -18,7 +18,8 @@ const BASE = [
   { id: 'knife', name: 'Combat Knife', cat: 'melee', start: true, free: true, inf: true, melee: true, mob: 1.2, dmg: 35, rate: .4, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xd8dde3, len: .3, model: 'knife' },
   // flamethrower: short cone that hits everything in front of you and sets it on fire. mag = fuel
   { id: 'flame', name: 'Flamethrower', cat: 'special', start: true, flame: true, dmg: 5, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, model: 'flame' },
-  { id: 'rocket', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, rocket: true, dmg: 150, rate: 1.1, mag: 1, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, model: 'rocket' },
+  // shoulder = a big gun carried on the shoulder, held near its front with the back end going over the shoulder
+  { id: 'rocket', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, rocket: true, shoulder: true, dmg: 150, rate: 1.1, mag: 1, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, model: 'rocket' },
   // flare gun: burn = damage per quarter second, burnT = seconds
   { id: 'flare', name: 'Flare Gun', cat: 'premium', start: true, flare: true, dmg: 40, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, model: 'flare' },
 ];
@@ -88,205 +89,212 @@ const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
 let gunSpin = null, gunSpinV = 0; // the eradicator's barrel cluster, and how fast it's spinning
 let gunRound = null; // the rocket sitting in the launcher's tube, hidden while it's empty
 
-// gun models are pixel art: every size and spot in GUN_MODELS is in gun pixels (GPX world units each, times the gun's GUN_SCALE).
-// Guns point down -z with the grip near the origin. Every piece gets one texel of shading per pixel,
-// and the outermost ring of pixels on each face is painted black, so the outline is part of the pixel art
-const GPX = .02, GUN_SCALE = { knife: .75 };
-let gpx = GPX; // pixel size of the gun being built
-let gunShade = null; // light grey speckle multiplied over every piece's color
-const shadeTex = () => gunShade ??= tex(g => {
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = 228 + Math.random() * 27 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y, 1, 1); }
-});
-// aPix = where this spot is on its face and how big the face is, both in gun pixels. A pixel within 1 of the face's edge is black.
-// Sides 2 pixels thick or less keep their color across, or thin parts like barrels would be solid black
-function edgeMat(m) {
-  m.onBeforeCompile = s => {
-    s.vertexShader = 'attribute vec4 aPix;\nvarying vec4 vPix;\n' + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvPix = aPix;');
-    s.fragmentShader = 'varying vec4 vPix;\n' + s.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-      vec2 pe = mix(vec2(9.), min(vPix.xy, vPix.zw - vPix.xy), step(2.5, vPix.zw));
-      if (min(pe.x, pe.y) < 1.) { diffuseColor.rgb = vec3(.025); totalEmissiveRadiance = vec3(0.); }`);
+// gun models are voxel pixel art. Every size and spot in GUN_MODELS is in gun pixels, GPX world units each.
+// Guns point down -z with the grip near the origin. The pieces are filled into a grid of pixels (later pieces paint over
+// earlier ones), and only the outside of that grid is drawn, one little square per pixel with a touch of shading.
+// A pixel turns black where the surface folds away round a corner, and on the darker side of a line where two colors meet,
+// so the black outline is part of the pixel art. Anything 2 pixels thin is all outline, so parts that should show
+// their color need to be 4 or more pixels across
+const GPX = .01, GUN_DARK = 0x2c2c30;
+const gunPal = [null], gunPalI = {}; // palette index -> { c: color, glow, lum }
+function palIdx(col, glow = false) {
+  const k = (glow ? 'g' : '') + col;
+  if (gunPalI[k] === undefined) { const c = new THREE.Color(col); gunPalI[k] = gunPal.push({ c, glow, lum: .2126 * c.r + .7152 * c.g + .0722 * c.b }) - 1; }
+  return gunPalI[k];
+}
+// each face: its normal, then two edges along it with a × b = normal, so the squares face outward
+const VOX_FACES = [
+  [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]], [[0, 1, 0], [0, 0, 1], [1, 0, 0]],
+  [[0, -1, 0], [1, 0, 0], [0, 0, 1]], [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [0, 1, 0], [1, 0, 0]],
+];
+// pieces = [w, h, d, palette index, x, y, z] boxes centered on x, y, z. Returns { lit, glow } geometries (either can be null)
+function voxelGeos(pieces) {
+  const boxes = pieces.map(([w, h, d, m, x, y, z]) => [Math.round(x - w / 2), Math.round(y - h / 2), Math.round(z - d / 2), Math.round(x + w / 2), Math.round(y + h / 2), Math.round(z + d / 2), m]);
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const b of boxes) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], b[k] - 1); hi[k] = Math.max(hi[k], b[k + 3] + 1); }
+  const [NX, NY, NZ] = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], cell = new Uint16Array(NX * NY * NZ);
+  for (const [x0, y0, z0, x1, y1, z1, m] of boxes)
+    for (let z = z0; z < z1; z++) for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) cell[((z - lo[2]) * NY + (y - lo[1])) * NX + (x - lo[0])] = m;
+  const at = (x, y, z) => x < 0 || y < 0 || z < 0 || x >= NX || y >= NY || z >= NZ ? 0 : cell[(z * NY + y) * NX + x];
+  const out = { lit: [[], [], []], glow: [[], [], []] }; // positions, normals, colors
+  const CORNER = [0, 1, 2, 0, 2, 3], ca = [0, 1, 1, 0], cb = [0, 0, 1, 1]; // the two triangles of a square, and each corner's steps along a and b
+  for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
+    const m = cell[(z * NY + y) * NX + x]; if (!m) continue;
+    const P = gunPal[m];
+    for (let f = 0; f < 6; f++) {
+      const [n, a, b] = VOX_FACES[f];
+      if (at(x + n[0], y + n[1], z + n[2])) continue;
+      // the face carries on into a neighbour if that pixel is solid with nothing on top of it
+      let black = false;
+      for (let e = 0; e < 4 && !black; e++) {
+        const t = e < 2 ? a : b, s = e & 1 ? -1 : 1;
+        const ux = x + s * t[0], uy = y + s * t[1], uz = z + s * t[2], m2 = at(ux, uy, uz);
+        if (!m2 || at(ux + n[0], uy + n[1], uz + n[2])) black = true; // an edge of the shape
+        else if (m2 !== m) { const L2 = gunPal[m2].lum; if (P.lum < L2 || (P.lum === L2 && m < m2)) black = true; } // a color line, drawn on the darker side
+      }
+      let r = 0, g = 0, bl = 0;
+      if (!black) {
+        const h = Math.imul(x * 73856093 ^ y * 19349663 ^ z * 83492791 ^ (f + 1) * 2654435761, 1597334677) >>> 0;
+        const sh = P.glow ? 1 : .8 + (h % 1000) / 1000 * .2; // one shade per pixel, like a texture
+        r = P.c.r * sh; g = P.c.g * sh; bl = P.c.b * sh;
+      }
+      const [pos, nor, col] = out[P.glow ? 'glow' : 'lit'];
+      const ox = x + lo[0] + (n[0] > 0), oy = y + lo[1] + (n[1] > 0), oz = z + lo[2] + (n[2] > 0);
+      for (let q = 0; q < 6; q++) {
+        const k = CORNER[q], i = ca[k], j = cb[k];
+        pos.push((ox + i * a[0] + j * b[0]) * GPX, (oy + i * a[1] + j * b[1]) * GPX, (oz + i * a[2] + j * b[2]) * GPX);
+        nor.push(n[0], n[1], n[2]); col.push(r, g, bl);
+      }
+    }
+  }
+  const geo = ([pos, nor, col]) => {
+    if (!pos.length) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.computeBoundingSphere(); return g;
   };
-  m.customProgramCacheKey = () => 'gunEdge';
-  return m;
-}
-// a box whose texture is stretched so one texel covers one gun pixel on every face (BoxGeometry face order: +x, -x, +y, -y, +z, -z)
-function pixBox(w, h, d) {
-  const geo = new THREE.BoxGeometry(w * gpx, h * gpx, d * gpx), uv = geo.attributes.uv, pix = new Float32Array(24 * 4);
-  const sz = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]], ox = Math.random() * 16 | 0, oy = Math.random() * 16 | 0;
-  for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
-    const i = f * 4 + k, u = uv.getX(i) * sz[f][0], v = uv.getY(i) * sz[f][1];
-    pix.set([u, v, sz[f][0], sz[f][1]], i * 4); uv.setXY(i, (u + ox) / 16, (v + oy) / 16);
-  }
-  geo.setAttribute('aPix', new THREE.BufferAttribute(pix, 4));
-  return geo;
-}
-function piece(parent, w, h, d, mat, x, y, z) {
-  const m = new THREE.Mesh(pixBox(w, h, d), mat);
-  m.position.set(x * gpx, y * gpx, z * gpx); m.userData.dim = [w, h, d]; parent.add(m); return m;
-}
-function mergeGeos(geos) {
-  const pos = [], nor = [], uv = [], pix = [], idx = []; let n = 0;
-  for (const g of geos) {
-    pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array); pix.push(...g.attributes.aPix.array);
-    for (const i of g.index.array) idx.push(i + n);
-    n += g.attributes.position.count; g.dispose();
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  out.setAttribute('aPix', new THREE.Float32BufferAttribute(pix, 4));
-  out.setIndex(idx); return out;
-}
-// melts a group's pieces into one mesh per material, so a whole gun is a handful of draw calls
-function bake(root) {
-  const byMat = new Map();
-  for (const m of [...root.children]) {
-    if (!m.isMesh || !m.userData.dim) continue;
-    m.updateMatrix();
-    if (!byMat.has(m.material)) byMat.set(m.material, []);
-    byMat.get(m.material).push(m.geometry.applyMatrix4(m.matrix));
-    root.remove(m);
-  }
-  for (const [mat, geos] of byMat) root.add(new THREE.Mesh(mergeGeos(geos), mat));
+  return { lit: geo(out.lit), glow: geo(out.glow) };
 }
 
 // each model returns, in gun pixels: muzzle [y, z], grip [y, z] (right hand), fore [y, z] (left hand, null on one-handed guns),
 // bands = z spots for the gold upgrade bands and band = [width, height, y] for them
 const GUN_MODELS = {
   voxel({ p, mat, dark, glow }) {
-    const teal = glow(0x2ee6d6), grip = mat(0x2c2c2c);
-    p(4, 3, 16, mat(0x6a6a6a), 0, 1.5, -8); // slide
-    p(4, 1, 16, mat(0x8e8e8e), 0, 3.5, -8); // its lighter top
-    p(4, 2, 13, dark, 0, -1, -6.5); // frame
-    p(2, 2, 1, teal, 0, 1.5, -16.5); // emitter in the muzzle
-    for (const z of [-4, -7, -10]) p(5, 1, 1, teal, 0, 1.5, z); // teal cubes down the sides
-    p(2, 1, 1, dark, 0, 4.5, -1); p(1, 1, 1, dark, 0, 4.5, -15); // sights
-    p(1, 1, 4, dark, 0, -4.5, -7.5); p(1, 2, 1, dark, 0, -3, -9.5); // trigger guard
-    p(1, 2, 1, mat(0x555555), 0, -3, -7); // trigger
-    p(4, 3, 4, grip, 0, -3.5, -3.5); p(4, 3, 4, grip, 0, -6.5, -2.5); // short grip under the back of the slide, raked back a step
-    p(4, 1, 4, dark, 0, -8.5, -2.5); // base of the grip
-    return { muzzle: [1.5, -17], grip: [-5.5, -3], fore: null, bands: [-5.5, -8.5], band: [5, 7, 1] };
+    const teal = glow(0x2ee6d6), grip = mat(0x303030);
+    p(8, 6, 32, mat(0x6a6a6a), 0, 3, -16); p(8, 2, 32, mat(0x8e8e8e), 0, 7, -16); // slide and its lighter top
+    for (const z of [-2, -5]) p(8, 5, 1, dark, 0, 3.5, z); // grip lines at the back of the slide
+    p(8, 4, 26, dark, 0, -2, -13); // frame
+    p(4, 4, 2, teal, 0, 3, -33); // emitter in the muzzle
+    for (const z of [-7, -26]) p(10, 4, 4, teal, 0, 3, z); // teal cubes set into the sides
+    p(4, 2, 2, dark, 0, 9, -2); p(2, 2, 2, dark, 0, 9, -30); // sights
+    p(2, 2, 10, dark, 0, -9, -15); p(2, 4, 2, dark, 0, -6, -19); p(2, 4, 2, mat(0x666666), 0, -6, -13); // trigger guard and trigger
+    p(8, 6, 8, grip, 0, -7, -7); p(8, 6, 8, grip, 0, -13, -5); p(8, 2, 8, dark, 0, -17, -5); // short grip under the back of the slide
+    return { muzzle: [3, -34], grip: [-11, -6], fore: null, bands: [-13, -20], band: [10, 14, 2] };
   },
   shotgun({ p, mat, dark }) {
-    const wood = mat(0x7a5232), dwood = mat(0x4e3420), steel = mat(0x4a4a4a);
-    p(4, 5, 9, wood, 0, -.5, 4.5); p(4, 6, 1, dwood, 0, -1, 9.5); // stock and butt pad
-    p(5, 5, 11, steel, 0, .5, -5.5); // receiver
-    p(3, 3, 26, dark, 0, 1.5, -24); // barrel
-    p(3, 2, 18, steel, 0, -1, -20); // mag tube
-    p(5, 4, 9, wood, 0, -1.5, -21); // pump
-    for (const z of [-19, -21, -23]) p(6, 1, 1, dwood, 0, -1.5, z); // pump grooves
-    p(1, 1, 1, mat(0xdddddd), 0, 3.5, -36); // bead sight
-    p(4, 4, 1, dark, 0, 1.5, -37.5); // muzzle ring
-    p(4, 3, 3, wood, 0, -3.5, -1.5); p(4, 3, 3, wood, 0, -6.5, -.5); // pistol grip
-    p(1, 1, 4, dark, 0, -4.5, -5); p(1, 2, 1, dark, 0, -3, -7.5); p(1, 2, 1, mat(0x777777), 0, -3, -4); // guard and trigger
-    return { muzzle: [1.5, -38], grip: [-5, -1], fore: [-2.5, -21], bands: [-3, -8], band: [6, 6, .5] };
+    const wood = mat(0x7a5232), dwood = mat(0x4e3420), steel = mat(0x4a4a4e);
+    p(8, 10, 18, wood, 0, -1, 9); p(8, 4, 12, wood, 0, -8, 12); p(8, 16, 2, dwood, 0, -3, 19); // stock, its lower step, butt pad
+    p(10, 10, 22, steel, 0, 1, -11); p(10, 4, 8, dark, 0, 2, -12); // receiver and ejection port
+    p(6, 6, 52, dark, 0, 3, -48); p(6, 4, 36, steel, 0, -2, -40); // barrel, mag tube under it
+    p(10, 8, 18, wood, 0, -3, -42); for (const z of [-37, -42, -47]) p(12, 8, 2, dwood, 0, -3, z); // pump and its ridges
+    p(2, 2, 2, mat(0xdddddd), 0, 7, -72); p(8, 8, 2, dark, 0, 3, -75); // bead sight, muzzle ring
+    p(8, 6, 6, wood, 0, -7, -3); p(8, 6, 6, wood, 0, -13, -1); // pistol grip
+    p(2, 2, 10, dark, 0, -9, -11); p(2, 4, 2, dark, 0, -6, -15); p(2, 4, 2, mat(0x777777), 0, -6, -9); // guard and trigger
+    return { muzzle: [3, -77], grip: [-10, -2], fore: [-5, -42], bands: [-6, -17], band: [12, 12, 1] };
   },
   ar({ p, mat, dark }) {
-    const body = mat(0x3d4d3d), dk = mat(0x2a352a);
-    p(4, 5, 8, dk, 0, 0, 5); p(4, 6, 1, dark, 0, -.5, 9.5); p(2, 2, 1, dark, 0, .5, .5); // stock, butt, joint
-    p(5, 5, 15, body, 0, 0, -7.5); // receiver
-    p(3, 1, 13, dark, 0, 3, -7.5); p(2, 2, 2, dark, 0, 4.5, -2); // top rail, rear sight
-    p(5, 4, 11, dk, 0, 0, -20.5); // handguard
-    for (const z of [-18, -21, -24]) p(6, 1, 2, mat(0x111111), 0, 0, z); // vents
-    p(2, 2, 7, dark, 0, .5, -29.5); p(3, 3, 3, dark, 0, .5, -34.5); // barrel, muzzle brake
-    p(1, 3, 1, dark, 0, 3.5, -25); // front sight post
-    p(4, 4, 3, dark, 0, -4.5, -10); p(4, 3, 3, dark, 0, -8, -11); // mag, curving forward
-    p(4, 4, 3, dk, 0, -4.5, -1.5); p(4, 3, 3, dk, 0, -8, -.5); // pistol grip
-    p(1, 1, 5, dark, 0, -6, -5.5); p(1, 2, 1, mat(0x666666), 0, -3.5, -4); // guard and trigger
-    return { muzzle: [.5, -36], grip: [-6, -1], fore: [-3, -21], bands: [-5, -11], band: [6, 6, 0] };
+    const body = mat(0x3d4d3d), dk = mat(0x2c382c);
+    p(8, 10, 16, dk, 0, 0, 10); p(8, 12, 2, dark, 0, -1, 19); p(4, 4, 2, dark, 0, 1, 1); // stock, butt, joint
+    p(10, 10, 30, body, 0, 0, -15); // receiver
+    p(6, 2, 26, dark, 0, 6, -15); p(4, 4, 4, dark, 0, 9, -4); // top rail, rear sight
+    p(10, 8, 22, dk, 0, 0, -41); for (const z of [-36, -42, -48]) p(10, 2, 4, mat(0x111111), 0, 0, z); // handguard and its vents
+    p(4, 4, 14, dark, 0, 1, -59); p(6, 6, 6, dark, 0, 1, -69); p(2, 6, 2, dark, 0, 7, -50); // barrel, muzzle brake, front sight
+    p(8, 8, 6, dark, 0, -9, -20); p(8, 6, 6, dark, 0, -16, -22); // mag, curving forward
+    p(8, 8, 6, dk, 0, -9, -3); p(8, 6, 6, dk, 0, -16, -1); // pistol grip
+    p(2, 2, 10, dark, 0, -12, -11); p(2, 4, 2, mat(0x666666), 0, -7, -9); // guard and trigger
+    return { muzzle: [1, -72], grip: [-12, -2], fore: [-5, -34], bands: [-10, -26], band: [12, 12, 0] };
   },
   sniper({ p, mat, dark, glow }) {
-    const wood = mat(0x4a3220), blk = mat(0x1a1a1a), silver = mat(0x8a8a8a);
-    p(4, 6, 10, wood, 0, -1, 5); p(4, 7, 1, mat(0x2e1f14), 0, -1.5, 10.5); p(3, 2, 6, wood, 0, 3, 4); // stock, butt, cheek rest
-    p(4, 4, 18, blk, 0, 0, -9); // action
-    p(4, 3, 10, wood, 0, -3.5, -16); // forend
-    p(2, 2, 28, dark, 0, .5, -32); p(3, 3, 5, dark, 0, .5, -48.5); // barrel, suppressor
-    p(3, 3, 16, mat(0x2a2a2a), 0, 5.5, -10); // scope tube
-    p(4, 4, 2, dark, 0, 5.5, -1); p(4, 4, 2, dark, 0, 5.5, -19); // scope bells
-    p(3, 3, 1, glow(0x66ccff), 0, 5.5, -20.5); // lens
-    p(2, 2, 2, dark, 0, 3, -5); p(2, 2, 2, dark, 0, 3, -14); // scope mounts
-    p(4, 1, 1, silver, 4, 1, -3); p(2, 2, 2, silver, 7, 1, -3); // bolt handle and knob
-    p(4, 5, 3, wood, 0, -4.5, -1.5); p(4, 3, 3, wood, 0, -8.5, -.5); // pistol grip
-    p(1, 1, 4, dark, 0, -5.5, -5); p(1, 3, 1, dark, 0, -3.5, -7.5); p(1, 2, 1, silver, 0, -3, -4); // guard and trigger
-    return { muzzle: [.5, -51], grip: [-7, -1], fore: [-6, -16], bands: [-6, -12], band: [5, 5, 0] };
+    const wood = mat(0x4a3220), act = mat(0x34343a), silver = mat(0x8a8a8a);
+    p(8, 12, 20, wood, 0, -2, 10); p(8, 14, 2, mat(0x2e1f14), 0, -3, 21); p(6, 4, 12, wood, 0, 6, 8); // stock, butt, cheek rest
+    p(8, 8, 36, act, 0, 0, -18); p(8, 6, 20, wood, 0, -7, -32); // action, forend
+    p(4, 4, 56, dark, 0, 1, -64); p(6, 6, 10, dark, 0, 1, -97); // barrel, suppressor
+    p(6, 6, 32, mat(0x2a2a2e), 0, 11, -20); p(8, 8, 4, dark, 0, 11, -2); p(8, 8, 4, dark, 0, 11, -38); // scope tube and bells
+    p(6, 6, 2, glow(0x66ccff), 0, 11, -41); // lens
+    p(4, 4, 4, dark, 0, 6, -10); p(4, 4, 4, dark, 0, 6, -28); // scope mounts
+    p(8, 2, 2, silver, 8, 2, -6); p(4, 4, 4, silver, 14, 2, -6); // bolt handle and knob
+    p(8, 10, 6, wood, 0, -9, -3); p(8, 6, 6, wood, 0, -17, -1); // pistol grip
+    p(2, 2, 8, dark, 0, -11, -10); p(2, 6, 2, dark, 0, -7, -15); p(2, 4, 2, silver, 0, -6, -8); // guard and trigger
+    return { muzzle: [1, -102], grip: [-14, -2], fore: [-7, -28], bands: [-14, -24], band: [10, 10, 0] };
   },
   eradicator({ p, mat, dark, sub, at }) {
-    const steel = mat(0x777777), dk = mat(0x3a3a3a);
-    p(9, 9, 13, steel, 0, 0, -5.5); p(10, 10, 1, dk, 0, 0, 1.5); // housing, back plate
-    p(2, 1, 10, dk, 0, 7.5, -5.5); p(2, 2.5, 1, dk, 0, 5.75, -1); p(2, 2.5, 1, dk, 0, 5.75, -10); // carry handle
-    p(5, 6, 7, mat(0x5a5a2a), -7, -1.5, -5.5); p(3, 1, 2, mat(0xc9a43a), -6, 2, -5.5); // ammo box and belt
-    const spin = sub(0, 0, -23.5), sp = at(spin);
-    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; sp(1.5, 1.5, 23, dark, Math.cos(a) * 2.25, Math.sin(a) * 2.25, 0); }
-    sp(2, 2, 23, dk, 0, 0, 0); for (const z of [-6, 8]) sp(7, 7, 1.5, dk, 0, 0, z); // spindle and barrel rings
-    p(4, 4, 3, dk, 0, -6.5, -1); p(4, 3, 3, dk, 0, -10, 0); // rear grip
-    p(1, 1, 3, dark, 0, -8, -4.5); p(1, 3, 1, dark, 0, -6, -6.5); p(1, 2, 1, mat(0x999999), 0, -5.5, -3.5); // guard and trigger
-    p(3, 7, 3, dk, 0, -8, -10); // front handle
-    return { muzzle: [0, -36], grip: [-8, 0], fore: [-9, -10], bands: [-3, -8], band: [10, 10, 0], spin };
+    const steel = mat(0x7a7a7a), dk = mat(0x3c3c40), bar = mat(0x5a5a5e), gold = mat(0xc9a43a);
+    p(18, 20, 26, steel, 0, 0, -11); p(20, 22, 2, dk, 0, 0, 3); // housing, back plate
+    p(4, 4, 2, dk, 0, 12, -2); p(4, 4, 2, dk, 0, 12, -20); p(4, 4, 22, dk, 0, 16, -11); // carry handle
+    p(10, 12, 14, mat(0x5a5a2a), -14, -3, -11); p(6, 4, 10, gold, -12, 5, -11); // ammo box and the belt feeding in
+    const spin = sub(0, 0, -47), sp = at(spin);
+    for (const [x, y] of [[6, 0], [-6, 0], [3, 5], [-3, 5], [3, -5], [-3, -5]]) { sp(4, 4, 46, bar, x, y, 0); sp(2, 2, 1, mat(0x111111), x, y, -22.5); } // barrels with dark bores
+    sp(4, 4, 46, dk, 0, 0, 0); for (const z of [-12, 16]) sp(20, 20, 4, dk, 0, 0, z); // spindle and barrel rings
+    p(8, 8, 6, dk, 0, -14, -2); p(8, 6, 6, dk, 0, -21, 0); // rear grip
+    p(2, 2, 6, dark, 0, -16, -8); p(2, 6, 2, dark, 0, -13, -12); p(2, 4, 2, mat(0x999999), 0, -12, -7); // guard and trigger
+    p(8, 14, 6, dk, 0, -17, -20); // front handle
+    return { muzzle: [0, -72], grip: [-17, -1], fore: [-18, -20], bands: [-6, -14], band: [20, 22, 0], spin };
   },
   knife({ p, mat }) {
-    const brown = mat(0x5a3a1a), dbrown = mat(0x3a2412), steel = mat(0x8a8f96), blade = mat(0xc8ced6), edge = mat(0xf0f4f8);
-    p(3, 4, 8, brown, 0, 0, 0); p(4, 5, 1, dbrown, 0, 0, 1.5); p(4, 5, 1, dbrown, 0, 0, -1.5); // handle and wraps
-    p(4, 5, 2, steel, 0, 0, 5); // pommel
-    p(3, 10, 2, steel, 0, .5, -5); // crossguard, sticking out above and below like the blade's edges
-    p(1, 4, 14, blade, 0, 1, -13); p(1, 1, 13, edge, 0, -1.5, -12.5); // blade, sharp edge along the bottom
-    p(1.4, 1, 10, mat(0x9aa3ad), 0, 1.5, -12); // fuller groove
-    p(1, 3, 2, blade, 0, 1.5, -21); p(1, 1, 2, blade, 0, 2.5, -23); // tip
-    return { muzzle: [0, -24], grip: [0, 0], fore: null, bands: [-2.5, 2.5], band: [4, 6, 0] };
+    const brown = mat(0x5a3a1a), dbrown = mat(0x3a2412), steel = mat(0x8a8f96), blade = mat(0xc4cad2);
+    p(6, 8, 12, brown, 0, 0, 0); for (const z of [-3, 3]) p(8, 10, 2, dbrown, 0, 0, z); p(8, 10, 4, steel, 0, 0, 8); // handle, wraps, pommel
+    p(6, 16, 4, steel, 0, 1, -8); // crossguard, running up and down like the blade
+    p(4, 10, 18, blade, 0, 3, -19); p(4, 8, 4, blade, 0, 2, -30); p(4, 5, 4, blade, 0, .5, -34); // blade, stepping down to the tip
+    p(4, 2, 26, mat(0xf2f5f8), 0, -1, -23); // bright sharp edge along the bottom
+    p(4, 1, 12, mat(0x8a929c), 0, 4.5, -19); // fuller groove
+    return { muzzle: [0, -36], grip: [0, 0], fore: null, bands: [0, 0], band: [10, 12, 0] };
   },
   flame({ p, mat, dark, glow }) {
     const grey = mat(0x5a5a5a), dk = mat(0x333333), red = mat(0xc43030);
-    p(5, 5, 14, grey, 0, 0, -6); p(4, 4, 2, dk, 0, 0, 2); // body, rear cap
-    p(6, 6, 7, dk, 0, .5, -16.5); for (const z of [-15, -17, -19]) p(7, 1, 1, mat(0x111111), 0, .5, z); // heat shroud and its ribs
-    p(3, 3, 5, dark, 0, .5, -22.5); p(4, 4, 1, dark, 0, .5, -25.5); // nozzle
-    p(1, 1, 1, glow(0xffaa33), 0, -2, -25.5); // pilot flame
-    p(6, 6, 9, red, 0, -5.5, -7.5); for (const z of [-5, -10]) p(7, 7, 1, dk, 0, -5.5, z); // fuel tank and straps
-    p(2, 2, 1, mat(0xc9a43a), 0, -5.5, -12.5); // tank cap
-    p(4, 4, 3, dk, 0, -4.5, .5); p(4, 3, 3, dk, 0, -8, 1.5); // rear grip
-    p(1, 1, 2, dark, 0, -7, -2); p(1, 2, 1, mat(0x999999), 0, -3.5, -2); // guard and trigger
-    p(3, 6, 3, dk, 0, -5.5, -16.5); // front handle
-    return { muzzle: [.5, -26], grip: [-6, 1], fore: [-6, -16.5], bands: [-4, -9], band: [6, 6, .5] };
+    p(10, 10, 28, grey, 0, 0, -12); p(8, 8, 4, dk, 0, 0, 4); // body, rear cap
+    p(12, 12, 14, dk, 0, 1, -33); for (const z of [-29, -33, -37]) p(14, 14, 2, mat(0x161616), 0, 1, z); // heat shroud and its ribs
+    p(6, 6, 10, dark, 0, 1, -45); p(8, 8, 2, dark, 0, 1, -51); // nozzle
+    p(2, 2, 10, dark, 0, -4, -45); p(4, 4, 2, glow(0xffaa33), 0, -5, -51); // pilot pipe and its flame
+    p(12, 12, 18, red, 0, -11, -15); for (const z of [-9, -21]) p(14, 14, 2, dk, 0, -11, z); // fuel tank and straps
+    p(4, 4, 2, mat(0xc9a43a), 0, -11, -25); // tank cap
+    p(8, 8, 6, dk, 0, -9, 1); p(8, 6, 6, dk, 0, -16, 3); // rear grip
+    p(2, 2, 4, dark, 0, -14, -4); p(2, 4, 2, mat(0x999999), 0, -7, -4); // guard and trigger
+    p(8, 12, 6, dk, 0, -11, -33); // front handle
+    return { muzzle: [1, -53], grip: [-12, 2], fore: [-12, -33], bands: [-3, -15], band: [12, 12, 1] };
   },
+  // held near the front, with the long back end going over your shoulder
   rocket({ p, mat, dark, glow, sub, at }) {
-    const olive = mat(0x66784c), dk = mat(0x3a4630);
-    p(8, 8, 40, olive, 0, 0, -18); // tube
-    p(10, 10, 3, dk, 0, 0, -38.5); p(10, 10, 3, dk, 0, 0, 2.5); // front and rear rings
-    p(6, 6, 1, mat(0x101010), 0, 0, -40.25); // dark tube mouth
-    p(1, 2, 26, mat(0xc9a43a), 4.5, 0, -18); // yellow warning stripe
-    p(3, 3, 6, dark, -3, 5.5, -14); p(2, 2, 1, glow(0xff5544), -3, 5.5, -17.5); // sight with a red lens
-    p(4, 4, 3, dark, 0, -6, -5); p(4, 3, 3, dark, 0, -9.5, -4); // rear grip
-    p(1, 1, 4, dark, 0, -7.5, -8.5); p(1, 3, 1, dark, 0, -5.5, -11); p(1, 2, 1, mat(0x888888), 0, -5, -7.5); // guard and trigger
-    p(3, 7, 3, dark, 0, -7.5, -24); // front grip
+    const olive = mat(0x66784c), dk = mat(0x3a4630), hole = mat(0x101010);
+    p(16, 16, 84, olive, 0, 0, 12); // tube
+    p(20, 20, 6, dk, 0, 0, -31); p(20, 20, 6, dk, 0, 0, 51); p(18, 18, 4, dark, 0, 0, 56); // front ring, rear ring, exhaust
+    p(12, 12, 2, hole, 0, 0, -33); p(12, 12, 2, hole, 0, 0, 57); // dark tube mouths
+    for (const x of [-9, 9]) p(2, 4, 56, mat(0xc9a43a), x, 0, 12); // yellow warning stripes
+    p(6, 6, 12, dark, -7, 11, -16); p(4, 4, 2, glow(0xff5544), -7, 11, -23); // sight with a red lens
+    p(12, 4, 16, mat(0x2a2a2a), 0, -10, 24); // shoulder pad under the back half
+    p(8, 8, 6, dk, 0, -12, 0); p(8, 6, 6, dk, 0, -19, 2); // trigger grip
+    p(2, 2, 8, dark, 0, -15, -7); p(2, 6, 2, dark, 0, -11, -11); p(2, 4, 2, mat(0x888888), 0, -10, -6); // guard and trigger
+    p(8, 14, 6, dk, 0, -15, -20); // front grip
     const round = sub(0, 0, 0), r = at(round); // the loaded rocket, poking well out of the front
-    r(4, 4, 7, mat(0xaa3333), 0, 0, -41.5); r(5, 5, 1, mat(0x2a2a2a), 0, 0, -42.5); r(2, 2, 3, mat(0xdd5544), 0, 0, -46.5);
-    return { muzzle: [0, -48], grip: [-8, -4], fore: [-9, -24], bands: [-9, -28], band: [9, 9, 0], round };
+    r(8, 8, 12, mat(0xaa3333), 0, 0, -39); r(10, 10, 2, mat(0x2a2a2a), 0, 0, -46); r(6, 6, 4, mat(0xcc4433), 0, 0, -49); r(4, 4, 4, mat(0xe86a50), 0, 0, -53);
+    return { muzzle: [0, -55], grip: [-14, 1], fore: [-15, -20], bands: [-10, -24], band: [20, 20, 0], round };
   },
   flare({ p, mat, dark, glow }) {
-    const red = mat(0xc8402a), grip = mat(0x2a2a2a);
-    p(6, 5, 14, red, 0, 1.5, -9); p(6, 1, 14, mat(0xe8684a), 0, 4.5, -9); // fat barrel and its lighter top
-    p(8, 8, 2, dark, 0, 2, -16.5); p(4, 4, 1, glow(0xffaa33), 0, 2, -17.75); // muzzle ring with the flare inside
-    p(5, 7, 4, mat(0x3a3a3a), 0, 1.5, 0); p(2, 3, 2, dark, 0, 6.5, 2); // breech and hammer
-    p(4, 4, 4, grip, 0, -4, .5); p(4, 3, 4, grip, 0, -7.5, 1.5); p(4, 2, 4, grip, 0, -10, 2.5); // grip, raked back in steps
-    p(1, 1, 5, dark, 0, -4.5, -4); p(1, 3, 1, dark, 0, -2.5, -7); p(1, 2, 1, mat(0x888888), 0, -2, -3.5); // guard and trigger
-    return { muzzle: [2, -18], grip: [-6, 1.5], fore: null, bands: [-6, -11], band: [7, 7, 1.5] };
+    const red = mat(0xc8402a), grip = mat(0x2e2e2e);
+    p(12, 10, 28, red, 0, 3, -18); p(12, 2, 28, mat(0xe8684a), 0, 9, -18); // fat barrel and its lighter top
+    p(16, 16, 4, dark, 0, 4, -33); p(8, 8, 2, glow(0xffaa33), 0, 4, -34); // muzzle ring with the flare inside
+    p(10, 14, 8, mat(0x3a3a3a), 0, 3, 0); p(4, 6, 4, dark, 0, 13, 3); // breech and hammer
+    p(8, 8, 8, grip, 0, -8, 1); p(8, 6, 8, grip, 0, -15, 3); p(8, 4, 8, grip, 0, -20, 5); // grip, raked back in steps
+    p(2, 2, 10, dark, 0, -9, -8); p(2, 6, 2, dark, 0, -5, -12); p(2, 4, 2, mat(0x888888), 0, -5, -6); // guard and trigger
+    return { muzzle: [4, -36], grip: [-12, 3], fore: null, bands: [-12, -22], band: [14, 16, 4] };
   },
 };
 // builds gun i's model into group g with `stars` gold upgrade bands: the same model in your hands, a bot's, and the armory.
+// The geometry is made once per gun and star count and shared (meshes are marked userData.shared, so never dispose them).
 // Returns muzzle, grip and fore in world units ([y, z]), plus spin (the eradicator's barrels) and round (the loaded rocket)
-const gunMats = {};
-const gunMat = col => gunMats[col] ??= edgeMat(lam({ color: col, map: shadeTex() }));
+const gunGeoCache = {};
+const gunLit = new THREE.MeshLambertMaterial({ vertexColors: true }), gunGlow = new THREE.MeshBasicMaterial({ vertexColors: true });
+function gunGeos(i, stars) {
+  const main = [], subs = [];
+  const c = { mat: col => palIdx(col), dark: palIdx(GUN_DARK), glow: col => palIdx(col, true) };
+  c.p = (...a) => main.push(a);
+  c.sub = (x, y, z) => { const s = { at: [x, y, z], list: [] }; subs.push(s); return s; };
+  c.at = s => (...a) => s.list.push(a);
+  const m = GUN_MODELS[BASE[i].id](c), [bw, bh, by] = m.band, gold = palIdx(0xffcc22);
+  for (let s = 0; s < stars; s++) c.p(bw, bh, 6, gold, 0, by, m.bands[s]); // one gold band per upgrade
+  const part = s => s && { at: s.at, geos: voxelGeos(s.list) };
+  return { m, main: voxelGeos(main), spin: part(m.spin), round: part(m.round) };
+}
 function makeGun(i, g, stars) {
-  gpx = GPX * (GUN_SCALE[BASE[i].id] || 1);
-  const c = { mat: gunMat, dark: gunMat(0x1e1e1e), glow: col => gunMats['g' + col] ??= new THREE.MeshBasicMaterial({ color: col }) };
-  c.p = (...a) => piece(g, ...a);
-  c.at = parent => (...a) => piece(parent, ...a);
-  c.sub = (x, y, z) => { const s = new THREE.Group(); s.position.set(x * gpx, y * gpx, z * gpx); g.add(s); return s; };
-  const m = GUN_MODELS[BASE[i].id](c);
-  const gold = gunMats.gold ??= edgeMat(lam({ color: 0xffcc22, emissive: 0x553300, map: shadeTex() })), [bw, bh, by] = m.band;
-  for (let s = 0; s < stars; s++) c.p(bw, bh, 2, gold, 0, by, m.bands[s]); // one gold band per upgrade
-  for (const s of [g, m.spin, m.round]) if (s) bake(s);
-  const w = v => v && v.map(n => n * gpx);
-  return { muzzle: w(m.muzzle), grip: w(m.grip), fore: w(m.fore), spin: m.spin ?? null, round: m.round ?? null };
+  const b = gunGeoCache[BASE[i].id + ':' + stars] ??= gunGeos(i, stars);
+  const add = (parent, geos) => {
+    for (const [geo, mat] of [[geos.lit, gunLit], [geos.glow, gunGlow]]) if (geo) { const m = new THREE.Mesh(geo, mat); m.userData.shared = true; parent.add(m); }
+  };
+  add(g, b.main);
+  const sub = s => { if (!s) return null; const grp = new THREE.Group(); grp.position.set(...s.at.map(n => n * GPX)); add(grp, s.geos); g.add(grp); return grp; };
+  const w = v => v && v.map(n => n * GPX);
+  return { muzzle: w(b.m.muzzle), grip: w(b.m.grip), fore: w(b.m.fore), spin: sub(b.spin), round: sub(b.round) };
 }
 
 // your first-person arms: the arm from your own skin, fist on the grip, running back off the bottom of the screen.
@@ -338,6 +346,13 @@ function reload() {
 }
 function cancelReload() { reloading = 0; stopSfx(reloadSnd); reloadSnd = null; }
 buildGun();
+// build every gun's plain model ahead of time, one per idle moment, so the first bot to pull one out doesn't stall a frame
+{
+  const later = window.requestIdleCallback || (f => setTimeout(f, 50));
+  let k = 0;
+  const next = () => { if (k >= BASE.length) return; gunGeoCache[BASE[k].id + ':0'] ??= gunGeos(k, 0); k++; later(next); };
+  later(next);
+}
 
 const parts = [], pGeo = new THREE.BoxGeometry(.08, .08, .08), pMats = {};
 function burst(p, color, n) {
