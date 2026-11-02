@@ -71,9 +71,12 @@ const grassMat = seeThru(tex(g => {
 }));
 grassMat.alphaTest = .5;
 const grassGeo = new THREE.PlaneGeometry(1, 1).translate(0, .5, 0);
+// things that are only there for looks and get hidden on low graphics (grass, fireflies, light shafts)
+const detailObjs = [];
+const detail = o => { detailObjs.push(o); o.visible = gfxQ().detail; return o; };
 function grassTufts(tufts) {
-  instanced(grassGeo, grassMat, tufts);
-  instanced(grassGeo, grassMat, tufts.map(t => { const u = [...t]; u[6] += Math.PI / 2; return u; }));
+  detail(instanced(grassGeo, grassMat, tufts));
+  detail(instanced(grassGeo, grassMat, tufts.map(t => { const u = [...t]; u[6] += Math.PI / 2; return u; })));
 }
 const crate1 = surf(crateMat(1), 'wood'), crate2 = surf(crateMat(2), 'wood');
 const addCrates = list => { for (const [x, z, tall] of list) addBlock(x, z, 1.2, 1.2, tall ? 2.4 : 1.2, tall ? crate2 : crate1); };
@@ -89,14 +92,84 @@ function surfaceAt(x, z, r, feet) {
   return MAP.surfAt ? MAP.surfAt(x, z, feet, base, s) : base;
 }
 
+// Every separate mesh costs a draw call each frame, and a map is made of hundreds of small boxes. So the first time a map
+// is loaded, its meshes that never move are merged: one mesh per look (material) per 20x20 area, so the parts out of view
+// still get skipped. The originals are taken out of the scene but kept, with their positions, for bullets and line of sight
+function bakeMap(m) {
+  m.root.updateMatrixWorld(true);
+  const C = 20, groups = new Map(), sig = new Map(), bb = new THREE.Box3(), c = new THREE.Vector3();
+  const shown = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  const look = mt => { // materials made separately but looking the same can share a mesh
+    const k = [mt.type, mt.color?.getHex(), mt.emissive?.getHex(), mt.emissiveIntensity, mt.map?.uuid, mt.side, mt.alphaTest, mt.fog].join();
+    return sig.get(k) || sig.set(k, mt).get(k);
+  };
+  m.root.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || !shown(o)) return;
+    const mt = o.material, g = o.geometry;
+    if (mt.transparent || mt.vertexColors || mt.blending !== THREE.NormalBlending || !g.attributes.normal || g.morphAttributes.position) return;
+    if (!g.boundingBox) g.computeBoundingBox();
+    bb.copy(g.boundingBox).applyMatrix4(o.matrixWorld).getCenter(c);
+    const lm = look(mt), key = lm.uuid + ':' + Math.floor(c.x / C) + ':' + Math.floor(c.z / C);
+    if (!groups.has(key)) groups.set(key, { mt: lm, list: [] });
+    groups.get(key).list.push(o);
+  });
+  const p = new THREE.Vector3(), nm = new THREE.Matrix3();
+  for (const { mt, list } of groups.values()) {
+    if (list.length < 2) continue;
+    let nv = 0, ni = 0;
+    for (const o of list) { const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new Uint32Array(ni);
+    let v = 0, i = 0;
+    for (const o of list) {
+      const g = o.geometry, P = g.attributes.position, Nr = g.attributes.normal, U = g.attributes.uv, n = P.count, w = o.matrixWorld;
+      const flip = w.determinant() < 0; // a mirrored mesh: turn its triangles round so they still face out
+      nm.getNormalMatrix(w);
+      for (let k = 0; k < n; k++) {
+        p.fromBufferAttribute(P, k).applyMatrix4(w); pos[(v + k) * 3] = p.x; pos[(v + k) * 3 + 1] = p.y; pos[(v + k) * 3 + 2] = p.z;
+        p.fromBufferAttribute(Nr, k).applyMatrix3(nm).normalize(); nor[(v + k) * 3] = p.x; nor[(v + k) * 3 + 1] = p.y; nor[(v + k) * 3 + 2] = p.z;
+        if (U) { uv[(v + k) * 2] = U.getX(k); uv[(v + k) * 2 + 1] = U.getY(k); }
+      }
+      const src = g.index?.array, cnt = src ? src.length : n;
+      for (let k = 0; k < cnt; k += 3) {
+        const a = src ? src[k] : k, b = src ? src[k + 1] : k + 1, d = src ? src[k + 2] : k + 2;
+        idx[i++] = v + a; idx[i++] = v + (flip ? d : b); idx[i++] = v + (flip ? b : d);
+      }
+      v += n;
+      o.removeFromParent();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeBoundingSphere(); geo.computeBoundingBox();
+    const merged = new THREE.Mesh(geo, mt); merged.matrixAutoUpdate = false; m.root.add(merged);
+  }
+  m.baked = true;
+}
+
+// how far you can see (fog) on the loaded map; low graphics pulls it in so less gets drawn
+function applyView() {
+  if (!MAP) return;
+  const e = MAP.env, k = gfxQ().view;
+  scene.fog.near = e.fogNear * k; scene.fog.far = e.fogFar * k;
+  camera.far = Math.max(60, 200 * k); camera.updateProjectionMatrix();
+}
+// apply the graphics settings to everything that can change without a reload
+function applyGfx() {
+  renderer.setPixelRatio(pixelRatio()); renderer.setSize(innerWidth, innerHeight);
+  const an = Math.min(gfxQ().aniso, renderer.capabilities.getMaxAnisotropy());
+  for (const t of allTex) if (t.anisotropy !== an) { t.anisotropy = an; t.needsUpdate = true; }
+  for (const o of detailObjs) o.visible = gfxQ().detail;
+  applyView();
+}
+
 function useMap(id) {
   const m = MAPS[id];
   if (MAP === m) return;
+  if (!m.baked) bakeMap(m);
   if (MAP) scene.remove(MAP.root);
   MAP = m; scene.add(m.root);
   A = m.half; solids = m.solids; ground = m.ground; crateMeshes = m.cover;
   const e = m.env;
-  scene.background.setHex(e.sky); scene.fog.color.setHex(e.fog); scene.fog.near = e.fogNear; scene.fog.far = e.fogFar;
+  scene.background.setHex(e.sky); scene.fog.color.setHex(e.fog); applyView();
   hemi.color.setHex(e.hemiSky); hemi.groundColor.setHex(e.hemiGround); hemi.intensity = e.hemi;
   sun.color.setHex(e.sunColor); sun.intensity = e.sun; sun.position.set(...(e.sunDir || [10, 20, 5]));
   if (m.pads.length !== PAD_COUNT[m.size]) console.warn(`${id} has ${m.pads.length} pads, ${m.size} maps should have ${PAD_COUNT[m.size]}`);

@@ -1,7 +1,19 @@
 const $ = id => document.getElementById(id);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); // full-res render; only textures stay pixelated
+// graphics settings, kept per device. q = 'high', 'medium' or 'low'; res = render resolution (.5 to 1); fps = show the counter.
+// Chromebooks start on medium. Edge smoothing (antialias) can only be set when the renderer is made, so it changes on reload
+const GFX_Q = {
+  high:   { aa: true,  maxRatio: 2, aniso: 16, detail: true,  view: 1 },
+  medium: { aa: false, maxRatio: 1, aniso: 4,  detail: true,  view: 1 },
+  low:    { aa: false, maxRatio: 1, aniso: 1,  detail: false, view: .7 },
+};
+const gfx = { q: /CrOS/.test(navigator.userAgent) ? 'medium' : 'high', res: 1, fps: false };
+try { const s = JSON.parse(localStorage.getItem('voxelstrike-gfx')); if (s) { if (GFX_Q[s.q]) gfx.q = s.q; if (s.res >= .5 && s.res <= 1) gfx.res = s.res; gfx.fps = !!s.fps; } } catch {}
+const gfxQ = () => GFX_Q[gfx.q];
+const renderer = new THREE.WebGLRenderer({ antialias: gfxQ().aa, powerPreference: 'high-performance' });
+const gfxAA = gfxQ().aa; // what this page was actually made with
+const pixelRatio = () => Math.min(devicePixelRatio, gfxQ().maxRatio) * gfx.res; // full-res render on high; only textures stay pixelated
+renderer.setPixelRatio(pixelRatio());
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
@@ -14,13 +26,15 @@ const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 1.1); scene.add(hemi)
 const sun = new THREE.DirectionalLight(0xffffff, 1.3); sun.position.set(10, 20, 5); scene.add(sun);
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
+const allTex = []; // every pixel texture, so a quality change can update how sharp they are
 function tex(draw, rx = 1, ry = 1) {
   const c = document.createElement('canvas'); c.width = c.height = 16;
   draw(c.getContext('2d'));
   const t = new THREE.CanvasTexture(c);
   t.magFilter = THREE.NearestFilter;               // crisp pixel-art up close
   t.minFilter = THREE.NearestMipmapLinearFilter;   // no shimmering far away
-  t.anisotropy = renderer.capabilities.getMaxAnisotropy(); // sharp at steep angles (floor)
+  t.anisotropy = Math.min(gfxQ().aniso, renderer.capabilities.getMaxAnisotropy()); // sharp at steep angles (floor)
+  allTex.push(t);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry);
   return t;

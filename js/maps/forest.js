@@ -219,7 +219,7 @@ for (const [x, z] of gaps) {
   if ([[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]].some(([ox, oz]) => blocked(x + ox, z + oz))) continue; // the gap has to be wide enough
   const m = new THREE.Mesh(shaftGeo, shaftMat.clone());
   m.quaternion.setFromUnitVectors(up, MOON);
-  m.position.set(x + MOON.x * shaftLen / 2, MOON.y * shaftLen / 2, z + MOON.z * shaftLen / 2); add(m);
+  m.position.set(x + MOON.x * shaftLen / 2, MOON.y * shaftLen / 2, z + MOON.z * shaftLen / 2); add(detail(m));
   const pool = new THREE.Mesh(poolGeo, moonPoolMat); pool.rotation.x = -Math.PI / 2; pool.scale.set(.55, .55, 1); pool.position.set(x, .05, z); add(pool);
   shafts.push({ m, x, z });
 }
@@ -229,7 +229,7 @@ for (let i = 0; i < 70; i++) {
   const s = .06 + rnd() * .06;
   const m = box(s, s, s, new THREE.MeshBasicMaterial({ color: i % 4 ? 0xd8ff6a : 0xffe27a, transparent: true }));
   const x = (rnd() * 2 - 1) * FA, y = .4 + rnd() * 3.2, z = (rnd() * 2 - 1) * FA;
-  m.position.set(x, y, z); add(m); flies.push({ m, x, y, z, p: rnd() * 6.3, s: .4 + rnd() * .8 });
+  m.position.set(x, y, z); add(detail(m)); flies.push({ m, x, y, z, p: rnd() * 6.3, s: .4 + rnd() * .8 });
 }
 M.tick = () => { // runs every frame while this map is loaded
   const t = performance.now() / 1000;

@@ -248,9 +248,17 @@ function bootDone() {
   document.body.classList.replace('boot', 'booting');
   setTimeout(() => document.body.classList.remove('booting'), 600);
 }
+// the FPS counter (Settings > Graphics), updated twice a second
+let fpsN = 0, fpsT = 0;
+function fpsTick(raw) {
+  if (!gfx.fps) return;
+  fpsN++; fpsT += raw;
+  if (fpsT >= .5) { $('fps').textContent = Math.round(fpsN / fpsT) + ' FPS'; fpsN = fpsT = 0; }
+}
 (function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), .05);
+  const raw = clock.getDelta(), dt = Math.min(raw, .05);
+  fpsTick(raw);
   drownTick(dt); musicTick();
   if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=64">
+<link id="css" rel="stylesheet" href="css/style.css?v=65">
 </head>
 <body class="boot">
 <div id="hud">
@@ -11,6 +11,7 @@
   <div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="80" autocomplete="off" spellcheck="false"></div>
   <div id="toast"></div><div id="arm"></div><div id="hp"></div><div id="ammo"></div><div id="hotbar"></div>
 </div>
+<div id="fps"></div>
 <div id="lobby">
   <div id="custPanel">
     <div id="custRows"></div>
@@ -52,6 +53,7 @@
       <div id="setTabs">
         <button data-t="controls">CONTROLS</button>
         <button data-t="sound">SOUND</button>
+        <button data-t="graphics">GRAPHICS</button>
         <button data-t="account">ACCOUNT</button>
       </div>
       <div id="setBody">
@@ -72,6 +74,19 @@
             <span>Sound effects</span><input id="vol" type="range" min="0" max="1" step="0.05"><b id="volV"></b>
             <span>Music</span><input id="mvol" type="range" min="0" max="1" step="0.05"><b id="mvolV"></b>
           </div>
+        </section>
+        <section data-t="graphics">
+          <h2>QUALITY</h2>
+          <div id="gfxQ"><button data-q="high">HIGH</button><button data-q="medium">MEDIUM</button><button data-q="low">LOW</button></div>
+          <small id="gfxDesc"></small>
+          <h2>RESOLUTION</h2>
+          <div class="sliders">
+            <span>Render resolution</span><input id="gfxRes" type="range" min="0.5" max="1" step="0.05"><b id="gfxResV"></b>
+          </div>
+          <small>Lower draws fewer pixels, so it runs faster but looks softer.</small>
+          <h2>DISPLAY</h2>
+          <label class="tick"><input id="gfxFps" type="checkbox"> Show FPS</label>
+          <small id="gfxNote"></small>
         </section>
         <section data-t="account">
           <h2>CLOUD SAVE</h2>
@@ -109,7 +124,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 64;
+const V = 65;
 const FILES = ['js/core.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js'];
 for (const src of FILES) {

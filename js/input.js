@@ -33,6 +33,27 @@ $('vol').addEventListener('input', e => { setVolume(+e.target.value); renderSens
 $('mvol').addEventListener('input', e => { setMusicVolume(+e.target.value); renderSens(); });
 $('vol').addEventListener('change', () => sfx('ui'));
 renderSens();
+// graphics (per device, see core.js)
+const GFX_DESC = {
+  high: 'Full resolution with smooth edges. Best for a gaming PC.',
+  medium: 'No edge smoothing, and high-resolution screens draw at standard resolution. A good fit for Chromebooks and laptops.',
+  low: 'Like medium, plus no grass, fireflies or light shafts, blurrier textures far away and a shorter view distance.',
+};
+const saveGfx = () => { try { localStorage.setItem('voxelstrike-gfx', JSON.stringify(gfx)); } catch {} };
+function renderGfx() {
+  document.querySelectorAll('#gfxQ button').forEach(b => b.classList.toggle('sel', b.dataset.q === gfx.q));
+  $('gfxDesc').textContent = GFX_DESC[gfx.q];
+  $('gfxRes').value = gfx.res; $('gfxResV').textContent = Math.round(gfx.res * 100) + '%';
+  $('gfxFps').checked = gfx.fps; $('fps').style.display = gfx.fps ? '' : 'none';
+  $('gfxNote').textContent = gfxQ().aa !== gfxAA ? 'Edge smoothing turns ' + (gfxQ().aa ? 'on' : 'off') + ' the next time you reload the page.' : '';
+}
+$('gfxQ').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.dataset.q === gfx.q) return;
+  gfx.q = b.dataset.q; saveGfx(); applyGfx(); renderGfx(); sfx('ui');
+});
+$('gfxRes').addEventListener('input', e => { gfx.res = +e.target.value; saveGfx(); applyGfx(); renderGfx(); });
+$('gfxFps').addEventListener('change', e => { gfx.fps = e.target.checked; saveGfx(); renderGfx(); });
+renderGfx();
 const held = a =>binds[a].some(c => c && keys[c]);
 const isBind = (a, code) => binds[a].includes(code);
 function nice(code) {
@@ -62,7 +83,7 @@ $('bindList').addEventListener('mousedown', e => {
   e.stopPropagation(); e.preventDefault();
   rebinding = { a: b.dataset.a, s: +b.dataset.s }; renderBinds();
 });
-// settings page: CONTROLS / SOUND / ACCOUNT tabs. It opens on whichever tab you used last
+// settings page: CONTROLS / SOUND / GRAPHICS / ACCOUNT tabs. It opens on whichever tab you used last
 let setTab = 'controls';
 function showSetTab(t) {
   setTab = t; rebinding = null; renderBinds();

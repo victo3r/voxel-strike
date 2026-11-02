@@ -11,7 +11,7 @@ const LX = 29, LZ = -31; // the lighthouse
 const HUTS = [[-34, 27, [1, 0]], [-34, -27, [1, 0]], [6, 36, [0, -1]]];
 // the sea gets deeper in steps away from the shore, down to SEA_D out by the edge of the map, and drowns you.
 // The pool is safe: you can go in, and get back out up the steps at its west end
-const SEA_D = 3, POOL = [-24, -12, -5, 5], POOL_Y = .7, POOL_F = -1.5; // the pool's water level and floor
+const SEA_D = 3, POOL = [-21, -9, -5, 5], POOL_Y = .7, POOL_F = -1.5; // the pool's water level and floor
 const inPool = (x, z, r = 0) => x + r > POOL[0] && x - r < POOL[1] && z + r > POOL[2] && z - r < POOL[3];
 const drawSeabed = g => {
   noise(g, [200, 182, 136], 16);
@@ -88,7 +88,7 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 }
 // hills: [x, z, radius, height]. Kept off everything built on the ground, the pads and the crates
 const HILLS = [[-28, -22, 10, 5], [-24, 25, 10, 5.5], [12, -26, 8, 4], [0, -6, 5.5, 2.5]];
-const KEEP_R = [[-28, -8, -9, 9, 2], [-38.5, -28.5, -7.5, 6.5, 1.5],[-4.5, 4.5, -21, -14.5, 2.5], [.5, 15.5, 16.5, 27.5, 2], ...HUTS.map(([x, z]) => [x - 1.6, x + 1.6, z - 1.6, z + 1.6, 2])];
+const KEEP_R = [[-25, -5, -9, 9, 2], [-38.5, -28.5, -7.5, 6.5, 1.5],[-4.5, 4.5, -21, -14.5, 2.5], [.5, 15.5, 16.5, 27.5, 2], ...HUTS.map(([x, z]) => [x - 1.6, x + 1.6, z - 1.6, z + 1.6, 2])];
 const KEEP_C = [...M.pads.map(([x, z]) => [x, z, 3]), ...M.crates.map(([x, z]) => [x, z, 2.2])];
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   const c = at(i, j), x0 = i - O, z0 = j - O, x = x0 + .5, z = z0 + .5;
@@ -115,6 +115,7 @@ M.land = (x, z) => kindAt(x, z) !== SEA;
 // Each route is smoothed into a curve, and every land cell close to it gets paving (up and over the hills too)
 const ROUTES = [
   [[19, 12], [13, 11], [6, 9.8], [-1, 10.6], [-7, 10.6], [-13, 11.4], [-21, 11.4], [-26.6, 10.6], [-29, 7.5], [-29, 0]], // pier, south of the pool, hotel door
+  [[-29, 0], [-25.4, 0]],                                                                                            // the door out to the pool deck
   [[-29, 0], [-29, -7.8], [-27, -10.6], [-21, -11.4], [-13, -11.4], [-6, -11.2], [-2, -13.8], [2, -14.2]],             // north of the pool to the tiki bar
   [[2, -14.2], [8, -13.4], [15, -15.2], [21, -19.6], [25.5, -24.4], [29, -27.4]],                                    // on to the lighthouse door
   [[6, 9.8], [7.2, 4], [6.4, -4], [4.4, -10], [2, -14.2]],                                                             // across the middle
@@ -421,7 +422,7 @@ M.nav = (p, t) => {
 const tile = surf(lam({ map: tex(g => { noise(g, [234, 226, 208], 9); g.fillStyle = '#c8bca6'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(8, 0, 1, 16); }) }), 'stone');
 const drawPoolTile = g => { noise(g, [72, 172, 214], 10); g.fillStyle = '#e4f4fb'; for (const i of [0, 4, 8, 12]) { g.fillRect(0, i, 16, 1); g.fillRect(i, 0, 1, 16); } };
 const poolTile = surf(lam({ map: tex(drawPoolTile) }), 'stone');
-const DECK = [-27, -9, -8, 8], DECK_STEP = [-28, -8, -9, 9], RIM = .25, POOL_O = [POOL[0] - RIM, POOL[1] + RIM, POOL[2] - RIM, POOL[3] + RIM];
+const DECK = [-24, -6, -8, 8], DECK_STEP = [-25, -5, -9, 9], RIM = .25, POOL_O = [POOL[0] - RIM, POOL[1] + RIM, POOL[2] - RIM, POOL[3] + RIM];
 const DECK_Y = 1, DECK_STEP_Y = .5;
 rectMinus(DECK, POOL_O).forEach(r => rectSlab(r, 0, DECK_Y, tile, true, 2));
 rectMinus(DECK_STEP, DECK).forEach(r => rectSlab(r, 0, DECK_STEP_Y, tile, true, 2));
@@ -507,8 +508,8 @@ function umbrella(x, z, y0, cols) {
 }
 let uc = 0;
 for (const z of [-6.5, 6.5]) {
-  for (const x of [-25.5, -22.5, -16.5, -13.5]) lounger(x, z, DECK_Y, 'z', z < 0 ? -1 : 1, towelCols[uc++ % towelCols.length]);
-  umbrella(-19.5, z, DECK_Y, umbCols[uc % umbCols.length]); uc++;
+  for (const x of [-22.5, -19.5, -13.5, -10.5]) lounger(x, z, DECK_Y, 'z', z < 0 ? -1 : 1, towelCols[uc++ % towelCols.length]);
+  umbrella(-16.5, z, DECK_Y, umbCols[uc % umbCols.length]); uc++;
 }
 for (const [x, z] of [[22, -7], [27, -7], [22, -1.5], [27, -1.5]]) {
   lounger(x, z - .95, 0, 'x', -1, towelCols[uc++ % towelCols.length]);
@@ -570,7 +571,7 @@ for (const s of [-1, 1]) { // teal trim round the outside of the walls, near the
   const bz = box(.04, .22, HZ1 - HZ0 + .06, teal); bz.position.set(s < 0 ? HX0 - .01 : HX1 + .01, RH - .3, (HZ0 + HZ1) / 2); add(bz);
 }
 flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(g, [226, 214, 190], 8); g.fillStyle = '#bfae8e'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, 4, 6) }), (HX0 + HX1) / 2, LAND_Y + .01, (HZ0 + HZ1) / 2);
-// a flat canopy over the door, out over the deck step, held up by a pillar at each outer corner. You can stand on it
+// a flat canopy over the door, held up by a pillar at each outer corner. You can stand on it
 {
   const X0 = HX1, X1 = -27.25, CZ = 2.6, BOT = 2.95, TOP = 3.2, cx = (X0 + X1) / 2, w = X1 - X0;
   addSlab(cx, 0, w, CZ * 2, BOT, TOP, stucco);
@@ -581,7 +582,7 @@ flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(
   for (const z of [-1.1, 1.1]) { // little lights in the underside
     const l = box(.32, .04, .32, new THREE.MeshLambertMaterial({ color: 0xfff4d0, emissive: 0xffe2a0, emissiveIntensity: .9 })); l.position.set(cx + .2, BOT - .02, z); add(l);
   }
-  const PY = DECK_STEP_Y; // the pillars stand on the deck step
+  const PY = 0;
   for (const s of [-1, 1]) {
     const px = X1 - .32, pz = s * (CZ - .32);
     addSlab(px, pz, .3, .3, PY, BOT, stucco);
@@ -856,13 +857,22 @@ function palm(x, z, inside, y0 = 0) { // y0 = the height of the ground it grows 
   palms.push([x, z]);
 }
 const padSpots = M.pads.map(([x, z]) => [x, z, 2.4]).concat(M.crates.map(([x, z]) => [x, z, 1.2]));
-const free = (x, z, r) => !inPool(x, z, r + .5) && !building.solids.some(s => x + r > s.minX && x - r < s.maxX && z + r > s.minZ && z - r < s.maxZ)
+// places on the ground that aren't solids but still shouldn't have trees or grass in them: [x0, x1, z0, z1]
+const NO_GROW = [[PIT[0] - 1, PIT[1] + 1, PIT[2] - 1, PIT[3] + 1]];
+const overlaps = (x, z, r, s) => x + r > s.minX && x - r < s.maxX && z + r > s.minZ && z - r < s.maxZ;
+const free = (x, z, r) => !inPool(x, z, r + .5) && !building.solids.some(s => overlaps(x, z, r, s))
+  && !NO_GROW.some(([a, b, c, d]) => overlaps(x, z, r, { minX: a, maxX: b, minZ: c, maxZ: d }))
   && padSpots.every(([px, pz, pr]) => Math.hypot(px - x, pz - z) > pr + r);
+// a palm's fronds spread about 3.5 out from the trunk, a couple of blocks up, so keep it away from anything tall
+// enough to poke through them (walls, roofs, umbrellas)
+// (taken before any palms go in, so their own crowns don't count)
+const tallThings = [...building.solids, ...later];
+const roomAbove = (x, z, y0) => !tallThings.some(s => (s.top ?? 99) > y0 + 2.5 && overlaps(x, z, 3.5, s));
 // a palm needs dry land with the same height all round it, so the trunk doesn't stand on the edge of a step
 const flatDry = (x, z) => { const h = hAt(x, z); for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) { const k = kindAt(x + a, z + b); if (k < SAND || hAt(x + a, z + b) !== h) return false; } return true; };
 for (let tries = 0, k = 0; k < 30 && tries < 4000; tries++) {
   const x = (rnd() * 2 - 1) * (RA - 2), z = (rnd() * 2 - 1) * (RA - 2);
-  if (!flatDry(x, z) || Math.hypot(x, z) < 5 || !free(x, z, 1.4) || onPath(x, z, 1.2) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 5.5)) continue;
+  if (!flatDry(x, z) || Math.hypot(x, z) < 5 || !free(x, z, 1.4) || !roomAbove(x, z, hAt(x, z)) || onPath(x, z, 1.2) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 5.5)) continue;
   if (Math.abs(x - LX) < 6.5 && Math.abs(z - LZ) < 6.5) continue; // not under the gallery
   palm(x, z, true, hAt(x, z)); k++;
 }
@@ -871,7 +881,7 @@ const GROVES = [[-16, -31, 7], [14, -34, 6], [-20, 30, 7.5], [-11, 22, 4.5], [26
 for (const [gx, gz, gr] of GROVES) {
   for (let tries = 0, k = 0; k < Math.round(gr * 1.4) && tries < 900; tries++) {
     const a = rnd() * 6.28, d = Math.sqrt(rnd()) * gr, x = gx + Math.cos(a) * d, z = gz + Math.sin(a) * d;
-    if (!flatDry(x, z) || !free(x, z, 1.4) || onPath(x, z, 1.2) || palms.some(([p, q]) => Math.hypot(p - x, q - z) < 3.6)) continue;
+    if (!flatDry(x, z) || !free(x, z, 1.4) || !roomAbove(x, z, hAt(x, z)) || onPath(x, z, 1.2) || palms.some(([p, q]) => Math.hypot(p - x, q - z) < 3.6)) continue;
     palm(x, z, true, hAt(x, z)); k++;
   }
 }
@@ -882,6 +892,7 @@ for (const [x, z, r] of [[92, -48, 7], [-78, 74, 6], [-96, -36, 8], [34, 104, 5]
   const n = 2 + (r > 6 ? 2 : 1);
   for (let i = 0; i < n; i++) { const a = rnd() * 6.28, d = rnd() * (r - 2); palm(x + Math.cos(a) * d, z + Math.sin(a) * d, false, .4); }
 }
+M.palms = palms;
 building.cover.push(inst(unit, trunkMat, trunksIn)); // bullets stop on the trunks inside the map, not on the leaves
 inst(unit, trunkMat, trunksOut); inst(frondGeo, frondMat, fronds); inst(unit, plain(0xffffff), nuts);
 
