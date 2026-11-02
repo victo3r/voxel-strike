@@ -63,10 +63,10 @@ function update(dt) {
     vm.rotation.set(.22 - kick * .9, kick * .5, 0);
   } else if (hold === 'heavy') { // low at your hip
     vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob - (reloading > 0 ? .12 : 0), -.6 + kick * .06);
-    vm.rotation.set(.04 + kick * .1 + (reloading > 0 ? -.4 : 0), .06 * (1 - adsT), 0);
-  } else if (hold === 'shoulder') { // on your shoulder: further out to the right and angled so its back end leaves the screen at the side
-    vm.position.set(.4 - adsT * .2, -.22 + adsT * .04 + bob - (reloading > 0 ? .12 : 0), -.72 + kick * .1);
-    vm.rotation.set(kick * .2 + (reloading > 0 ? -.35 : 0), .34 * (1 - adsT * .4), 0);
+    vm.rotation.set(.04 + kick * .1 + (reloading > 0 ? -.4 : 0), 0, 0);
+  } else if (hold === 'shoulder') { // on your shoulder, pulled in close and pointing straight ahead; its back end runs past your head
+    vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob - (reloading > 0 ? .12 : 0), -.62 + kick * .1);
+    vm.rotation.set(kick * .2 + (reloading > 0 ? -.35 : 0), 0, 0);
   } else {
     vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob - (reloading > 0 ? .15 : 0), -.55 + kick * .08);
     vm.rotation.set(kick * .25 * (1 - adsT * .85) + (reloading > 0 ? -.6 : 0), 0, 0); // much less muzzle climb while aiming so the gun doesn't cover the crosshair

@@ -194,7 +194,7 @@ const GUN_MODELS = {
     p(6, 5, 11, steel, 0, .5, -5.5); // receiver
     p(4, 4, 26, mat(GUN_STEEL), 0, 2, -24); p(4, 3, 18, steel, 0, -1.5, -20); // barrel, mag tube under it
     p(6, 4, 10, wood, 0, -1, -21); for (const z of [-17.5, -20.5, -23.5]) p(6, 4, 1, dwood, 0, -1, z); // pump and its grooves
-    p(1, 1, 1, mat(0xdddddd), 0, 4.5, -36.5); p(6, 6, 1, dark, 0, 2, -37.5); // bead sight, muzzle ring
+    p(1, 1, 1, mat(0xdddddd), 0, 4.5, -36.5); p(4, 4, 1, dark, 0, 2, -37.5); // bead sight, dark muzzle end
     p(4, 3, 3, wood, 0, -3.5, -1.5); p(4, 3, 3, wood, 0, -6.5, -.5); // pistol grip
     p(1, 1, 4, dark, 0, -4.5, -5); p(1, 2, 1, dark, 0, -3, -7.5); p(1, 2, 1, mat(0x777777), 0, -3, -4.5); // guard and trigger
     return { muzzle: [2, -38], grip: [4, 6, 4, 0, -5, -1], fore: [6, 4, 10, 0, -1, -21], bands: [-3, -8], band: [8, 8, .5] };
@@ -205,7 +205,7 @@ const GUN_MODELS = {
     p(6, 6, 15, body, 0, 0, -7.5); // receiver
     p(4, 1, 13, dark, 0, 3.5, -7.5); p(2, 2, 2, dark, 0, 5, -2); // top rail, rear sight
     p(6, 6, 11, dk, 0, 0, -20.5); for (const z of [-18, -21, -24]) p(6, 2, 2, mat(0x2a2a2e), 0, 0, z); // handguard and its vents
-    p(4, 4, 8, mat(GUN_STEEL), 0, 1, -30); p(6, 6, 3, dark, 0, 1, -35.5); p(2, 3, 1, dark, 0, 4.5, -25.5); // barrel, muzzle brake, front sight
+    p(4, 4, 8, mat(GUN_STEEL), 0, 1, -30); p(4, 4, 3, dark, 0, 1, -35.5); p(2, 3, 1, dark, 0, 4.5, -25.5); // barrel, muzzle brake, front sight
     p(4, 4, 4, dark, 0, -5, -10); p(4, 3, 4, dark, 0, -8.5, -11); // mag, curving forward
     p(4, 4, 4, dk, 0, -5, -2); p(4, 3, 4, dk, 0, -8.5, -1); // pistol grip
     p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
@@ -215,7 +215,7 @@ const GUN_MODELS = {
     const wood = mat(0x5a3d26), act = mat(0x44444c), silver = mat(0x9a9a9a);
     p(4, 6, 10, wood, 0, -1, 5); p(4, 8, 1, mat(0x2e1f14), 0, -1, 10.5); p(4, 2, 6, wood, 0, 3, 4); // stock, butt, cheek rest
     p(4, 4, 18, act, 0, 0, -9); p(4, 3, 10, wood, 0, -3.5, -16); // action, forend
-    p(3, 3, 28, mat(GUN_STEEL), 0, .5, -32); p(5, 5, 6, dark, 0, .5, -49); // barrel, suppressor
+    p(4, 4, 28, mat(GUN_STEEL), 0, .5, -32); p(4, 4, 6, dark, 0, .5, -49); // barrel, suppressor
     p(4, 4, 16, mat(0x2a2a2e), 0, 6, -10); p(6, 6, 2, dark, 0, 6, -1); p(6, 6, 2, dark, 0, 6, -19); // scope tube and bells
     p(4, 4, 1, glow(0x66ccff), 0, 6, -19.5); // lens
     p(2, 2, 2, dark, 0, 3, -5); p(2, 2, 2, dark, 0, 3, -15); // scope mounts
@@ -252,7 +252,7 @@ const GUN_MODELS = {
     const grey = mat(0x66666a), dk = mat(0x404044), red = mat(0xc43030);
     p(6, 6, 14, grey, 0, 0, -6); p(4, 4, 2, dk, 0, 0, 2); // body, rear cap
     p(8, 8, 7, dk, 0, 0, -16.5); for (const z of [-14.5, -16.5, -18.5]) p(8, 8, 1, mat(0x161616), 0, 0, z); // heat shroud and its ribs
-    p(4, 4, 5, dark, 0, 0, -22.5); p(6, 6, 2, dark, 0, 0, -26); // nozzle
+    p(4, 4, 7, dark, 0, 0, -23.5); // nozzle
     p(2, 2, 6, dark, 0, -3, -23); p(2, 2, 2, glow(0xffaa33), 0, -3, -27); // pilot pipe and its flame
     p(6, 6, 10, red, 0, -6, -8); for (const z of [-4.5, -10.5]) p(8, 8, 1, dk, 0, -6, z); // fuel tank and straps
     p(4, 4, 1, mat(0xc9a43a), 0, -6, -13.5); // tank cap
@@ -265,7 +265,7 @@ const GUN_MODELS = {
   rocket({ p, mat, dark, glow, sub, at }) {
     const olive = mat(0x6f8253), dk = mat(0x45533a), hole = mat(0x101010);
     p(8, 8, 52, olive, 0, 0, 4); // tube
-    p(10, 10, 3, dk, 0, 0, -20.5); p(10, 10, 3, dk, 0, 0, 26.5); p(10, 10, 2, dark, 0, 0, 30); // front ring, rear ring, exhaust
+    p(8, 8, 3, dk, 0, 0, -20.5); p(10, 10, 3, dk, 0, 0, 26.5); p(10, 10, 2, dark, 0, 0, 30); // front ring, rear ring, exhaust
     p(6, 6, 1, hole, 0, 0, -21.5); p(6, 6, 1, hole, 0, 0, 30.5); // dark tube mouths
     for (const x of [-3.5, 3.5]) p(1, 4, 36, mat(0xc9a43a), x, 0, 4); // yellow warning stripes
     p(4, 4, 6, dark, -3, 6, -12); p(2, 2, 1, glow(0xff5544), -3, 6, -15.5); // sight with a red lens
@@ -280,7 +280,7 @@ const GUN_MODELS = {
   flare({ p, mat, dark, glow }) {
     const red = mat(0xc8402a), grip = mat(0x3a3a3e);
     p(6, 6, 14, red, 0, 2, -9); p(6, 1, 14, mat(0xe8684a), 0, 4.5, -9); // fat barrel and its lighter top
-    p(8, 8, 2, dark, 0, 2, -17); p(4, 4, 1, glow(0xffaa33), 0, 2, -17.5); // muzzle ring with the flare inside
+    p(6, 6, 2, dark, 0, 2, -17); p(4, 4, 1, glow(0xffaa33), 0, 2, -17.5); // dark muzzle with the flare inside
     p(6, 8, 4, mat(0x3a3a3a), 0, 2, 0); p(2, 3, 2, dark, 0, 7.5, 2); // breech and hammer
     p(4, 4, 4, grip, 0, -4, 0); p(4, 3, 4, grip, 0, -7.5, 1); p(4, 2, 4, grip, 0, -10, 2); // grip, raked back in steps
     p(1, 1, 5, dark, 0, -4.5, -3.5); p(1, 3, 1, dark, 0, -2.5, -6.5); p(1, 2, 1, mat(0x888888), 0, -2, -3.5); // guard and trigger
@@ -357,30 +357,32 @@ const holdOf = w => w.hold;
 const ARM_U = .0325, UP_V = new THREE.Vector3(0, 1, 0);
 let armGeos = null;
 const armMats = {};
-function vmArm(left, box, dir) {
+function vmArm(left, box, dir, low = 0) { // low: aim that far down the box (0 = its middle, 1 = its bottom)
   armGeos ??= [partBox(4, 12, 4, 40, 16, ARM_U), partBox(4, 12, 4, 32, 48, ARM_U)];
   const L = prof.look ?? PRESETS[0].look, k = JSON.stringify(L);
   const mat = armMats[k] ??= lam({ map: skinTexture(L) });
   dir.normalize();
-  const t = fistOut(gunCells(cur), box.c, dir, 2.2 * ARM_U, .006);
-  const piv = new THREE.Group(); piv.position.set(...box.c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir);
-  for (let s = 0; s < 2; s++) { // a second length behind the arm, so its end never shows on screen
+  const c = [box.c[0], box.c[1] - low * box.h[1], box.c[2]], t = fistOut(gunCells(cur), c, dir, 2.2 * ARM_U, .006);
+  const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir);
+  for (let s = 0; s < 3; s++) { // more lengths behind the arm, so its end never shows on screen
     const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; m.userData.shared = true; piv.add(m);
   }
   vm.add(piv);
 }
-// which way each first-person arm runs from its fist, per hold
+// which way each first-person arm runs from its fist, per hold: back toward you and down off the screen,
+// so the fist faces forward into the grip instead of pushing up under the gun
+// [x, y, z, low]: the direction, and how far down the grip the fist lands (low on the grip keeps the arm under a stock)
 const VM_ARMS = {
-  pistol: [[.3, -1, .55]], rifle: [[.35, -1, .55], [-.55, -1, .45]], heavy: [[.4, -1, .5], [-.6, -1, .4]],
-  shoulder: [[.35, -1, .5], [-.6, -1, .4]], melee: [[.3, -.9, .6]],
+  pistol: [[.15, -.2, 1, .3]], rifle: [[.2, -.25, 1, .5], [-.35, -.3, 1, .6]], heavy: [[.25, -.25, 1, .4], [-.4, -.3, 1, .3]],
+  shoulder: [[.2, -.25, 1, .5], [-.35, -.3, 1, .5]], melee: [[.15, -.15, 1, 0]],
 };
 function buildGun() {
   vm.traverse(o => { if (o.geometry && o !== flashMesh && !o.userData.shared) o.geometry.dispose(); });
   vm.clear(); flashMesh.visible = false;
   const { muzzle: [my, mz], grip, fore, spin, round } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
   gunSpin = spin; gunRound = round;
-  vmArm(false, grip, new THREE.Vector3(...arms[0]));
-  if (fore && arms[1]) vmArm(true, fore, new THREE.Vector3(...arms[1]));
+  vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
+  if (fore && arms[1]) vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]);
   if (WEAPONS[cur].melee) return;
   flashMesh.position.set(0, my, mz - .04); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight);
 }
