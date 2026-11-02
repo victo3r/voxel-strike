@@ -70,7 +70,7 @@ function update(dt) {
       shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
       // account rewards: 1 real coin every wave, 15 XP every 5th wave
       const xp = wave % 5 ? 0 : 15, r = grant(xp, 1);
-      waveReward = `Account: +1 ◆${xp ? ` +${xp} XP` : ''}` + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ◆` : '');
+      waveReward = `Account: +1 ${COIN}${xp ? ` +${xp} XP` : ''}` + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ${COIN}` : '');
       openShop(); return;
     }
     if ((waveWait -= dt) <= 0) {
@@ -238,7 +238,7 @@ function update(dt) {
   const spare = reserve[cur] === Infinity ? '∞' : reserve[cur];
   $('ammo').textContent = `${w.name} ${stars(cur)}\n${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : ammo[cur] + ' / ' + spare}`;
   $('ammo').style.whiteSpace = 'pre';
-  if (!pvp()) $('top').textContent = `WAVE ${wave}   ·   KILLS ${kills}   ·   ◆ ${coins}`; // deathmatch fills the top in updateDM
+  if (!pvp()) $('top').innerHTML = `WAVE ${wave}   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`; // deathmatch fills the top in updateDM
 }
 
 const clock = new THREE.Clock();

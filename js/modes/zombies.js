@@ -85,7 +85,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
     else {
       if (!by && zz.type === 'boss') sfx('killSpecial'); // regular zombies die too often for a kill sound; their death groan is enough
       if (zz.type === 'exploder') explode(zz); // shooting one still sets it off, so keep your distance
-      else if (zz.type === 'boss') { sfx('bossRoar', { at: zz.g.position, far: 80, rate: .75 }); banner(`BOSS DOWN!\n+${zz.coins} ◆`); }
+      else if (zz.type === 'boss') { sfx('bossRoar', { at: zz.g.position, far: 80, rate: .75 }); banner(`BOSS DOWN!\n+${zz.coins} ${COIN}`, true); }
       else sfx('zDie', { at: zz.g.position, far: 35, rate: big ? .7 : 1 });
     }
   }
@@ -186,17 +186,17 @@ const isUpg = it => it.gun !== undefined && owned[it.gun];
 const maxed = it => (isUpg(it) && lvl[it.gun] >= 2) || (it.armor && P.maxArmor >= ARMOR_CAP);
 const priceOf = it => it.armor ? it.price + armorBought * 25 : isUpg(it) ? Math.round(it.price * (lvl[it.gun] ? 1.25 : .75)) : it.price;
 function renderShop() {
-  $('shopInfo').textContent = `Wave ${wave} cleared! +${bonus} bonus   ·   ◆ ${coins}   ·   ♥ ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ⛨ ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
+  $('shopInfo').innerHTML = `Wave ${wave} cleared! +${bonus} bonus   ·   <span class="pc">${COIN}${coins}</span>   ·   ♥ ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ⛨ ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
   $('items').innerHTML = SHOP.map((it, i) => {
     const upg = isUpg(it), done = maxed(it);
     const off = done || (it.heal && P.hp >= P.max) || (it.refill && ammoFull()) || coins < priceOf(it);
-    let label = it.name, desc = it.desc, cost = '◆ ' + priceOf(it);
+    let label = it.name, desc = it.desc, cost = COIN + priceOf(it);
     if (it.gun !== undefined) label = `<small class="cat">${CATS[slotOf(it.gun)][1]}</small><br>${label}`;
     if (upg) {
       const g = it.gun, b = BASE[g], L = lvl[g] + 1;
       label = `<small class="cat">${CATS[slotOf(g)][1]}</small><br>${it.name} <span class="cat">${stars(g)}</span>`;
       desc = done ? 'fully upgraded' : `dmg ${WEAPONS[g].dmg}→${Math.round(b.dmg * (1 + .25 * L))} · mag ${WEAPONS[g].mag}→${Math.round(b.mag * (1 + .25 * L))} · faster reload`;
-      cost = done ? 'MAXED' : 'UPGRADE ◆ ' + priceOf(it);
+      cost = done ? 'MAXED' : 'UPGRADE ' + COIN + priceOf(it);
     }
     if (it.armor && done) { desc = `armor maxed at ${ARMOR_CAP}`; cost = 'MAXED'; }
     return `<button data-i="${i}" class="${done ? 'own' : ''}" ${off ? 'disabled' : ''}>${label}<br><small>${desc}</small><br>${cost}</button>`;
@@ -223,5 +223,5 @@ $('next').addEventListener('click', () => {
   rerollPads(); // so pickups match what you own now (e.g. ammo once you have a 2nd gun, armor once you've bought some)
   lockMouse();
 });
-function banner(text) { const b = $('banner'); b.textContent = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }
+function banner(text, html = false) { const b = $('banner'); b[html ? 'innerHTML' : 'textContent'] = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }
 let crossT = 0; function setCross(c) { $('cross').style.setProperty('--c', c); crossT = .08; }

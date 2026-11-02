@@ -167,11 +167,28 @@ const lookChoices = () => prof.myLook && !isPreset(prof.myLook) ? [...PRESETS, {
 const lookIndex = () => { const k = lookKey(prof.look); return lookChoices().findIndex(p => lookKey(p.look) === k); };
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
 let heroCh, torso, headPiv, armL, armR; // armL = the arm on the left of the screen when it faces you
+// in the armory he raises the gun you're looking at, held the way the bots hold theirs (deathmatch.js makeBot/holdGun)
+const holdG = new THREE.Group(); holdG.position.y = 22 / 16; // at the shoulders
+let holdKey = '', holdK = 0;
+const HOLD_TILT = .3; // points it a little down, at the floor in front of him
+function heroGun(i) {
+  const key = i < 0 ? '' : i + ':' + gunStars(i);
+  if (key === holdKey) return;
+  if (holdKey && key && holdK > .9) holdK = .7; // swapping guns: dips and brings the new one back up
+  holdKey = key;
+  holdG.traverse(o => o.geometry?.dispose()); holdG.clear();
+  if (i < 0) return;
+  const g = new THREE.Group();
+  makeGun(i, g, Math.max(0, gunStars(i) - 1), false); // gold bands for its upgrades, like in your hands
+  g.rotation.y = Math.PI; g.position.set(-4 / 16, .5 / 16, 10 / 16); g.scale.setScalar(1 / 16 / BOT_U); // he's a little taller than a bot
+  holdG.add(g);
+}
 function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
   heroCh = buildChar(prof.look, 1 / 16, true);
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
+  heroCh.g.add(holdG);
   $('lookName').textContent = lookChoices()[lookIndex()]?.name ?? 'CUSTOM';
 }
 function pickLook(step) {
@@ -258,6 +275,8 @@ $('custDone').onclick = () => showCust(false);
 addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && custOpen()) showCust(false); });
 
 const REST = .45; // default 3/4 view
+const ARM_REST = -1; // in the armory he turns toward the panel, so you see the side of the gun he's holding
+let wasArm = false;
 let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, mNX = 0, mNY = 0;
 const heroScreen = { x: innerWidth * .7, y: innerHeight / 2 };
 const stage = $('stage');
@@ -293,16 +312,23 @@ function frameLobby(dt = 0) {
 
 function updateLobby(dt) {
   const t = performance.now() / 1000;
+  if (armOpen !== wasArm) { wasArm = armOpen; lastDrag = -1e9; } // opening or closing the armory: turn right away
   if (dragX === null) {
     spin += spinV * dt; spinV *= Math.exp(-4 * dt);
     if (performance.now() - lastDrag > 2500) {
-      const rest = REST + Math.round((spin - REST) / (Math.PI * 2)) * Math.PI * 2;
-      spin += (rest - spin) * Math.min(1, dt * 1.5);
+      const base = armOpen ? ARM_REST : REST, rest = base + Math.round((spin - base) / (Math.PI * 2)) * Math.PI * 2;
+      spin += (rest - spin) * Math.min(1, dt * (armOpen ? 3 : 1.5));
     }
   }
   hero.rotation.y = spin;
   armL.rotation.z = -.05 - Math.sin(t * 1.6) * .03; armR.rotation.z = .05 + Math.sin(t * 1.6) * .03;
   armL.rotation.x = Math.sin(t * 1.1) * .05; armR.rotation.x = -Math.sin(t * 1.1) * .05;
+  // armory: arms come up to hold the gun. The gun swings up with them, growing in as it leaves his side
+  holdK += ((armOpen && holdKey ? 1 : 0) - holdK) * Math.min(1, dt * 9);
+  const e = holdK * holdK * (3 - 2 * holdK), up = -Math.PI / 2 + HOLD_TILT;
+  armL.rotation.x += (up - armL.rotation.x) * e; armL.rotation.z += (.2 - armL.rotation.z) * e;
+  armR.rotation.x += (up - armR.rotation.x) * e; armR.rotation.z += (-.85 - armR.rotation.z) * e;
+  holdG.visible = e > .01; holdG.rotation.x = armL.rotation.x + Math.PI / 2; holdG.scale.setScalar(Math.min(1, e * 2.5));
   torso.scale.z = 1 + Math.sin(t * 1.6) * .02;
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   // fade the head back to center as the cursor moves behind the body, so it never flips across at ±180°

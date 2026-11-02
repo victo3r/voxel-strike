@@ -1,6 +1,6 @@
 // Star upgrades cost a share of the gun's own price: UPG[0] for ★★, UPG[1] for ★★★ (so less than buying the gun again).
 const UPG = [.75, .9];
-let armCat = 'primary', armOpen = false;
+let armCat = 'primary', armOpen = false, armHover = -1; // armHover = the gun card under the mouse
 const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought yet (starters are always 0: no stars)
 const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
 const inMatch = () => !inLobby && pvp() && !matchOver;
@@ -15,7 +15,7 @@ function gunStats(i) {
   return `DMG ${w.pellets > 1 ? dmg + '×' + w.pellets : dmg} · ${rate} · ${w.flame ? 'FUEL' : 'MAG'} ${mag}${mob}`;
 }
 function renderArmory() {
-  $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">◆ ${prof.coins}</span>`;
+  $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img src="${SPRITES[loadoutGun(c)]}"><span>${label}</span></button>`).join('');
   const list = BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
@@ -24,16 +24,21 @@ function renderArmory() {
     const w = BASE[i], have = hasGun(i), st = gunStars(i), locked = !have && prof.lv < (w.unlock ?? 0);
     let btns = '';
     if (locked) btns = `<button disabled>🔒 LVL ${w.unlock}</button>`;
-    else if (!have) btns = `<button data-buy="${i}" ${prof.coins < w.price ? 'disabled' : ''}>BUY ◆ ${w.price}</button>`;
+    else if (!have) btns = `<button data-buy="${i}" ${prof.coins < w.price ? 'disabled' : ''}>BUY ${COIN}${w.price}</button>`;
     else {
       btns = i === eq ? '<button class="eq" disabled>EQUIPPED</button>' : `<button data-eq="${i}">EQUIP</button>`;
-      if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${'★'.repeat(st + 1)} ◆ ${upgPrice(i)}</button>`;
+      if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${'★'.repeat(st + 1)} ${COIN}${upgPrice(i)}</button>`;
     }
     const starTxt = w.start ? '' : '★'.repeat(st) + '☆'.repeat(3 - st);
-    return `<div class="card${locked ? ' locked' : ''}${i === eq ? ' on' : ''}"><img src="${SPRITES[i]}">` +
+    return `<div class="card${locked ? ' locked' : ''}${i === eq ? ' on' : ''}" data-i="${i}"><img src="${SPRITES[i]}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt}</span></div><small>${gunStats(i)}</small><div class="cb">${btns}</div></div>`;
   }).join('');
+  armHold();
 }
+// the lobby character holds the gun under the mouse, or the one equipped in this category
+const armHold = () => { if (inLobby) heroGun(BASE[armHover]?.cat === armCat ? armHover : loadoutGun(armCat)); };
+$('armList').addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (c && +c.dataset.i !== armHover) { armHover = +c.dataset.i; armHold(); } });
+$('armList').addEventListener('mouseleave', () => { armHover = -1; armHold(); });
 
 function armSync(i, how) {
   if (!inMatch()) return;

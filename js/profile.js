@@ -27,6 +27,6 @@ function grant(xp, coins) {
 const xpBar = () => `<div class="xpbar"><div style="width:${prof.lv >= LV_MAX ? 100 : Math.min(100, prof.xp / xpNeed(prof.lv) * 100)}%"></div></div>`;
 const xpText = () => prof.lv >= LV_MAX ? 'MAX LEVEL' : `${prof.xp} / ${xpNeed(prof.lv)} XP`;
 function showProf() { // lobby: compact level badge with a thin XP bar, then coins
-  $('prof').innerHTML = `<div class="lv"><b>LVL ${prof.lv}</b>${xpBar()}<small>${xpText()}</small></div><span class="pc">◆ ${prof.coins}</span>`;
+  $('prof').innerHTML = `<div class="lv"><b>LVL ${prof.lv}</b>${xpBar()}<small>${xpText()}</small></div><span class="pc">${COIN}${prof.coins}</span>`;
 }
 showProf();

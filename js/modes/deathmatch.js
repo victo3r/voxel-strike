@@ -622,8 +622,8 @@ function endMatch() {
   $('postBoard').innerHTML = boardHTML();
   const won = MR.team ? lead > 0 : place === 1;
   const [xp, gold] = MR.team ? teamReward(lead) : rewardFor(place), { ups, bonus } = grant(xp, gold);
-  $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ◆</span></div>`
-    + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ◆</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
+  $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ${COIN}</span></div>`
+    + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ${COIN}</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
   sfx(won ? 'win' : 'lose'); musicEnd();
   if (ups) setTimeout(() => sfx('levelUp'), 700);

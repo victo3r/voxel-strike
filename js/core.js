@@ -57,3 +57,14 @@ const runShirtTex = tex(g => noise(g, [200, 75, 40], 30));
 const bruteShirtTex = tex(g => noise(g, [70, 45, 85], 25));
 const boomShirtTex = tex(g => noise(g, [185, 200, 55], 30));
 const bossShirtTex = tex(g => noise(g, [110, 20, 20], 25));
+
+// the coin: 16x16 pixel art, a gold coin lit from the top-left with a voxel cube stamped in the middle.
+// COIN is the icon to drop into any HTML text; it draws from the --coin image set here
+const COIN = '<i class="coin"></i>';
+{
+  const rows = ['.....oooooo.....', '...ooHRRRRRoo...', '..ooHHbbbbRroo..', '.ooHbgggggggroo.', '.oHbggTTTTgggro.', 'oHHgTTTTTTTTgrro', 'oRbgLLTTTTXXbBDo', 'oRbgLLLLXXXXbBDo', 'oRbgLLLLXXXXbBDo', 'oRbgLLLLXXXXbBDo', 'oRRgLLLLXXXXbDDo', '.orggbLLXXbbBDo.', '.oorgggbbbbBDoo.', '..oorrBBBBDDoo..', '...oorDDDDDoo...', '.....oooooo.....'];
+  const pal = { o: '#3d2604', D: '#965c08', r: '#d69614', R: '#ffde60', H: '#fff6c8', g: '#f6c025', b: '#e2a218', B: '#ffe26e', T: '#ffee96', L: '#e09210', X: '#ac6608' };
+  const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d');
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x, y, 1, 1); } }));
+  document.documentElement.style.setProperty('--coin', `url(${c.toDataURL()})`);
+}

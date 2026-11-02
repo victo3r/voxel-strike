@@ -269,7 +269,7 @@ function steelBar(S, t, ch, r, inPh, v) {
   if (inPh === 7) for (let i = 0; i < 6; i++) steel(S, t + (12 + i * .5) * st, notes[4], v * (.55 + i * .07));
 }
 // rave stab: a whole chord hit short and sharp
-function stab(S, t, notes, v) {
+function raveStab(S, t, notes, v) {
   const lp = ac.createBiquadFilter(), g = ac.createGain();
   lp.type = 'lowpass'; lp.frequency.setValueAtTime(2600, t); lp.frequency.exponentialRampToValueAtTime(700, t + .15);
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .003); g.gain.setTargetAtTime(0, t + .003, .09);
@@ -394,7 +394,7 @@ function muBar(S, t) {
   }
   if (song.stab && !quiet && (heat > .4 || drop)) {
     const steps = [[0, 6, 10], [3, 10], [0, 7], [0, 3, 6]][pr() * 4 | 0];
-    for (const s of steps) stab(S, t + s * st, ch[1], .06);
+    for (const s of steps) raveStab(S, t + s * st, ch[1], .06);
   }
 }
 
