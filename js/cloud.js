@@ -33,8 +33,8 @@ function applySave(s) {
   applying = true;
   const keepBest = better(best, s.best || {});
   for (const k of Object.keys(prof)) delete prof[k];
-  Object.assign(prof, { v: 1, lv: 1, xp: 0, coins: 0, earned: 0, guns: {}, loadout: {}, armor: 0 }, s.prof);
-  prof.guns = { ...prof.guns }; prof.loadout = { ...prof.loadout };
+  Object.assign(prof, { v: 1, lv: 1, xp: 0, coins: 0, earned: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0 }, s.prof);
+  prof.guns = { ...prof.guns }; prof.loadout = { ...prof.loadout }; prof.use = { ...prof.use };
   if (!prof.look) prof.look = { ...PRESETS[0].look };
   try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {}
   const n = cleanName(s.name);

@@ -13,7 +13,7 @@ const SNIPE_T = .9; // a sniper bot lines up its shot this long before it fires
 // health pads: a hurt bot that can't see its target walks to a stocked health pad within PAD_NEAR,
 // or within PAD_FAR once it's down to PAD_LOW HP. It also grabs any health pad it walks over while hurt.
 // Bots skip ammo pads (they never run out of spare ammo). Armor pads show up once you wear armor (js/armor.js), and bots
-// wear the same tier you do, so a bot with a dented armor bar grabs any armor pad it walks over.
+// roll their own armor (never better than yours), so a bot with a dented armor bar grabs any armor pad it walks over.
 const PAD_LOW = 60, PAD_NEAR = 8, PAD_FAR = 30;
 // the rules for each match mode. t = match length (s), you = your respawn wait (s), bot = a bot's respawn wait after its angel
 // floats away (s), join = the other bots have all joined by this time (s), kills = ranked on kills only (no points),
@@ -67,18 +67,19 @@ const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t
 const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res === 0 ? t[1] : t[t.length - 1]; };
 // every bot gets a full loadout when it joins, one gun per category, and keeps it for the whole match (respawns too).
 // BOT_PICKS = what it can roll for each category (a name listed twice is twice as likely)
+// Its stars on each gun and its armor are rolled too, anywhere from none up to what you're using, never more
 const BOT_PICKS = {
   primary: ['shotgun', 'ar', 'ar', 'eradicator'],
-  backup: ['voxel'],
+  backup: ['voxel', 'voxel', 'hitman'],
   melee: ['knife'],
-  special: ['flame'],
+  special: ['flame', 'heatray'],
   sniper: ['sniper'],
   premium: ['flare', 'flare', 'rocket'],
 };
 // the distance a bot tries to keep from its target with each gun [closest, furthest]
 const BOT_KEEP = {
-  voxel: [5, 12], shotgun: [2.5, 6], ar: [8, 16], eradicator: [6, 12], sniper: [16, 32],
-  knife: [.9, 1.6], flame: [2, 5], rocket: [9, 18], flare: [7, 16],
+  voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], eradicator: [6, 12], sniper: [16, 32],
+  knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
 };
 // how good each gun is at a distance (higher = better). A bot holds whichever of its guns scores best,
 // times its own taste for that gun, so two bots in the same spot can pick different guns
@@ -87,6 +88,8 @@ const GUN_FIT = {
   shotgun: d => d < 5 ? 1 : d < 9 ? .85 : d < 14 ? .3 : .05,
   flame: d => d < 5 ? 1.05 : d < 6.5 ? .5 : 0,
   voxel: d => d < 14 ? .5 : .3,
+  hitman: d => d < 18 ? .55 : .4,
+  heatray: d => d < 3 ? .5 : d < 25 ? .85 : .2,
   ar: d => d < 3 ? .6 : d < 20 ? .9 : .55,
   eradicator: d => d < 16 ? .95 : .5,
   sniper: d => d > 20 ? 1.1 : d > 14 ? .6 : d > 8 ? .25 : .1,
@@ -101,7 +104,11 @@ function botLoadout() {
   // taste: a little random per gun, plus one category it really likes (so you get snipers, rushers, rocket spammers...)
   const fav = pickOf(['primary', 'primary', 'sniper', 'melee', 'special', 'premium']), taste = {};
   for (const g of load) taste[BASE[g].id] = (.85 + Math.random() * .3) * (BASE[g].cat === fav ? 1.3 : 1);
-  return { load, taste };
+  // stars: any number up to the ones you take into a match on that gun (none on guns you don't have, starters have none).
+  // W = its stats with those stars
+  const stars = {}, W = {};
+  for (const g of load) { const top = Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
+  return { load, taste, stars, W, armor: botArmor() };
 }
 
 const BOT_U = 1.85 / 33; // one skin pixel on a bot: 33 pixels tall (with the neck) = 1.85, same height as you
@@ -212,7 +219,7 @@ const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round } = makeGun(b.gun, gunM, 0);
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round } = makeGun(b.gun, gunM, b.rec.stars[b.gun]); // its upgrade bands, like yours
   // held the way its hold says (js/hold.js): the gun and both arms come from the solved pose, which is in character pixels
   // from its feet. The aim group pivots at shoulder height. A one-handed weapon leaves the left arm hanging a little forward
   const h = holdFor(b.gun);
@@ -243,16 +250,16 @@ function botEquip(b, g) {
   if (g === b.gun) return;
   b.mags[b.gun] = b.ammo; b.reload = 0; // switching away mid-reload throws the reload away, like yours
   b.gun = g; b.ammo = b.mags[g]; b.swap = SWAP_T; b.burst = 4 + (Math.random() * 6 | 0); b.aimT = 0;
-  if (b.fireOn > 0) { b.fireOn = 0; sfx('flameEnd', { at: b.g.position, far: 50 }); }
+  if (b.fireOn > 0) { b.fireOn = 0; sfx(b.fireEnd, { at: b.g.position, far: 50 }); }
   b.pickT = Math.max(b.pickT, 1.2 + Math.random() * .8); // sticks with it for a bit, unless it runs dry
   holdGun(b); sfx('equip', { at: b.g.position, far: 15, v: .7 });
-  const W = BASE[g];
+  const W = b.rec.W[g];
   if (!W.inf && b.ammo <= 0) { b.reload = SWAP_T + W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); } // picked up an empty one: reload it
 }
 function makeBot(rec) {
   const [x, z] = spawnSpot(rec);
-  const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(matchArmor());
-  if (arm) dressArmor(ch, matchArmor(), teamMode() ? TEAMS[rec.team].shirts[0] : null);
+  const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(rec.armor);
+  if (arm) dressArmor(ch, rec.armor, teamMode() ? TEAMS[rec.team].shirts[0] : null);
   g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
   // both arms forward holding the gun, swung up and down with the aim from the shoulders
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
@@ -262,10 +269,10 @@ function makeBot(rec) {
   g.add(tag); scene.add(g);
   const yaw = Math.atan2(-x, -z);
   g.rotation.y = yaw;
-  const mags = {}; for (const i of rec.load) mags[i] = BASE[i].mag; // every gun full on respawn
+  const mags = {}; for (const i of rec.load) mags[i] = rec.W[i].mag; // every gun full on respawn
   const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, armor: arm ? arm.hp : 0, maxArmor: arm ? arm.hp : 0, dr: arm ? arm.dr : 0, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
-    gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
+    gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, fireEnd: 'flameEnd', leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
   b.gun = pickGun(b, HUNT_D); b.ammo = mags[b.gun]; // spawns holding whatever it likes best for running into someone
   holdGun(b);
@@ -276,7 +283,7 @@ function makeBot(rec) {
 // a bot died (called from hurtZombie). by = the bot that killed it, or null if it was you. nobody = it drowned, no credit
 function botDown(b, by, head, nobody = false) {
   b.tag.visible = false; b.flashM.visible = false;
-  if (b.fireOn > 0) { b.fireOn = 0; sfx('flameEnd', { at: b.g.position, far: 50 }); }
+  if (b.fireOn > 0) { b.fireOn = 0; sfx(b.fireEnd, { at: b.g.position, far: 50 }); }
   b.rec.wait = MR.bot + DIE_T; // its angel floats away first
   if (!nobody) sfx('die', { at: b.g.position, far: 40 });
   if (!b.drowned) angel(b); // one that drowned just sinks
@@ -330,7 +337,7 @@ function respawnYou() {
   cancelReload(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
 
-const eye = new THREE.Vector3(), aimV = new THREE.Vector3(), dirV = new THREE.Vector3(), hitV = new THREE.Vector3(), losDir = new THREE.Vector3();
+const eye = new THREE.Vector3(), beamTo = new THREE.Vector3(), aimV = new THREE.Vector3(), dirV = new THREE.Vector3(), hitV = new THREE.Vector3(), losDir = new THREE.Vector3();
 const losRay = new THREE.Raycaster(), pBox = new THREE.Box3();
 function clearLine(a, c) { // nothing solid between two points (crates block, the see-through fence doesn't)
   losDir.subVectors(c, a); const d = losDir.length(); if (d < .01) return true;
@@ -401,7 +408,7 @@ function botStab(b, W, t, dist) {
 const coneV = new THREE.Vector3(), flameV = new THREE.Vector3();
 function botFlame(b, W) {
   if (!(b.fireOn > 0)) sfx('flameStart', { at: b.g.position, far: 50 });
-  b.fireOn = .2;
+  b.fireOn = .2; b.fireEnd = 'flameEnd';
   aimDir(b.aimYaw, b.aimPitch, dirV);
   b.flashM.getWorldPosition(flameV);
   for (let k = 0; k < 2; k++) {
@@ -422,11 +429,13 @@ function botFlame(b, W) {
   }
 }
 function botFire(b, W, dist) {
-  b.ammo--; b.muzzle = W.flame ? 0 : .05;
-  if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
+  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : .05;
+  // a beam is held in long sweeps, everything else automatic in short bursts
+  if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto guns: about as fast as a person clicks
   if (W.scope) b.aimT = 0;
-  if (!W.flame) sfx(W.id, { at: b.g.position, far: 100 });
+  if (W.beam) { if (!(b.fireOn > 0)) sfx('heatStart', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = 'heatEnd'; }
+  else if (!W.flame) sfx(W.id, { at: b.g.position, far: W.quiet ? 35 : 100 }); // a suppressed gun only carries so far
   if (b.ammo <= 0) {
     b.reload = W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
     b.pickT = Math.min(b.pickT, .15 + Math.random() * .25); // out: think about switching instead of standing there reloading
@@ -449,11 +458,12 @@ function botFire(b, W, dist) {
   for (let i = 0; i < W.pellets; i++) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
-    losRay.set(eye, dirV); losRay.far = 90;
+    losRay.set(eye, dirV); losRay.far = W.range || 90;
     const wall = losRay.intersectObjects(walls, false)[0], wallD = wall ? wall.distance : Infinity;
     const bot = others.length ? losRay.intersectObjects(others, false)[0] : null, botD = bot ? bot.distance : Infinity;
     const onYou = youUp && losRay.ray.intersectBox(pBox, hitV), youD = onYou ? eye.distanceTo(hitV) : Infinity;
     const near = Math.min(wallD, botD, youD);
+    if (W.beam) showBeam(b, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)));
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45;
@@ -466,7 +476,7 @@ function botFire(b, W, dist) {
 }
 
 function updateBot(b, dt) {
-  let W = BASE[b.gun];
+  let W = b.rec.W[b.gun];
   const pos = b.g.position;
   eye.set(pos.x, pos.y + 1.6, pos.z);
   b.hitByT -= dt;
@@ -488,14 +498,15 @@ function updateBot(b, dt) {
   if ((b.pickT -= dt) <= 0) {
     b.pickT = sees ? .5 + Math.random() * .7 : 2 + Math.random() * 2;
     botEquip(b, pickGun(b, sees || b.lostT < 1.5 ? dist : HUNT_D));
-    W = BASE[b.gun];
+    W = b.rec.W[b.gun];
   }
   // out of the fight for a bit: it reloads what's in its hands, and the guns it switched away from empty get topped up
   if (!sees && b.lostT > 1) {
     if (!W.inf && b.reload <= 0 && b.swap <= 0 && b.ammo < W.mag) { b.reload = W.reload; sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); }
     for (const g of b.rec.load) {
-      if (g === b.gun || b.mags[g] >= BASE[g].mag) continue;
-      if ((b.refill[g] = (b.refill[g] || 0) + dt) >= BASE[g].reload) { b.mags[g] = BASE[g].mag; b.refill[g] = 0; }
+      const G = b.rec.W[g];
+      if (g === b.gun || b.mags[g] >= G.mag) continue;
+      if ((b.refill[g] = (b.refill[g] || 0) + dt) >= G.reload) { b.mags[g] = G.mag; b.refill[g] = 0; }
     }
   }
   const keep = BOT_KEEP[W.id], sniper = !!W.scope;
@@ -516,13 +527,13 @@ function updateBot(b, dt) {
   b.g.rotation.y = b.aimYaw - b.holdTurn; b.headPiv.rotation.y = b.holdTurn; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
   b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.flashM.visible = b.muzzle > 0;
-  if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx('flameEnd', { at: pos, far: 50 });
+  if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx(b.fireEnd, { at: pos, far: 50 });
   b.stab = Math.max(0, b.stab - dt); b.aim.position.z = b.stab * 1.3; // knife jab: arms shoot forward and come back
   if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels, like yours
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
   // in range for this gun: knife = arm's reach, flamethrower = its flame, rocket = not close enough to blow itself up
-  const inRange = W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.rocket ? dist > 4 : true;
+  const inRange = W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : true;
   const ready = sees && b.seeT >= BOT.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
   b.aimT = ready && sniper ? b.aimT + dt : 0;
   if (ready && b.cd <= 0 && (!sniper || b.aimT >= SNIPE_T)) { if (W.melee) botStab(b, W, t, dist); else botFire(b, W, dist); }
@@ -600,7 +611,7 @@ function dmDown(dt) {
   respawnT -= dt;
   if (respawnT <= 0) { respawnYou(); return false; }
   adsT = 0; if (camera.fov !== 75) { camera.fov = 75; camera.updateProjectionMatrix(); }
-  $('scope').style.display = 'none'; $('cross').style.display = 'none'; vm.visible = false;
+  $('scope').style.display = $('holo').style.display = 'none'; $('cross').style.display = 'none'; vm.visible = false;
   // you float up like the bots' angels do, looking down at where you were. Drowned: you sink instead (drownTick)
   const t = YOU_RESPAWN - respawnT, f = Math.min(1, t / 1.2);
   if (P.drowned) { camera.position.set(P.pos.x, P.pos.y + .35, P.pos.z); camera.rotation.set(P.pitch, P.yaw, .4); }
@@ -646,10 +657,9 @@ function endMatch() {
 $('againBtn').addEventListener('click', () => { restart(); lockMouse(); });
 $('postLobby').addEventListener('click', () => { restart(); showLobby(true); });
 
-// deathmatch: a gun from your account, with its saved stars (prof.guns: id -> stars 1-3) and full ammo
+// deathmatch: a gun from your account, at the stars you picked to use (gunUse, js/armory.js), with full ammo
 function giveGun(g) {
-  const st = prof.guns[BASE[g].id];
-  lvl[g] = st ? Math.min(2, st - 1) : 0; applyLvl(g);
+  lvl[g] = Math.max(0, Math.min(2, gunUse(g) - 1)); applyLvl(g);
   owned[g] = true; ammo[g] = WEAPONS[g].mag; reserve[g] = resMax(g);
 }
 // called at the end of restart(): sets up whichever mode you picked in the lobby

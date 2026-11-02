@@ -10,8 +10,12 @@ const CAT_I = Object.fromEntries(CATS.map(([k], i) => [k, i]));
 // unlock = account level you need before you can buy it in the armory. price = its armory price in account coins
 // mob = mobility: how fast you run while holding it, as a multiple of normal speed (1 if not set)
 // hold = how it's carried: pistol, rifle, heavy, shoulder or melee (see HOLDS below)
+// zoom = aiming zooms this many times through a holo sight (the sniper's scope is its own thing). quiet = suppressed: heard from less far away
+// beam = fires a constant beam, dmg every rate seconds while you hold the trigger, out to range. mag = its charge
 const BASE = [
   { id: 'voxel', hold: 'pistol', name: 'Voxel Gun', cat: 'backup', start: true, free: true, dmg: 20, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3 },
+  { id: 'hitman', hold: 'pistol', name: 'Hitman', cat: 'backup', unlock: 3, price: 60, zoom: 2, quiet: true, dmg: 17, rate: .2, mag: 18, reload: 1.1, pellets: 1, spread: 0, auto: false, color: 0x2c2c30, len: .4 },
+  { id: 'heatray', hold: 'rifle', name: 'Heat Ray', cat: 'special', unlock: 4, price: 100, beam: true, dmg: 4, rate: .05, range: 30, mag: 100, reload: 2.0, pellets: 1, spread: 0, auto: true, color: 0xb5652b, len: .7 },
   { id: 'shotgun', hold: 'rifle', name: 'Shotgun', cat: 'primary', start: true, dmg: 10, rate: .75, mag: 6, reload: 1.6, pellets: 9, spread: .07, auto: false, color: 0x6b4a2b, len: .6 },
   { id: 'ar', hold: 'rifle', name: 'Assault Rifle', cat: 'primary', start: true, dmg: 12, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55 },
   { id: 'sniper', hold: 'rifle', name: 'Sniper Rifle', cat: 'sniper', start: true, dmg: 80, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, scope: true },
@@ -31,10 +35,9 @@ const gi = id => W_ID[id]; // weapon id -> its index in BASE/WEAPONS
 const lvl = BASE.map(() => 0); // 0 = ★, 1 = ★★, 2 = ★★★
 const WEAPONS = BASE.map(w => ({ ...w }));
 const magAt = (b, L) => b.mag === 1 ? 1 : Math.round(b.mag * (1 + .25 * L));
-function applyLvl(i) {
-  const b = BASE[i], L = lvl[i];
-  Object.assign(WEAPONS[i], { dmg: Math.round(b.dmg * (1 + .25 * L)), mag: magAt(b, L), reload: +(b.reload * (1 - .15 * L)).toFixed(2) });
-}
+// gun i's stats with L upgrades (0 = ★). Bots get their own copy at whatever stars they rolled
+const statsAt = (i, L) => { const b = BASE[i]; return { ...b, dmg: Math.round(b.dmg * (1 + .25 * L)), mag: magAt(b, L), reload: +(b.reload * (1 - .15 * L)).toFixed(2) }; };
+function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, mag: s.mag, reload: s.reload }); }
 // deathmatch: starters have no stars. Zombie waves: everything you buy in its shop can be starred
 const upgradable = i => mode === 'zombies' ? !BASE[i].free : !BASE[i].start;
 const stars = i => upgradable(i) ? '★'.repeat(lvl[i] + 1) + '☆'.repeat(2 - lvl[i]) : '';
@@ -64,6 +67,10 @@ const SPRITE_RECTS = {
   flame: [[1, 3, 5, 7, '#c33'], [2, 4, 1, 4, '#e66'], [6, 4, 10, 3, '#555'], [16, 4, 6, 2, '#333'], [22, 3, 2, 4, '#222'], [23, 1, 1, 2, '#fa3'], [9, 7, 2, 3, '#222'], [5, 9, 4, 1, '#222']],
   rocket: [[2, 3, 18, 5, '#4b5b3b'], [6, 3, 1, 5, '#333'], [15, 3, 1, 5, '#333'], [20, 4, 3, 3, '#a33'], [23, 5, 1, 1, '#a33'], [8, 8, 2, 3, '#222'], [12, 8, 2, 3, '#222'], [10, 1, 3, 2, '#222']],
   flare: [[4, 3, 14, 4, '#c8402a'], [4, 3, 14, 1, '#e8684a'], [17, 2, 5, 6, '#3a3a3a'], [21, 3, 1, 4, '#fa3'], [6, 7, 4, 5, '#2a2a2a'], [10, 7, 3, 1, '#444'], [12, 7, 1, 2, '#444']],
+  hitman: [[2, 4, 11, 3, '#3a3a40'], [2, 4, 11, 1, '#55555d'], [13, 3, 10, 5, '#26262b'], [16, 3, 1, 5, '#3c3c42'], [20, 3, 1, 5, '#3c3c42'],
+    [4, 0, 1, 4, '#222'], [9, 0, 1, 4, '#222'], [4, 0, 6, 1, '#222'], [6, 2, 2, 1, '#f33'], [3, 7, 4, 5, '#2a2a2a'], [7, 7, 3, 1, '#444'], [9, 7, 1, 2, '#444']],
+  heatray: [[0, 5, 4, 3, '#5a3a22'], [4, 4, 10, 4, '#b5652b'], [4, 4, 10, 1, '#d98a4a'], [5, 1, 9, 2, '#c9a43a'], [6, 1, 7, 1, '#fff2a8'], [8, 3, 3, 1, '#333'],
+    [14, 5, 8, 2, '#777'], [16, 4, 1, 4, '#b5652b'], [19, 4, 1, 4, '#b5652b'], [22, 5, 2, 2, '#ffb347'], [5, 8, 2, 4, '#3a2a1a'], [9, 8, 3, 2, '#ffd23f'], [12, 8, 3, 2, '#3a3a3a']],
 };
 // drawn one pixel in from the edge, then every empty pixel touching the gun turns black: the same black edge the 3D models have
 const SPRITES = BASE.map(w => SPRITE_RECTS[w.id]).map(rects => {
@@ -88,6 +95,7 @@ const flashMesh = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd
 const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
 let gunSpin = null, gunSpinV = 0; // the eradicator's barrel cluster, and how fast it's spinning
 let gunRound = null; // the rocket sitting in the launcher's tube, hidden while it's empty
+let gunHolo = null; // [y, z] of the holo sight's window on the gun in your hands (aiming brings it to the middle of the screen)
 
 // gun models are voxel pixel art. Every size and spot in GUN_MODELS is in gun pixels, GPX world units each (times GUN_SCALE).
 // Guns point down -z with the grip near the origin. The pieces are filled into a grid of pixels (later pieces paint over
@@ -286,6 +294,44 @@ const GUN_MODELS = {
     p(1, 1, 5, dark, 0, -4.5, -3.5); p(1, 3, 1, dark, 0, -2.5, -6.5); p(1, 2, 1, mat(0x888888), 0, -2, -3.5); // guard and trigger
     return { muzzle: [2, -18], grip: [4, 9, 5, 0, -6.5, .5], fore: null, bands: [-6, -11], band: [8, 8, 2] };
   },
+  // a black pistol with a long suppressor and a holo sight on the slide. holo = [y, z] of the middle of the sight's window,
+  // which lines up with the middle of the screen when you aim
+  hitman({ p, mat, dark, glow }) {
+    const slide = mat(0x3a3a40), grip = mat(0x2e2e33), can = mat(0x26262b), ring = mat(0x45454c);
+    p(4, 4, 14, slide, 0, 2, -7); p(4, 1, 14, mat(0x55555d), 0, 3.5, -7); // slide and its lighter top
+    for (const z of [-1.5, -3.5]) p(4, 2, 1, dark, 0, 2.5, z); // grip serrations at the back of the slide
+    p(4, 2, 12, dark, 0, -1, -6); // frame
+    p(6, 6, 12, can, 0, 2, -20); for (const z of [-15.5, -20, -24.5]) p(6, 6, 1, ring, 0, 2, z); // suppressor and its rings
+    p(2, 2, 1, mat(0x0c0c0c), 0, 2, -25.5); // its bore
+    p(6, 1, 6, dark, 0, 4.5, -6); // holo sight: mount, then an open window framed by two posts and a hood
+    for (const x of [-3.5, 3.5]) p(1, 6, 2, dark, x, 8, -6.5);
+    p(8, 1, 2, dark, 0, 11.5, -6.5);
+    p(2, 1, 1, glow(0xff3333), 0, 5.5, -4.5); // the emitter that throws the red dot
+    p(1, 1, 4, dark, 0, -4.5, -7); p(1, 2, 1, dark, 0, -3, -9.5); p(1, 2, 1, mat(0x777777), 0, -3, -6.5); // trigger guard and trigger
+    p(4, 3, 4, grip, 0, -3.5, -3); p(4, 3, 4, grip, 0, -6.5, -2); p(4, 1, 4, dark, 0, -8.5, -2); // grip
+    return { muzzle: [2, -27], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -13], band: [6, 8, 1], holo: [8, -6] };
+  },
+  // a copper beam rifle. A big magnifying glass lies on top facing the sky to catch sunlight, and the barrel focuses that heat
+  // into the beam: cooling fins down the barrel, a glowing tip, and a glowing heat cell under the body
+  heatray({ p, mat, dark, glow }) {
+    const cop = mat(0xb5652b), dcop = mat(0x7e4220), brass = mat(0xc9a43a), steel = mat(0x6e6e74), wood = mat(0x5a3a22);
+    p(4, 6, 8, wood, 0, -.5, 4); p(4, 8, 1, mat(0x3a2414), 0, -1, 8.5); // stock and butt
+    p(6, 6, 16, cop, 0, 0, -8); p(6, 1, 16, mat(0xd98a4a), 0, 2.5, -8); // body and its lighter top
+    for (const z of [-2.5, -13.5]) p(6, 6, 1, dcop, 0, 0, z); // rivet bands
+    p(2, 2, 2, dark, 0, 4, -6); p(2, 2, 2, dark, 0, 4, -10); // posts holding the lens up
+    for (const z of [-3.5, -12.5]) p(10, 2, 1, brass, 0, 5, z); // lens frame: front and back
+    for (const x of [-4.5, 4.5]) p(1, 2, 8, brass, x, 5, -8); // and its sides
+    p(8, 1, 8, mat(0xbfe3ee), 0, 5.5, -8); // the magnifying glass
+    p(2, 1, 2, glow(0xfff2a8), 0, 5.5, -8); // the spot where it gathers the sunlight
+    p(2, 1, 4, glow(0xffd27a), 0, 3.5, -8); // the focused light it pours into the body
+    p(4, 4, 14, steel, 0, .5, -23); for (const z of [-18.5, -22, -25.5]) p(8, 8, 1, cop, 0, .5, z); // barrel and its fins
+    p(4, 4, 2, dark, 0, .5, -31); p(2, 2, 1, glow(0xffb347), 0, .5, -32.5); // emitter and its glowing tip
+    p(4, 4, 4, dcop, 0, -4.5, -1); p(4, 3, 4, dcop, 0, -7.5, 0); // pistol grip
+    p(1, 1, 4, dark, 0, -5.5, -5); p(1, 2, 1, mat(0x888888), 0, -3.5, -4.5); // guard and trigger
+    p(4, 5, 4, mat(0x3a3a3a), 0, -5.5, -9); p(4, 2, 2, glow(0xffd23f), 0, -5.5, -9); // heat cell, with a window glowing out of both sides
+    p(6, 4, 6, dark, 0, -5, -14); // front handle under the barrel's root
+    return { muzzle: [.5, -33], grip: [4, 7, 4, 0, -6, -.5], fore: [6, 4, 6, 0, -5, -14], bands: [-6, -10], band: [8, 7, -.5] };
+  },
 };
 // builds gun i's model into group g with `stars` gold upgrade bands: the same model in your hands, a bot's, and the armory.
 // The geometry is made once per gun and star count and shared (meshes are marked userData.shared, so never dispose them).
@@ -326,7 +372,7 @@ function makeGun(i, g, stars) {
   };
   add(g, b.main);
   const sub = s => { if (!s) return null; const grp = new THREE.Group(); grp.position.set(...s.at.map(n => n * px)); add(grp, s.geos); g.add(grp); return grp; };
-  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin: sub(b.spin), round: sub(b.round) };
+  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin: sub(b.spin), round: sub(b.round), holo: b.m.holo && b.m.holo.map(n => n * px) };
 }
 // the solid pixels on the outside of gun i (with no upgrade bands), as x, y, z centers in world units, for keeping arms out of it
 const gunCellCache = {};
@@ -379,8 +425,8 @@ const VM_ARMS = {
 function buildGun() {
   vm.traverse(o => { if (o.geometry && o !== flashMesh && !o.userData.shared) o.geometry.dispose(); });
   vm.clear(); flashMesh.visible = false;
-  const { muzzle: [my, mz], grip, fore, spin, round } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
-  gunSpin = spin; gunRound = round;
+  const { muzzle: [my, mz], grip, fore, spin, round, holo } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
+  gunSpin = spin; gunRound = round; gunHolo = holo;
   vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
   if (fore && arms[1]) vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]);
   if (WEAPONS[cur].melee) return;

@@ -8,7 +8,8 @@ function shoot() {
   if (ammo[cur] <= 0) { if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
   ammo[cur]--; cd = w.rate;
   if (gunSpin) gunSpinV = 30;
-  if (w.flame) flame(w);
+  if (w.beam) heatBeam(w);
+  else if (w.flame) flame(w);
   else {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3;
     sfx(w.id);
@@ -66,6 +67,36 @@ function flame(w) {
     zz.burn = BURN_T; zz.burnDmg = w.dmg * .6; zz.burnBy = null;
   }
 }
+// heat ray: a straight beam from the gun to whatever's under your crosshair (out to its range), doing its damage every tick
+function heatBeam(w) {
+  kick = .12; beamHeld = .12; // keeps the hum going (sound.js)
+  camera.getWorldDirection(fwd);
+  ray2.setFromCamera(ndc.set(0, 0), camera); ray2.far = w.range;
+  const hit = ray2.intersectObjects(shotTargets(), false)[0];
+  const end = hit ? hit.point : tmp.copy(camera.position).addScaledVector(fwd, w.range);
+  const zz = hit?.object.userData.zombie;
+  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head); }
+  if (hit && Math.random() < .35) burst(end, Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1); // scorching where it lands
+  showBeam(null, flashMesh.getWorldPosition(beamFrom), end);
+}
+// beams on screen, one per shooter (null = you): a hot orange glow round a white core, from the muzzle to where it lands.
+// Each lasts a moment after the last tick, so holding the trigger keeps it steady
+const beamGeo = new THREE.BoxGeometry(1, 1, 1), beamFrom = new THREE.Vector3(), beams = new Map();
+const beamMats = [new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xfff4d0 })];
+function showBeam(by, from, to) {
+  let b = beams.get(by);
+  if (!b) {
+    const g = new THREE.Group();
+    for (const [mat, s] of [[beamMats[0], 1], [beamMats[1], .4]]) { const m = new THREE.Mesh(beamGeo, mat); m.scale.set(s, s, 1); g.add(m); }
+    scene.add(g); beams.set(by, b = { g, life: 0 });
+  }
+  const len = from.distanceTo(to);
+  b.g.position.lerpVectors(from, to, .5); b.g.lookAt(to); b.g.scale.set(.055, .055, len);
+  b.g.visible = true; b.life = .08;
+}
+function beamTick(dt) { for (const b of beams.values()) if (b.g.visible && (b.life -= dt) <= 0) b.g.visible = false; }
+function clearBeams() { for (const b of beams.values()) scene.remove(b.g); beams.clear(); }
+
 // rockets and flares fired by a deathmatch bot (by = the bot) can hit you, and skip the bot that fired them.
 // Yours (by = null) fly out of the camera and never hit you.
 const youBox = new THREE.Box3(), youHitP = new THREE.Vector3();

@@ -275,6 +275,17 @@ const SOUNDS = {
     s.tone({ f: 180, f2: 60, d: .15, v: .7 });
     for (let k = 0; k < 7; k++) s.click({ t: .04 + s.r() * .4, f: 2500 + s.r() * 3000, v: .3 });
   }],
+  hitman: [.25, .32, s => { // suppressed: a soft "thwp" and the slide clacking back, no bang
+    s.hiss({ ft: 'bandpass', f: 1300, f2: 500, q: 1.2, d: .045, v: 1 });
+    s.thud({ d: .025, f: 220, v: .7 });
+    s.clack({ t: .012, f: 3200, d: .01, v: .55 }); s.clack({ t: .05, f: 2600, d: .012, v: .4 });
+  }],
+  heatStart: [.3, .45, s => { // the beam catching: a quick rising zap
+    s.tone({ f: 300, f2: 1800, d: .14, v: .5, glide: .1 });
+    s.tone({ type: 'square', f: 150, f2: 420, d: .14, v: .2, lp: 2000, glide: .1 });
+    s.hiss({ ft: 'highpass', f: 4000, d: .08, v: .35 });
+  }],
+  heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
   swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife whoosh
   slash: [.2, .6, s => { // knife connecting: a metal "shing" and a thud
     s.hiss({ ft: 'highpass', f: 3000, f2: 6000, d: .06, v: .8 });
@@ -298,6 +309,12 @@ const SOUNDS = {
   r_flame: [2.2, .45, s => { s.latch(.15); s.hiss({ ft: 'highpass', f: 3000, t: .45, a: .05, d: .35, v: .5 }); s.thunk(1.2); s.latch(1.75); s.clack({ t: 1.95, f: 4000, d: .008, v: .5 }); s.hiss({ t: 1.98, f: 400, f2: 1200, d: .15, v: .5 }); }],
   r_rocket: [2.6, .45, s => { s.latch(.3); s.hiss({ ft: 'bandpass', f: 600, f2: 300, q: 2, t: 1.0, a: .1, d: .25, v: .5 }); s.thunk(1.35); s.latch(2.1); }],
   r_flare: [1.3, .45, s => { s.latch(.1); s.shell(.6); s.latch(1.0); }],
+  r_hitman: [1.1, .45, s => { s.magOut(.08); s.magIn(.5); s.rack(.82); }],
+  r_heatray: [2, .45, s => { // vent the heat, swap the cell, then it charges back up
+    s.latch(.12); s.hiss({ ft: 'highpass', f: 3500, f2: 1500, t: .18, a: .03, d: .45, v: .5 });
+    s.magOut(.8); s.magIn(1.2);
+    s.tone({ f: 400, f2: 2000, t: 1.5, a: .25, d: .1, v: .28, glide: .3 }); s.tone({ f: 2000, t: 1.85, d: .12, v: .25 });
+  }],
 
   // ---- getting hit. These play from whoever got hit, so a far-away hit is barely audible ----
   // a short, strained "hgh!" pushed out of the chest, the mouth closing toward "uhm"
@@ -470,8 +487,9 @@ function hurtSfx(who, name, at, opts = {}) {
   sfx(name, { at, far: 30, ...opts });
 }
 
-// ---- sounds that keep going while something is held: the flamethrower and the eradicator's motor ----
+// ---- sounds that keep going while something is held: the flamethrower, the eradicator's motor and the heat ray ----
 let flameHeld = 0, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null;
+let beamHeld = 0, beamOn = false, beamGain = null;
 function flameBuffer() { // 2 seconds of roaring, crackling fire that loops without a seam
   const n = SR * 2, x = SR / 10, r = rng(99), raw = new Float32Array(n + x);
   let lo = 0, lo2 = 0;
@@ -506,5 +524,16 @@ function soundTick(dt, live) {
     spinOsc.connect(lp).connect(spinGain).connect(bus); spinOsc.start();
   }
   if (spinOsc) { spinOsc.frequency.setTargetAtTime(50 + spin * 130, t, .05); spinGain.gain.setTargetAtTime(spin * .07, t, .05); }
+  // heat ray: a buzzing hum with a fast shimmer while the beam is on
+  beamHeld = live ? beamHeld - dt : 0;
+  const bOn = beamHeld > 0;
+  if (bOn && !beamGain) {
+    beamGain = ac.createGain(); beamGain.gain.value = 0;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 1.5;
+    const lfo = ac.createOscillator(), depth = ac.createGain(); lfo.frequency.value = 11; depth.gain.value = 9;
+    for (const [type, f] of [['sawtooth', 110], ['square', 221]]) { const o = ac.createOscillator(); o.type = type; o.frequency.value = f; lfo.connect(depth).connect(o.frequency); o.connect(bp); o.start(); }
+    bp.connect(beamGain).connect(bus); lfo.start();
+  }
+  if (bOn !== beamOn) { beamOn = bOn; sfx(bOn ? 'heatStart' : 'heatEnd'); beamGain?.gain.setTargetAtTime(bOn ? .1 : 0, t, bOn ? .03 : .06); }
 }
-function soundsOff() { flameHeld = 0; if (flameGain) flameGain.gain.value = 0; flameOn = false; if (spinGain) spinGain.gain.value = 0; }
+function soundsOff() { flameHeld = 0; if (flameGain) flameGain.gain.value = 0; flameOn = false; if (spinGain) spinGain.gain.value = 0; beamHeld = 0; beamOn = false; if (beamGain) beamGain.gain.value = 0; }

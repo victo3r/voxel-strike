@@ -51,11 +51,14 @@ function update(dt) {
   }
   const hold = holdOf(w);
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
-  const fov = 75 - adsT * (w.scope ? 57 : 20);
+  // zoom: a holo sight's zoom is how many times bigger things look, so the view narrows to 1/zoom of the normal one
+  const zoomFov = w.zoom ? 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(37.5)) / w.zoom)) : 0;
+  const fov = 75 - adsT * (w.scope ? 57 : w.zoom ? 75 - zoomFov : 20);
   if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }
-  const scoped = w.scope && adsT > .8;
+  const scoped = w.scope && adsT > .8, holo = !!(w.zoom && gunHolo) && adsT > .8;
   $('scope').style.display = scoped ? 'block' : 'none';
-  $('cross').style.display = scoped ? 'none' : '';
+  $('holo').style.display = holo ? 'block' : 'none';
+  $('cross').style.display = scoped || holo ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
   if (w.melee) { // blade tipped up a little out of your fist
@@ -71,6 +74,7 @@ function update(dt) {
     vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob - (reloading > 0 ? .15 : 0), -.55 + kick * .08);
     vm.rotation.set(kick * .25 * (1 - adsT * .85) + (reloading > 0 ? -.6 : 0), 0, 0); // much less muzzle climb while aiming so the gun doesn't cover the crosshair
     if (hold === 'pistol') vm.position.y += .09 * (1 - adsT); // a pistol sits higher so your fist under its grip is on screen
+    if (w.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // aiming raises the holo sight's window onto the middle of the screen
   }
   if ((crossT -= dt) <= 0) $('cross').style.setProperty('--c', '#fff');
   }
@@ -228,7 +232,7 @@ function update(dt) {
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, 0x888888, 1); }
   }
 
-  updateFlares(dt);
+  updateFlares(dt); beamTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;

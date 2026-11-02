@@ -47,6 +47,9 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #shop small{color:var(--silver);font-size:13px}
 #shop .cat{color:var(--acc-lt)}
 #scope{position:absolute;inset:0;display:none;background:radial-gradient(circle,transparent 0 31vh,#111 31.5vh 32.5vh,#000 33vh)}
+/* the holo sight's red dot and ring, seen through the window on the Hitman */
+#holo{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;display:none;border:2px solid rgba(255,60,60,.75);border-radius:50%;box-sizing:border-box;filter:drop-shadow(0 0 3px rgba(255,40,40,.8))}
+#holo:before{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#ff4040}
 #scope:before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:#000}
 #scope:after{content:"";position:absolute;top:50%;left:0;right:0;height:2px;margin-top:-1px;background:#000}
 
@@ -127,6 +130,10 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armAct .an{font:bold 20px monospace}
 #armAct .st,#armDet .st{color:var(--acc-lt);font-size:15px}
 #armAct .ab{display:flex;gap:8px;pointer-events:auto}
+/* which star you use: ◀ USING ★★ ▶ */
+#armAct .lvp{display:flex;align-items:center;gap:10px;pointer-events:auto;font:bold 15px monospace;color:var(--acc-lt)}
+#armAct .lvp button{font:bold 14px monospace;padding:5px 11px}
+.st i{font-style:normal;opacity:.35}
 #armAct button{font:bold 17px monospace;padding:9px 18px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
 #armAct button:hover:not(:disabled){background:var(--hov)}
 #armAct button:disabled{opacity:.6;cursor:default}

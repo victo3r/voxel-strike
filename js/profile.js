@@ -5,10 +5,11 @@ const xpNeed = lv => XP_BASE + XP_STEP * (lv - 1);
 const lvBonus = lv => 5 * (lv - 1); // coins for reaching level lv: 5 at level 2, 10 at level 3 ... 245 at level 50
 // guns: weapon id -> stars (1-3) for unlockable guns you own. Starters aren't listed, everyone has them.
 // loadout: category -> weapon id, the one gun per category you take into a match (missing = that category's starter)
-// armor: stars on your armor, 0 = none (js/armor.js ARMOR_TIERS)
+// use: weapon id -> the stars you take into a match when that's fewer than you own (missing = all of them)
+// armor: stars on your armor, 0 = none (js/armor.js ARMOR_TIERS). armorUse: the star you wear when it's lower than that (0 = your best)
 // v = save format version, so later changes can upgrade old saves instead of wiping them
-let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, armor: 0 }; // xp = progress toward the next level
-try { const s = JSON.parse(localStorage.getItem('voxelstrike-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout } }; } catch {}
+let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0 }; // xp = progress toward the next level
+try { const s = JSON.parse(localStorage.getItem('voxelstrike-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use } }; } catch {}
 let onSave = () => {}; // js/cloud.js sets this to upload the change when you're signed in
 const saveProf = () => { try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {} onSave(); };
 

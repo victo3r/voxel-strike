@@ -178,13 +178,13 @@ const SHR = new THREE.Vector3(...SH_R).divideScalar(16), SHL = new THREE.Vector3
 const armTo = (sh, p, out) => out.setFromUnitVectors(DOWN, _av.copy(p).sub(sh).normalize());
 const _av = new THREE.Vector3();
 function heroGun(i) {
-  const key = i < 0 ? '' : i + ':' + gunStars(i);
+  const key = i < 0 ? '' : i + ':' + gunUse(i);
   if (key === holdKey) return;
   holdKey = key;
   holdG.clear(); // gun geometry is shared (makeGun), nothing to free
   if (i < 0) { pose = null; return; }
   const g = new THREE.Group();
-  makeGun(i, g, Math.max(0, gunStars(i) - 1)); // gold bands for its upgrades, like in your hands
+  makeGun(i, g, Math.max(0, gunUse(i) - 1)); // gold bands for the stars you use, like in your hands
   g.scale.setScalar(GUN_S);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   pose = { pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, sh: holdOf(BASE[i]) === 'shoulder' };
@@ -200,12 +200,12 @@ function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
   heroCh = buildChar(prof.look, 1 / 16, true);
-  dressArmor(heroCh, heroArmorN = prof.armor | 0);
+  dressArmor(heroCh, heroArmorN = wornArmor());
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
   $('lookName').textContent = lookChoices()[lookIndex()]?.name ?? 'CUSTOM';
 }
-// the armor he's wearing: yours, or the tier you're looking at in the armory
+// the armor he's wearing: the star you wear, or the one you're looking at in the armory
 let heroArmorN = 0;
 function heroArmor(n) { if (heroCh && n !== heroArmorN) { dressArmor(heroCh, heroArmorN = n); } }
 function pickLook(step) {

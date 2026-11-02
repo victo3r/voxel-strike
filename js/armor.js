@@ -1,6 +1,7 @@
 // Armor you wear: one item, Basic Armor, bought once in the armory (WEAR page) and then upgraded one star at a time.
 // Each star is a different chestplate. prof.armor = how many stars you have (0 = none, 1 = Wooden ... 8 = Champion).
-// It's worn in every bot match (not zombie waves, which has its own shop armor). Bots wear the same tier you do.
+// You can wear any star you own (prof.armorUse), not just your best. It's worn in every bot match (not zombie waves,
+// which has its own shop armor). Each bot rolls its own armor, never better than yours.
 // hp = the armor bar you spawn with: it takes damage before your health.
 // dr = share of every hit it takes off before anything else (so Ruby: a 50 hit does 46, and the armor bar soaks that first).
 // unlock = account level you need for that star, price = coins for that star (the first star is buying it)
@@ -33,8 +34,13 @@ const ARMOR_ITEM = 'Basic Armor';
 const GEMS = { am: [178, 122, 238], ru: [228, 58, 76], em: [58, 204, 112], di: [134, 234, 246] };
 const armorOf = n => ARMOR_TIERS[n - 1] ?? null;
 const armorStars = n => '★'.repeat(n) + '☆'.repeat(ARMOR_MAX - n);
+// the star you've picked to wear (0 = none): your best unless you picked a lower one
+const wornArmor = () => { const n = Math.min(ARMOR_MAX, prof.armor | 0), u = prof.armorUse | 0; return u ? Math.min(u, n) : n; };
 // the tier worn in this match: yours in bot matches, none in zombie waves
-const matchArmor = () => pvp() ? Math.min(ARMOR_MAX, prof.armor | 0) : 0;
+const matchArmor = () => pvp() ? wornArmor() : 0;
+// a bot's armor for the match: none (BOT_BARE of the time) or any star up to the one you're wearing, all equally likely
+const BOT_BARE = .15;
+const botArmor = () => { const n = matchArmor(); return n && Math.random() >= BOT_BARE ? 1 + (Math.random() * n | 0) : 0; };
 // puts on (or takes off) the armor for this match: full armor bar and its damage cut
 function wearArmor() {
   const T = armorOf(matchArmor());
