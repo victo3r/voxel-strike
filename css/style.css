@@ -183,3 +183,21 @@ canvas{width:100vw!important;height:100vh!important;display:block}
   #bindList,#sensList{font-size:13px;gap:3px 6px;margin:6px}#binds button{font-size:12px;padding:3px 6px}
   #shop button{font-size:14px;padding:6px}#items{gap:6px;margin:6px}#banner{font-size:36px}
 }
+
+#acct{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;color:#bcd;min-height:26px}
+#acct b{color:#fff}
+#acct small{font-size:12px;color:#7fa}
+#acct small.saving{color:#bcd}#acct small.offline{color:#f96}
+#acct button{font:bold 12px monospace;padding:4px 8px;background:rgba(0,0,0,.45);color:#bcd;border:2px solid #2a5a60;cursor:pointer}
+#acct button:hover{color:#fff;border-color:#ffd23f}
+#acct #acctOut{margin-left:auto}
+#acctBox{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.88);color:#fff;text-shadow:2px 2px 0 #000;z-index:11;overflow-y:auto;padding:12px 8px;box-sizing:border-box}
+#acctBox h1{font-size:48px;margin:0;color:#ffd23f;text-shadow:5px 5px 0 #b33}
+#acctBox p{margin:0;font-size:15px;max-width:90vw;text-align:center}
+#acctBox input{width:min(300px,80vw);font:bold 16px monospace;padding:7px 10px;background:rgba(0,0,0,.45);color:#ffd23f;border:3px solid #2a5a60;outline:none}
+#acctBox input:focus{border-color:#ffd23f}
+#acctBox button{font:bold 15px monospace;padding:7px 10px;background:#3a2a1a;color:#fff;border:3px solid #ffd23f;cursor:pointer}
+#acctBox button:hover{background:#5a3f22}
+#acctX{position:absolute;top:12px;right:12px}
+#acctErr{color:#f96;min-height:1.2em}
+#acctBox small{color:#999;font-size:12px;max-width:90vw;text-align:center}

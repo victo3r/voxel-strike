@@ -137,6 +137,6 @@ let myName = cleanName(localStorage.getItem('voxelstrike-name'));
 if (!myName) { myName = newMyName(); localStorage.setItem('voxelstrike-name', myName); }
 function setMyName(s) {
   const n = cleanName(s);
-  if (n) { myName = n; try { localStorage.setItem('voxelstrike-name', n); } catch {} }
+  if (n && n !== myName) { myName = n; try { localStorage.setItem('voxelstrike-name', n); } catch {} onSave(); }
   return myName;
 }

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=61">
+<link id="css" rel="stylesheet" href="css/style.css?v=62">
 </head>
 <body>
 <div id="hud">
@@ -14,6 +14,7 @@
 <div id="lobby">
   <div id="lobbyPanel">
     <div id="prof"></div>
+    <div id="acct"></div>
     <div id="nameRow"><input id="nameIn" maxlength="16" autocomplete="off" spellcheck="false"><button id="nameDice" title="Random name">🎲</button></div>
     <p id="lobbyBest"></p>
     <div class="label">SELECT MODE</div>
@@ -69,6 +70,16 @@
   <div id="rewards"></div>
   <div><button id="againBtn">PLAY AGAIN</button> <button id="postLobby">EXIT TO LOBBY</button></div>
 </div>
+<div id="acctBox">
+  <button id="acctX">✕ CLOSE</button>
+  <h1>ACCOUNT</h1>
+  <p>Sign in to keep your level, coins, guns and look on every device.</p>
+  <input id="acctUser" maxlength="16" placeholder="Username" autocomplete="username" spellcheck="false">
+  <input id="acctPass" type="password" maxlength="128" placeholder="Password" autocomplete="current-password">
+  <div><button id="acctIn">SIGN IN</button> <button id="acctNew">CREATE ACCOUNT</button></div>
+  <p id="acctErr"></p>
+  <small>There's no email, so a lost password can't be reset. Write it down somewhere.</small>
+</div>
 <div id="shop">
   <h1>SHOP</h1>
   <p id="shopInfo"></p>
@@ -82,9 +93,9 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 61;
+const V = 62;
 const FILES = ['js/core.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/weapons.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js'];
+  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js'];
 for (const src of FILES) {
   const s = document.createElement('script');
   s.src = src + '?v=' + V; s.async = false; // async=false keeps them running in list order
