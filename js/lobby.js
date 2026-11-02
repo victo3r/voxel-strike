@@ -167,22 +167,61 @@ const lookChoices = () => prof.myLook && !isPreset(prof.myLook) ? [...PRESETS, {
 const lookIndex = () => { const k = lookKey(prof.look); return lookChoices().findIndex(p => lookKey(p.look) === k); };
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
 let heroCh, torso, headPiv, armL, armR; // armL = the arm on the left of the screen when it faces you
-// in the armory he raises the gun you're looking at, held the way the bots hold theirs (deathmatch.js makeBot/holdGun)
-const holdG = new THREE.Group(); holdG.position.y = 22 / 16; // at the shoulders
-let holdKey = '', holdK = 0;
-const HOLD_TILT = .3; // points it a little down, at the floor in front of him
+// in the armory he holds the gun you picked out in front of his chest, side-on to you: his right hand on the grip and,
+// on long guns, his left hand on the front of it. The gun sits where both arms (which don't bend) can reach their spots
+const holdG = new THREE.Group(); // its position and turn are in the character's space, worked out per gun by solveHold
+let holdKey = '', holdK = 0, pose = null;
+const GUN_S = 1.25 / 16 / BOT_U; // the same gun model the bots hold, a bit bigger so it shows off better
+const BEHIND = new THREE.Vector3(0, 0, -.13);
+// where the hands go, in the gun model's own units: [y, z] for the right hand, then the left hand (null = held in one hand)
+const GRIPS = {
+  voxel: [[-.15, .02], null], flare: [[-.16, .02], null], knife: [[-.01, .04], null],
+  shotgun: [[-.14, 0], [-.1, -.42]], ar: [[-.14, .02], [-.07, -.4]], sniper: [[-.14, .02], [-.09, -.33]],
+  eradicator: [[-.18, .02], [-.15, -.36]], rocket: [[-.19, -.04], [-.21, -.45]], flame: [[-.16, .02], [-.11, -.46]],
+};
+// which way the muzzle points: across his body to his left (your right), tipped up a little
+const AIM_2H = new THREE.Vector3(1, .36, .1).normalize(), AIM_1H = new THREE.Vector3(1, .45, .12).normalize(), AIM_MELEE = new THREE.Vector3(.5, .8, .35).normalize();
+const SH_R = new THREE.Vector3(-6 / 16, 22 / 16, 0), SH_L = new THREE.Vector3(6 / 16, 22 / 16, 0); // shoulders (character.js buildChar)
+const REACH = 8 / 16; // shoulder to the middle of the hand
+const FWD = new THREE.Vector3(0, 0, -1), DOWN = new THREE.Vector3(0, -1, 0);
+const armTo = (sh, p) => new THREE.Quaternion().setFromUnitVectors(DOWN, p.clone().sub(sh).normalize());
+function solveHold(i, box) {
+  const w = BASE[i], [r, f] = GRIPS[w.id] ?? [[-.15, 0], null];
+  const q = new THREE.Quaternion().setFromUnitVectors(FWD, f ? AIM_2H : w.melee ? AIM_MELEE : AIM_1H);
+  const off = ([y, z]) => new THREE.Vector3(0, y, z).multiplyScalar(GUN_S).applyQuaternion(q); // from the gun's origin
+  const oR = off(r).add(BEHIND), oF = f && off(f).add(BEHIND); // hands grip it from behind, so the gun is in front of them
+  let backZ = Infinity; // the nearest the gun gets to his chest, from its origin
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z])
+    backZ = Math.min(backZ, new THREE.Vector3(x, y, z).applyQuaternion(q).z);
+  const p = new THREE.Vector3(), hand = new THREE.Vector3(), best = new THREE.Vector3();
+  let bestC = Infinity;
+  for (let x = -.5; x <= .5; x += .025) for (let y = .75; y <= 1.35; y += .025) for (let z = .15; z <= .8; z += .025) {
+    if (z + backZ < .2 || z + oR.z < .22 || (oF && z + oF.z < .22)) continue; // keep the gun and his hands out in front of his chest
+    p.set(x, y, z);
+    let c = (hand.copy(p).add(oR).distanceTo(SH_R) - REACH) ** 2 + .3 * (y - 1.05) ** 2 + .2 * (z - .3) ** 2;
+    if (oF) c += (hand.copy(p).add(oF).distanceTo(SH_L) - REACH) ** 2 + .5 * (x + (oR.x + oF.x) / 2) ** 2; // hands either side of his middle
+    else c += .15 * (x + .1) ** 2;
+    if (c < bestC) { bestC = c; best.copy(p); }
+  }
+  return { pos: best, q, qR: armTo(SH_R, best.clone().add(oR)), qL: oF ? armTo(SH_L, best.clone().add(oF)) : null };
+}
 function heroGun(i) {
   const key = i < 0 ? '' : i + ':' + gunStars(i);
   if (key === holdKey) return;
   if (holdKey && key && holdK > .9) holdK = .7; // swapping guns: dips and brings the new one back up
   holdKey = key;
   holdG.traverse(o => o.geometry?.dispose()); holdG.clear();
-  if (i < 0) return;
+  if (i < 0) { pose = null; return; }
   const g = new THREE.Group();
   makeGun(i, g, Math.max(0, gunStars(i) - 1), false); // gold bands for its upgrades, like in your hands
-  g.rotation.y = Math.PI; g.position.set(-4 / 16, .5 / 16, 10 / 16); g.scale.setScalar(1 / 16 / BOT_U); // he's a little taller than a bot
+  g.scale.setScalar(GUN_S); g.updateMatrixWorld(true);
+  pose = solveHold(i, new THREE.Box3().setFromObject(g));
   holdG.add(g);
 }
+// the hold eases between guns instead of snapping (these follow pose)
+const hPos = new THREE.Vector3(-.4, .6, .2), hQ = new THREE.Quaternion(), hQR = new THREE.Quaternion(), hQL = new THREE.Quaternion();
+const LOW_Q = new THREE.Quaternion().setFromUnitVectors(FWD, new THREE.Vector3(.3, -1, .3).normalize()), LOW_P = new THREE.Vector3(-.4, .6, .2);
+const _q = new THREE.Quaternion(), _p = new THREE.Vector3();
 function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
@@ -275,7 +314,7 @@ $('custDone').onclick = () => showCust(false);
 addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && custOpen()) showCust(false); });
 
 const REST = .45; // default 3/4 view
-const ARM_REST = -1; // in the armory he turns toward the panel, so you see the side of the gun he's holding
+const ARM_REST = -.25; // in the armory he faces you, turned a little toward the panel, with the gun side-on across his chest
 let wasArm = false;
 let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, mNX = 0, mNY = 0;
 const heroScreen = { x: innerWidth * .7, y: innerHeight / 2 };
@@ -321,14 +360,18 @@ function updateLobby(dt) {
     }
   }
   hero.rotation.y = spin;
-  armL.rotation.z = -.05 - Math.sin(t * 1.6) * .03; armR.rotation.z = .05 + Math.sin(t * 1.6) * .03;
-  armL.rotation.x = Math.sin(t * 1.1) * .05; armR.rotation.x = -Math.sin(t * 1.1) * .05;
+  armL.rotation.set(Math.sin(t * 1.1) * .05, 0, -.05 - Math.sin(t * 1.6) * .03);
+  armR.rotation.set(-Math.sin(t * 1.1) * .05, 0, .05 + Math.sin(t * 1.6) * .03);
   // armory: arms come up to hold the gun. The gun swings up with them, growing in as it leaves his side
   holdK += ((armOpen && holdKey ? 1 : 0) - holdK) * Math.min(1, dt * 9);
-  const e = holdK * holdK * (3 - 2 * holdK), up = -Math.PI / 2 + HOLD_TILT;
-  armL.rotation.x += (up - armL.rotation.x) * e; armL.rotation.z += (.2 - armL.rotation.z) * e;
-  armR.rotation.x += (up - armR.rotation.x) * e; armR.rotation.z += (-.85 - armR.rotation.z) * e;
-  holdG.visible = e > .01; holdG.rotation.x = armL.rotation.x + Math.PI / 2; holdG.scale.setScalar(Math.min(1, e * 2.5));
+  const e = holdK * holdK * (3 - 2 * holdK);
+  if (pose) {
+    const k = Math.min(1, dt * 12);
+    hPos.lerp(pose.pos, k); hQ.slerp(pose.q, k); hQR.slerp(pose.qR, k); hQL.slerp(pose.qL ?? armR.quaternion, k);
+    armL.quaternion.slerp(hQR, e); armR.quaternion.slerp(hQL, e); // armL is his right arm (heroCh.armR)
+    holdG.position.copy(_p.copy(LOW_P).lerp(hPos, e)); holdG.quaternion.copy(_q.copy(LOW_Q).slerp(hQ, e));
+  }
+  holdG.visible = e > .01; holdG.scale.setScalar(Math.min(1, e * 2.5));
   torso.scale.z = 1 + Math.sin(t * 1.6) * .02;
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   // fade the head back to center as the cursor moves behind the body, so it never flips across at ±180°
@@ -343,4 +386,5 @@ function updateLobby(dt) {
   for (const l of lamps) l.intensity = 5.5 + Math.sin(t * 9 + l.position.x) * .4 + Math.sin(t * 23) * .2;
   glowStrip.material.color.setHSL(.48, .85, .5 + Math.sin(t * 2) * .08);
   frameLobby(dt);
+  if (armOpen) placeAct(); // the armory's buttons follow him as the camera glides
 }

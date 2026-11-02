@@ -108,21 +108,35 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armory #armTabs button.sel{background:var(--sel);color:#fff}
 #armTabs img{width:60px;height:30px;image-rendering:pixelated}
 #armList{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-#armList .card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;background:var(--glass);border:3px solid var(--line-dim);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
-#armList .card.on{border-color:var(--acc);background:rgba(47,191,113,.3)}
-#armList .card.locked{opacity:.5}
+#armList .card{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 10px 10px;background:var(--glass);border:3px solid var(--line-dim);box-shadow:4px 4px 0 rgba(0,0,0,.4);cursor:pointer}
+#armList .card:hover{background:var(--hov)}
+#armList .card.sel{border-color:var(--acc);background:rgba(47,191,113,.3)}
+#armList .card.locked{opacity:.5}#armList .card.locked.sel{opacity:.75}
+#armList .tag{position:absolute;top:4px;right:6px;font:bold 11px monospace;color:var(--silver)}
+#armList .card.on .tag{color:var(--acc-lt)}
+#armAct{position:fixed;bottom:4%;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:8px;z-index:9;color:#fff;text-shadow:2px 2px 0 #000;pointer-events:none}
+#armAct .an{font:bold 20px monospace}
+#armAct .st,#armDet .st{color:var(--acc-lt);font-size:15px}
+#armAct .ab{display:flex;gap:8px;pointer-events:auto}
+#armAct button{font:bold 17px monospace;padding:9px 18px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+#armAct button:hover:not(:disabled){background:var(--hov)}
+#armAct button:disabled{opacity:.6;cursor:default}
+#armAct button.eq{opacity:1;border-color:var(--acc);background:rgba(47,191,113,.3);color:var(--acc-lt)}
+#armDet{flex-direction:column;gap:8px}
+#armDet #detBack{align-self:flex-start;font:bold 14px monospace;padding:6px 12px}
+#detCv{width:100%!important;height:min(280px,36vh)!important;display:block}
+#armDet .dn{font:bold 24px monospace}
+#armDet p{margin:0;font-size:14px;line-height:1.45;color:var(--silver)}
+#armDet .ds{display:grid;grid-template-columns:auto 1fr;gap:5px 18px;margin-top:6px;font-size:14px}
+#armDet .ds span{color:var(--muted)}
 #armList .card img{width:96px;height:48px;image-rendering:pixelated}
 #armList .cn{font-size:17px;font-weight:bold;text-align:center}
 #armList .st{color:var(--acc-lt);font-size:13px}
 #armList small{color:var(--silver);font-size:12px}
-#armList .cb{display:flex;gap:6px;margin-top:4px}
 #armory button{font-family:monospace}
-#armList .cb button{font:bold 14px monospace;padding:6px 10px}
-#armList .cb button:disabled{opacity:.5;cursor:default}
-#armList .cb button.eq{opacity:1;border-color:var(--acc);background:rgba(47,191,113,.3);color:var(--acc-lt)}
 #armX{margin-left:auto;font:bold 15px monospace;padding:7px 10px}
 @media (max-height:620px),(max-width:620px){#armory h1{font-size:26px;text-shadow:3px 3px 0 var(--acc-dk)}#armTabs img{width:44px;height:22px}#armory #armTabs button{font-size:9px}#armList{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
-@media (max-width:700px){#armory{width:100%;-webkit-mask-image:none;mask-image:none;padding:12px 14px}}
+@media (max-width:700px){#armory{width:100%;-webkit-mask-image:none;mask-image:none;padding:12px 14px 100px}#armAct{left:50%!important;bottom:12px}}
 
 /* match HUD + leaderboards */
 #top .clock{font-size:30px;color:#fff}
