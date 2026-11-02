@@ -4,26 +4,28 @@
 // hp = the armor bar you spawn with: it takes damage before your health.
 // dr = share of every hit it takes off before anything else (so Ruby: a 50 hit does 46, and the armor bar soaks that first).
 // unlock = account level you need for that star, price = coins for that star (the first star is buying it)
-// shape = how the chestplate is built (see armorPieces): t = how far the plates stand off the chest, yb = where the plate ends at the bottom,
-//   pad = shoulder pads [outer x, top y, bottom of the side plate], layer = a second plate on the pads, pecs = raised chest plates,
-//   gem = size of the chest gem, shards = crystals on each pad, tas = where the plates over the hips end, spine = a ridge down the back
+// shape = how the chestplate is built (see armorPieces): t = how far the plates stand off the chest, yb = where the plate ends at the bottom
+//   (the body runs y -12..12, so Wooden only covers the upper chest and each star reaches a bit lower),
+//   pad = shoulder pads [outer x, top y, bottom of the side plate], flap = how far down the plates joining each pad to the
+//   chest run over the front and back of the shoulder, layer = a second plate on the pads, pecs = raised chest plates,
+//   gem = size of the chest gem, shards = crystals on each pad, tas = how far the plates over the hips hang below the plate, spine = a ridge down the back
 const ARMOR_TIERS = [
   { id: 'wood', name: 'Wooden', hp: 50, dr: 0, unlock: 2, price: 10, c: [150, 104, 58], hi: [190, 144, 90], dk: [98, 64, 32],
-    shape: { t: 2, yb: -8 } },
+    shape: { t: 2, yb: 3 } },
   { id: 'steel', name: 'Steel', hp: 75, dr: 0, unlock: 5, price: 40, c: [158, 164, 174], hi: [212, 218, 226], dk: [96, 102, 112],
-    shape: { t: 2, yb: -10, pad: [14, 15] } },
+    shape: { t: 2, yb: 1, pad: [13, 14], flap: 9 } },
   { id: 'gold', name: 'Gold', hp: 100, dr: 0, unlock: 9, price: 100, c: [226, 178, 40], hi: [255, 226, 110], dk: [158, 112, 16],
-    shape: { t: 3, yb: -11, pad: [16, 16], pecs: true } },
+    shape: { t: 3, yb: -1, pad: [14, 14], flap: 8, pecs: true } },
   { id: 'amethyst', name: 'Amethyst', hp: 100, dr: .04, unlock: 14, price: 200, c: [146, 88, 206], hi: [198, 152, 246], dk: [88, 46, 144], gem: [238, 218, 255],
-    shape: { t: 3, yb: -11, pad: [17, 16, 8], pecs: true, gem: 6, shards: 1 } },
+    shape: { t: 3, yb: -3, pad: [15, 15], flap: 7, pecs: true, gem: 6, shards: 1 } },
   { id: 'ruby', name: 'Ruby', hp: 100, dr: .08, unlock: 20, price: 320, c: [196, 38, 58], hi: [244, 104, 114], dk: [122, 16, 34], gem: [255, 198, 202],
-    shape: { t: 3, yb: -11, pad: [18, 17, 7], layer: true, pecs: true, gem: 6, shards: 1, tas: -15 } },
+    shape: { t: 3, yb: -4, pad: [16, 15], flap: 7, layer: true, pecs: true, gem: 6, shards: 1, tas: 3 } },
   { id: 'emerald', name: 'Emerald', hp: 100, dr: .12, unlock: 27, price: 450, c: [36, 164, 86], hi: [110, 226, 150], dk: [16, 102, 50], gem: [206, 255, 224],
-    shape: { t: 4, yb: -11, pad: [18, 17, 6], layer: true, pecs: true, gem: 8, shards: 2, tas: -15 } },
+    shape: { t: 4, yb: -5, pad: [17, 15, 9], flap: 6, layer: true, pecs: true, gem: 8, shards: 2, tas: 3 } },
   { id: 'diamond', name: 'Diamond', hp: 100, dr: .16, unlock: 35, price: 600, c: [86, 206, 222], hi: [180, 246, 252], dk: [34, 142, 164], gem: [246, 255, 255],
-    shape: { t: 4, yb: -11, pad: [19, 18, 5], layer: true, pecs: true, gem: 8, shards: 3, tas: -16, spine: true } },
+    shape: { t: 4, yb: -6, pad: [18, 16, 8], flap: 6, layer: true, pecs: true, gem: 8, shards: 2, tas: 4, spine: true } },
   { id: 'champion', name: 'Champion', hp: 100, dr: .2, unlock: 50, price: 1000, c: [50, 50, 58], hi: [92, 92, 104], dk: [24, 24, 30], champ: true,
-    shape: { t: 4, yb: -11, pad: [19, 19, 4], layer: true, pecs: true, gem: 8, shards: 3, tas: -16, spine: true } },
+    shape: { t: 4, yb: -6, pad: [18, 16, 8], flap: 5, layer: true, pecs: true, gem: 8, shards: 2, tas: 4, spine: true } },
 ];
 const ARMOR_MAX = ARMOR_TIERS.length;
 const ARMOR_ITEM = 'Basic Armor';
@@ -62,8 +64,8 @@ function armorPieces(n, team = null) {
     M(3, 6, 5, 7, zf - 1, zf, hex([150, 150, 156]));
   }
   if (T.id === 'steel') { // overlapping bands, rivets in the corners
-    for (const y of [-6, -1, 4]) B(-9, 9, y, y + 1, -zf, zf, MID);
-    for (const y of [-9, 9]) M(6, 7, y, y + 1, zf - 1, zf, HI);
+    for (let y = yb + 4; y < 11; y += 4) B(-9, 9, y, y + 1, -zf, zf, MID);
+    for (const y of [yb + 3, 10]) M(6, 7, y, y + 1, zf - 1, zf, HI);
   }
   // the belt stands out from the plate. In team matches it's the team's color, so you can tell sides apart
   const beltC = team ? hex(team) : DK;
@@ -85,19 +87,25 @@ function armorPieces(n, team = null) {
   // plates hanging over the hips, front and back
   if (S.tas) for (const s of [1, -1]) {
     const [z0, z1] = s > 0 ? [4, zf] : [-zf, -4];
-    M(1, 8, S.tas, yb, z0, z1, C); M(1, 8, S.tas, S.tas + 1, z0, z1, DK);
+    const y0 = yb - S.tas;
+    M(1, 8, y0, yb, z0, z1, C); M(1, 8, y0, y0 + 1, z0, z1, DK);
   }
   // a ridge down the back
   if (S.spine) B(-2, 2, yb + 3, 12, -zf - 2, -zf, HI);
-  // shoulder pads over the tops of the arms, then a plate down the outside of the arm, a second plate on top, and crystals
+  // shoulder pads over the tops of the arms. Plates over the front and back of each shoulder join the pad to the chest,
+  // then (higher stars) a plate down the outside of the arm, a second plate on top, and crystals
   if (S.pad) {
-    const [x1, y1, lip] = S.pad;
-    M(8, x1, 12, y1, -6, 6, C); M(8, x1, y1 - 1, y1, -6, 6, HI); M(8, x1, 12, 13, -6, 6, DK);
-    if (lip) { M(16, x1, lip, 13, -6, 6, C); M(16, x1, lip, lip + 1, -6, 6, DK); }
+    const [x1, y1, lip] = S.pad, zp = zf - 1;
+    M(8, x1, 12, y1, -zp, zp, C); M(8, x1, y1 - 1, y1, -zp, zp, HI); M(8, x1, 12, 13, -zp, zp, DK);
+    if (S.flap) for (const s of [1, -1]) {
+      const [z0, z1] = s > 0 ? [4, zf] : [-zf, -4], xf = Math.min(x1, 14);
+      M(8, xf, S.flap, 13, z0, z1, C); M(8, xf, S.flap, S.flap + 1, z0, z1, DK);
+    }
+    if (lip) { M(16, x1, lip, 13, -zp, zp, C); M(16, x1, lip, lip + 1, -zp, zp, DK); }
     let top = y1;
-    if (S.layer) { M(10, x1 - 1, y1, y1 + 2, -4, 4, C); M(10, x1 - 1, y1 + 1, y1 + 2, -4, 4, HI); top += 2; }
+    if (S.layer) { M(10, x1 - 1, y1, y1 + 2, -4, 4, C); top += 2; }
     for (let k = 0; k < (S.shards ?? 0); k++) {
-      const x = 10 + k * 3, h = k === 1 ? 5 : 3, col = T.champ ? champGems[k % 4] : gemC;
+      const x = 10 + k * 3, h = k === 1 ? 3 : 2, col = T.champ ? champGems[k % 4] : gemC;
       B(x, x + 3, top, top + h, -2, 1, col); B(-x - 3, -x, top, top + h, -2, 1, T.champ ? champGems[(k + 3) % 4] : col);
     }
   }
