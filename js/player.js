@@ -1,9 +1,19 @@
 // A solid fills the space from s.bot (0 if not set) up to s.top, so floors can hang over your head.
 // A ramp (stairs) has a sloped top: s.ramp = { ax: 'x' | 'z', a, b } where its top is s.bot at coordinate a and s.top at b.
 // For a ramp, the height that counts is the highest point under you, so you walk up it like steps.
+// s.round = radius: a round solid (an umbrella, a palm's crown) that only counts inside that circle.
+// A peaked top (a roof, an umbrella): s.peak = { x, z, rx, rz, edge } is s.top over x, z, sloping down to edge at rx, rz out.
+// Round ones slope evenly all round, the rest like a pyramid. You walk up and down them like stairs.
 const BODY = 1.8, STEP = .5; // how tall you are for bumping your head, and the tallest ledge you walk up without jumping
-function overlaps(s, x, z, r) { return x + r > s.minX && x - r < s.maxX && z + r > s.minZ && z - r < s.maxZ; }
+function overlaps(s, x, z, r) {
+  return x + r > s.minX && x - r < s.maxX && z + r > s.minZ && z - r < s.maxZ && !(s.round && Math.hypot(x - (s.minX + s.maxX) / 2, z - (s.minZ + s.maxZ) / 2) > s.round + r);
+}
 function topAt(s, x, z, r) {
+  const K = s.peak;
+  if (K) {
+    const u = Math.max(0, Math.abs(x - K.x) - r) / K.rx, v = Math.max(0, Math.abs(z - K.z) - r) / K.rz;
+    return s.top - (s.top - K.edge) * Math.min(1, s.round ? Math.hypot(u, v) : Math.max(u, v));
+  }
   const R = s.ramp; if (!R) return s.top;
   const c = R.ax === 'x' ? x : z, h = v => s.bot + (s.top - s.bot) * Math.max(0, Math.min(1, (v - R.a) / (R.b - R.a)));
   return Math.max(h(c - r), h(c + r));
@@ -23,7 +33,8 @@ function groundAt(x, z, r, feet) {
   for (const s of solids) if (overlaps(s, x, z, r)) {
     const t = topAt(s, x, z, r);
     if (t > feet + 0.05 || t < g) continue;
-    if (t > g) { g = t; groundRamp = !!s.ramp; groundSolid = s; } else if (s.ramp) groundRamp = true;
+    const slope = !!(s.ramp || s.peak);
+    if (t > g) { g = t; groundRamp = slope; groundSolid = s; } else if (slope) groundRamp = true;
   }
   return g;
 }
@@ -67,16 +78,21 @@ const inWater = (x, z, feet) => !!MAP.water?.(x, z, feet);
 const overWater = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, 0, feet));
 // water you can go into without drowning (MAP.wet: the resort's pool). Spawns stay out of it
 const poolAt = (x, z) => !!MAP.wet?.(x, z, groundAt(x, z, 0, 0));
-// splash going into it, for you and for a bot or zombie (o.wet remembers whether it was already in)
+// splash going into it, for you and for a bot or zombie (o.wet remembers whether it was already in).
+// At most one splash every half second each, so bobbing about at the surface doesn't spam them
 function wetCheck(o, p) {
-  const wet = !!MAP.wet?.(p.x, p.z, p.y);
-  if (wet && !o.wet) { sfx('splash', o === P ? { v: .55 } : { at: p, far: 30, v: .55 }); splash(p); }
+  const wet = !!MAP.wet?.(p.x, p.z, p.y), now = performance.now();
+  if (wet && !o.wet && !(now - (o.splashAt || -1e9) < 500)) { o.splashAt = now; sfx('splash', o === P ? { v: .55 } : { at: p, far: 30, v: .55 }); splash(p); }
   o.wet = wet;
 }
-function walkDry(pos, nx, nz, r, grounded) {
-  const ox = pos.x, oy = pos.y, oz = pos.z, lag = pos.lag;
+// MAP.trapped: down in the pool. Would standing at x, z put you down in it?
+const dropsIn = (x, z, r, feet) => MAP.trapped({ x, y: groundAt(x, z, r, feet), z });
+// into = whoever it's after is down in the pool, so it's fine to go in after them. Otherwise it stays out
+function walkDry(pos, nx, nz, r, grounded, into) {
+  const ox = pos.x, oy = pos.y, oz = pos.z, lag = pos.lag, wasIn = !into && MAP.trapped?.(pos);
   if (!walkTo(pos, nx, nz, r, grounded)) return false;
-  if (!overWater(pos.x, pos.z, pos.y) || overWater(ox, oz, oy)) return true;
+  const sea = overWater(pos.x, pos.z, pos.y) && !overWater(ox, oz, oy);
+  if (!sea && (into || !MAP.trapped || wasIn || !dropsIn(pos.x, pos.z, r, pos.y))) return true;
   pos.x = ox; pos.y = oy; pos.z = oz; pos.lag = lag; return false;
 }
 // gravity for bots and zombies, the same as yours: walking off an edge they fall, but they stay on their feet down stairs.

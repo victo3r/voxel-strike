@@ -115,9 +115,18 @@ function bigTree(x, z, inside) {
   const w = 1.3 + rnd() * .9, h = 7.5 + rnd() * 3, s = 8 + rnd() * 3.5, c = pick(F_TINTS), ry = rnd() * Math.PI;
   (inside ? trunks : edgeTrunks).push([x, h / 2, z, w, h, w, 0]);
   (inside ? trunks : edgeTrunks).push([x, .3, z, w * 1.4, .6, w * 1.4, 0]);
-  if (inside) addSolid(x, z, w * 1.4, w * 1.4, 99);
+  if (inside) addSolid(x, z, w * 1.4, w * 1.4, h - .9);
   leaves.push([x, h + .6, z, s, 3, s, ry, c], [x, h + 2.8, z, s * .62, 2, s * .62, ry, c]);
-  if (rnd() < .6) { const a = rnd() * 6.28; leaves.push([x + Math.cos(a) * s * .3, h - 1, z + Math.sin(a) * s * .3, s * .5, 1.8, s * .5, ry, c]); }
+  // the leaf clumps are turned, so the part you can stand on is the biggest square that fits inside each one
+  const fit = 1 / (Math.abs(Math.cos(ry)) + Math.abs(Math.sin(ry))), clump = (cx, cz, size, bot, top) => {
+    const hw = size / 2 * fit, sol = addSolid(cx, cz, hw * 2, hw * 2, top, 'grass'); sol.bot = bot;
+  };
+  if (inside) { clump(x, z, s, h - .9, h + 2.1); clump(x, z, s * .62, h + 1.8, h + 3.8); }
+  if (rnd() < .6) {
+    const a = rnd() * 6.28, lx = x + Math.cos(a) * s * .3, lz = z + Math.sin(a) * s * .3;
+    leaves.push([lx, h - 1, lz, s * .5, 1.8, s * .5, ry, c]);
+    if (inside) clump(lx, lz, s * .5, h - 1.9, h - .1);
+  }
   spots.push([x, z]);
 }
 for (let tries = 0, k = 0; k < 60 && tries < 4000; tries++) {

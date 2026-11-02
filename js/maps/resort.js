@@ -36,6 +36,13 @@ const rectSlab = ([x0, x1, z0, z1], bot, top, m, cover, k) => addSlab((x0 + x1) 
 const rectMinus = ([x0, x1, z0, z1], [h0, h1, k0, k1]) =>
   [[x0, x1, z0, k0], [x0, x1, k1, z1], [x0, h0, k0, k1], [h1, x1, k0, k1]].filter(([a, b, c, d]) => b - a > .01 && d - c > .01);
 const plain = c => lam({ color: c });
+// tops you can stand on (roofs, umbrellas, palm crowns): solids added at the end, so they don't change where the palms and tufts go.
+// Round ones (r) are a circle of that radius. peak = how high the middle is, edge = how high the rim is (see topAt)
+const later = [];
+function standOn(x, z, rx, rz, bot, edge, peak, round, surf) {
+  later.push({ mesh: null, minX: x - rx, maxX: x + rx, minZ: z - rz, maxZ: z + rz, bot, top: peak, surf, round: round ? rx : 0,
+    peak: peak > edge ? { x, z, rx, rz, edge } : null });
+}
 
 // --- the island: a grid of 1x1 cells over the whole map. Each is sea, wet sand, sand or grass, and grass can be raised into hills ---
 // Hills go up in half-block terraces, at most half a block between any two touching cells (diagonals too),
@@ -328,6 +335,7 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(LX + sx * (GA - .12)
 const CW = GA + .3;
 addSlab(LX, LZ, CW * 2, CW * 2, CY, CY + .25, red);
 const roofM = new THREE.Mesh(new THREE.ConeGeometry(CW * Math.SQRT2, 2.2, 4), red); roofM.rotation.y = Math.PI / 4; roofM.position.set(LX, CY + .25 + 1.1, LZ); add(roofM);
+standOn(LX, LZ, CW, CW, CY + .25, CY + .25, CY + 2.45, false, 'metal');
 const knob = box(.3, .45, .3, ironMat); knob.position.set(LX, CY + .25 + 2.2 + .15, LZ); add(knob);
 const LAMP_Y = GY + 1.4;
 const stand = box(.36, LAMP_Y - .35 - (GY + .6), .36, ironMat); stand.position.set(LX, (GY + .6 + LAMP_Y - .35) / 2, LZ); add(stand); // the lamp sits on this
@@ -391,10 +399,45 @@ for (const z of [PS.z0 - .12, PS.z1 + .12]) { // a handrail either side, curving
   const top = box(.9, .07, .07, chrome); top.position.set(PS.x0 - .1, DECK_Y + 1, z); add(top);
   const down = box(.07, 1.3, .07, chrome); down.position.set(PS.x0 + .35, DECK_Y + .35, z); add(down);
 }
-const POOL_LOW = p => inPool(p.x, p.z) && p.y < DECK_Y - .3; // down in the pool, not up on the deck
+// down in the pool, below the deck. Anywhere on the steps counts until you're right up at the top
+const POOL_LOW = p => inPool(p.x, p.z) && p.y < DECK_Y - .05;
 const POOL_BOT = { x: PS.x1 + .7, z: 0 }, POOL_UP = { x: PS.x0 - 1.6, z: 0 };
-// bots and zombies in the pool chasing someone out of it: to the bottom of the steps, then up them
-const poolNav = (p, t) => !POOL_LOW(p) || POOL_LOW(t) ? null : Math.abs(p.z) < .8 && p.x < POOL_BOT.x + .2 ? POOL_UP : POOL_BOT;
+const onSteps = p => p.x > PS.x0 && p.x < PS.x1 && p.z > PS.z0 && p.z < PS.z1;
+// bots and zombies in the pool chasing someone out of it: to the bottom of the steps, then up them and off onto the deck
+// (they don't go back in after someone who isn't in it, see walkDry)
+const poolNav = (p, t) => POOL_LOW(t) ? null : POOL_LOW(p) ? (Math.abs(p.z) < .8 && p.x < POOL_BOT.x + .2 ? POOL_UP : POOL_BOT) : onSteps(p) ? POOL_UP : null;
+// out of the pool, with it in the way of where it's going: to a corner of the walk round it. The walk is far enough out
+// to miss the umbrella poles, and a corner only counts if it can get there without crossing the pool
+const ROUND = .7, CROSS = .4;
+const PC = [[POOL_O[0] - ROUND, POOL_O[2] - ROUND], [POOL_O[1] + ROUND, POOL_O[2] - ROUND], [POOL_O[1] + ROUND, POOL_O[3] + ROUND], [POOL_O[0] - ROUND, POOL_O[3] + ROUND]].map(([x, z]) => ({ x, z }));
+function crossesPool(a, b) { // does the line from a to b pass over the water (with room for a body)?
+  const lo = [POOL[0] - CROSS, POOL[2] - CROSS], hi = [POOL[1] + CROSS, POOL[3] + CROSS], d = [b.x - a.x, b.z - a.z], s = [a.x, a.z];
+  let t0 = 0, t1 = 1;
+  for (let k = 0; k < 2; k++) {
+    if (Math.abs(d[k]) < 1e-9) { if (s[k] <= lo[k] || s[k] >= hi[k]) return false; continue; }
+    let u = (lo[k] - s[k]) / d[k], v = (hi[k] - s[k]) / d[k]; if (u > v) [u, v] = [v, u];
+    t0 = Math.max(t0, u); t1 = Math.min(t1, v); if (t0 >= t1) return false;
+  }
+  return true;
+}
+function poolAround(p, t) {
+  if (POOL_LOW(p) || onSteps(p)) return null;
+  if (inPool(p.x, p.z, CROSS)) { // right at the edge (its middle can hang over the water a little): if it's heading in, back off the edge first
+    const ds = [p.x - POOL[0] + CROSS, POOL[1] + CROSS - p.x, p.z - POOL[2] + CROSS, POOL[3] + CROSS - p.z], k = ds.indexOf(Math.min(...ds));
+    const n = [[-1, 0], [1, 0], [0, -1], [0, 1]][k];
+    if ((t.x - p.x) * n[0] + (t.z - p.z) * n[1] >= 0) return null;
+    return { x: n[0] ? (n[0] < 0 ? POOL[0] : POOL[1]) + n[0] * 1.2 : p.x, z: n[1] ? (n[1] < 0 ? POOL[2] : POOL[3]) + n[1] * 1.2 : p.z };
+  }
+  if (!crossesPool(p, t)) return null;
+  let best = null, bd = Infinity;
+  for (const c of PC) {
+    const dc = Math.hypot(c.x - p.x, c.z - p.z);
+    if (dc < .5 || crossesPool(p, c)) continue; // already there, or the pool's in the way of this one too
+    const d = dc + Math.hypot(t.x - c.x, t.z - c.z) + (crossesPool(c, t) ? 6 : 0);
+    if (d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
 
 // loungers and umbrellas. y0 = what they stand on, along = 'x' or 'z' (which way they lie), dir = which end the back is at
 const towelCols = [0xe8505a, 0x3ab0e0, 0xf2c94c, 0x5cc48a, 0xf08bb4];
@@ -417,6 +460,7 @@ function umbrella(x, z, y0, cols) {
   t.repeat.set(2, 1);
   const top = new THREE.Mesh(new THREE.ConeGeometry(1.7, .55, 16, 1, true), lam({ map: t, side: THREE.DoubleSide }));
   top.position.set(x, y0 + 2.55, z); add(top);
+  standOn(x, z, 1.7, 1.7, y0 + 2.275, y0 + 2.275, y0 + 2.825, true);
 }
 let uc = 0;
 for (const z of [-6.5, 6.5]) {
@@ -442,12 +486,15 @@ for (let i = 0; i < 11; i++) { const b = box(.12, .32 + (i % 3) * .06, .12, plai
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(BX + sx * 3.3, BZ + .1 + sz * 2.55, .3, .3, 0, 3, wood);
 const barRoof = box(8, .35, 6.6, thatch); barRoof.position.set(BX, 3.15, BZ); add(barRoof); building.cover.push(barRoof);
 const barCone = new THREE.Mesh(new THREE.ConeGeometry(5.6, 1.8, 4), thatch); barCone.rotation.y = Math.PI / 4; barCone.scale.set(1, 1, .82); barCone.position.set(BX, 4.2, BZ); add(barCone);
+standOn(BX, BZ, 4, 3.3, 2.975, 3.325, 3.325, false, 'wood'); // the flat edge of the roof
+standOn(BX, BZ, 5.6 / Math.SQRT2, 5.6 / Math.SQRT2 * .82, 3.3, 3.3, 5.1, false, 'wood'); // and the thatch peak on it
 for (const x of [-2.2, -.7, .8, 2.3]) { addSlab(BX + x, BZ + 3, .45, .45, 0, .6, wood); const seat = box(.55, .08, .55, plain(0xc0392b)); seat.position.set(BX + x, .64, BZ + 3); add(seat); }
 
 // --- beach huts ---
 function hut(x, z, face) { // face = which way the door looks: [dx, dz]
   addSlab(x, z, 3.2, 3.2, 0, 2.6, wood);
   const r = new THREE.Mesh(new THREE.ConeGeometry(2.9, 1.7, 4), thatch); r.rotation.y = Math.PI / 4; r.position.set(x, 3.45, z); add(r); building.cover.push(r);
+  standOn(x, z, 2.9 / Math.SQRT2, 2.9 / Math.SQRT2, 2.6, 2.6, 4.3, false, 'wood');
   const door = box(face[0] ? .04 : 1, 1.9, face[0] ? 1 : .04, plain(0x4a2e18)); door.position.set(x + face[0] * 1.61, .95, z + face[1] * 1.61); add(door);
   for (const s of [-1, 1]) { // a window either side of the door
     const w = box(face[0] ? .04 : .6, .6, face[0] ? .6 : .04, plain(0x2c4a5a));
@@ -483,6 +530,8 @@ flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(
 // striped awning over the door
 const awnT = tex(g => { for (let i = 0; i < 16; i++) { g.fillStyle = (i >> 1) % 2 ? '#ffffff' : '#2fb5a8'; g.fillRect(i, 0, 1, 16); } }); awnT.repeat.set(3, 1);
 const awning = box(1.4, .08, 3.4, lam({ map: awnT })); awning.rotation.z = .25; awning.position.set(HX1 + .65, 2.8, 0); add(awning);
+{ const hx = .7 * Math.cos(.25), hy = .7 * Math.sin(.25); // tilted, so its top is a slope like a stair's
+  later.push({ mesh: null, minX: HX1 + .65 - hx, maxX: HX1 + .65 + hx, minZ: -1.7, maxZ: 1.7, bot: 2.8 - hy, top: 2.8 + hy + .04, ramp: { ax: 'x', a: HX1 + .65 - hx, b: HX1 + .65 + hx } }); }
 // inside: a reception desk with a key board behind it, a sofa, and a plant either side of the door
 addSlab(-36.6, 0, .7, 3, 0, 1.05, wood);
 const desk = box(.9, .08, 3.2, plain(0x6a4428)); desk.position.set(-36.6, 1.09, 0); add(desk);
@@ -493,6 +542,7 @@ addSlab(-33.5, 5.1, 2.6, .9, 0, .45, sofaMat); addSlab(-33.5, 5.55, 2.6, .3, .45
 for (const z of [-4.9, 4.9]) {
   addSlab(HX1 - HT - .45, z, .5, .5, 0, .55, surf(plain(0xb5653a), 'stone'));
   const leaves = box(.8, .9, .8, leafMat); leaves.position.set(HX1 - HT - .45, 1, z); add(leaves);
+  standOn(HX1 - HT - .45, z, .4, .4, .55, 1.45, 1.45, false, 'grass');
 }
 // roof terrace: a low wall round the edge with a gap at the top of the stairs, two loungers, an umbrella and an AC unit to hide behind
 const PH = .8, PT = .25, H_GAP = -36;
@@ -610,7 +660,7 @@ function palm(x, z, inside, y0 = 0) { // y0 = the height of the ground it grows 
     tx = x + Math.cos(a) * lean * f * f; tz = z + Math.sin(a) * lean * f * f;
     out.push([tx, y0 + h * (i + .5) / n, tz, s, h / n + .03, s, 0, 0, 0xffffff]);
   }
-  if (inside) addSolid(x, z, .7, .7, 99);
+  if (inside) { addSolid(x, z, .7, .7, top - .25); standOn(tx, tz, 1.6, 1.6, top - .25, top + .1, top + .1, true, 'grass'); } // the trunk, and the crown you can stand on
   const k = 8 + (rnd() * 3 | 0), spin = rnd() * 6.28, c = PALM_TINTS[rnd() * PALM_TINTS.length | 0];
   for (let i = 0; i < k; i++) {
     const ry = spin + i * 6.28 / k + (rnd() - .5) * .3, L1 = 1.4 + rnd() * .5, L2 = 1.5 + rnd() * .7, p1 = -.25 + rnd() * .3, p2 = .7 + rnd() * .4;
@@ -660,6 +710,7 @@ for (let tries = 0; tufts.length < 600 && tries < 9000; tries++) {
 }
 grassTufts(tufts);
 
+building.solids.push(...later);
 // the hills as solids you stand on: for each terrace height, the cells at least that high merged into rectangles.
 // Added last so the palms and tufts above could still be placed on them
 for (let L = .5; L <= 8; L += .5) {
@@ -693,7 +744,12 @@ M.wet = (x, z, y) => inPool(x, z) && y < POOL_Y;
 M.trapped = POOL_LOW; // in the pool: bots use the steps to get out even while they can see their target
 // a building's stairs, door or steps out of the pool on the way to a target. Whichever building the walker is in comes first
 const lhNav = M.nav;
-M.nav = (p, t) => poolNav(p, t) ?? (hotelPlace(p) !== 'out' ? hotelNav(p, t) : lhNav(p, t) ?? hotelNav(p, t));
+// and round the pool if it's in the way of that (unless the target is in it)
+M.around = (p, t) => POOL_LOW(t) ? null : poolAround(p, t);
+M.nav = (p, t) => {
+  const w = poolNav(p, t) ?? (hotelPlace(p) !== 'out' ? hotelNav(p, t) : lhNav(p, t) ?? hotelNav(p, t));
+  return (POOL_LOW(t) ? null : poolAround(p, w ?? t)) ?? w;
+};
 // footsteps: the sand and the lawn on the ground
 M.surfAt = (x, z, y, base, s) => {
   if (s) return base;

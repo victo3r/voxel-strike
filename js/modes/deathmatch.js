@@ -444,7 +444,9 @@ function updateBot(b, dt) {
   const pad = !sees && b.hp < b.maxHp ? nearPad(pos, b.hp <= PAD_LOW ? PAD_FAR : PAD_NEAR) : null;
   let gx = dx, gz = dz, gd = dist;
   // a target on another floor it can't see, or it's down in the pool: take the stairs (MAP.nav gives the next spot on the way)
-  const way = pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : !sees || MAP.trapped?.(pos) ? MAP.nav?.(pos, tp) : null;
+  // one it can see but has to get closer to across the pool: round the edge of it
+  const way = pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : !sees || MAP.trapped?.(pos) ? MAP.nav?.(pos, tp) : radial > 0 ? MAP.around?.(pos, tp) : null;
+  const into = !pad && !!MAP.trapped?.(tp); // it only goes into the pool after a target that's in it
   if (way) { gx = way.x - pos.x; gz = way.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; side = 0; }
   else if (pad) { gx = pad.x - pos.x; gz = pad.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; }
   else if (dist < 1.5 && !W.melee) radial = -1; // too close (a bot with its knife out wants to be this close)
@@ -460,8 +462,8 @@ function updateBot(b, dt) {
   if (ml > .05) {
     const s = BOT.speed * (W.mob || 1) * dt / ml; mx *= s; mz *= s;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
-    if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded)) bump = true;
-    if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded)) bump = true;
+    if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded, into)) bump = true;
+    if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded, into)) bump = true;
     if (bump && sees) b.strafe = -b.strafe;
     if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) {
       b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1;

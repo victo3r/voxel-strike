@@ -162,8 +162,9 @@ function update(dt) {
         if (od < (z.r + o.r) * 1.15 && od > 0) { vx += ox / od; vz += oz / od; }
       }
       const s = spd * dt, nx = z.g.position.x + vx * s, nz = z.g.position.z + vz * s;
-      walkDry(z.g.position, nx, z.g.position.z, z.r, !z.vy); // no climbing ledges in mid-air
-      walkDry(z.g.position, z.g.position.x, nz, z.r, !z.vy);
+      const into = !!MAP.trapped?.(P.pos); // into the pool only after you
+      walkDry(z.g.position, nx, z.g.position.z, z.r, !z.vy, into); // no climbing ledges in mid-air
+      walkDry(z.g.position, z.g.position.x, nz, z.r, !z.vy, into);
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
     } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.type === 'boss' ? 3.5 : 2.2)) { // the boss can reach you on tall crates
