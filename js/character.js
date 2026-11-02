@@ -1,5 +1,6 @@
 // Every person in the game (the lobby character, bots, later the customizer) is built here from a "look".
-// Proportions are Minecraft's, in skin pixels: head 8x8x8, body 8x12x4, legs 4x12x4, arms 4x12x4.
+// Proportions are Minecraft's, in skin pixels: head 8x8x8, body 8x12x4, legs 4x12x4, arms 4x12x4,
+// plus a 4x1x4 neck between the body and head, so 33 pixels tall.
 // The texture is one 64x64 skin laid out like a Minecraft skin, so a hand-drawn skin image could be swapped in later.
 //
 // look = { skin: 0-5, girl, eyes, hair, hairC, top, topC, top2, bottom, bottomC, shoes, shoeC, extra }
@@ -63,7 +64,7 @@ const regions = (u, v, w, h, d) => ({
 });
 // "right" = the character's own right side. On a side face, the column next to the front is column d-1 on the right and 0 on the left.
 const PARTS = {
-  head: [0, 0, 8, 8, 8], body: [16, 16, 8, 12, 4],
+  head: [0, 0, 8, 8, 8], body: [16, 16, 8, 12, 4], neck: [32, 0, 4, 1, 4], // the neck sits where a Minecraft skin keeps its hat layer, unused here
   legR: [0, 16, 4, 12, 4], legL: [16, 48, 4, 12, 4], armR: [40, 16, 4, 12, 4], armL: [32, 48, 4, 12, 4],
 };
 
@@ -186,6 +187,13 @@ function paintSkin(g, L, rnd) {
     for (let y = 0; y < H.body[7]; y++) hairPx(body.right, 0, y, y === H.body[7] - 1);
   }
 
+  // ---- neck: in the chin's shadow, a bit darker than the face. Long hair hangs down the back of it, a hoodie's hood folds round it
+  const neck = regions(...PARTS.neck.slice(0, 2), 4, 1, 4), nk = shadeC(SK, -18);
+  for (const f of ['front', 'left', 'right', 'top', 'bottom']) fill(neck[f], nk, 8);
+  fill(neck.back, shadeC(SK, -24), 8);
+  if (H.body) { for (let x = 0; x < 4; x++) hairPx(neck.back, x, 0, false); hairPx(neck.left, 3, 0, false); hairPx(neck.right, 0, 0, false); }
+  else if (L.top === 'hoodie') { for (let x = 0; x < 4; x++) at(neck.back, x, 0, shadeC(TOP, 18), 12); at(neck.left, 3, 0, shadeC(TOP, 18), 12); at(neck.right, 0, 0, shadeC(TOP, 18), 12); }
+
   // ---- arms ----
   const sleeve = { tee: 4, long: 11, tank: 0, hoodie: 11, jacket: 11 }[L.top] ?? 4;
   for (const p of ['armR', 'armL']) {
@@ -280,14 +288,15 @@ function buildChar(look, U = 1 / 16, own = false) {
   const g = new THREE.Group();
   const mesh = (geo, parent, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x * U, y * U, z * U); parent.add(m); return m; };
   const body = mesh(partBox(8, 12, 4, 16, 16, U), g, 0, 18, 0);
-  const headPiv = new THREE.Group(); headPiv.position.y = 24 * U; g.add(headPiv);
+  const neck = mesh(partBox(4, 1, 4, 32, 0, U), g, 0, 24.5, 0);
+  const headPiv = new THREE.Group(); headPiv.position.y = 25 * U; g.add(headPiv);
   const head = mesh(partBox(8, 8, 8, 0, 0, U), headPiv, 0, 4, 0); head.userData.head = true;
   const pivot = (x, y) => { const p = new THREE.Group(); p.position.set(x * U, y * U, 0); g.add(p); return p; };
   const armR = pivot(-6, 22), armL = pivot(6, 22), legR = pivot(-2, 12), legL = pivot(2, 12);
   const armRM = mesh(partBox(4, 12, 4, 40, 16, U), armR, 0, -4, 0), armLM = mesh(partBox(4, 12, 4, 32, 48, U), armL, 0, -4, 0);
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
-  const parts = [head, body, armRM, armLM, legRM, legLM];
-  // ch.armor = the armor it's wearing (js/armor.js dressArmor), its pieces ride on the parts
+  const parts = [head, neck, body, armRM, armLM, legRM, legLM];
+  // ch.armor = the armor it's wearing (js/armor.js dressArmor): the chestplate rides on the body, each shoulder pad on its arm
   const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null };
   ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); };
   return ch;

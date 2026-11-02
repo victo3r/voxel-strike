@@ -104,7 +104,7 @@ function botLoadout() {
   return { load, taste };
 }
 
-const BOT_U = 1.85 / 32; // one skin pixel on a bot: 32 pixels tall = 1.85, same height as you
+const BOT_U = 1.85 / 33; // one skin pixel on a bot: 33 pixels tall (with the neck) = 1.85, same height as you
 const BOT_LOOKS = [ // shirt color, name color (used on the tag, leaderboard and kill feed). The rest of the look comes from the name
   { shirt: [185, 40, 40], css: '#ff6a6a' },
   { shirt: [205, 120, 30], css: '#ffa94a' },
@@ -294,7 +294,7 @@ function angel(b) {
   for (const m of b.mats) { m.transparent = true; m.opacity = .6; m.depthWrite = false; m.emissive.setHex(0x8a8a8a); m.needsUpdate = true; }
   const glow = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false });
   const haloMat = glow(0xffe27a, .95), wingMat = glow(0xffffff, .7), extra = [];
-  const halo = new THREE.Mesh(haloGeo, haloMat); halo.rotation.x = Math.PI / 2; halo.position.y = 34.5 * u;
+  const halo = new THREE.Mesh(haloGeo, haloMat); halo.rotation.x = Math.PI / 2; halo.position.y = 35.5 * u;
   b.g.add(halo); extra.push(halo);
   // a wing on each side of its back: a long upper feather and a shorter one under it, tilted out and back
   const wings = [-1, 1].map(s => {
