@@ -22,6 +22,7 @@ function update(dt) {
     const f = Math.exp(-5 * dt); P.kx *= f; P.kz *= f;
     if (Math.abs(P.kx) + Math.abs(P.kz) < .2) P.kx = P.kz = 0;
   }
+  launchMove(P, P.pos, .35, P.onGround, dt); // thrown by a rocket blast
   if (held('jump') && P.onGround) { P.vy = 9; P.onGround = false; }
   const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
   if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } } // bumped your head
@@ -90,6 +91,11 @@ function update(dt) {
       if (z.dead > 1.5) { scene.remove(z.g); zombies.splice(i, 1); }
       continue;
     }
+    if (!(z.hp > 0)) { // safety net: still standing with no (or broken) health. Finish it off, credited to whoever hit it last
+      z.hp = 0; hurtZombie(z, 1, z.g.position.clone().setY(z.g.position.y + 1), false, true, z.hitBy && z.hitBy !== YOU_T ? z.hitBy : null);
+      continue;
+    }
+    launchMove(z, z.g.position, z.r, !z.vy, dt); // thrown by a rocket blast
     if (z.burn > 0) { // on fire: takes damage every quarter second until it burns out
       z.burn -= dt;
       if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true, z.burnBy ?? null); }
@@ -200,7 +206,7 @@ function update(dt) {
     if (hit || onYou || r.life <= 0) {
       scene.remove(r.m); rockets.splice(i, 1);
       // your rocket hurts you up to ROCKET_SELF. A bot's rocket hurts you as much as yours hurts a bot
-      blast(onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone(), ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by);
+      blast(onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone(), ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, true);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);

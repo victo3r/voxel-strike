@@ -76,8 +76,35 @@ function rayHitsYou(r, far) { // distance along ray r to your body, or Infinity.
   const d = r.origin.distanceTo(youHitP); return d <= far ? d : Infinity;
 }
 const targetsFor = by => by ? shotTargets().filter(o => o.userData.zombie !== by) : shotTargets();
-const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 35; // speed, blast radius, most damage it can do to whoever fired it
+const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 12; // speed, blast radius, most damage it can do to whoever fired it
 const rockets = [];
+// rocket jumping: a rocket's blast throws everyone in it away from where it went off, harder the closer they were.
+// LAUNCH = how hard it throws whoever fired it (speed at point blank), LAUNCH_OTHER = the share everyone else gets.
+// Jumping as it goes off adds to it (your jump's speed carries on top), and LAUNCH_JUMP more on top of that.
+// LAUNCH_UP = the least upward push, so a blast beside you still lifts you off the ground. LAUNCH_MAX = fastest you can go up
+const LAUNCH = 13, LAUNCH_OTHER = .45, LAUNCH_JUMP = 1.25, LAUNCH_UP = .35, LAUNCH_MAX = 17;
+// in the air you keep the sideways push for a long time (AIR_DRAG), on the ground it stops you quickly (GROUND_DRAG)
+const AIR_DRAG = .5, GROUND_DRAG = 10;
+const launchV = new THREE.Vector3();
+// o = P (you) or a bot/zombie, center = the middle of its body, p = where the blast went off, f = 1 at point blank to 0 at the edge
+function launch(o, center, p, f, self) {
+  launchV.subVectors(center, p); if (launchV.lengthSq() < 1e-4) launchV.set(0, 1, 0);
+  launchV.normalize(); launchV.y = Math.max(launchV.y, LAUNCH_UP); launchV.normalize();
+  const you = o === P, jumping = you && (P.vy > 0 || held('jump'));
+  let s = LAUNCH * f * (self ? 1 : LAUNCH_OTHER) * (jumping ? LAUNCH_JUMP : 1);
+  if (!you) s /= o.scale || 1; // bigger zombies are heavier
+  o.vy = Math.min(LAUNCH_MAX, Math.max(o.vy || 0, 0) + launchV.y * s);
+  o.lx = (o.lx || 0) + launchV.x * s; o.lz = (o.lz || 0) + launchV.z * s;
+  if (you) P.onGround = false;
+}
+// the sideways part of a launch: carries on through the air, dies out quickly once you land. grounded = standing on something
+function launchMove(o, pos, r, grounded, dt) {
+  if (!o.lx && !o.lz) return;
+  if (!walkTo(pos, pos.x + o.lx * dt, pos.z, r, false)) o.lx = 0; // flew into a wall: that way stops
+  if (!walkTo(pos, pos.x, pos.z + o.lz * dt, r, false)) o.lz = 0;
+  const k = Math.exp(-(grounded ? GROUND_DRAG : AIR_DRAG) * dt); o.lx *= k; o.lz *= k;
+  if (Math.abs(o.lx) + Math.abs(o.lz) < .1) o.lx = o.lz = 0;
+}
 function fireRocket(w, from = null, dir = null, by = null) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const m = new THREE.Group(), body = box(.1, .1, .4, lam({ color: 0x4b5b3b })), tip = box(.12, .12, .12, lam({ color: 0xaa3333 }));

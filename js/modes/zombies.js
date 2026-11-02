@@ -62,7 +62,10 @@ function spawnZombie(type = pickType()) {
 // quiet = burn damage: small orange sparks, no red flash or hit marker
 // by = the deathmatch bot doing the damage, or null if it's you
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
+  if (!Number.isFinite(dmg)) return; // a bad number here would leave it with NaN health, and then nothing could ever kill it
   zz.hp -= dmg;
+  const dies = zz.hp <= 0 && !zz.dead;
+  if (dies) zz.dead = .0001; // marked dead before the effects below, so a problem in a sound or particle can't leave it unkillable
   if (zz.type === 'bot' && by !== zz) { // remember who's hurting it and how much they've done in the last 2s (not its own rocket)
     const who = by ?? YOU_T;
     if (zz.hitBy !== who || zz.hitByT <= 0) zz.hitDmg = 0;
@@ -75,8 +78,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
     // the hit sound comes from whoever got hit (zombies sound lower), so it's quiet when they're far away
     hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
   }
-  if (zz.hp <= 0 && !zz.dead) {
-    zz.dead = .0001;
+  if (dies) {
     if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); }
     if (zz.type === 'bot') botDown(zz, by, head);
     else {
@@ -104,7 +106,7 @@ function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 
 function drownYou() {
   if (respawnT > 0 || matchOver || dead) return;
   sfx('splash'); splash(P.pos);
-  P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = 0; P.drowned = true;
+  P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0; P.drowned = true;
   if (mode === 'dm') { youDown(null); return; }
   dead = true; saveBest(); document.exitPointerLock();
 }
@@ -147,17 +149,23 @@ function explode(z) {
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
-// by = the deathmatch bot whose rocket it was: it gets the kills, and takes no more than ROCKET_SELF itself, like you do from yours
-function blast(p, R, zDmg, pDmg, skip, by = null) {
+// by = the deathmatch bot whose rocket it was: it gets the kills, and takes no more than ROCKET_SELF itself, like you do from yours.
+// rocket = it was a rocket, so it also throws everyone in it (rocket jumping, see launch in combat.js). Exploders don't
+function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false) {
   burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
-  if (pd < R && !dead && pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by);
+  if (pd < R && !dead && respawnT <= 0) {
+    if (pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by);
+    if (rocket && respawnT <= 0 && !dead) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, !by);
+  }
   for (const o of zombies) {
     if (o === skip || o.dead) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-    if (od < R) hurtZombie(o, o === by ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
+    if (od >= R) continue;
+    hurtZombie(o, o === by ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
+    if (rocket && !o.dead) launch(o, c, p, 1 - od / R, o === by);
   }
 }
 
@@ -168,7 +176,7 @@ const SHOP = [
   { gun: 'sniper', price: 140, desc: `${BASE[gi('sniper')].dmg} dmg, aim to scope` },
   { gun: 'flame', price: 200, desc: 'burns everything in front of you' },
   { gun: 'flare', price: 120, desc: 'one fiery shot that sets them on fire' },
-  { gun: 'rocket', price: 450, desc: 'big splash damage, don\'t fire point blank' },
+  { gun: 'rocket', price: 450, desc: 'big splash damage, shoot the ground to rocket jump' },
   { name: 'Medkit',  price: 15, heal: 50, desc: '+50 HP' },
   { name: 'Armor',   price: 40, armor: 25, desc: `+25 max armor, refills it (cap ${ARMOR_CAP})` },
   { name: 'Ammo',    price: 20, refill: true, desc: 'refill all spare ammo' },

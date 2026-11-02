@@ -25,13 +25,13 @@ const SONGS = {
     bass: [[0, 0, 10], [10, 0, 2], [12, 7, 4]],
     lead: true, amb: 'wind', hats: .6, reese: .7,
   },
-  resort: { // liquid drum & bass: F major, bright, electric piano chords, waves washing in
+  resort: { // liquid drum & bass: F major, bright, electric piano chords, a steel pan riff, waves washing in
     bpm: 168,
     chords: [[34, [50, 53, 57, 60]], [33, [52, 55, 57, 60]], [43, [53, 57, 58, 62]], [41, [55, 57, 60, 64]]],
     pad: { cut: 1800, a: .8, v: .75 },
     kit: { kickD: .12, snare: 205, drive: 1.15, bright: 1.15, room: .2, ride: .9 },
     bass: [[0, 0, 3], [3, 0, 1], [6, 7, 2], [8, 0, 2], [10, 12, 2], [14, 7, 2]],
-    keys: true, amb: 'waves', hats: 1, reese: .45,
+    keys: true, steel: true, amb: 'waves', hats: 1, reese: .45,
   },
   yard: { // harder and punchier: A minor, drier breaks, rave stabs and a growling reese when it heats up
     bpm: 176,
@@ -169,7 +169,7 @@ function muStart(w) {
   S.dly.connect(dl).connect(fb).connect(S.dly); dl.connect(dOut); dOut.connect(S.out); dOut.connect(S.wet);
   const send = (g, to, v) => { const s = ac.createGain(); s.gain.value = v; g.connect(s).connect(to); };
   const bus = (v, wet = 0, dly = 0) => { const g = ac.createGain(); g.gain.value = v; g.connect(S.out); if (wet) send(g, S.wet, wet); if (dly) send(g, S.dly, dly); return g; };
-  S.pad = bus(.9, .55); S.bass = bus(1); S.keys = bus(.7, .3, .25); S.lead = bus(.6, .35, .55); S.stab = bus(.45, .5, .2);
+  S.pad = bus(.9, .55); S.bass = bus(1); S.keys = bus(.7, .3, .25); S.lead = bus(.6, .35, .55); S.stab = bus(.45, .5, .2); S.steel = bus(.6, .3, .3);
   S.reese = bus(0, .05);
   // drums: a lowpass filter that's nearly closed when things are calm (muffled, like it's in the next room) and opens up as it heats up
   S.drums = ac.createGain(); S.drums.gain.value = .5;
@@ -242,6 +242,31 @@ function pluck(S, t, m, v) {
   lp.type = 'lowpass'; lp.Q.value = 2; lp.frequency.setValueAtTime(2400, t); lp.frequency.exponentialRampToValueAtTime(300, t + .3);
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .004); g.gain.setTargetAtTime(0, t + .004, .18);
   osc('sawtooth', mtof(m), t, t + 1.2).connect(lp).connect(g).connect(S.lead);
+}
+// steel pan: the note plus its octave, twelfth and double octave (how pans are tuned). The high ones die away fast,
+// so it pings on the hit and then rings warm instead of glassy. Each note starts a hair sharp and settles (the pan's "boing"),
+// and a second copy a few cents off makes it shimmer
+const PAN_PARTS = [[1, 1, .5], [1.0035, .3, .45], [2, .5, .22], [3, .2, .1], [4.02, .07, .05]]; // [pitch ratio, level, how fast it dies]
+function steel(S, t, m, v) {
+  const f = mtof(m), lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3800;
+  lp.connect(S.steel);
+  for (const [k, a, d] of PAN_PARTS) {
+    const o = osc('sine', f * k * 1.01, t, t + 2), g = ac.createGain();
+    o.frequency.setValueAtTime(f * k * 1.01, t); o.frequency.exponentialRampToValueAtTime(f * k, t + .035);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v * a, t + .003); g.gain.setTargetAtTime(0, t + .003, d);
+    o.connect(g).connect(lp);
+  }
+}
+// a calypso riff over the chords. The rhythm and note shapes are picked once per phrase (r = the phrase's random numbers),
+// so bars 5-8 answer bars 1-4. The notes come from the chord, so the same shape follows the chords round.
+// The last bar of the phrase ends on a quick roll, like pan players do on a held note
+const PAN_RHYTHMS = [[0, 3, 6, 8, 10, 12], [0, 3, 6, 10, 12, 14], [0, 2, 4, 7, 10], [0, 6, 8, 11, 14], [2, 4, 6, 10, 12]];
+function steelBar(S, t, ch, r, inPh, v) {
+  const order = [0, 1, 2, 3].map(() => r() * PAN_RHYTHMS.length | 0), shapes = [0, 1, 2, 3].map(() => Array.from({ length: 6 }, () => r() * 5 | 0));
+  const notes = [...ch[1].map(m => m + 12), ch[1][0] + 24], k = inPh & 3, st = S.st;
+  const steps = PAN_RHYTHMS[order[k]], sh = shapes[k];
+  steps.forEach((s, i) => { if (!(inPh === 7 && s >= 12)) steel(S, t + s * st, notes[sh[i % sh.length]], v * (s % 4 ? .8 : 1)); });
+  if (inPh === 7) for (let i = 0; i < 6; i++) steel(S, t + (12 + i * .5) * st, notes[4], v * (.55 + i * .07));
 }
 // rave stab: a whole chord hit short and sharp
 function stab(S, t, notes, v) {
@@ -361,6 +386,7 @@ function muBar(S, t) {
     const hits = [[0], [0, 6], [0, 10], [0, 3, 10]][pr() * 4 | 0];
     for (const s of quiet ? [0] : hits) ch[1].forEach((m, i) => key(S, t + s * st + i * .012, m + 12, s ? .035 : .05, s ? .8 : 1.6));
   }
+  if (song.steel && !quiet && stage !== 'intro' && (ph % 2 === 0 || heat > .5)) steelBar(S, t, ch, pr, inPh, .075);
   if (song.lead && !quiet && stage !== 'intro' && (ph % 2 || heat > .5)) {
     const steps = [[0, 6, 10], [3, 8, 14], [0, 3, 6, 12], [2, 10]][pr() * 4 | 0], idx = steps.map(() => pr() * 4 | 0);
     steps.forEach((s, i) => pluck(S, t + s * st, ch[1][idx[i]] + 12, .07));
@@ -378,7 +404,8 @@ function muLobbyBar(S, t) {
   if (!(b & 1)) { pad(S, t, ch[1], S.barDur * 2, song.pad); sub(S, t, ch[0], S.barDur * 2 - .15, .5, .4); }
   const up = b & 1 ? [...ch[1]].reverse() : ch[1]; // a slow broken chord, up one bar and back down the next
   up.forEach((m, i) => key(S, t + (b & 1 ? 4 : 0) * st + i * 2 * st, m + 12, .03, 2));
-  if ((b & 7) >= 4) {
+  if (song.steel) { if ((b & 7) >= 2) steelBar(S, t, ch, pr, b & 7, .045); } // the resort's turn: steel pan instead of the pluck
+  else if ((b & 7) >= 4) {
     const steps = [[0, 6, 10], [4, 10], [0, 3, 8]][pr() * 3 | 0], idx = steps.map(() => pr() * 4 | 0);
     steps.forEach((s, i) => pluck(S, t + s * st, ch[1][idx[i]] + 12, .05));
   }

@@ -112,10 +112,34 @@ for (const x of [-3.1, 3.1]) {
   const pl = new THREE.PointLight(0xffb45a, 6, 7); pl.position.set(x, 2.3, -1.4); lobbyScene.add(pl);
   lamps.push(pl);
 }
-for (let i = 0; i < 14; i++) {
-  const a = Math.random() * Math.PI * 2, d = 1.8 + Math.random() * 3.8;
-  const f = box(.14, .14, .14, lam({ color: [0xff4d6d, 0xffd23f, 0xb48cff, 0xffffff][i % 4] }));
-  f.position.set(Math.cos(a) * d, .07, Math.sin(a) * d); lobbyScene.add(f);
+// flowers in small clumps: daisies (a cross of petals round a middle) and tulips (a cup of petals), on stems with a leaf or two.
+// [petal color, middle color]
+const FLOWER_COLS = [[0xff4d6d, 0xffd23f], [0xffd23f, 0xc0641a], [0xb48cff, 0xfff0a0], [0xffffff, 0xffc82e], [0xff8a3d, 0x7a3a10]];
+const lStemMat = lam({ color: 0x3f8f3a }), lLeafMat2 = lam({ color: 0x4fa844 });
+const flowerMats = new Map(), fMat = c => { if (!flowerMats.has(c)) flowerMats.set(c, lam({ color: c })); return flowerMats.get(c); };
+function lFlower(x, z, tulip, [petal, mid]) {
+  const g = new THREE.Group(), h = (tulip ? .38 : .3) * (.8 + Math.random() * .4);
+  const head = new THREE.Group(); head.position.y = h;
+  const part = (to, w, ht, d, m, px, py, pz) => { const b = box(w, ht, d, m); b.position.set(px, py, pz); to.add(b); return b; };
+  part(g, .035, h, .035, lStemMat, 0, h / 2, 0);
+  for (const s of Math.random() < .5 ? [1] : [1, -1]) part(g, .12, .025, .05, lLeafMat2, s * .06, h * (.25 + Math.random() * .2), 0).rotation.z = s * .5;
+  const pm = fMat(petal);
+  if (tulip) { // four petal walls round a middle, open at the top
+    for (const [px, pz] of [[.045, 0], [-.045, 0], [0, .045], [0, -.045]]) part(head, px ? .035 : .1, .12, pz ? .035 : .1, pm, px, .06, pz);
+    part(head, .06, .07, .06, fMat(mid), 0, .035, 0);
+  } else {
+    part(head, .07, .04, .07, fMat(mid), 0, .015, 0);
+    for (const [px, pz] of [[.075, 0], [-.075, 0], [0, .075], [0, -.075]]) part(head, px ? .08 : .065, .025, pz ? .08 : .065, pm, px, 0, pz);
+    head.rotation.x = .35 + Math.random() * .3; // tipped toward the camera so you see the face
+  }
+  g.add(head);
+  g.position.set(x, 0, z); g.scale.setScalar(1.25); g.rotation.y = tulip ? Math.random() * 6.3 : (Math.random() - .5) * .8; // daisies roughly face the camera
+  lobbyScene.add(g);
+}
+for (let c = 0; c < 6; c++) {
+  const a = Math.random() * Math.PI * 2, d = 2 + Math.random() * 3.4, cx = Math.cos(a) * d, cz = Math.sin(a) * d;
+  const col = FLOWER_COLS[c % FLOWER_COLS.length], tulip = c % 3 === 1;
+  for (let k = 0, n = 2 + (Math.random() * 3 | 0); k < n; k++) lFlower(cx + (Math.random() - .5) * .7, cz + (Math.random() - .5) * .7, tulip, col);
 }
 
 const flies = [];
