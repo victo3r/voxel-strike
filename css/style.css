@@ -75,17 +75,21 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #menuTitle{font-size:56px;margin:0 0 6px;color:#ffd23f;text-shadow:5px 5px 0 #b33}
 #menuBtns{display:flex;flex-direction:column;gap:10px;margin-top:12px;width:220px}
 #menuBtns button{margin:0;width:100%}
-#armory{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;background:rgba(0,0,0,.88);color:#fff;text-shadow:2px 2px 0 #000;z-index:9;overflow-y:auto;padding:12px 8px;box-sizing:border-box}
-#armory h1{font-size:48px;margin:auto 0 4px;color:#ffd23f;text-shadow:5px 5px 0 #b33}
-#armory>:last-child{margin-bottom:auto}
+/* armory: a panel down the left side; the lobby camera slides over so your character stands on the right (lobby.js frameLobby) */
+#armory{position:fixed;left:0;top:0;bottom:0;width:min(640px,58vw);display:none;flex-direction:column;background:linear-gradient(90deg,rgba(3,16,22,.93),rgba(3,16,22,.84) 82%,rgba(3,16,22,0));color:#fff;text-shadow:2px 2px 0 #000;z-index:9;overflow-y:auto;padding:16px 56px 18px 22px;box-sizing:border-box;animation:armIn .3s ease-out}
+@keyframes armIn{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
+#armory>*{flex-shrink:0}
+#armHead{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+#armory h1{font-size:40px;margin:0;color:#ffd23f;text-shadow:5px 5px 0 #b33}
 #armInfo{display:flex;gap:18px;font-size:18px;font-weight:bold}#armInfo .pc{margin-left:0}
-#armTabs{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:12px 0}
-#armTabs button{display:flex;flex-direction:column;align-items:center;gap:2px;width:92px;padding:6px 0 4px;background:rgba(0,0,0,.45);border:3px solid #555;color:#ccc;font:bold 11px monospace;cursor:pointer}
-#armTabs button.sel{border-color:#ffd23f;background:rgba(70,50,10,.65);color:#fff}
+#armTabs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:14px 0 12px}
+#armTabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0 4px;background:rgba(18,48,54,.85);border:3px solid #2a5a60;color:#bcd;font:bold 11px monospace;cursor:pointer;text-shadow:1px 1px 0 #000}
+#armTabs button:hover{border-color:#7fe3d8}
+#armTabs button.sel{border-color:#ffd23f;background:rgba(28,88,86,.9);color:#fff}
 #armTabs img{width:60px;height:30px;image-rendering:pixelated}
-#armList{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;width:min(700px,96vw)}
-#armList .card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;background:#3a2a1a;border:3px solid #6b5332}
-#armList .card.on{border-color:#ffd23f}
+#armList{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+#armList .card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;background:rgba(18,48,54,.85);border:3px solid #2a5a60;box-shadow:4px 4px 0 #000}
+#armList .card.on{border-color:#ffd23f;background:rgba(28,88,86,.9)}
 #armList .card.locked{opacity:.5}
 #armList .card img{width:96px;height:48px;image-rendering:pixelated}
 #armList .cn{font-size:17px;font-weight:bold;text-align:center}
@@ -97,8 +101,10 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armList .cb button:hover:not(:disabled){background:#5a3f22}
 #armList .cb button:disabled{opacity:.5;cursor:default}
 #armList .cb button.eq{opacity:1;border-color:#5c5;color:#9f9}
-#armX{position:fixed;top:8px;right:8px;z-index:11;font:bold 15px monospace;padding:7px;background:#3a2a1a;color:#fff;border:3px solid #ffd23f;cursor:pointer}
-@media (max-height:620px),(max-width:620px){#armory h1{font-size:28px}#armTabs button{width:64px}#armTabs img{width:44px;height:22px}}
+#armX{margin-left:auto;font:bold 15px monospace;padding:7px 10px;background:rgba(18,48,54,.85);color:#fff;border:3px solid #2a5a60;cursor:pointer;text-shadow:2px 2px 0 #000;box-shadow:3px 3px 0 #000}
+#armX:hover{border-color:#ffd23f}
+@media (max-height:620px),(max-width:620px){#armory h1{font-size:26px;text-shadow:3px 3px 0 #b33}#armTabs img{width:44px;height:22px}#armTabs button{font-size:9px}#armList{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+@media (max-width:700px){#armory{width:100%;background:rgba(3,16,22,.9);padding:12px 14px}}
 #top .clock{font-size:30px;color:#fff}
 #top .clock.low{color:#ff5a5a}
 #top .place{font-size:16px;margin-top:2px}

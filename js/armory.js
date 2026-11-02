@@ -62,8 +62,14 @@ $('armory').addEventListener('click', e => {
 });
 const armIcon = () => $('armIcon').src = SPRITES[loadoutGun('primary')]; // the lobby's ARMORY button shows your primary gun
 armIcon();
-function openArmory() { armOpen = true; renderArmory(); $('armory').style.display = 'flex'; }
-function closeArmory() { if (!armOpen) return; armOpen = false; $('armory').style.display = 'none'; armIcon(); }
+// in the lobby the home buttons hide and the camera slides over (lobby.js). In a match the menu hides so you see the game behind it
+function armShow(on) {
+  $('armory').style.display = on ? 'flex' : 'none';
+  if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; $('lookPick').style.display = on ? 'none' : ''; }
+  else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
+}
+function openArmory() { armOpen = true; renderArmory(); armShow(true); }
+function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // stopPropagation so the click doesn't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => { if (e.code === 'Escape' && armOpen && $('binds').style.display !== 'flex') closeArmory(); });

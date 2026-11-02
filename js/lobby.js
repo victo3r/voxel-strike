@@ -271,13 +271,20 @@ addEventListener('pointermove', e => {
   if (dragX !== null) { const d = (e.clientX - dragX) * .012; spin += d; spinV = d * 30; dragX = e.clientX; }
 });
 
-// frame the camera so the character sits in the middle of the #stage area, whatever the window size
-function frameLobby() {
+// frame the camera so the character sits in the middle of the #stage area, whatever the window size.
+// With the armory open, that's the part of the screen to the right of its panel. The camera glides to a new framing instead of jumping
+let frameCur = null;
+function frameLobby(dt = 0) {
   const W = innerWidth, H = innerHeight, r = stage.getBoundingClientRect();
-  const sw = r.width || W, sh = r.height || H, cx = r.left + sw / 2, cy = r.top + sh * .5;
+  let left = r.left, sw = r.width || W;
+  const sh = r.height || H;
+  if (armOpen && W > 700) { const a = $('armory').getBoundingClientRect().right - 40; if (a > left) { sw = r.right - a; left = a; } } // -40: the panel fades out at its edge
   const tan = Math.tan(THREE.MathUtils.degToRad(lobbyCam.fov / 2));
   const visH = Math.max(3.6 / (sh / H * .9), 2.2 / (sw / W * .9) / (W / H)); // ~3.6 blocks tall in the stage
-  const dist = Math.max(5, Math.min(20, visH / 2 / tan));
+  const want = { cx: left + sw / 2, cy: r.top + sh * .5, dist: Math.max(5, Math.min(20, visH / 2 / tan)) };
+  if (!frameCur || !dt) frameCur = want;
+  else { const k = 1 - Math.exp(-dt * 7); for (const key in want) frameCur[key] += (want[key] - frameCur[key]) * k; }
+  const { cx, cy, dist } = frameCur;
   lobbyCam.aspect = W / H;
   lobbyCam.position.set(0, 1.5 + dist * .14, dist); lobbyCam.lookAt(0, 1.4, 0);
   lobbyCam.setViewOffset(W, H, W / 2 - cx, H / 2 - cy, W, H); // slide the picture so the hero lands on the stage
@@ -309,5 +316,5 @@ function updateLobby(dt) {
   for (const r of lRays) r.material.opacity = .055 + Math.sin(t * .5 + r.position.x) * .02;
   for (const l of lamps) l.intensity = 5.5 + Math.sin(t * 9 + l.position.x) * .4 + Math.sin(t * 23) * .2;
   glowStrip.material.color.setHSL(.48, .85, .5 + Math.sin(t * 2) * .08);
-  frameLobby();
+  frameLobby(dt);
 }

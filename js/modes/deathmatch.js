@@ -77,7 +77,7 @@ const BOT_PICKS = {
 // the distance a bot tries to keep from its target with each gun [closest, furthest]
 const BOT_KEEP = {
   voxel: [5, 12], shotgun: [2.5, 6], ar: [8, 16], eradicator: [6, 12], sniper: [16, 32],
-  knife: [0, 1], flame: [2, 5], rocket: [9, 18], flare: [7, 16],
+  knife: [.9, 1.6], flame: [2, 5], rocket: [9, 18], flare: [7, 16],
 };
 // how good each gun is at a distance (higher = better). A bot holds whichever of its guns scores best,
 // times its own taste for that gun, so two bots in the same spot can pick different guns
@@ -379,7 +379,9 @@ function burnTick(dt) {
 function botStab(b, W, t, dist) {
   b.cd = W.rate; b.stab = .2; sfx('swing', { at: b.g.position, far: 20 });
   const p = tPos(t), pos = b.g.position, want = Math.atan2(p.x - pos.x, p.z - pos.z);
-  if (dist > W.range || Math.abs(p.y - pos.y) > 1.6 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) > .6) return;
+  // right on top of its target the direction to it is meaningless, so it counts as in front
+  const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
+  if (dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing) return;
   const at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
   sfx('slash', { at, far: 20 });
   if (t.you) hurtPlayer(Math.round(W.dmg * BOT.dmgMul), false, b);
@@ -508,7 +510,7 @@ function updateBot(b, dt) {
   if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels, like yours
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   // in range for this gun: knife = arm's reach, flamethrower = its flame, rocket = not close enough to blow itself up
-  const inRange = W.melee ? dist <= W.range + .3 && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.rocket ? dist > 4 : true;
+  const inRange = W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.rocket ? dist > 4 : true;
   const ready = sees && b.seeT >= BOT.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
   b.aimT = ready && sniper ? b.aimT + dt : 0;
   if (ready && b.cd <= 0 && (!sniper || b.aimT >= SNIPE_T)) { if (W.melee) botStab(b, W, t, dist); else botFire(b, W, dist); }
@@ -537,6 +539,10 @@ function updateBot(b, dt) {
     if (o === b || o.dead) continue;
     const ox = pos.x - o.g.position.x, oz = pos.z - o.g.position.z, od = Math.hypot(ox, oz);
     if (od < .8 && od > 0) { mx += ox / od; mz += oz / od; }
+  }
+  if (respawnT <= 0 && Math.abs(P.pos.y - pos.y) < 1.8) { // and out of you, so it never stands inside your camera
+    const ox = pos.x - P.pos.x, oz = pos.z - P.pos.z, od = Math.hypot(ox, oz);
+    if (od < .75) { if (od > .001) { mx += ox / od * 2; mz += oz / od * 2; } else mx += 2; }
   }
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
