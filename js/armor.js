@@ -1,24 +1,35 @@
-// Armor you wear: bought once in the armory (WEAR page), then upgraded one star at a time.
-// Each star is a different armor. prof.armor = how many stars you have (0 = none, 1 = Wooden ... 8 = Champion).
+// Armor you wear: one item, Basic Armor, bought once in the armory (WEAR page) and then upgraded one star at a time.
+// Each star is a different chestplate. prof.armor = how many stars you have (0 = none, 1 = Wooden ... 8 = Champion).
 // It's worn in every bot match (not zombie waves, which has its own shop armor). Bots wear the same tier you do.
 // hp = the armor bar you spawn with: it takes damage before your health.
 // dr = share of every hit it takes off before anything else (so Ruby: a 50 hit does 46, and the armor bar soaks that first).
 // unlock = account level you need for that star, price = coins for that star (the first star is buying it)
+// shape = how the chestplate is built (see armorPieces): t = how far the plates stand off the chest, yb = where the plate ends at the bottom,
+//   pad = shoulder pads [outer x, top y, bottom of the side plate], layer = a second plate on the pads, pecs = raised chest plates,
+//   gem = size of the chest gem, shards = crystals on each pad, tas = where the plates over the hips end, spine = a ridge down the back
 const ARMOR_TIERS = [
-  { id: 'wood', name: 'Wooden', hp: 50, dr: 0, unlock: 2, price: 10, c: [150, 104, 58], hi: [190, 144, 90], dk: [98, 64, 32] },
-  { id: 'steel', name: 'Steel', hp: 75, dr: 0, unlock: 5, price: 40, c: [158, 164, 174], hi: [212, 218, 226], dk: [96, 102, 112] },
-  { id: 'gold', name: 'Gold', hp: 100, dr: 0, unlock: 9, price: 100, c: [226, 178, 40], hi: [255, 226, 110], dk: [158, 112, 16] },
-  { id: 'amethyst', name: 'Amethyst', hp: 100, dr: .04, unlock: 14, price: 200, c: [146, 88, 206], hi: [198, 152, 246], dk: [88, 46, 144], gem: [238, 218, 255] },
-  { id: 'ruby', name: 'Ruby', hp: 100, dr: .08, unlock: 20, price: 320, c: [196, 38, 58], hi: [244, 104, 114], dk: [122, 16, 34], gem: [255, 198, 202] },
-  { id: 'emerald', name: 'Emerald', hp: 100, dr: .12, unlock: 27, price: 450, c: [36, 164, 86], hi: [110, 226, 150], dk: [16, 102, 50], gem: [206, 255, 224] },
-  { id: 'diamond', name: 'Diamond', hp: 100, dr: .16, unlock: 35, price: 600, c: [86, 206, 222], hi: [180, 246, 252], dk: [34, 142, 164], gem: [246, 255, 255] },
-  { id: 'champion', name: 'Champion', hp: 100, dr: .2, unlock: 50, price: 1000, c: [50, 50, 58], hi: [90, 90, 102], dk: [20, 20, 26], champ: true },
+  { id: 'wood', name: 'Wooden', hp: 50, dr: 0, unlock: 2, price: 10, c: [150, 104, 58], hi: [190, 144, 90], dk: [98, 64, 32],
+    shape: { t: 2, yb: -8 } },
+  { id: 'steel', name: 'Steel', hp: 75, dr: 0, unlock: 5, price: 40, c: [158, 164, 174], hi: [212, 218, 226], dk: [96, 102, 112],
+    shape: { t: 2, yb: -10, pad: [14, 15] } },
+  { id: 'gold', name: 'Gold', hp: 100, dr: 0, unlock: 9, price: 100, c: [226, 178, 40], hi: [255, 226, 110], dk: [158, 112, 16],
+    shape: { t: 3, yb: -11, pad: [16, 16], pecs: true } },
+  { id: 'amethyst', name: 'Amethyst', hp: 100, dr: .04, unlock: 14, price: 200, c: [146, 88, 206], hi: [198, 152, 246], dk: [88, 46, 144], gem: [238, 218, 255],
+    shape: { t: 3, yb: -11, pad: [17, 16, 8], pecs: true, gem: 6, shards: 1 } },
+  { id: 'ruby', name: 'Ruby', hp: 100, dr: .08, unlock: 20, price: 320, c: [196, 38, 58], hi: [244, 104, 114], dk: [122, 16, 34], gem: [255, 198, 202],
+    shape: { t: 3, yb: -11, pad: [18, 17, 7], layer: true, pecs: true, gem: 6, shards: 1, tas: -15 } },
+  { id: 'emerald', name: 'Emerald', hp: 100, dr: .12, unlock: 27, price: 450, c: [36, 164, 86], hi: [110, 226, 150], dk: [16, 102, 50], gem: [206, 255, 224],
+    shape: { t: 4, yb: -11, pad: [18, 17, 6], layer: true, pecs: true, gem: 8, shards: 2, tas: -15 } },
+  { id: 'diamond', name: 'Diamond', hp: 100, dr: .16, unlock: 35, price: 600, c: [86, 206, 222], hi: [180, 246, 252], dk: [34, 142, 164], gem: [246, 255, 255],
+    shape: { t: 4, yb: -11, pad: [19, 18, 5], layer: true, pecs: true, gem: 8, shards: 3, tas: -16, spine: true } },
+  { id: 'champion', name: 'Champion', hp: 100, dr: .2, unlock: 50, price: 1000, c: [50, 50, 58], hi: [92, 92, 104], dk: [24, 24, 30], champ: true,
+    shape: { t: 4, yb: -11, pad: [19, 19, 4], layer: true, pecs: true, gem: 8, shards: 3, tas: -16, spine: true } },
 ];
 const ARMOR_MAX = ARMOR_TIERS.length;
+const ARMOR_ITEM = 'Basic Armor';
 // the four gems set into Champion armor
 const GEMS = { am: [178, 122, 238], ru: [228, 58, 76], em: [58, 204, 112], di: [134, 234, 246] };
 const armorOf = n => ARMOR_TIERS[n - 1] ?? null;
-const armorName = n => n ? armorOf(n).name + ' Armor' : 'Armor';
 const armorStars = n => '★'.repeat(n) + '☆'.repeat(ARMOR_MAX - n);
 // the tier worn in this match: yours in bot matches, none in zombie waves
 const matchArmor = () => pvp() ? Math.min(ARMOR_MAX, prof.armor | 0) : 0;
@@ -28,152 +39,119 @@ function wearArmor() {
   P.maxArmor = T ? T.hp : 0; P.dr = T ? T.dr : 0; P.armor = P.maxArmor;
 }
 
-// ---- the armor texture: a 64x64 sheet laid out like a skin (character.js), painted with only the armored pixels.
-// Anything left blank is see-through, so the face, hands and elbows show through.
-function paintArmor(g, n, team) {
-  const T = armorOf(n), rnd = charRng(n * 977 + (team ? team[0] * 31 + team[2] : 0));
-  const put = (r, x, y, col, v = 10) => {
-    if (x < 0 || y < 0 || x >= r[2] || y >= r[3]) return;
-    const k = (rnd() - .5) * v;
-    g.fillStyle = `rgb(${col[0] + k | 0},${col[1] + k | 0},${col[2] + k | 0})`; g.fillRect(r[0] + x, r[1] + y, 1, 1);
-  };
-  // the surface of a plate: planks with dark seams for wood, facets for gems, a little shine on gold
-  const surf = (x, y) => {
-    if (T.id === 'wood') return y % 4 === 3 ? mixC(T.c, T.dk, .7) : (x * 7 + y * 3) % 11 === 0 ? shadeC(T.c, -16) : T.c;
-    if (T.gem) return (x + y) % 4 === 0 ? mixC(T.c, T.hi, .55) : (x + 2 * y) % 5 === 3 ? mixC(T.c, T.dk, .35) : T.c;
-    if (T.id === 'gold') return rnd() < .1 ? mixC(T.c, T.hi, .6) : T.c;
-    if (T.champ) return (x + y) % 6 === 0 ? mixC(T.c, T.hi, .5) : T.c;
-    return T.c;
-  };
-  // a plate over rows y0-y1 of face r: lighter top row (when it's 3+ rows), darker bottom row, darker at the box's corners
-  const plate = (r, y0, y1) => {
-    for (let y = y0; y <= y1; y++) for (let x = 0; x < r[2]; x++) {
-      const edge = x === 0 || x === r[2] - 1;
-      put(r, x, y, y === y1 ? T.dk : y === y0 && y1 - y0 >= 2 ? T.hi : edge ? mixC(surf(x, y), T.dk, .5) : surf(x, y));
-    }
-  };
-  const cap = r => { // a face covered all over (tops of the helmet and shoulders), darker round its rim
-    for (let y = 0; y < r[3]; y++) for (let x = 0; x < r[2]; x++)
-      put(r, x, y, x === 0 || y === 0 || x === r[2] - 1 || y === r[3] - 1 ? mixC(surf(x, y), T.dk, .45) : surf(x, y));
-  };
-  const gem = (r, x, y, col) => { // a 2x2 gem: bright corner, darker opposite corner
-    put(r, x, y, mixC(col, [255, 255, 255], .45), 4); put(r, x + 1, y, col, 4); put(r, x, y + 1, col, 4); put(r, x + 1, y + 1, shadeC(col, -45), 4);
-  };
-  const trimGem = T.champ || !T.gem ? null : mixC(T.gem, T.hi, .5); // regular gem tiers get studs in a paler shade of their own color
+// ---- the chestplate model: voxel pixel art built the same way as the guns (weapons.js voxelGeos), so it has the same
+// black outline. Sizes are in armor pixels, half a skin pixel each, measured from the middle of the body:
+// the body is x -8..8 (+x is the character's left), y -12..12, z -4..4 (+z is the front). The arms hang at x 8..16,
+// the head sits on top at y 12+ over x -8..8, so the shoulder pads start at x 8 and the plates stay below the head.
+// Parts that should show their color are 3+ pixels across (2 is all outline).
+const rgbHex = a => a.reduce((h, v) => h * 256 + Math.max(0, Math.min(255, Math.round(v))), 0);
+function armorPieces(n, team = null) {
+  const T = armorOf(n), S = T.shape, out = [], hex = a => palIdx(rgbHex(a));
+  const C = hex(T.c), HI = hex(T.hi), DK = hex(T.dk), MID = hex(mixC(T.c, T.dk, .5));
+  const gemC = T.gem ? hex(T.c.map((v, k) => (v + T.gem[k]) / 2)) : HI, gemL = T.gem ? hex(T.gem) : HI;
+  const B = (x0, x1, y0, y1, z0, z1, m) => out.push([x1 - x0, y1 - y0, z1 - z0, m, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]);
+  const M = (x0, x1, y0, y1, z0, z1, m) => { B(x0, x1, y0, y1, z0, z1, m); B(-x1, -x0, y0, y1, z0, z1, m); };
+  const zf = 4 + S.t, yb = S.yb, champGems = [GEMS.am, GEMS.ru, GEMS.em, GEMS.di].map(hex);
 
-  // ---- helmet: crown, sides and back down to row 6, a brow band, cheek guards and a nose guard. The face stays open
-  const H = regions(...PARTS.head.slice(0, 2), 8, 8, 8), F = H.front;
-  cap(H.top);
-  for (const f of ['left', 'right', 'back']) plate(H[f], 0, 6);
-  plate(F, 0, 1);
-  for (let y = 2; y <= 6; y++) { put(F, 0, y, y === 6 ? T.dk : mixC(surf(0, y), T.dk, .4)); put(F, 7, y, y === 6 ? T.dk : mixC(surf(7, y), T.dk, .4)); }
-  for (let y = 2; y <= 4; y++) { put(F, 3, y, y === 4 ? T.dk : surf(3, y)); put(F, 4, y, y === 4 ? T.dk : surf(4, y)); }
-  if (T.champ) gem(F, 3, 0, GEMS.di); else if (trimGem) gem(F, 3, 0, trimGem);
-  else if (T.id === 'gold') { put(F, 3, 0, T.hi, 4); put(F, 4, 0, T.hi, 4); }
-
-  // ---- chestplate: rows 0-9 all round, then a belt. Team matches add a band in the team's color so you can tell sides apart
-  const B = regions(...PARTS.body.slice(0, 2), 8, 12, 4), BF = B.front;
-  for (const f of ['front', 'back', 'left', 'right']) {
-    plate(B[f], 0, 9);
-    for (let x = 0; x < B[f][2]; x++) { put(B[f], x, 10, T.dk, 6); put(B[f], x, 11, mixC(T.c, T.dk, .55), 8); }
-    if (team) for (let x = 0; x < B[f][2]; x++) { put(B[f], x, 7, team, 8); put(B[f], x, 8, shadeC(team, -35), 8); }
+  // the shell round the chest, darker along its bottom
+  B(-9, 9, yb, 13, -zf, zf, C);
+  B(-9, 9, yb, yb + 1, -zf, zf, DK);
+  if (T.id === 'wood') { // planks with dark seams, and two leather straps over the shoulders
+    for (let y = yb + 4; y < 12; y += 4) B(-9, 9, y, y + 1, -zf, zf, MID);
+    M(3, 6, yb, 13, -zf, zf, hex([92, 60, 34]));
+    M(3, 6, 5, 7, zf - 1, zf, hex([150, 150, 156]));
   }
-  for (let x = 1; x < 7; x++) put(BF, x, 5, mixC(surf(x, 5), T.dk, .55)); // where the chest plate meets the stomach plate
-  if (T.champ) { put(BF, 3, 2, GEMS.am, 4); put(BF, 4, 2, GEMS.ru, 4); put(BF, 3, 3, GEMS.em, 4); put(BF, 4, 3, GEMS.di, 4); }
-  else if (trimGem) gem(BF, 3, 2, trimGem);
-  else if (T.id === 'gold') for (const [x, y] of [[3, 2], [4, 2], [3, 3], [4, 3]]) put(BF, x, y, T.hi, 4);
-  else if (T.id === 'steel') for (const [x, y] of [[1, 1], [6, 1], [1, 8], [6, 8]]) put(BF, x, y, T.dk, 4); // rivets
+  if (T.id === 'steel') { // overlapping bands, rivets in the corners
+    for (const y of [-6, -1, 4]) B(-9, 9, y, y + 1, -zf, zf, MID);
+    for (const y of [-9, 9]) M(6, 7, y, y + 1, zf - 1, zf, HI);
+  }
+  // the belt stands out from the plate. In team matches it's the team's color, so you can tell sides apart
+  const beltC = team ? hex(team) : DK;
+  if (T.id !== 'wood') B(-9, 9, yb, yb + 3, -zf - 1, zf + 1, beltC);
+  else B(-9, 9, yb, yb + 2, -zf, zf, team ? beltC : hex([92, 60, 34]));
+  // raised chest plates, with a lighter top edge
+  if (S.pecs) {
+    M(1, 8, 1, 10, zf, zf + 1, C); M(1, 8, 9, 10, zf, zf + 1, HI);
+  }
+  // the chest gem: one gem in its tier's color (Champion: a square of all four), standing out from the chest plates
+  if (S.gem) {
+    const g = S.gem / 2, y0 = 10 - S.gem; // its top lines up with the top of the chest plates
+    if (T.champ) [[-g, 0, y0 + g], [0, g, y0 + g], [-g, 0, y0], [0, g, y0]].forEach(([x0, x1, y], k) => B(x0, x1, y, y + g, zf, zf + 2, champGems[k]));
+    else { B(-g, g, y0, 10, zf, zf + 2, gemC); B(-g, -g + 2, 8, 10, zf + 1, zf + 2, gemL); }
+  } else if (T.id === 'gold') B(-2, 2, 4, 8, zf, zf + 2, HI);
   // buckle
-  const buck = T.champ ? GEMS.am : trimGem ?? T.hi;
-  for (const [x, y] of [[3, 10], [4, 10], [3, 11], [4, 11]]) put(BF, x, y, buck, 4);
-  for (let y = 0; y < 4; y++) for (let x = 0; x < 8; x++) { // shoulders, with the neck left open
-    if (x >= 2 && x <= 5 && y >= 1 && y <= 2) continue;
-    put(B.top, x, y, x === 0 || x === 7 || y === 0 || y === 3 ? mixC(surf(x, y), T.dk, .45) : surf(x, y));
+  const buck = T.champ ? champGems[0] : T.gem ? gemC : HI;
+  if (T.id !== 'wood') B(-2, 2, yb, yb + 3, zf + 1, zf + 2, buck);
+  // plates hanging over the hips, front and back
+  if (S.tas) for (const s of [1, -1]) {
+    const [z0, z1] = s > 0 ? [4, zf] : [-zf, -4];
+    M(1, 8, S.tas, yb, z0, z1, C); M(1, 8, S.tas, S.tas + 1, z0, z1, DK);
   }
-
-  // ---- arms: a shoulder guard (rows 0-3) and a bracer (rows 6-9). The elbow and the fist stay bare
-  for (const p of ['armR', 'armL']) {
-    const r = regions(...PARTS[p].slice(0, 2), 4, 12, 4), out = r[p === 'armR' ? 'right' : 'left'];
-    for (const f of ['front', 'back', 'left', 'right']) { plate(r[f], 0, 3); plate(r[f], 6, 9); }
-    cap(r.top);
-    if (T.champ) gem(out, 1, 1, p === 'armR' ? GEMS.ru : GEMS.em); else if (trimGem) gem(out, 1, 1, trimGem);
-  }
-
-  // ---- legs: leg guards (rows 0-7) and boots (rows 8-11) with soles
-  for (const p of ['legR', 'legL']) {
-    const r = regions(...PARTS[p].slice(0, 2), 4, 12, 4);
-    for (const f of ['front', 'back', 'left', 'right']) {
-      plate(r[f], 0, 7);
-      for (let x = 0; x < 4; x++) {
-        put(r[f], x, 8, T.hi); put(r[f], x, 9, mixC(T.c, T.dk, .25)); put(r[f], x, 10, mixC(T.c, T.dk, .25)); put(r[f], x, 11, T.dk);
-      }
+  // a ridge down the back
+  if (S.spine) B(-2, 2, yb + 3, 12, -zf - 2, -zf, HI);
+  // shoulder pads over the tops of the arms, then a plate down the outside of the arm, a second plate on top, and crystals
+  if (S.pad) {
+    const [x1, y1, lip] = S.pad;
+    M(8, x1, 12, y1, -6, 6, C); M(8, x1, y1 - 1, y1, -6, 6, HI); M(8, x1, 12, 13, -6, 6, DK);
+    if (lip) { M(16, x1, lip, 13, -6, 6, C); M(16, x1, lip, lip + 1, -6, 6, DK); }
+    let top = y1;
+    if (S.layer) { M(10, x1 - 1, y1, y1 + 2, -4, 4, C); M(10, x1 - 1, y1 + 1, y1 + 2, -4, 4, HI); top += 2; }
+    for (let k = 0; k < (S.shards ?? 0); k++) {
+      const x = 10 + k * 3, h = k === 1 ? 5 : 3, col = T.champ ? champGems[k % 4] : gemC;
+      B(x, x + 3, top, top + h, -2, 1, col); B(-x - 3, -x, top, top + h, -2, 1, T.champ ? champGems[(k + 3) % 4] : col);
     }
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) put(r.bottom, x, y, y === 0 || x === 0 || x === 3 ? mixC(T.dk, T.c, .3) : T.dk, 6);
-    if (T.champ) gem(r.front, 1, 4, p === 'legR' ? GEMS.am : GEMS.di); else if (trimGem) gem(r.front, 1, 4, trimGem);
   }
+  return out;
 }
-const armorTexCache = new Map();
-function armorTexture(n, team = null) {
-  const key = n + ':' + (team ?? '');
-  if (!armorTexCache.has(key)) {
-    const c = document.createElement('canvas'); c.width = c.height = 64;
-    paintArmor(c.getContext('2d'), n, team);
-    const t = new THREE.CanvasTexture(c);
-    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter; t.colorSpace = THREE.SRGBColorSpace;
-    armorTexCache.set(key, t);
-  }
-  return armorTexCache.get(key);
-}
-
-// ---- the armor pieces: a box a little bigger than each body part, showing the armor texture.
-// FIT = how far out each piece sits, in skin pixels. The two legs differ a hair so where they overlap one is always in front
-const ARMOR_FIT = { head: .5, body: .5, armR: .35, armL: .35, legR: .3, legL: .25 };
-const ARMOR_PARTS = ['head', 'body', 'armR', 'armL', 'legR', 'legL']; // same order as buildChar's parts
+const ARMOR_PX = 2; // armor pixels per skin pixel
 const armorGeoCache = {};
-function armorGeo(part, U) {
-  const k = part + ':' + U;
-  if (!armorGeoCache[k]) {
-    const [u, v, w, h, d] = PARTS[part], i = ARMOR_FIT[part], R = regions(u, v, w, h, d);
-    armorGeoCache[k] = skinBox(w + 2 * i, h + 2 * i, d + 2 * i, U, [R.left, R.right, R.top, R.bottom, R.front, R.back]);
-  }
-  return armorGeoCache[k];
+function armorGeo(n, team, U) {
+  const k = n + ':' + (team ?? '') + ':' + U;
+  return armorGeoCache[k] ??= voxelGeos(armorPieces(n, team), U / ARMOR_PX).lit;
 }
-const armorMat = (n, team) => lam({ map: armorTexture(n, team), alphaTest: .5 });
-// puts armor tier n on a character from buildChar (0 takes it off). Each piece rides on its body part, so it moves with it.
-// team = the team color for the chest band, in team matches
+// its own material per character, so it flashes when they're hurt and fades with their ghost. Lit like the guns
+const armorMat = () => { const m = new THREE.MeshLambertMaterial({ vertexColors: true }); m.onBeforeCompile = gunLit.onBeforeCompile; return m; };
+// puts armor tier n on a character from buildChar (0 takes it off). It rides on the body, so it moves with it.
+// team = the team color for the belt, in team matches
 function dressArmor(ch, n, team = null) {
   if (ch.armor) {
-    ch.armor.meshes.forEach(m => m.parent.remove(m));
+    ch.armor.mesh.parent.remove(ch.armor.mesh);
     ch.mats.splice(ch.mats.indexOf(ch.armor.mat), 1); ch.armor.mat.dispose(); ch.armor = null;
   }
   if (!n) return;
-  const mat = armorMat(n, team);
-  const meshes = ARMOR_PARTS.map((p, k) => { const m = new THREE.Mesh(armorGeo(p, ch.U), mat); ch.parts[k].add(m); return m; });
-  ch.mats.push(mat); ch.armor = { n, mat, meshes };
+  const mat = armorMat(), mesh = new THREE.Mesh(armorGeo(n, team, ch.U), mat);
+  ch.body.add(mesh); ch.mats.push(mat); ch.armor = { n, mat, mesh };
 }
+// the chestplate on its own, for the spinning preview in the armory (geometry is shared, nothing to free)
+function armorModel(n, g) { g.add(new THREE.Mesh(armorGeo(n, null, 1 / 16), gunLit)); }
 
-// ---- icons for the armory: a helmet and a chestplate, with the same black outline the gun sprites have
-const ICON_HELM = ['..HHHHH..', '.HAAAAAD.', 'HAAAGAAAD', 'AAAAAAAAD', 'AA.....AD', 'AA.....AD', 'DD.....DD'];
-const ICON_CHEST = ['HHHH......HHHH', 'AAAAH....HAAAD', 'AAAAAHHHHAAAAD', 'AAAAAAAAAAAAAD', '.AAAAAGGAAAAD.', '.AAAAAGGAAAAD.',
-  '..AAAAAAAAAD..', '..AAAAAAAAAD..', '..DAAAAAAAAD..', '..DDDDDDDDDD..'];
-const ARMOR_SPRITES = ARMOR_TIERS.map((T, k) => {
-  const W = 26, H = 14, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d'), rgb = a => `rgb(${a.map(v => Math.max(0, Math.min(255, v | 0)))})`;
-  const draw = (rows, ox, oy, gems) => {
-    let gi = 0;
-    rows.forEach((row, y) => [...row].forEach((ch, x) => {
-      if (ch === '.') return;
-      let col = ch === 'H' ? T.hi : ch === 'D' ? T.dk : T.c;
-      if (ch === 'A' && T.id === 'wood' && y % 3 === 2) col = mixC(T.c, T.dk, .6);
-      if (ch === 'G') col = T.champ ? gems[gi++ % gems.length] : T.gem ?? (T.id === 'gold' ? T.hi : T.c);
-      g.fillStyle = rgb(col); g.fillRect(ox + x, oy + y, 1, 1);
-    }));
-  };
-  draw(ICON_HELM, 1, 4, [GEMS.di]);
-  draw(ICON_CHEST, 11, 2, [GEMS.am, GEMS.ru, GEMS.em, GEMS.di]);
-  const img = g.getImageData(0, 0, W, H), d = img.data, solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && d[(y * W + x) * 4 + 3] > 0;
-  g.fillStyle = '#000';
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
-    if (!solid(x, y) && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) g.fillRect(x, y, 1, 1);
-  return c.toDataURL();
-});
+// ---- icons: the chestplate seen from the front, every tier in the same frame (so the bigger ones look bigger),
+// drawn 4 screen pixels per armor pixel, with a black outline round it and where a raised part stands in front of another
+const armorSpriteCache = [];
+function armorSprite(k) { // k = tier index (0 = Wooden)
+  if (armorSpriteCache[k]) return armorSpriteCache[k];
+  const { lo, NX, NY, NZ, at } = voxelGrid(armorPieces(k + 1));
+  const W = 42, H = 38, X0 = -21, YT = 21, K = 4; // frame: x -21..21, y 21 down to -17 (Champion just fits)
+  const dep = new Float32Array(W * H).fill(-99), col = new Array(W * H);
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const x = X0 + c - lo[0], y = YT - r - lo[1];
+    for (let z = NZ - 1; z >= 0; z--) { const m = at(x, y, z); if (m) { dep[r * W + c] = z; col[r * W + c] = gunPal[m].c; break; } }
+  }
+  const cv = document.createElement('canvas'); cv.width = W * K; cv.height = H * K;
+  const g = cv.getContext('2d'), filled = (r, c) => r >= 0 && c >= 0 && r < H && c < W && dep[r * W + c] > -99;
+  let zmax = 0; dep.forEach(d => zmax = Math.max(zmax, d));
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const i = r * W + c, d = dep[i];
+    let black;
+    if (d === -99) black = filled(r - 1, c) || filled(r + 1, c) || filled(r, c - 1) || filled(r, c + 1);
+    else black = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].some(([a, b]) => filled(a, b) && dep[a * W + b] > d);
+    if (d === -99 && !black) continue;
+    if (black) g.fillStyle = '#000';
+    else {
+      const sh = Math.max(.6, 1 - (zmax - d) * .06), h = col[i].getHex();
+      g.fillStyle = `rgb(${(h >> 16 & 255) * sh | 0},${(h >> 8 & 255) * sh | 0},${(h & 255) * sh | 0})`;
+    }
+    g.fillRect(c * K, r * K, K, K);
+  }
+  return armorSpriteCache[k] = cv.toDataURL();
+}

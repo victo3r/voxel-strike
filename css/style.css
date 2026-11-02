@@ -134,6 +134,11 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armDet{flex-direction:column;gap:8px}
 #armDet #detBack{align-self:flex-start;font:bold 14px monospace;padding:6px 12px}
 #detCv{width:100%!important;height:min(280px,36vh)!important;display:block}
+#detView{position:relative}
+#detView .arw{position:absolute;bottom:8px;font:bold 16px monospace;padding:6px 12px;z-index:1}
+#detView .arw.l{left:8px}#detView .arw.r{right:8px}
+#detView .arw:disabled{opacity:.3}
+img.ai{image-rendering:auto!important;object-fit:contain}
 #armDet .dn{font:bold 24px monospace}
 #armDet p{margin:0;font-size:14px;line-height:1.45;color:var(--silver)}
 #armDet .ds{display:grid;grid-template-columns:auto 1fr;gap:5px 18px;margin-top:6px;font-size:14px}
