@@ -40,7 +40,7 @@ function applySave(s) {
   const n = cleanName(s.name);
   if (n) { myName = n; $('nameIn').value = n; try { localStorage.setItem('voxelstrike-name', n); } catch {} }
   if (!keepBest && s.best) { best = { wave: s.best.wave | 0, kills: s.best.kills | 0 }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
-  showProf(); showBest(); dressHero();
+  showProf(); dressHero(); armIcon();
   if (armOpen) renderArmory();
   applying = false;
   if (keepBest) markDirty(); // this device has a better zombie run than the cloud copy
@@ -112,27 +112,22 @@ async function pull() {
   finally { busy = false; }
 }
 
-// ---- account box in the lobby ----
+// ---- account section of the settings page ----
 function renderAcct() {
   const el = $('acct');
-  if (!auth) { el.innerHTML = '<button id="acctBtn">☁ SIGN IN TO SAVE PROGRESS</button>'; return; }
+  $('acctForm').style.display = auth ? 'none' : '';
+  if (!auth) { el.innerHTML = ''; return; }
   const st = { saving: 'SAVING…', saved: 'SAVED', offline: 'OFFLINE · SAVES LATER' }[cloudState] ?? '';
-  el.innerHTML = `<span>☁ <b>${auth.user}</b></span><small class="${cloudState}">${st}</small><button id="acctOut">SIGN OUT</button>`;
+  el.innerHTML = `<span>Signed in as <b>${auth.user}</b></span><small class="${cloudState}">${st}</small><button id="acctOut">SIGN OUT</button>`;
 }
 $('acct').addEventListener('click', async e => {
-  if (e.target.id === 'acctBtn') { $('acctErr').textContent = ''; $('acctBox').style.display = 'flex'; $('acctUser').focus(); sfx('ui'); }
   if (e.target.id === 'acctOut') {
     if (sync.dirty) await push();
     api('POST', '/logout').catch(() => {});
     signedOut(); sfx('ui');
   }
 });
-const closeAcct = () => { $('acctBox').style.display = 'none'; $('acctPass').value = ''; };
-$('acctX').addEventListener('click', closeAcct);
-$('acctBox').addEventListener('keydown', e => {
-  if (e.code === 'Escape') closeAcct();
-  if (e.code === 'Enter' || e.code === 'NumpadEnter') acctGo('login');
-});
+$('acctForm').addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'NumpadEnter') acctGo('login'); });
 $('acctIn').addEventListener('click', () => acctGo('login'));
 $('acctNew').addEventListener('click', () => acctGo('signup'));
 
@@ -147,7 +142,7 @@ async function acctGo(how) {
   const otherAccount = sync.user && sync.user.toLowerCase() !== r.user.toLowerCase();
   auth = { user: r.user, token: r.token };
   try { localStorage.setItem('voxelstrike-auth', JSON.stringify(auth)); } catch {}
-  closeAcct(); sfx('buy');
+  $('acctPass').value = ''; $('acctErr').textContent = ''; sfx('buy');
   sync = { user: r.user, rev: 0, dirty: false };
   if (how === 'signup' || !r.save) { sync.rev = r.rev; saveSync(); if (!r.save) await push(); else setState('saved'); return; }
   // signing in on a device that already has progress: the bigger save wins, unless this device was synced to a different account

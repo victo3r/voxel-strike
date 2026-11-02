@@ -60,8 +60,10 @@ $('armory').addEventListener('click', e => {
   } else if (b.id === 'armX') { closeArmory(); return; }
   renderArmory();
 });
+const armIcon = () => $('armIcon').src = SPRITES[loadoutGun('primary')]; // the lobby's ARMORY button shows your primary gun
+armIcon();
 function openArmory() { armOpen = true; renderArmory(); $('armory').style.display = 'flex'; }
-function closeArmory() { if (!armOpen) return; armOpen = false; $('armory').style.display = 'none'; }
+function closeArmory() { if (!armOpen) return; armOpen = false; $('armory').style.display = 'none'; armIcon(); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // stopPropagation so the click doesn't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => { if (e.code === 'Escape' && armOpen && $('binds').style.display !== 'flex') closeArmory(); });

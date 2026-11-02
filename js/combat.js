@@ -158,7 +158,7 @@ function updateFlares(dt) {
   }
 }
 
-// pads at fixed spots around the map. They start empty each game. Each holds one pickup; after you grab it, a new random one appears 20-30s later.
+// pads at fixed (invisible) spots around the map. They start empty each game. Each holds one pickup; after you grab it, a new random one appears 20-30s later.
 // You can't grab something that would do nothing (full HP, full armor, full ammo), so it stays there for later.
 const pickMat = t => lam({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: .35 });
 const PICKUPS = {
@@ -167,16 +167,13 @@ const PICKUPS = {
   armor: pickMat(tex(g => { noise(g, [175, 180, 188], 22); g.fillStyle = '#f2f4f7'; g.fillRect(4, 3, 8, 6); g.fillRect(5, 9, 6, 2); g.fillRect(6, 11, 4, 2); g.fillRect(7, 13, 2, 1); g.fillStyle = '#5c6068'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16); })),
 };
 const HEAL_PICK = 30, ARMOR_PICK = 25, RESPAWN = 20, FIRST_SPAWN = 15; // pads start empty; first pickups show up 15-25s in
-const pads = [], padGeo = new THREE.CylinderGeometry(.7, .7, .05, 16), padMat = lam({ color: 0x555555 }), pickGeo = new THREE.BoxGeometry(.45, .45, .45);
+const pads = [], pickGeo = new THREE.BoxGeometry(.45, .45, .45);
 let padsFor = null;
 function setupPads() {
   if (padsFor === MAP) return;
-  for (const p of pads) { clearPad(p); scene.remove(p.mesh); }
+  for (const p of pads) clearPad(p);
   pads.length = 0; padsFor = MAP;
-  for (const [x, z] of MAP.pads) {
-    const mesh = new THREE.Mesh(padGeo, padMat); mesh.position.set(x, .07, z); scene.add(mesh);
-    pads.push({ x, z, mesh, item: null, type: '', t: 0 });
-  }
+  for (const [x, z] of MAP.pads) pads.push({ x, z, item: null, type: '', t: 0 });
 }
 function pickupType() { // ammo only once you own a gun that uses it, armor only once you've bought some
   const opts = ['health', 'health'];

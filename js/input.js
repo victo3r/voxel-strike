@@ -62,11 +62,20 @@ $('bindList').addEventListener('mousedown', e => {
   e.stopPropagation(); e.preventDefault();
   rebinding = { a: b.dataset.a, s: +b.dataset.s }; renderBinds();
 });
-$('ctrlBtn').addEventListener('click', e => { e.stopPropagation(); rebinding = null; renderBinds(); $('binds').style.display = 'flex'; });
-$('bindDone').addEventListener('click', () => { rebinding = null; $('binds').style.display = 'none'; });
+// settings page: CONTROLS / SOUND / ACCOUNT tabs. It opens on whichever tab you used last
+let setTab = 'controls';
+function showSetTab(t) {
+  setTab = t; rebinding = null; renderBinds();
+  document.querySelectorAll('#setTabs button').forEach(b => b.classList.toggle('sel', b.dataset.t === t));
+  document.querySelectorAll('#setBody section').forEach(s => s.style.display = s.dataset.t === t ? '' : 'none');
+  $('setBody').scrollTop = 0;
+}
+$('setTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.t !== setTab) { showSetTab(b.dataset.t); sfx('ui'); } });
+function openSettings() { $('acctErr').textContent = ''; showSetTab(setTab); $('binds').style.display = 'flex'; }
+$('ctrlBtn').addEventListener('click', e => { e.stopPropagation(); openSettings(); });
 $('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); sens = { ...DEFAULT_SENS }; saveSens(); renderSens(); renderHelp(); renderBinds(); });
 renderHelp();
-const closeBinds = () => { rebinding = null; $('binds').style.display = 'none'; };
+const closeBinds = () => { rebinding = null; $('binds').style.display = 'none'; $('acctPass').value = ''; };
 $('bindX').addEventListener('click', closeBinds);
 addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && $('binds').style.display === 'flex') closeBinds(); });
 
@@ -95,7 +104,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys[e.code] = false);
 addEventListener('mousedown', e => {
   const code = 'Mouse' + e.button;
-  if (rebinding) { if (!e.target.closest('#bindReset,#bindDone,#bindX,#sensList')) { e.preventDefault(); assign(code); } return; }
+  if (rebinding) { if (!e.target.closest('#bindReset,#bindX,#setTabs,.sliders')) { e.preventDefault(); assign(code); } return; }
   if (chatting) { e.preventDefault(); return; } // clicking while typing doesn't shoot or steal focus from the chat box
   keys[code] = true; press(code);
 });
@@ -157,25 +166,50 @@ function showLobby(on) {
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
   vm.visible = !on;
-  if (on) { $('menu').style.display = 'none'; camera.fov = 75; camera.updateProjectionMatrix(); musicLobby(); }
+  if (on) { $('menu').style.display = 'none'; camera.fov = 75; camera.updateProjectionMatrix(); musicLobby(); armIcon(); }
 }
-$('playBtn').addEventListener('click', () => {
-  restart(); showLobby(false);
-  lockMouse();
-});
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); showLobby(true); });
-$('modes').addEventListener('click', e => {
-  const b = e.target.closest('.mode'); if (!b || b.disabled) return;
-  document.querySelectorAll('.mode').forEach(m => m.classList.toggle('sel', m === b));
-  mode = b.dataset.mode; sfx('ui');
-});
-const markMap = () => document.querySelectorAll('.map').forEach(m => m.classList.toggle('sel', m.dataset.map === mapId));
+
+// PLAY: pick a mode, then one of the maps that mode can be played on. Picking the map starts the match.
+const MODES = [
+  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Survive the waves, earn coins, beat the boss every 5 waves', maps: ['yard', 'forest', 'resort'] },
+  { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ['yard', 'forest', 'resort'] },
+];
+const MAP_PLAYERS = { small: 4, medium: 8, large: 8 };
 if (!MAPS[mapId]) mapId = 'yard';
-markMap();
-$('maps').addEventListener('click', e => {
-  const b = e.target.closest('.map'); if (!b) return;
-  mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId); markMap(); sfx('ui');
+const savedMode = localStorage.getItem('voxelstrike-mode');
+if (MODES.some(m => m.id === savedMode)) mode = savedMode;
+let pickMode = null; // null = choosing a mode, otherwise the mode whose maps are listed
+function renderPick() {
+  const m = MODES.find(m => m.id === pickMode);
+  $('pickTitle').textContent = m ? m.name : 'SELECT MODE';
+  $('pickBack').textContent = m ? '◀ MODES' : '◀ BACK';
+  $('pickList').className = m ? 'maps' : 'modes';
+  $('pickList').innerHTML = m
+    ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1);
+        return `<button data-map="${id}" class="${id === mapId ? 'sel' : ''}"><b>${d.name.toUpperCase()}</b><small>${size}${m.id === 'dm' ? ` · ${MAP_PLAYERS[d.size]} players` : ''}</small></button>`; }).join('')
+    : MODES.map(o => `<button data-mode="${o.id}" class="${o.id === mode ? 'sel' : ''}"><b>${o.name}</b><small>${o.desc}</small></button>`).join('');
+}
+const pickOpen = () => $('pick').style.display === 'flex';
+function showPick(on) {
+  $('pick').style.display = on ? 'flex' : 'none';
+  $('lobbyUI').style.display = on ? 'none' : '';
+  $('lookPick').style.display = on ? 'none' : '';
+  if (on) { pickMode = null; renderPick(); }
+}
+$('playBtn').addEventListener('click', () => { showPick(true); sfx('ui'); });
+$('pickBack').addEventListener('click', () => { if (pickMode) { pickMode = null; renderPick(); } else showPick(false); sfx('ui'); });
+$('pickList').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.mode) {
+    mode = pickMode = b.dataset.mode; localStorage.setItem('voxelstrike-mode', mode);
+    if (!MODES.find(m => m.id === mode).maps.includes(mapId)) mapId = MODES.find(m => m.id === mode).maps[0];
+    renderPick(); sfx('ui'); return;
+  }
+  mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId);
+  showPick(false); restart(); showLobby(false); lockMouse();
 });
+addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && pickOpen()) $('pickBack').click(); });
 // your name: saves when you click away or press Enter. Blank goes back to the old one. 🎲 rolls a random one.
 $('nameIn').value = myName;
 const saveName = () => { $('nameIn').value = setMyName($('nameIn').value); };
@@ -184,7 +218,38 @@ $('nameIn').addEventListener('blur', saveName);
 $('nameIn').addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'NumpadEnter') $('nameIn').blur(); });
 $('nameDice').addEventListener('click', () => { $('nameIn').value = setMyName(newMyName(myName)); sfx('ui'); });
 document.addEventListener('pointerlockchange', () => { if (document.activeElement === $('nameIn')) $('nameIn').blur(); });
-$('lobbyCtrl').addEventListener('click', () => { rebinding = null; renderBinds(); $('binds').style.display = 'flex'; });
+$('lobbySet').addEventListener('click', () => { openSettings(); sfx('ui'); });
+
+// pixel icons for the lobby buttons, drawn from a grid with a dark outline added round the edge
+function pixIcon(rows, col, scale = 4) {
+  const h = rows.length, w = rows[0].length, c = document.createElement('canvas');
+  c.width = (w + 2) * scale; c.height = (h + 2) * scale;
+  const g = c.getContext('2d'), on = (x, y) => rows[y]?.[x] === 'X';
+  for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
+    const fill = on(x, y), edge = !fill && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => on(x + a, y + b));
+    if (!fill && !edge) continue;
+    g.fillStyle = fill ? (y < h / 2 ? col[0] : col[1]) : '#000'; // lighter top half, darker bottom half
+    g.fillRect((x + 1) * scale, (y + 1) * scale, scale, scale);
+  }
+  return c.toDataURL();
+}
+$('setIcon').src = pixIcon([
+  '.....XXXX.....',
+  '..XX.XXXX.XX..',
+  '.XXXXXXXXXXXX.',
+  '.XXXXXXXXXXXX.',
+  '..XXXXXXXXXX..',
+  'XXXXXX..XXXXXX',
+  'XXXXX....XXXXX',
+  'XXXXX....XXXXX',
+  'XXXXXX..XXXXXX',
+  '..XXXXXXXXXX..',
+  '.XXXXXXXXXXXX.',
+  '.XXXXXXXXXXXX.',
+  '..XX.XXXX.XX..',
+  '.....XXXX.....',
+], ['#d8dde4', '#9aa3ae']);
+$('playIcon').src = pixIcon(Array.from({ length: 13 }, (_, y) => Array.from({ length: 11 }, (_, x) => x <= Math.min(y, 12 - y) * 1.7 ? 'X' : '.').join('')), ['#ffffff', '#d6f5d0']);
 showLobby(true);
 
 function restart() {

@@ -247,7 +247,8 @@ $('custRand').onclick = () => {
 const custOpen = () => $('custPanel').style.display === 'flex';
 function showCust(on) {
   $('custPanel').style.display = on ? 'flex' : 'none';
-  $('lobbyPanel').style.display = on ? 'none' : '';
+  $('lobbyUI').style.display = on ? 'none' : '';
+  $('lobby').classList.toggle('cust', on);
   $('lookPick').style.display = on ? 'none' : '';
   if (on) renderCust();
   sfx('ui');

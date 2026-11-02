@@ -138,10 +138,7 @@ function saveBest() {
   if (mode !== 'zombies') return;
   newBest = wave > best.wave || (wave === best.wave && kills > best.kills);
   if (newBest) { best = { wave, kills }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} onSave(); }
-  showBest();
 }
-const showBest = () => $('lobbyBest').textContent =best.wave ? `BEST: wave ${best.wave} · ${best.kills} kills` : '';
-showBest();
 const booms = [];
 function explode(z) {
   if (z.boomed) return;
