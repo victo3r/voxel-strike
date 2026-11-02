@@ -1,7 +1,7 @@
 startMap('resort', {
   name: 'The Resort', size: 'large', half: 42,
   env: { sky: 0x8fd4ff, fog: 0xc4e8ff, fogNear: 50, fogFar: 160, hemiSky: 0xffffff, hemiGround: 0xd9c38e, hemi: 1.05, sunColor: 0xfff0d8, sun: 1.4, sunDir: [14, 22, 9] },
-  pads: [[24, -22], [26, 4], [-18, 14], [-18, -14], [0, 30], [2, -30], [-36, 0], [12, 14]],
+  pads: [[24, -22], [26, 4], [-18, 14], [-18, -14], [0, 30], [2, -30], [-33.5, -3], [12, 14]], // [-33.5, -3] is inside the hotel
   crates: [], // crates don't suit a resort
 });
 {
@@ -9,7 +9,8 @@ const M = MAPS.resort, RA = M.half, rnd = seeded(777);
 const G = 200;
 const LX = 29, LZ = -31; // the lighthouse
 const HUTS = [[-34, 27, [1, 0]], [-34, -27, [1, 0]], [6, 36, [0, -1]]];
-// the sea gets deeper in steps away from the shore, down to SEA_D out by the edge of the map. You sink into it and the pool
+// the sea gets deeper in steps away from the shore, down to SEA_D out by the edge of the map, and drowns you.
+// The pool is safe: you can go in, and get back out up the steps at its west end
 const SEA_D = 3, POOL = [-24, -12, -5, 5], POOL_Y = .7, POOL_F = -1.5; // the pool's water level and floor
 const inPool = (x, z, r = 0) => x + r > POOL[0] && x - r < POOL[1] && z + r > POOL[2] && z - r < POOL[3];
 const drawSeabed = g => {
@@ -80,7 +81,7 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 }
 // hills: [x, z, radius, height]. Kept off everything built on the ground, the pads and the crates
 const HILLS = [[-28, -22, 10, 5], [-24, 25, 10, 5.5], [12, -26, 8, 4], [0, -6, 5.5, 2.5]];
-const KEEP_R = [[-28, -8, -9, 9, 2], [-4.5, 4.5, -21, -14.5, 2.5], [.5, 15.5, 16.5, 27.5, 2], ...HUTS.map(([x, z]) => [x - 1.6, x + 1.6, z - 1.6, z + 1.6, 2])];
+const KEEP_R = [[-28, -8, -9, 9, 2], [-38.5, -28.5, -7.5, 6.5, 1.5],[-4.5, 4.5, -21, -14.5, 2.5], [.5, 15.5, 16.5, 27.5, 2], ...HUTS.map(([x, z]) => [x - 1.6, x + 1.6, z - 1.6, z + 1.6, 2])];
 const KEEP_C = [...M.pads.map(([x, z]) => [x, z, 3]), ...M.crates.map(([x, z]) => [x, z, 2.2])];
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   const c = at(i, j), x0 = i - O, z0 = j - O, x = x0 + .5, z = z0 + .5;
@@ -365,7 +366,7 @@ M.nav = (p, t) => {
   return near(p, stop(a)) ? stop(a - 1) : stop(a);
 };
 
-// --- the pool: a raised deck with a step all round, and a hole in the middle 2.5 blocks deep. Fall in and you drown ---
+// --- the pool: a raised deck with a step all round, and a hole in the middle 2.5 blocks deep, with steps down at the west end ---
 const tile = surf(lam({ map: tex(g => { noise(g, [234, 226, 208], 9); g.fillStyle = '#c8bca6'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(8, 0, 1, 16); }) }), 'stone');
 const drawPoolTile = g => { noise(g, [72, 172, 214], 10); g.fillStyle = '#e4f4fb'; for (const i of [0, 4, 8, 12]) { g.fillRect(0, i, 16, 1); g.fillRect(i, 0, 1, 16); } };
 const poolTile = surf(lam({ map: tex(drawPoolTile) }), 'stone');
@@ -377,6 +378,23 @@ rectMinus(DECK_STEP, DECK).forEach(r => rectSlab(r, 0, .5, tile, true, 2));
 rectMinus(POOL_O, POOL).forEach(r => { rectSlab(r, POOL_F, POOL_Y - .1, poolTile, true, 2); rectSlab(r, POOL_Y - .1, DECK_Y, tile, true, 2); });
 flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], decal({ map: tex(drawPoolTile, (POOL[1] - POOL[0]) / 2, (POOL[3] - POOL[2]) / 2) }), (POOL[0] + POOL[1]) / 2, POOL_F + .01, 0);
 const poolWater = flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], waterMat([95, 205, 235], .6, 4, 3), (POOL[0] + POOL[1]) / 2, POOL_Y, 0);
+// the steps: from the deck at the west wall down to the floor. You collide with a smooth slope, the steps are what you see
+const PS = { x0: POOL[0], x1: POOL[0] + 4, z0: -1.25, z1: 1.25 }, PSTEPS = 5;
+building.solids.push({ mesh: null, minX: PS.x0, maxX: PS.x1, minZ: PS.z0, maxZ: PS.z1, bot: POOL_F, top: DECK_Y, ramp: { ax: 'x', a: PS.x1, b: PS.x0 }, surf: 'stone' });
+for (let s = 0; s < PSTEPS; s++) {
+  const w = (PS.x1 - PS.x0) / PSTEPS, h = (DECK_Y - POOL_F) * (PSTEPS - s) / PSTEPS;
+  const m = tbox(w, h, PS.z1 - PS.z0, tile); m.position.set(PS.x0 + w * (s + .5), POOL_F + h / 2, 0); add(m); building.cover.push(m);
+}
+const chrome = surf(plain(0xd6dde3), 'metal');
+for (const z of [PS.z0 - .12, PS.z1 + .12]) { // a handrail either side, curving over from the deck down onto the top step
+  const up = box(.07, 1, .07, chrome); up.position.set(PS.x0 - .55, DECK_Y + .5, z); add(up);
+  const top = box(.9, .07, .07, chrome); top.position.set(PS.x0 - .1, DECK_Y + 1, z); add(top);
+  const down = box(.07, 1.3, .07, chrome); down.position.set(PS.x0 + .35, DECK_Y + .35, z); add(down);
+}
+const POOL_LOW = p => inPool(p.x, p.z) && p.y < DECK_Y - .3; // down in the pool, not up on the deck
+const POOL_BOT = { x: PS.x1 + .7, z: 0 }, POOL_UP = { x: PS.x0 - 1.6, z: 0 };
+// bots and zombies in the pool chasing someone out of it: to the bottom of the steps, then up them
+const poolNav = (p, t) => !POOL_LOW(p) || POOL_LOW(t) ? null : Math.abs(p.z) < .8 && p.x < POOL_BOT.x + .2 ? POOL_UP : POOL_BOT;
 
 // loungers and umbrellas. y0 = what they stand on, along = 'x' or 'z' (which way they lie), dir = which end the back is at
 const towelCols = [0xe8505a, 0x3ab0e0, 0xf2c94c, 0x5cc48a, 0xf08bb4];
@@ -437,6 +455,80 @@ function hut(x, z, face) { // face = which way the door looks: [dx, dz]
   }
 }
 for (const [x, z, face] of HUTS) hut(x, z, face);
+
+// --- the hotel: a one-floor lobby west of the pool, with a roof terrace you get to up the stairs on its north side ---
+const HX0 = -38, HX1 = -30, HZ0 = -6, HZ1 = 6, HT = .3, RH = 3.4, RT = 3.7; // footprint, wall thickness, ceiling, roof top
+const stucco = surf(lam({ map: tex(g => { noise(g, [244, 238, 226], 10); g.fillStyle = 'rgba(0,0,0,.05)'; for (const y of [5, 11]) g.fillRect(0, y, 16, 1); }) }), 'stone');
+const teal = plain(0x2fb5a8);
+// walls. Openings: [centre along the wall, width, bottom, top]. The windows are too short to climb through, but you can shoot through them
+const H_DOOR = [0, 2.4, 0, 2.6], hWin = c => [c, 1.6, 1, 2.4];
+const H_WALLS = { E: [hWin(-3.6), H_DOOR, hWin(3.6)], W: [hWin(-3), hWin(3)], N: [], S: [hWin(-35.5), hWin(-32.5)] };
+for (const [side, holes] of Object.entries(H_WALLS)) {
+  const ns = side === 'N' || side === 'S', lo = ns ? HX0 : HZ0 + HT, hi = ns ? HX1 : HZ1 - HT; // N and S run the full width so they cover the corners
+  const piece = (a0, a1, b, t) => {
+    if (a1 - a0 < .01 || t - b < .01) return;
+    if (side === 'N') addSlab((a0 + a1) / 2, HZ0 + HT / 2, a1 - a0, HT, b, t, stucco); else if (side === 'S') addSlab((a0 + a1) / 2, HZ1 - HT / 2, a1 - a0, HT, b, t, stucco);
+    else addSlab(side === 'W' ? HX0 + HT / 2 : HX1 - HT / 2, (a0 + a1) / 2, HT, a1 - a0, b, t, stucco);
+  };
+  let a = lo;
+  for (const [c, ow, ob, ot] of holes) { piece(a, c - ow / 2, 0, RH); piece(c - ow / 2, c + ow / 2, 0, ob); piece(c - ow / 2, c + ow / 2, ot, RH); a = c + ow / 2; }
+  piece(a, hi, 0, RH);
+}
+addSlab((HX0 + HX1) / 2, (HZ0 + HZ1) / 2, HX1 - HX0, HZ1 - HZ0, RH, RT, stucco); // the roof
+for (const s of [-1, 1]) { // teal trim round the outside of the walls, near the top
+  const bx = box(HX1 - HX0 + .06, .22, .04, teal); bx.position.set((HX0 + HX1) / 2, RH - .3, s < 0 ? HZ0 - .01 : HZ1 + .01); add(bx);
+  const bz = box(.04, .22, HZ1 - HZ0 + .06, teal); bz.position.set(s < 0 ? HX0 - .01 : HX1 + .01, RH - .3, (HZ0 + HZ1) / 2); add(bz);
+}
+flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(g, [226, 214, 190], 8); g.fillStyle = '#bfae8e'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, 4, 6) }), (HX0 + HX1) / 2, LAND_Y + .01, (HZ0 + HZ1) / 2);
+// striped awning over the door
+const awnT = tex(g => { for (let i = 0; i < 16; i++) { g.fillStyle = (i >> 1) % 2 ? '#ffffff' : '#2fb5a8'; g.fillRect(i, 0, 1, 16); } }); awnT.repeat.set(3, 1);
+const awning = box(1.4, .08, 3.4, lam({ map: awnT })); awning.rotation.z = .25; awning.position.set(HX1 + .65, 2.8, 0); add(awning);
+// inside: a reception desk with a key board behind it, a sofa, and a plant either side of the door
+addSlab(-36.6, 0, .7, 3, 0, 1.05, wood);
+const desk = box(.9, .08, 3.2, plain(0x6a4428)); desk.position.set(-36.6, 1.09, 0); add(desk);
+const keyBoard = box(.04, .9, 2.2, teal); keyBoard.position.set(HX0 + HT + .02, 1.9, 0); add(keyBoard);
+for (let i = 0; i < 8; i++) { const k = box(.03, .1, .06, plain(0xe8c860)); k.position.set(HX0 + HT + .05, 1.7 + (i >> 2) * .35, -.75 + (i % 4) * .5); add(k); }
+const sofaMat = plain(0x3a7fa8);
+addSlab(-33.5, 5.1, 2.6, .9, 0, .45, sofaMat); addSlab(-33.5, 5.55, 2.6, .3, .45, 1, sofaMat);
+for (const z of [-4.9, 4.9]) {
+  addSlab(HX1 - HT - .45, z, .5, .5, 0, .55, surf(plain(0xb5653a), 'stone'));
+  const leaves = box(.8, .9, .8, leafMat); leaves.position.set(HX1 - HT - .45, 1, z); add(leaves);
+}
+// roof terrace: a low wall round the edge with a gap at the top of the stairs, two loungers, an umbrella and an AC unit to hide behind
+const PH = .8, PT = .25, H_GAP = -36;
+addSlab(HX1 - PT / 2, (HZ0 + HZ1) / 2, PT, HZ1 - HZ0, RT, RT + PH, stucco);
+addSlab(HX0 + PT / 2, (HZ0 + HZ1) / 2, PT, HZ1 - HZ0, RT, RT + PH, stucco);
+addSlab((HX0 + HX1) / 2, HZ1 - PT / 2, HX1 - HX0 - PT * 2, PT, RT, RT + PH, stucco);
+addSlab((H_GAP + HX1) / 2, HZ0 + PT / 2, HX1 - PT - H_GAP, PT, RT, RT + PH, stucco);
+lounger(-33, 3.2, RT, 'x', -1, towelCols[0]); lounger(-33, 1.2, RT, 'x', -1, towelCols[1]);
+umbrella(-35.4, 2.2, RT, umbCols[1]);
+addSlab(-33.5, -3, 1.6, 1.2, RT, RT + 1.1, surf(plain(0x9aa0a6), 'metal'));
+// the stairs up: a ramp along the outside of the north wall, rising west to a landing at roof height
+const HS = { x0: H_GAP, x1: -29, z0: -7.4, z1: HZ0 }, HSTEPS = 10;
+addSlab((HX0 + H_GAP) / 2, (HS.z0 + HS.z1) / 2, H_GAP - HX0, HS.z1 - HS.z0, 0, RT, stucco); // the landing
+building.solids.push({ mesh: null, minX: HS.x0, maxX: HS.x1, minZ: HS.z0, maxZ: HS.z1, bot: 0, top: RT, ramp: { ax: 'x', a: HS.x1, b: HS.x0 }, surf: 'stone' });
+for (let s = 0; s < HSTEPS; s++) {
+  const w = (HS.x1 - HS.x0) / HSTEPS, h = RT * (HSTEPS - s) / HSTEPS;
+  const m = tbox(w, h, HS.z1 - HS.z0, stucco); m.position.set(HS.x0 + w * (s + .5), h / 2, (HS.z0 + HS.z1) / 2); add(m); building.cover.push(m);
+}
+// how bots and zombies get in, out and up: through the door, or round to the bottom of the stairs and up to the gap in the roof wall
+const H_IN = { x: HX1 - 1.3, z: 0 }, H_OUT = { x: HX1 + 1, z: 0 };
+const H_SB = { x: HS.x1 + .6, z: (HS.z0 + HS.z1) / 2 }, H_ST = { x: (HX0 + H_GAP) / 2, z: (HS.z0 + HS.z1) / 2 }, H_RE = { x: (HX0 + H_GAP) / 2, z: HZ0 + 1.4 };
+const inside = (x, z) => x > HX0 + HT && x < HX1 - HT && z > HZ0 + HT && z < HZ1 - HT;
+function hotelPlace(p) {
+  if (inside(p.x, p.z) && p.y < RH - 1) return 'in';
+  if (p.x > HX0 - .3 && p.x < HX1 + .3 && p.z > HZ0 - .3 && p.z < HZ1 + .3 && p.y > RT - .6) return 'roof';
+  if (p.x > HX0 && p.x < HS.x1 && p.z > HS.z0 && p.z < HS.z1 && p.y > .3) return 'stair';
+  return 'out';
+}
+function hotelNav(p, t) {
+  const a = hotelPlace(p), b = hotelPlace(t);
+  if (a === b) return null;
+  if (a === 'in') return near(p, H_IN) ? H_OUT : H_IN;
+  if (a === 'out') return b === 'in' ? (near(p, H_OUT) ? H_IN : H_OUT) : near(p, H_SB) ? H_ST : H_SB;
+  if (a === 'stair') return b === 'roof' ? (p.x < H_GAP + .5 ? H_RE : H_ST) : H_SB;
+  return H_ST; // on the roof: back to the top of the stairs
+}
 
 // --- volleyball court: a sand pit in the grass with a low wooden border ---
 const PIT = [.5, 15.5, 16.5, 27.5];
@@ -594,12 +686,18 @@ for (let i = 0; i < 16; i++) {
 
 // the ground under your middle: the sea and the pool go down to their floor, so you drop in when you step off the edge
 M.floor = (x, z) => inPool(x, z) ? POOL_F : kindAt(x, z) === SEA ? seaFloor(ci(x), ci(z)) : 0;
-// you've gone under once you're half a block below the water
-M.water = (x, z, feet) => inPool(x, z) ? feet < POOL_Y - .5 : kindAt(x, z) === SEA && feet < WATER_Y - .5;
+// the sea drowns you once you're half a block below the water. The pool doesn't
+M.water = (x, z, feet) => !inPool(x, z) && kindAt(x, z) === SEA && feet < WATER_Y - .5;
+// below the pool's surface: for the splash going in, and the blue tint when your eyes are under
+M.wet = (x, z, y) => inPool(x, z) && y < POOL_Y;
+M.trapped = POOL_LOW; // in the pool: bots use the steps to get out even while they can see their target
+// a building's stairs, door or steps out of the pool on the way to a target. Whichever building the walker is in comes first
+const lhNav = M.nav;
+M.nav = (p, t) => poolNav(p, t) ?? (hotelPlace(p) !== 'out' ? hotelNav(p, t) : lhNav(p, t) ?? hotelNav(p, t));
 // footsteps: the sand and the lawn on the ground
 M.surfAt = (x, z, y, base, s) => {
   if (s) return base;
-  if (Math.abs(x - LX) < LI && Math.abs(z - LZ) < LI) return 'stone'; // the lighthouse's ground floor
+  if (Math.abs(x - LX) < LI && Math.abs(z - LZ) < LI || inPool(x, z) || inside(x, z)) return 'stone'; // the lighthouse's and hotel's ground floors, the pool floor
   if (x > PIT[0] && x < PIT[1] && z > PIT[2] && z < PIT[3]) return 'sand';
   return kindAt(x, z) === GRASS ? 'grass' : 'sand';
 };

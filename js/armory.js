@@ -7,11 +7,12 @@ const inMatch = () => !inLobby && mode === 'dm' && !matchOver;
 
 function gunStats(i) {
   const w = BASE[i], L = Math.max(0, gunStars(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), mag = Math.round(w.mag * (1 + .25 * L));
-  if (w.melee) return `DMG ${dmg} · MELEE`;
+  const mob = w.mob && w.mob !== 1 ? ` · SPEED ${w.mob > 1 ? '+' : ''}${Math.round((w.mob - 1) * 100)}%` : '';
+  if (w.melee) return `DMG ${dmg} · MELEE${mob}`;
   const L2 = Math.max(0, gunStars(i) - 1), rl = +(w.reload * (1 - .15 * L2)).toFixed(1);
-  if (w.mag === 1) return `DMG ${dmg} · RELOAD ${rl}s`; // one shot per reload, so fire rate doesn't mean much
+  if (w.mag === 1) return `DMG ${dmg} · RELOAD ${rl}s${mob}`; // one shot per reload, so fire rate doesn't mean much
   const rate = (1 / w.rate).toFixed(w.rate < .2 ? 0 : 1) + '/s';
-  return `DMG ${w.pellets > 1 ? dmg + '×' + w.pellets : dmg} · ${rate} · ${w.flame ? 'FUEL' : 'MAG'} ${mag}`;
+  return `DMG ${w.pellets > 1 ? dmg + '×' + w.pellets : dmg} · ${rate} · ${w.flame ? 'FUEL' : 'MAG'} ${mag}${mob}`;
 }
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">◆ ${prof.coins}</span>`;

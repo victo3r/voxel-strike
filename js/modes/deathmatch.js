@@ -127,7 +127,7 @@ function spawnSpot(skip) {
   let best = null, bestD = -1;
   for (let tries = 0; tries < 60; tries++) {
     const x = (Math.random() * 2 - 1) * (A - 2), z = (Math.random() * 2 - 1) * (A - 2);
-    if (blocked(x, z, .45, 0) || MAP.land && !MAP.land(x, z) || overWater(x, z, 0)) continue; // not in the sea or the pool
+    if (blocked(x, z, .45, 0) || MAP.land && !MAP.land(x, z) || overWater(x, z, 0) || poolAt(x, z)) continue; // not in the sea or the pool
     const d = others.length ? Math.min(...others.map(o => Math.hypot(x - o.x, z - o.z))) : 99;
     if (d > bestD) { bestD = d; best = [x, z]; }
   }
@@ -296,8 +296,8 @@ function updateBot(b, dt) {
   }
   const pad = !sees && b.hp < b.maxHp ? nearPad(pos, b.hp <= PAD_LOW ? PAD_FAR : PAD_NEAR) : null;
   let gx = dx, gz = dz, gd = dist;
-  // a target on another floor it can't see: take the stairs (MAP.nav gives the next spot on the way)
-  const way = !pad && !sees ? MAP.nav?.(pos, tp) : pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : null;
+  // a target on another floor it can't see, or it's down in the pool: take the stairs (MAP.nav gives the next spot on the way)
+  const way = pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : !sees || MAP.trapped?.(pos) ? MAP.nav?.(pos, tp) : null;
   if (way) { gx = way.x - pos.x; gz = way.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; side = 0; }
   else if (pad) { gx = pad.x - pos.x; gz = pad.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; }
   else if (dist < 1.5) radial = -1;
@@ -311,7 +311,7 @@ function updateBot(b, dt) {
   }
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
-    const s = BOT.speed * dt / ml; mx *= s; mz *= s;
+    const s = BOT.speed * (W.mob || 1) * dt / ml; mx *= s; mz *= s;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
     if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded)) bump = true;
     if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded)) bump = true;

@@ -65,6 +65,14 @@ function slideOut(pos, nx, nz, r, h) {
 const inWater = (x, z, feet) => !!MAP.water?.(x, z, feet);
 // walkTo for bots and zombies: they won't step into water themselves, or jump over it (they check where they'd land)
 const overWater = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, 0, feet));
+// water you can go into without drowning (MAP.wet: the resort's pool). Spawns stay out of it
+const poolAt = (x, z) => !!MAP.wet?.(x, z, groundAt(x, z, 0, 0));
+// splash going into it, for you and for a bot or zombie (o.wet remembers whether it was already in)
+function wetCheck(o, p) {
+  const wet = !!MAP.wet?.(p.x, p.z, p.y);
+  if (wet && !o.wet) { sfx('splash', o === P ? { v: .55 } : { at: p, far: 30, v: .55 }); splash(p); }
+  o.wet = wet;
+}
 function walkDry(pos, nx, nz, r, grounded) {
   const ox = pos.x, oy = pos.y, oz = pos.z, lag = pos.lag;
   if (!walkTo(pos, nx, nz, r, grounded)) return false;
@@ -75,11 +83,12 @@ function walkDry(pos, nx, nz, r, grounded) {
 // A positive vy is a jump in progress, a negative one a fall.
 function settle(o, dt) {
   const p = o.g.position, gy = groundAt(p.x, p.z, o.r, p.y);
-  if (!o.vy && sticks(p.y - gy, o.onRamp)) { p.y = gy; o.onRamp = groundRamp; return; }
+  if (!o.vy && sticks(p.y - gy, o.onRamp)) { p.y = gy; o.onRamp = groundRamp; wetCheck(o, p); return; }
   const prev = p.y;
   o.vy = (o.vy || 0) - 25 * dt; p.y = Math.max(gy, p.y + o.vy * dt);
   if (o.vy > 0) { const c = ceilingAt(p.x, p.z, o.r, prev, p.y - prev); if (p.y + BODY > c) { p.y = c - BODY; o.vy = -.01; } }
   if (p.y === gy) { o.vy = 0; o.onRamp = groundRamp; }
+  wetCheck(o, p);
 }
 
 // max HP is always 100. Armor is a second health bar that soaks damage before HP does (unless the damage pierces)

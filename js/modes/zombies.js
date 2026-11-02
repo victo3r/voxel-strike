@@ -56,7 +56,7 @@ function spawnZombie(type = pickType()) {
     let x, z;
     if (MAP.water) { x = (Math.random() * 2 - 1) * (A - 2); z = (Math.random() * 2 - 1) * (A - 2); } // the edges are sea: anywhere on dry land
     else { const side = Math.random() * 4 | 0, r = (Math.random() * 2 - 1) * (A - 2), e = A - 1.5; x = side === 0 ? -e : side === 1 ? e : r; z = side === 2 ? -e : side === 3 ? e : r; }
-    if (!blocked(x, z, r0, 0) && !overWater(x, z, 0) && Math.hypot(x - P.pos.x, z - P.pos.z) > (MAP.water ? 14 : 10)) return makeZombie(x, z, type);
+    if (!blocked(x, z, r0, 0) && !overWater(x, z, 0) && !poolAt(x, z) && Math.hypot(x - P.pos.x, z - P.pos.z) > (MAP.water ? 14 : 10)) return makeZombie(x, z, type);
   }
 }
 // quiet = burn damage: small orange sparks, no red flash or hit marker
@@ -108,7 +108,8 @@ function drownYou() {
   if (mode === 'dm') { youDown(null); return; }
   dead = true; saveBest(); document.exitPointerLock();
 }
-// after you drown you keep sinking to the bottom, and the screen goes blue once your eyes are under. Called every frame
+// after you drown you keep sinking to the bottom, and the screen goes blue once your eyes are under.
+// The same blue when you're alive with your eyes under the pool's surface. Called every frame
 let underTint = null;
 function drownTick(dt) {
   if (!underTint) { underTint = document.createElement('div'); underTint.style.cssText = 'position:fixed;inset:0;background:#1a6c9c;opacity:.5;pointer-events:none;display:none'; $('hit').before(underTint); }
@@ -117,7 +118,8 @@ function drownTick(dt) {
     P.pos.y = Math.max(MAP.floor?.(P.pos.x, P.pos.z) ?? 0, P.pos.y - 1.8 * dt);
     camera.position.y = P.pos.y + .35;
   }
-  underTint.style.display = show && inWater(P.pos.x, P.pos.z, camera.position.y - .5) ? 'block' : 'none';
+  const under = show && inWater(P.pos.x, P.pos.z, camera.position.y - .5) || !inLobby && MAP.wet?.(camera.position.x, camera.position.z, camera.position.y);
+  underTint.style.display = under ? 'block' : 'none';
 }
 // a bot or zombie in the water. A zombie counts as your kill (you lured it in). A bot's death goes to nobody
 function drownZombie(z) {
@@ -145,7 +147,7 @@ function explode(z) {
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
-function blast(p, R, zDmg, pDmg, skip, flat) { // flat: zombies/bots take full damage anywhere in the radius
+function blast(p, R, zDmg, pDmg, skip) {
   burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
@@ -154,7 +156,7 @@ function blast(p, R, zDmg, pDmg, skip, flat) { // flat: zombies/bots take full d
   for (const o of zombies) {
     if (o === skip || o.dead) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-    if (od < R) hurtZombie(o, flat ? zDmg : zDmg * (1 - od / R * .5), c, false);
+    if (od < R) hurtZombie(o, zDmg * (1 - od / R * .5), c, false);
   }
 }
 
