@@ -111,6 +111,49 @@ for (let changed = true; changed;) { // no cell more than half a block above any
 const kindAt = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? kind[at(i, j)] : SEA; };
 const hAt = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? H[at(i, j)] : 0; };
 M.land = (x, z) => kindAt(x, z) !== SEA;
+// a paved path: from the pier round both sides of the pool to the hotel door, to the tiki bar and the lighthouse, and out to each hut.
+// Each route is smoothed into a curve, and every land cell close to it gets paving (up and over the hills too)
+const ROUTES = [
+  [[19, 12], [13, 11], [6, 9.8], [-1, 10.6], [-7, 10.6], [-13, 11.4], [-21, 11.4], [-26.6, 10.6], [-29, 7.5], [-29, 0]], // pier, south of the pool, hotel door
+  [[-29, 0], [-29, -7.8], [-27, -10.6], [-21, -11.4], [-13, -11.4], [-6, -11.2], [-2, -13.8], [2, -14.2]],             // north of the pool to the tiki bar
+  [[2, -14.2], [8, -13.4], [15, -15.2], [21, -19.6], [25.5, -24.4], [29, -27.4]],                                    // on to the lighthouse door
+  [[6, 9.8], [7.2, 4], [6.4, -4], [4.4, -10], [2, -14.2]],                                                             // across the middle
+  [[-1, 10.6], [-2.6, 17], [-2.2, 24], [1, 30], [5.6, 33.4]],                                                          // south hut
+  [[-27.6, 10.9], [-29.6, 17], [-30.6, 23], [-31.8, 27]],                                                              // south-west hut
+  [[-27.6, -10.9], [-29.6, -17], [-30.6, -23], [-31.8, -27]],                                                          // north-west hut
+];
+const PATH = new Uint8Array(N * N);
+{
+  const segs = [];
+  for (const r of ROUTES) {
+    const P = k => r[Math.max(0, Math.min(r.length - 1, k))], pts = [];
+    for (let k = 0; k < r.length - 1; k++) for (let s = 0; s < 8; s++) { // Catmull-Rom through the points
+      const t = s / 8, [p0, p1, p2, p3] = [P(k - 1), P(k), P(k + 1), P(k + 2)], t2 = t * t, t3 = t2 * t;
+      pts.push([0, 1].map(d => .5 * (2 * p1[d] + (p2[d] - p0[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2 + (3 * p1[d] - p0[d] - 3 * p2[d] + p3[d]) * t3)));
+    }
+    pts.push(r[r.length - 1]);
+    for (let k = 0; k < pts.length - 1; k++) segs.push([pts[k], pts[k + 1]]);
+  }
+  const dist = (x, z, [a, b]) => {
+    const dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1)));
+    return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t);
+  };
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = i - O + .5, z = j - O + .5;
+    if (kind[at(i, j)] >= SAND && segs.some(s => dist(x, z, s) < 1.05)) PATH[at(i, j)] = 1;
+  }
+}
+const onPath = (x, z, r = 0) => { // is there paving within r of (x, z)?
+  for (let j = ci(z - r); j <= ci(z + r); j++) for (let i = ci(x - r); i <= ci(x + r); i++) if (inGrid(i, j) && PATH[at(i, j)]) return true;
+  return false;
+};
+const drawPaving = g => {
+  noise(g, [214, 196, 162], 12);
+  g.fillStyle = 'rgba(120,98,70,.55)'; // the gaps between the stones
+  g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 8); g.fillRect(9, 0, 1, 8); g.fillRect(4, 8, 1, 8); g.fillRect(12, 8, 1, 8);
+  g.fillStyle = 'rgba(255,248,228,.45)'; for (const [x, y] of [[2, 2], [11, 3], [6, 11], [14, 12], [1, 13]]) g.fillRect(x, y, 2, 1);
+};
+const paving = tex(drawPaving);
 
 // meshes made of cell faces. quads: [material index, 4 corners [x, y, z, u, v], normal]
 function cellMesh(quads, mats) {
@@ -150,7 +193,7 @@ const lawn = tex(drawGrass);
   const wet = tex(g => noise(g, [198, 176, 130], 12));
   const mats = [decal({ map: wet, vertexColors: true }), decal({ map: tex(drawSand), vertexColors: true }), decal({ map: lawn, vertexColors: true }),
     lam({ vertexColors: true, map: tex(g => { noise(g, [176, 156, 112], 16); g.fillStyle = 'rgba(120,100,70,.4)'; for (const y of [3, 9, 14]) g.fillRect(0, y, 16, 1); }) }),
-    lam({ vertexColors: true, map: tex(drawSeabed) })];
+    lam({ vertexColors: true, map: tex(drawSeabed) }), decal({ map: paving, vertexColors: true })];
   const CH = 14;
   // the side of cell (x0, z0) facing (a, b), from y0 up to y1
   const side = (quads, x0, z0, a, b, y0, y1) => {
@@ -169,7 +212,7 @@ const lawn = tex(drawGrass);
         continue;
       }
       if (inPool(x0 + .5, z0 + .5)) continue;
-      if (!H[c]) quads.push(topQuad(kind[c] - 1, x0, z0, LAND_Y, 0));
+      if (!H[c]) quads.push(topQuad(PATH[c] ? 5 : kind[c] - 1, x0, z0, LAND_Y, 0));
       for (const [a, b] of D4) if (seaAt(i + a, j + b)) side(quads, x0, z0, a, b, seaFloor(i + a, j + b), LAND_Y);
     }
     if (quads.length) building.cover.push(cellMesh(quads, mats));
@@ -180,14 +223,14 @@ const lawn = tex(drawGrass);
   const mats = [lam({ map: lawn, vertexColors: true }), lam({ vertexColors: true, map: tex(g => {
     noise(g, [128, 92, 60], 22); g.fillStyle = 'rgba(70,45,25,.4)'; for (let i = 0; i < 6; i++) g.fillRect(Math.random() * 16 | 0, 4 + Math.random() * 12 | 0, 2, 1);
     for (let x = 0; x < 16; x++) { const d = 2 + (Math.random() * 3 | 0); for (let y = 0; y < d; y++) { g.fillStyle = `rgb(${96 + (x * 7 + y * 5) % 20},${160 + (x * 3) % 20},${66})`; g.fillRect(x, y, 1, 1); } }
-  }) })];
+  }) }), lam({ map: paving, vertexColors: true })];
   const CH = 14;
   for (let cj = 0; cj < N; cj += CH) for (let cii = 0; cii < N; cii += CH) {
     const quads = [];
     for (let j = cj; j < cj + CH; j++) for (let i = cii; i < cii + CH; i++) {
       const c = at(i, j), h = H[c], x0 = i - O, z0 = j - O;
       if (!h) continue;
-      quads.push(topQuad(0, x0, z0, h));
+      quads.push(topQuad(PATH[c] ? 2 : 0, x0, z0, h));
       for (const [a, b] of D4) {
         const nh = inGrid(i + a, j + b) ? H[at(i + a, j + b)] : 0;
         if (nh >= h) continue;
@@ -379,9 +422,9 @@ const tile = surf(lam({ map: tex(g => { noise(g, [234, 226, 208], 9); g.fillStyl
 const drawPoolTile = g => { noise(g, [72, 172, 214], 10); g.fillStyle = '#e4f4fb'; for (const i of [0, 4, 8, 12]) { g.fillRect(0, i, 16, 1); g.fillRect(i, 0, 1, 16); } };
 const poolTile = surf(lam({ map: tex(drawPoolTile) }), 'stone');
 const DECK = [-27, -9, -8, 8], DECK_STEP = [-28, -8, -9, 9], RIM = .25, POOL_O = [POOL[0] - RIM, POOL[1] + RIM, POOL[2] - RIM, POOL[3] + RIM];
-const DECK_Y = 1;
+const DECK_Y = 1, DECK_STEP_Y = .5;
 rectMinus(DECK, POOL_O).forEach(r => rectSlab(r, 0, DECK_Y, tile, true, 2));
-rectMinus(DECK_STEP, DECK).forEach(r => rectSlab(r, 0, .5, tile, true, 2));
+rectMinus(DECK_STEP, DECK).forEach(r => rectSlab(r, 0, DECK_STEP_Y, tile, true, 2));
 // the pool's walls: blue tiles from the floor up to just under the water, deck tiles above that
 rectMinus(POOL_O, POOL).forEach(r => { rectSlab(r, POOL_F, POOL_Y - .1, poolTile, true, 2); rectSlab(r, POOL_Y - .1, DECK_Y, tile, true, 2); });
 flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], decal({ map: tex(drawPoolTile, (POOL[1] - POOL[0]) / 2, (POOL[3] - POOL[2]) / 2) }), (POOL[0] + POOL[1]) / 2, POOL_F + .01, 0);
@@ -527,11 +570,26 @@ for (const s of [-1, 1]) { // teal trim round the outside of the walls, near the
   const bz = box(.04, .22, HZ1 - HZ0 + .06, teal); bz.position.set(s < 0 ? HX0 - .01 : HX1 + .01, RH - .3, (HZ0 + HZ1) / 2); add(bz);
 }
 flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(g, [226, 214, 190], 8); g.fillStyle = '#bfae8e'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, 4, 6) }), (HX0 + HX1) / 2, LAND_Y + .01, (HZ0 + HZ1) / 2);
-// striped awning over the door
-const awnT = tex(g => { for (let i = 0; i < 16; i++) { g.fillStyle = (i >> 1) % 2 ? '#ffffff' : '#2fb5a8'; g.fillRect(i, 0, 1, 16); } }); awnT.repeat.set(3, 1);
-const awning = box(1.4, .08, 3.4, lam({ map: awnT })); awning.rotation.z = .25; awning.position.set(HX1 + .65, 2.8, 0); add(awning);
-{ const hx = .7 * Math.cos(.25), hy = .7 * Math.sin(.25); // tilted, so its top is a slope like a stair's
-  later.push({ mesh: null, minX: HX1 + .65 - hx, maxX: HX1 + .65 + hx, minZ: -1.7, maxZ: 1.7, bot: 2.8 - hy, top: 2.8 + hy + .04, ramp: { ax: 'x', a: HX1 + .65 - hx, b: HX1 + .65 + hx } }); }
+// a flat canopy over the door, out over the deck step, held up by a pillar at each outer corner. You can stand on it
+{
+  const X0 = HX1, X1 = -27.25, CZ = 2.6, BOT = 2.95, TOP = 3.2, cx = (X0 + X1) / 2, w = X1 - X0;
+  addSlab(cx, 0, w, CZ * 2, BOT, TOP, stucco);
+  const stripes = tex(g => { for (let i = 0; i < 16; i++) { g.fillStyle = (i >> 1) % 2 ? '#f6f3ea' : '#2fb5a8'; g.fillRect(0, i, 16, 1); } }, 1, CZ);
+  flatPlane(w - .1, CZ * 2 - .1, decal({ map: stripes }), cx, TOP + .005, 0);
+  const fascia = box(.08, .34, CZ * 2 + .16, teal); fascia.position.set(X1 + .04, (BOT + TOP) / 2, 0); add(fascia);
+  for (const s of [-1, 1]) { const f = box(w + .08, .34, .08, teal); f.position.set(cx + .04, (BOT + TOP) / 2, s * (CZ + .04)); add(f); }
+  for (const z of [-1.1, 1.1]) { // little lights in the underside
+    const l = box(.32, .04, .32, new THREE.MeshLambertMaterial({ color: 0xfff4d0, emissive: 0xffe2a0, emissiveIntensity: .9 })); l.position.set(cx + .2, BOT - .02, z); add(l);
+  }
+  const PY = DECK_STEP_Y; // the pillars stand on the deck step
+  for (const s of [-1, 1]) {
+    const px = X1 - .32, pz = s * (CZ - .32);
+    addSlab(px, pz, .3, .3, PY, BOT, stucco);
+    const base = box(.46, .18, .46, stucco); base.position.set(px, PY + .09, pz); add(base);
+    const cap = box(.46, .16, .46, stucco); cap.position.set(px, BOT - .08, pz); add(cap);
+    const band = box(.34, .1, .34, teal); band.position.set(px, BOT - .26, pz); add(band);
+  }
+}
 // inside: a reception desk with a key board behind it, a sofa, and a plant either side of the door
 addSlab(-36.6, 0, .7, 3, 0, 1.05, wood);
 const desk = box(.9, .08, 3.2, plain(0x6a4428)); desk.position.set(-36.6, 1.09, 0); add(desk);
@@ -599,35 +657,161 @@ building.solids.push({ mesh: null, minX: PX0, maxX: PX1, minZ: PZ - PW / 2, maxZ
 const pierDeck = tbox(PX1 - PX0, .12, PW, plank); pierDeck.position.set((PX0 + PX1) / 2, .44, PZ); add(pierDeck); building.cover.push(pierDeck);
 for (let x = PX0 + .4; x < PX1; x += 3) for (const s of [-1, 1]) { const p = box(.26, SEA_D + .5, .26, wood); p.position.set(x, (.5 - SEA_D) / 2, PZ + s * (PW / 2 - .15)); add(p); building.cover.push(p); } // posts down to the sea floor
 for (const x of [26, 34, 40]) for (const s of [-1, 1]) addSlab(x, PZ + s * 1.25, .3, .3, .5, .85, ironMat); // bollards
-const hullBlue = plain(0x1f4e8c), hullWhite = plain(0xf6f6f2), seatMat = plain(0xd8cfb8);
+const hullBlue = plain(0x1f4e8c), hullWhite = plain(0xf6f6f2), seatMat = plain(0xd8cfb8), navy = plain(0x14284a), glassDark = plain(0x1b2a3a);
+const chromeM = plain(0xdfe5ea), blackM = plain(0x222326), accentM = plain(0xe8505a);
+// boat hulls seen from above: a flat stern at x = 0, straight sides, then curving in to a point at the bow (x = L).
+// stern > 0 points the back end as well (the rowboat). ox shifts it forward, for a hole set inside a bigger hull
+function hullShape(L, W, bow, stern = 0, ox = 0, hole = false) {
+  const s = hole ? new THREE.Path() : new THREE.Shape(), h = W / 2;
+  s.moveTo(ox + stern, -h); s.lineTo(ox + L - bow, -h);
+  s.quadraticCurveTo(ox + L - bow * .15, -h, ox + L, 0);
+  s.quadraticCurveTo(ox + L - bow * .15, h, ox + L - bow, h);
+  s.lineTo(ox + stern, h);
+  if (stern) { s.quadraticCurveTo(ox + stern * .15, h, ox, 0); s.quadraticCurveTo(ox + stern * .15, -h, ox + stern, -h); }
+  else s.lineTo(ox, -h);
+  return s;
+}
+// the outline pulled up from y0 to y1, its stern at x, centred on z
+function hullPiece(shape, y0, y1, m, x, z, cover = true) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: y1 - y0, bevelEnabled: false, curveSegments: 12 }).rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(g, m); mesh.position.set(x, y0, z); add(mesh);
+  if (cover) building.cover.push(mesh);
+  return mesh;
+}
+const rim = (L, W, bow, t) => { const s = hullShape(L, W, bow); s.holes.push(hullShape(L - t * 2.5, W - t * 2, bow - t * 1.5, 0, t, true)); return s; };
+// a thin rod from a to b ([x, y, z])
+function rod(a, b, m, t = .05) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), r = box(t, t, L, m);
+  r.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); r.lookAt(b[0], b[1], b[2]); add(r); return r;
+}
+// a rail round the front of a hull at height y, with posts down to y0. Follows hullShape(L, W, bow) set at (x, z), from 'from' along the hull forward
+function bowRail(L, W, bow, x, z, y0, y, from) {
+  const pts = hullShape(L, W, bow).getPoints(8).filter((p, k, all) => p.x >= from && !(k && p.distanceTo(all[k - 1]) < .01)).map(p => [x + p.x, z - p.y]);
+  for (let k = 0; k < pts.length - 1; k++) rod([pts[k][0], y, pts[k][1]], [pts[k + 1][0], y, pts[k + 1][1]], chromeM, .045);
+  pts.forEach(([px, pz], k) => { if (k % 2 === 0 || k === pts.length - 1) rod([px, y0, pz], [px, y, pz], chromeM, .045); });
+}
+
 // speedboat tied up on the south side of the pier. Its deck is a step up from the pier, so you can walk onto it
 const SB = { x0: 35, x1: 40.6, z: 15.25, w: 2.4 };
-const sbx = (SB.x0 + SB.x1) / 2, sbL = SB.x1 - SB.x0;
+const sbx = (SB.x0 + SB.x1) / 2, sL = 6.45, sBow = 2.1;
 building.solids.push({ mesh: null, minX: SB.x0, maxX: SB.x1, minZ: SB.z - SB.w / 2, maxZ: SB.z + SB.w / 2, bot: 0, top: 1 });
 building.solids.push({ mesh: null, minX: SB.x1, maxX: SB.x1 + 1, minZ: SB.z - .7, maxZ: SB.z + .7, bot: 0, top: 1 });
-for (const [m, y0, y1] of [[hullBlue, -.35, .55], [hullWhite, .55, 1]]) { // sits a little way down in the water
-  const h = box(sbL, y1 - y0, SB.w, m); h.position.set(sbx, (y0 + y1) / 2, SB.z); add(h); building.cover.push(h);
-  const bow = box(1, y1 - y0, 1.4, m); bow.position.set(SB.x1 + .5, (y0 + y1) / 2, SB.z); add(bow); building.cover.push(bow);
-  const tip = box(.5, y1 - y0, .6, m); tip.position.set(SB.x1 + 1.2, (y0 + y1) / 2, SB.z); add(tip);
+// sits a little way down in the water: a narrower bottom, blue sides, a dark rub rail, white topsides with a red stripe, a rim round the deck
+hullPiece(hullShape(sL - .35, SB.w - .6, sBow - .1), -.4, .15, hullBlue, SB.x0 + .15, SB.z);
+hullPiece(hullShape(sL, SB.w, sBow), .15, .56, hullBlue, SB.x0, SB.z);
+hullPiece(hullShape(sL + .1, SB.w + .1, sBow + .05), .56, .65, navy, SB.x0 - .05, SB.z, false);
+hullPiece(hullShape(sL, SB.w, sBow), .65, 1, hullWhite, SB.x0, SB.z);
+hullPiece(hullShape(sL + .04, SB.w + .04, sBow + .02), .8, .86, accentM, SB.x0 - .02, SB.z, false);
+hullPiece(rim(sL, SB.w, sBow, .16), 1, 1.15, hullWhite, SB.x0, SB.z, false);
+hullPiece(hullShape(sL - .4, SB.w - .32, sBow - .24, 0, .16), 1, 1.01, plank, SB.x0, SB.z, false); // teak floor
+hullPiece(hullShape(sBow + .1, SB.w, sBow), 1, 1.13, hullWhite, SB.x0 + sL - sBow - .1, SB.z, false); // the foredeck
+bowRail(sL - .24, SB.w - .2, sBow - .14, SB.x0 + .1, SB.z, 1.13, 1.42, sL - sBow - .5);
+// steering console with a dash, wheel and throttle, a windscreen in front of it
+addSlab(sbx + .9, SB.z - .4, .8, .7, 1, 1.75, hullWhite);
+const dash = box(.5, .08, .66, blackM); dash.rotation.z = .5; dash.position.set(sbx + .95, 1.79, SB.z - .4); add(dash);
+const wheel = new THREE.Mesh(new THREE.TorusGeometry(.17, .03, 6, 14), blackM); wheel.rotation.y = Math.PI / 2; wheel.rotation.x = .5; wheel.position.set(sbx + .44, 1.78, SB.z - .4); add(wheel);
+rod([sbx + .44, 1.78, SB.z - .4], [sbx + .6, 1.7, SB.z - .4], blackM, .05);
+rod([sbx + .7, 1.75, SB.z - .02], [sbx + .6, 1.92, SB.z - .02], chromeM, .05);
+{
+  const ws = new THREE.Group(), pane = box(.04, .5, SB.w - .5, new THREE.MeshLambertMaterial({ color: 0x9fd8ff, transparent: true, opacity: .4, depthWrite: false }));
+  pane.position.y = .25; ws.add(pane);
+  const top = box(.06, .06, SB.w - .44, chromeM); top.position.y = .51; ws.add(top);
+  for (const s of [-1, 1]) { const p = box(.06, .52, .06, chromeM); p.position.set(0, .26, s * (SB.w / 2 - .22)); ws.add(p); }
+  ws.position.set(sbx + 1.5, 1.13, SB.z); ws.rotation.z = .45; add(ws);
 }
-addSlab(sbx + .9, SB.z - .4, .8, .7, 1, 1.85, hullWhite); // steering console
-const wheel = box(.06, .35, .35, plain(0x222222)); wheel.position.set(sbx + .48, 1.75, SB.z - .4); add(wheel);
-const shield = box(.06, .5, SB.w - .3, new THREE.MeshLambertMaterial({ color: 0x9fd8ff, transparent: true, opacity: .4, depthWrite: false }));
-shield.position.set(sbx + 1.45, 1.4, SB.z); add(shield);
-addSlab(sbx - 1.4, SB.z, .8, SB.w - .5, 1, 1.4, seatMat);
-const motor = box(.5, 1, .6, plain(0x2a2a2e)); motor.position.set(SB.x0 - .25, .8, SB.z); add(motor); building.cover.push(motor);
-// a yacht moored past the end of the pier, out of reach
-const yx = 53, yz = 7, yL = 12, yW = 4;
-const yHull = box(yL, 1.6, yW, hullWhite); yHull.position.set(yx, .6, yz); add(yHull);
-const yStripe = box(yL + .02, .25, yW + .02, hullBlue); yStripe.position.set(yx, .45, yz); add(yStripe);
-const yBow = box(2.4, 1.6, 2.4, hullWhite); yBow.position.set(yx + yL / 2 + 1, .6, yz); add(yBow);
-const yCab = box(6, 1.4, 3, hullWhite); yCab.position.set(yx - .8, 2.1, yz); add(yCab);
-const yWin = box(6.05, .5, 3.05, plain(0x1b2a3a)); yWin.position.set(yx - .8, 2.25, yz); add(yWin);
-const yTop = box(3.4, 1, 2.4, hullWhite); yTop.position.set(yx - 1.5, 3.3, yz); add(yTop);
-const yMast = box(.12, 2.4, .12, ironMat); yMast.position.set(yx - 1.5, 5, yz); add(yMast);
-// an old rowboat turned upside down on the sand
-for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) addSlab(16, 35.5, w, d, y0, y1, surf(lam({ map: tex(g => { noise(g, [150, 62, 40], 16); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 7, 16, 1); }) }), 'wood'), true, 1);
+for (const s of [-1, 1]) { // two seats facing forward
+  const z = SB.z + s * .45, sx = sbx + .05;
+  const post = box(.18, .3, .18, chromeM); post.position.set(sx, 1.15, z); add(post);
+  const cush = box(.55, .14, .5, hullWhite); cush.position.set(sx, 1.37, z); add(cush);
+  const back = box(.14, .5, .5, hullWhite); back.position.set(sx - .27, 1.67, z); add(back);
+  const pip = box(.56, .03, .4, hullBlue); pip.position.set(sx, 1.45, z); add(pip);
+}
+// a bench across the back, with a backrest along the stern
+addSlab(sbx - 1.4, SB.z, .8, SB.w - .5, 1, 1.32, hullWhite);
+const benchC = box(.78, .1, SB.w - .52, seatMat); benchC.position.set(sbx - 1.4, 1.37, SB.z); add(benchC);
+const benchB = box(.16, .42, SB.w - .52, seatMat); benchB.position.set(SB.x0 + .3, 1.62, SB.z); add(benchB);
+// the outboard motor on the stern
+{
+  const mx = SB.x0 - .38, motorM = plain(0x2a2a2e);
+  const bracket = box(.3, .3, .5, motorM); bracket.position.set(SB.x0 - .1, .95, SB.z); add(bracket);
+  const cowl = box(.62, .56, .56, motorM); cowl.position.set(mx, 1.35, SB.z); add(cowl); building.cover.push(cowl);
+  const cap = box(.5, .12, .46, motorM); cap.position.set(mx, 1.69, SB.z); add(cap);
+  const band = box(.64, .08, .58, hullWhite); band.position.set(mx, 1.2, SB.z); add(band);
+  const leg = box(.22, 1.5, .18, motorM); leg.position.set(mx + .05, .32, SB.z); add(leg);
+  const plate = box(.55, .04, .32, motorM); plate.position.set(mx + .05, -.2, SB.z); add(plate);
+  for (let i = 0; i < 3; i++) { const b = box(.04, .34, .1, chromeM); b.position.set(mx - .14, -.36, SB.z); b.rotation.x = i * 2.094; add(b); }
+}
+// red and green lights on the bow, cleats, fenders against the pier and ropes to the bollards
+for (const [s, c] of [[-1, 0xe03a3a], [1, 0x3ad06a]]) { const l = box(.12, .08, .04, new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: .6 })); l.position.set(SB.x0 + sL - sBow + .1, 1.06, SB.z + s * (SB.w / 2 + .01)); add(l); }
+for (const [cx, cz] of [[SB.x0 + .3, SB.z - SB.w / 2 + .12], [SB.x0 + .3, SB.z + SB.w / 2 - .12], [SB.x0 + sL - .9, SB.z - .2]]) { const c = box(.22, .06, .07, chromeM); c.position.set(cx, 1.18, cz); add(c); }
+for (const fx of [36.6, 39.2]) {
+  const f = new THREE.Mesh(new THREE.CylinderGeometry(.13, .13, .5, 8), hullWhite); f.position.set(fx, .55, SB.z - SB.w / 2 - .1); add(f);
+  rod([fx, .8, SB.z - SB.w / 2 - .1], [fx, 1.15, SB.z - SB.w / 2 + .05], plain(0xe8dcc0), .03);
+}
+const ropeM = plain(0xd8c8a0);
+rod([SB.x0 + sL - .9, 1.2, SB.z - .2], [40, .85, PZ + 1.25], ropeM, .04);
+rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
 
+// a yacht moored past the end of the pier, out of reach
+{
+  const X0 = 46.6, Z = 7, L = 14.6, W = 4, BOW = 5;
+  hullPiece(hullShape(L - .6, W - .8, BOW - .4), -.4, .3, navy, X0 + .3, Z, false);
+  hullPiece(hullShape(L, W, BOW), .3, 1.7, hullWhite, X0, Z, false);
+  hullPiece(hullShape(L + .04, W + .04, BOW + .02), .32, .52, hullBlue, X0 - .02, Z, false); // the stripe along the waterline
+  hullPiece(hullShape(L + .03, W + .03, BOW + .01), 1.5, 1.56, hullBlue, X0 - .015, Z, false); // and a thin one under the deck
+  hullPiece(rim(L, W, BOW, .2), 1.7, 1.9, hullWhite, X0, Z, false);
+  hullPiece(hullShape(L - .5, W - .4, BOW - .3, 0, .2), 1.7, 1.72, plank, X0, Z, false);
+  for (const s of [-1, 1]) { // windows along the hull, then round portholes further forward
+    const win = box(4.2, .26, .02, glassDark); win.position.set(X0 + 4, 1.12, Z + s * (W / 2 + .01)); add(win);
+    for (const px of [7.1, 7.9, 8.7]) { const p = new THREE.Mesh(new THREE.CircleGeometry(.12, 10), glassDark); p.position.set(X0 + px, 1.12, Z + s * (W / 2 + .012)); if (s < 0) p.rotation.y = Math.PI; add(p); }
+    const anchor = box(.3, .34, .04, blackM); anchor.position.set(X0 + L - 1.6, 1.25, Z + s * (W / 2 - .25 + .02)); add(anchor);
+  }
+  // swim platform and ladder off the back
+  const plat = box(1, .12, W - .6, plank); plat.position.set(X0 - .5, .55, Z); add(plat);
+  for (const s of [-1, 1]) rod([X0 - .8, .1, Z + s * .3], [X0 - .8, .95, Z + s * .3], chromeM, .045);
+  for (const y of [.25, .45]) rod([X0 - .8, y, Z - .3], [X0 - .8, y, Z + .3], chromeM, .04);
+  // the cabin, its wraparound windows, and the roof hanging over it
+  hullPiece(hullShape(7.6, 3.2, 2.4), 1.72, 3, hullWhite, X0 + 1.8, Z, false);
+  hullPiece(hullShape(7.64, 3.24, 2.42), 2.15, 2.7, glassDark, X0 + 1.78, Z, false);
+  hullPiece(hullShape(8.6, 3.6, 2.6), 3, 3.14, hullWhite, X0 + 1, Z, false);
+  // flybridge on top with a tinted screen, a rail round it, and a radar arch
+  hullPiece(hullShape(4.4, 3, 1.4), 3.14, 3.7, hullWhite, X0 + 2, Z, false);
+  hullPiece(hullShape(4.44, 3.04, 1.42), 3.45, 3.62, glassDark, X0 + 1.98, Z, false);
+  bowRail(4.4, 3, 1.4, X0 + 2, Z, 3.7, 4.1, 1.2);
+  for (const s of [-1, 1]) { const leg = rod([X0 + 2.2, 3.7, Z + s * 1.3], [X0 + 2.6, 5, Z + s * 1.15], hullWhite, .26); }
+  const bar = box(.45, .24, 2.6, hullWhite); bar.position.set(X0 + 2.6, 5.05, Z); add(bar);
+  const radar = new THREE.Mesh(new THREE.CylinderGeometry(.36, .36, .26, 14), hullWhite); radar.position.set(X0 + 2.6, 5.3, Z - .5); add(radar);
+  rod([X0 + 2.6, 5.15, Z + .7], [X0 + 2.6, 6.6, Z + .7], blackM, .04);
+  rod([X0 + 2.6, 5.15, Z + .95], [X0 + 2.6, 6.1, Z + .95], blackM, .04);
+  // rail round the bow, a flag on the stern, a table and bench on the back deck, and a life ring
+  bowRail(L - .3, W - .25, BOW - .2, X0 + .12, Z, 1.9, 2.4, L - BOW - 1.6);
+  rod([X0 + .2, 1.9, Z + 1.4], [X0 + .2, 3.1, Z + 1.4], chromeM, .04);
+  const flag = box(.6, .36, .02, accentM); flag.position.set(X0 - .1, 2.9, Z + 1.4); add(flag);
+  const flagW = box(.6, .12, .025, hullWhite); flagW.position.set(X0 - .1, 2.9, Z + 1.4); add(flagW);
+  const table = box(.9, .06, .9, plank); table.position.set(X0 + 1, 2.45, Z); add(table);
+  rod([X0 + 1, 1.72, Z], [X0 + 1, 2.42, Z], chromeM, .08);
+  const bench = box(.5, .4, W - 1, seatMat); bench.position.set(X0 + .4, 1.92, Z); add(bench);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.28, .08, 6, 14), plain(0xff7a2a)); ring.rotation.y = Math.PI / 2; ring.position.set(X0 + 1.76, 2.45, Z + 1.05); add(ring);
+}
+
+// an old rowboat turned upside down on the sand, with its oars next to it
+{
+  const X0 = 13.9, Z = 35.5, L = 4.2, W = 1.7;
+  for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) building.solids.push({ mesh: null, minX: 16 - w / 2, maxX: 16 + w / 2, minZ: Z - d / 2, maxZ: Z + d / 2, bot: y0, top: y1, surf: 'wood' });
+  const boards = c => lam({ map: tex(g => { noise(g, c, 14); g.fillStyle = 'rgba(0,0,0,.2)'; for (const y of [0, 5, 10]) g.fillRect(0, y, 16, 1); }) });
+  hullPiece(hullShape(L + .06, W + .06, 1.3, 1.1, -.03), 0, .12, plank, X0, Z);
+  hullPiece(hullShape(L, W, 1.3, 1.1), .12, .42, boards([92, 168, 176]), X0, Z);
+  hullPiece(hullShape(L - .2, W - .25, 1.2, 1, .1), .42, .62, boards([170, 64, 44]), X0, Z);
+  hullPiece(hullShape(L - .6, W - .7, 1, .85, .3), .62, .78, boards([170, 64, 44]), X0, Z);
+  const keel = box(L - .5, .08, .1, plain(0x4a2e18)); keel.position.set(X0 + L / 2, .82, Z); add(keel);
+  for (const [oz, ry] of [[Z + 1.35, .08], [Z + 1.7, -.05]]) {
+    const oar = new THREE.Group(), wd = plain(0xb08a58);
+    const shaft = box(2.3, .07, .07, wd); oar.add(shaft);
+    const blade = box(.6, .03, .2, wd); blade.position.x = 1.4; oar.add(blade);
+    const grip = box(.25, .08, .08, plain(0x6a4428)); grip.position.x = -1.2; oar.add(grip);
+    oar.position.set(X0 + L / 2, .045, oz); oar.rotation.y = ry; add(oar);
+  }
+}
 // --- palm trees ---
 const trunkMat = lam({ map: tex(g => { noise(g, [158, 124, 84], 16); g.fillStyle = 'rgba(80,55,30,.55)'; for (const y of [0, 5, 10]) g.fillRect(0, y, 16, 2); }) });
 const frondMat = seeThru(tex(g => {
@@ -678,9 +862,18 @@ const free = (x, z, r) => !inPool(x, z, r + .5) && !building.solids.some(s => x 
 const flatDry = (x, z) => { const h = hAt(x, z); for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) { const k = kindAt(x + a, z + b); if (k < SAND || hAt(x + a, z + b) !== h) return false; } return true; };
 for (let tries = 0, k = 0; k < 30 && tries < 4000; tries++) {
   const x = (rnd() * 2 - 1) * (RA - 2), z = (rnd() * 2 - 1) * (RA - 2);
-  if (!flatDry(x, z) || Math.hypot(x, z) < 5 || !free(x, z, 1.4) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 5.5)) continue;
+  if (!flatDry(x, z) || Math.hypot(x, z) < 5 || !free(x, z, 1.4) || onPath(x, z, 1.2) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 5.5)) continue;
   if (Math.abs(x - LX) < 6.5 && Math.abs(z - LZ) < 6.5) continue; // not under the gallery
   palm(x, z, true, hAt(x, z)); k++;
+}
+// groves: patches where the palms grow close together, with tall ferns under them. [x, z, radius]
+const GROVES = [[-16, -31, 7], [14, -34, 6], [-20, 30, 7.5], [-11, 22, 4.5], [26, 27, 4.5]];
+for (const [gx, gz, gr] of GROVES) {
+  for (let tries = 0, k = 0; k < Math.round(gr * 1.4) && tries < 900; tries++) {
+    const a = rnd() * 6.28, d = Math.sqrt(rnd()) * gr, x = gx + Math.cos(a) * d, z = gz + Math.sin(a) * d;
+    if (!flatDry(x, z) || !free(x, z, 1.4) || onPath(x, z, 1.2) || palms.some(([p, q]) => Math.hypot(p - x, q - z) < 3.6)) continue;
+    palm(x, z, true, hAt(x, z)); k++;
+  }
 }
 // little islands out at sea, each with a few palms
 const isleMat = lam({ map: tex(drawSand, 6, 6) });
@@ -694,19 +887,22 @@ inst(unit, trunkMat, trunksOut); inst(frondGeo, frondMat, fronds); inst(unit, pl
 
 // grass tufts on the lawn and up the hills (not in the volleyball pit or the pool)
 const tufts = [];
-for (let tries = 0; tufts.length < 600 && tries < 9000; tries++) {
-  const x = -O + rnd() * N, z = -O + rnd() * N;
-  if (kindAt(x, z) !== GRASS || x > PIT[0] - .5 && x < PIT[1] + .5 && z > PIT[2] - .5 && z < PIT[3] + .5 || !free(x, z, .4)) continue;
-  const s = .6 + rnd() * .6, h = hAt(x, z), hw = .55 * s, i0 = ci(x), j0 = ci(z);
-  // the tuft can face any way, so it reaches hw out in every direction. Skip it if that would hang off a terrace or poke into one
-  let edge = false;
-  for (let b = -1; b <= 1 && !edge; b++) for (let a = -1; a <= 1; a++) {
+function tuft(x, z, s, tall = 1) {
+  if (kindAt(x, z) !== GRASS || x > PIT[0] - .5 && x < PIT[1] + .5 && z > PIT[2] - .5 && z < PIT[3] + .5 || !free(x, z, .4)) return;
+  const h = hAt(x, z), hw = .55 * s, i0 = ci(x), j0 = ci(z);
+  // the tuft can face any way, so it reaches hw out in every direction. Skip it if that would hang off a terrace or poke into one,
+  // or reach onto the path
+  for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
     const i = i0 + a, j = j0 + b, nx = i - O, nz = j - O;
-    if (inGrid(i, j) && H[at(i, j)] === h && kind[at(i, j)] === GRASS) continue;
-    if (Math.hypot(Math.max(nx - x, 0, x - nx - 1), Math.max(nz - z, 0, z - nz - 1)) < hw) { edge = true; break; }
+    if (inGrid(i, j) && H[at(i, j)] === h && kind[at(i, j)] === GRASS && !PATH[at(i, j)]) continue;
+    if (Math.hypot(Math.max(nx - x, 0, x - nx - 1), Math.max(nz - z, 0, z - nz - 1)) < hw) return;
   }
-  if (edge) continue;
-  tufts.push([x, h, z, 1.1 * s, .8 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
+  tufts.push([x, h, z, 1.1 * s, .8 * s * tall, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
+}
+for (let tries = 0; tufts.length < 600 && tries < 9000; tries++) tuft(-O + rnd() * N, -O + rnd() * N, .6 + rnd() * .6);
+for (const [gx, gz, gr] of GROVES) for (let k = 0; k < gr * 14; k++) { // ferns: bigger and taller, thick in the groves
+  const a = rnd() * 6.28, d = Math.sqrt(rnd()) * gr;
+  tuft(gx + Math.cos(a) * d, gz + Math.sin(a) * d, 1 + rnd() * .7, 1.35);
 }
 grassTufts(tufts);
 
@@ -755,6 +951,7 @@ M.surfAt = (x, z, y, base, s) => {
   if (s) return base;
   if (Math.abs(x - LX) < LI && Math.abs(z - LZ) < LI || inPool(x, z) || inside(x, z)) return 'stone'; // the lighthouse's and hotel's ground floors, the pool floor
   if (x > PIT[0] && x < PIT[1] && z > PIT[2] && z < PIT[3]) return 'sand';
+  if (onPath(x, z)) return 'stone';
   return kindAt(x, z) === GRASS ? 'grass' : 'sand';
 };
 M.tick = () => {

@@ -114,6 +114,10 @@ async function pull() {
 
 // ---- account section of the settings page ----
 function renderAcct() {
+  // the ☁ next to your level: grey and dashed for a guest, green when saved, pulsing yellow while saving, red when offline
+  const cb = $('cloudBtn'), cs = !auth ? 'guest' : cloudState || 'saving';
+  cb.className = cs;
+  cb.title = { guest: 'Not signed in. Click to sign in and save your progress', saved: `Saved to ${auth?.user}`, saving: 'Syncing…', offline: "Offline. It'll save when you're back online" }[cs];
   const el = $('acct');
   $('acctForm').style.display = auth ? 'none' : '';
   if (!auth) { el.innerHTML = ''; return; }
@@ -129,6 +133,7 @@ $('acct').addEventListener('click', async e => {
 });
 $('acctForm').addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'NumpadEnter') acctGo('login'); });
 $('acctIn').addEventListener('click', () => acctGo('login'));
+$('cloudBtn').addEventListener('click', () => { showSetTab('account'); openSettings(); sfx('ui'); });
 $('acctNew').addEventListener('click', () => acctGo('signup'));
 
 async function acctGo(how) {

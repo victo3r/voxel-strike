@@ -221,3 +221,13 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #acctForm input:focus{border-color:#ffd23f}
 #acctErr{color:#f96;min-height:1.2em}
 #acctForm small{color:#999!important;font-size:12px}
+/* until the first frame of the lobby is drawn, show only the background, then fade everything else in */
+.boot>*:not(canvas){opacity:0!important;pointer-events:none!important}
+.booting>*:not(canvas){transition:opacity .45s ease-out}
+#cloudBtn{font:bold 20px monospace;width:34px;height:30px;padding:0;line-height:1;color:#fff;text-shadow:2px 2px 0 #000;background:rgba(18,48,54,.7);border:3px solid #2a5a60;cursor:pointer}
+#cloudBtn:hover{border-color:#ffd23f}
+#cloudBtn.guest{color:#7f8f94;border-style:dashed}
+#cloudBtn.saved{color:#7ee08a}
+#cloudBtn.saving{color:#ffd23f;animation:cloudpulse 1s ease-in-out infinite}
+#cloudBtn.offline{color:#ff7a6a}
+@keyframes cloudpulse{50%{opacity:.4}}

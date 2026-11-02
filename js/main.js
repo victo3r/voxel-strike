@@ -240,11 +240,20 @@ function update(dt) {
 }
 
 const clock = new THREE.Clock();
+// the page starts with only the background showing (class "boot"); the buttons fade in once the lobby has drawn a couple of frames
+let bootFrames = 0;
+function bootDone() {
+  if (bootFrames < 0 || ++bootFrames < 3) return;
+  bootFrames = -1;
+  document.body.classList.replace('boot', 'booting');
+  setTimeout(() => document.body.classList.remove('booting'), 600);
+}
 (function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), .05);
   drownTick(dt); musicTick();
-  if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; }
+  if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
+  bootDone();
   // the game keeps running while the menu is open (it isn't a pause). Only the zombie-waves shop and death screen stop it,
   // and with the mouse unlocked your keys are released, so you just stand there
   const live = !dead && !shopOpen && !matchOver;
