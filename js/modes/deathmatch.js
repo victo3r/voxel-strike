@@ -206,14 +206,19 @@ function spawnSpot(who) {
   return best ?? [0, 0];
 }
 const FLASH_MAT = new THREE.MeshBasicMaterial({ color: 0xffdd55 });
+const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 // put gun b.gun in the bot's hands: the same model you see in your own hands, turned to point forward out of its hands
 function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, grip: [gy, gz] } = makeGun(b.gun, gunM, 0);
-  // its right fist (near the end of the arm) closes round the grip. A shoulder gun sits out over its right shoulder, clear of its head
-  const sh = BASE[b.gun].shoulder;
-  gunM.rotation.y = Math.PI; gunM.position.set(sh ? -7.5 * u : -4 * u, -gy + (sh ? 2 * u : 0), 9 * u + gz);
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round } = makeGun(b.gun, gunM, 0);
+  // held the way its hold says (js/hold.js): the gun and both arms come from the solved pose, which is in character pixels
+  // from its feet. The aim group pivots at shoulder height. A one-handed weapon leaves the left arm hanging a little forward
+  const h = holdFor(b.gun);
+  gunM.position.set(h.T[0] * u, (h.T[1] - 22) * u, h.T[2] * u); gunM.quaternion.fromArray(h.q);
+  b.armR.quaternion.setFromUnitVectors(ARM_DOWN, _hv.fromArray(h.dR));
+  b.armL.quaternion.setFromUnitVectors(ARM_DOWN, h.dL ? _hv.fromArray(h.dL) : _hv.set(.08, -.95, .3).normalize());
+  b.holdTurn = h.turn; // the body turns this far right so the gun still points where it aims (a sideways stance)
   b.round = round;
   b.flashM ??= box(.14, .14, .14, FLASH_MAT);
   b.flashM.position.set(0, my, mz - .04); b.flashM.visible = false;
@@ -250,13 +255,13 @@ function makeBot(rec) {
   // both arms forward holding the gun, swung up and down with the aim from the shoulders
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
   for (const a of [ch.armR, ch.armL]) { aim.add(a); a.position.y = 0; }
-  ch.armR.rotation.set(-Math.PI / 2, 0, .2); ch.armL.rotation.set(-Math.PI / 2, 0, -.85);
+  ch.headPiv.rotation.order = 'YXZ';
   const tag = new THREE.Sprite(rec.tag); tag.scale.set(rec.tagW, .25, 1); tag.position.y = 2.25;
   g.add(tag); scene.add(g);
   const yaw = Math.atan2(-x, -z);
   g.rotation.y = yaw;
   const mags = {}; for (const i of rec.load) mags[i] = BASE[i].mag; // every gun full on respawn
-  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
+  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
@@ -283,7 +288,7 @@ function angel(b) {
   if (b.gunM) b.gunM.visible = false;
   b.aim.rotation.x = 0; b.aim.position.z = 0; b.g.rotation.x = b.g.rotation.z = 0;
   b.aim.children.forEach(a => { if (a !== b.gunM) a.rotation.set(0, 0, 0); });
-  b.pivR.rotation.set(0, 0, 0); b.pivL.rotation.set(0, 0, 0); b.headPiv.rotation.x = -.25; // looking up
+  b.pivR.rotation.set(0, 0, 0); b.pivL.rotation.set(0, 0, 0); b.headPiv.rotation.set(-.25, 0, 0); // looking up
   for (const m of b.mats) { m.transparent = true; m.opacity = .6; m.depthWrite = false; m.emissive.setHex(0x8a8a8a); m.needsUpdate = true; }
   const glow = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false });
   const haloMat = glow(0xffe27a, .95), wingMat = glow(0xffffff, .7), extra = [];
@@ -505,7 +510,8 @@ function updateBot(b, dt) {
   const wantPitch = Math.atan2(tp.y + (W.rocket ? .3 : 1.1) - pos.y - 1.6, th) + (W.flare ? Math.atan2(FLARE_DROP * fly * fly / 2, th) : 0);
   b.aimYaw += Math.atan2(Math.sin(wantYaw - b.aimYaw), Math.cos(wantYaw - b.aimYaw)) * k;
   b.aimPitch += (wantPitch - b.aimPitch) * k;
-  b.g.rotation.y = b.aimYaw; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
+  // a two-handed stance turns the body right, the head looks back round along the gun
+  b.g.rotation.y = b.aimYaw - b.holdTurn; b.headPiv.rotation.y = b.holdTurn; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
   b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.flashM.visible = b.muzzle > 0;
   if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx('flameEnd', { at: pos, far: 50 });

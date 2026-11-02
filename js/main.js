@@ -47,8 +47,9 @@ function update(dt) {
   if (gunRound) { // the rocket: gone once fired, slides back into the tube near the end of the reload
     const k = reloading > 0 ? reloading / w.reload : 0;
     gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
-    gunRound.position.z = reloading > 0 ? k / .4 * 16 * GPX : 0;
+    gunRound.position.z = reloading > 0 ? k / .4 * 10 * GPX : 0;
   }
+  const hold = holdOf(w);
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
   const fov = 75 - adsT * (w.scope ? 57 : 20);
   if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -57,15 +58,19 @@ function update(dt) {
   $('cross').style.display = scoped ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
-  if (w.melee) {
-    vm.position.set(.3 - kick * .08, -.28 + bob, -.5 - kick * .2);
-    vm.rotation.set(-kick * .9, kick * .5, 0);
-  } else if (w.shoulder) { // on your shoulder: further out to the right and angled so its back end leaves the screen at the side
+  if (w.melee) { // blade tipped up a little out of your fist
+    vm.position.set(.3 - kick * .08, -.22 + bob, -.5 - kick * .2);
+    vm.rotation.set(.22 - kick * .9, kick * .5, 0);
+  } else if (hold === 'heavy') { // low at your hip
+    vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob - (reloading > 0 ? .12 : 0), -.6 + kick * .06);
+    vm.rotation.set(.04 + kick * .1 + (reloading > 0 ? -.4 : 0), .06 * (1 - adsT), 0);
+  } else if (hold === 'shoulder') { // on your shoulder: further out to the right and angled so its back end leaves the screen at the side
     vm.position.set(.4 - adsT * .2, -.22 + adsT * .04 + bob - (reloading > 0 ? .12 : 0), -.72 + kick * .1);
     vm.rotation.set(kick * .2 + (reloading > 0 ? -.35 : 0), .34 * (1 - adsT * .4), 0);
   } else {
     vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob - (reloading > 0 ? .15 : 0), -.55 + kick * .08);
     vm.rotation.set(kick * .25 * (1 - adsT * .85) + (reloading > 0 ? -.6 : 0), 0, 0); // much less muzzle climb while aiming so the gun doesn't cover the crosshair
+    if (hold === 'pistol') vm.position.y += .09 * (1 - adsT); // a pistol sits higher so your fist under its grip is on screen
   }
   if ((crossT -= dt) <= 0) $('cross').style.setProperty('--c', '#fff');
   }

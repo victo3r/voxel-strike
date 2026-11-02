@@ -102,6 +102,35 @@ const addCrates = list => { for (const [x, z, tall] of list) addBlock(x, z, 1.2,
 // fixed random numbers: the same seed gives the same layout every game
 const seeded = s => () => (s = s * 16807 % 2147483647) / 2147483647;
 
+// daytime sky: a square pixel sun out along skyDir, with a soft glow, and flat blocky clouds. skyDir can be off from where the light comes from,
+// so the sun shows in the sky from the way you usually face without lighting those sides from behind.
+// None of it is fogged, so it shows past the fog. n clouds in a ring from r0 to r1 out, between heights y0 and y1
+const sunTex = tex(g => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const e = Math.min(x, y, 15 - x, 15 - y), v = e < 1 ? 0 : e < 2 ? 1 : 2;
+    if (v) { g.fillStyle = v === 1 ? '#ffd65c' : e < 4 ? '#ffeb94' : '#fff8d6'; g.fillRect(x, y, 1, 1); }
+  }
+});
+const sunGlowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32); gr.addColorStop(0, 'rgba(255,248,215,.75)'); gr.addColorStop(1, 'rgba(255,248,215,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
+})();
+const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9aa8b8, fog: false });
+function addSky(rnd, skyDir, n, r0, r1, y0, y1) {
+  const d = new THREE.Vector3(...skyDir).normalize().multiplyScalar(150);
+  const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false }));
+  sun.scale.setScalar(14); sun.position.copy(d); add(sun);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, fog: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  glow.scale.setScalar(46); glow.position.copy(d).multiplyScalar(1.01); add(glow);
+  for (let i = 0; i < n; i++) { // a wide slab with a smaller one on top
+    const a = rnd() * 6.28, r = r0 + rnd() * (r1 - r0), x = Math.cos(a) * r, z = Math.sin(a) * r, y = y0 + rnd() * (y1 - y0);
+    const w = 12 + rnd() * 18, dd = 7 + rnd() * 10;
+    const c1 = box(w, 3 + rnd() * 2, dd, cloudMat); c1.position.set(x, y, z); add(c1);
+    const c2 = box(w * .55, 2.5, dd * .6, cloudMat); c2.position.set(x + (rnd() - .5) * w * .3, y + 2.4, z + (rnd() - .5) * dd * .3); add(c2);
+  }
+}
+
 // what's under your feet at x, z (for footsteps): the thing you're standing on, or the map's ground there
 function surfaceAt(x, z, r, feet) {
   const keep = [groundRamp, groundSolid]; // don't disturb what the movement code just read

@@ -196,7 +196,7 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); s
 // A mode with `sub` opens a second page to pick between its versions (Blitz: free for all or team) before the maps.
 // Player counts on the map cards come from RULES in modes/deathmatch.js
 const ALL_MAPS = ['yard', 'forest', 'resort'];
-const V_MAPS = 2; // bump when the map pictures are retaken
+const V_MAPS = 3; // bump when the map pictures are retaken
 const MODES = [
   { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Survive the waves, earn coins, beat the boss every 5 waves', maps: ALL_MAPS },
   { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ALL_MAPS },
@@ -289,17 +289,25 @@ $('setIcon').src = pixIcon([
   '..XX.XXXX.XX..',
   '.....XXXX.....',
 ], ['#d8dde4', '#9aa3ae']);
-// PLAY: a sharp-cornered triangle, drawn smooth (no pixel steps along its edges), with a thin dark green outline.
-// Drawn at 256 so it stays crisp on high-DPI screens
+// PLAY: a pixel-art triangle on a 22-pixel grid with sharp corners. Instead of a hard black staircase, each pixel along the edge
+// gets an in-between color by how much of it the triangle and its dark green outline cover, so the edge looks smooth up close
+// but you can still see the pixels
 $('playIcon').src = (() => {
-  const c = document.createElement('canvas'); c.width = c.height = 256;
-  const g = c.getContext('2d'), pts = [[52, 22], [236, 128], [52, 234]];
-  g.beginPath(); g.moveTo(...pts[0]); g.lineTo(...pts[1]); g.lineTo(...pts[2]); g.closePath();
-  g.lineJoin = 'miter'; g.miterLimit = 10; g.lineWidth = 12; g.strokeStyle = '#0d4a28'; g.stroke();
-  const gr = g.createLinearGradient(0, 22, 0, 234); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#d4f2dd'); g.fillStyle = gr; g.fill();
+  const N = 22, S = 10, SS = 6, c = document.createElement('canvas'); c.width = c.height = N * S;
+  const g = c.getContext('2d'), P = [[4.5, 2], [20.5, 11], [4.5, 20]], W = 1.35; // corners, outline width (grid pixels)
+  // signed distance past each edge (negative = inside), the triangle is where all three are under 0. Growing by W keeps the corners sharp
+  const edges = P.map((a, k) => { const b = P[(k + 1) % 3], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dy / l, -dx / l, a]; });
+  const out = (x, y) => Math.max(...edges.map(([nx, ny, a]) => (x - a[0]) * nx + (y - a[1]) * ny)) * (edges[0][0] * (P[2][0] - P[0][0]) + edges[0][1] * (P[2][1] - P[0][1]) > 0 ? -1 : 1);
+  const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k), LINE = [13, 74, 40];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let fill = 0, line = 0;
+    for (let j = 0; j < SS; j++) for (let i = 0; i < SS; i++) { const d = out(x + (i + .5) / SS, y + (j + .5) / SS); if (d < 0) fill++; else if (d < W) line++; }
+    const cov = (fill + line) / (SS * SS); if (!cov) continue;
+    const top = mix([255, 255, 255], [212, 242, 221], y / N), col = mix(LINE, top, fill / (fill + line));
+    g.fillStyle = `rgba(${col.map(Math.round)},${Math.min(1, cov * 1.15)})`; g.fillRect(x * S, y * S, S, S);
+  }
   return c.toDataURL();
 })();
-
 // mode icons: pixel art with its black outline drawn in. pal maps each letter to a color, or to a function of (x, y) for split colors.
 // The bottom half is shaded a little darker
 function artIcon(rows, pal, scale = 8) {

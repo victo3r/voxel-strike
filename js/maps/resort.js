@@ -934,13 +934,7 @@ for (let L = .5; L <= 8; L += .5) {
   if (!any) break;
 }
 // --- sky ---
-const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9aa8b8, fog: false });
-for (let i = 0; i < 16; i++) {
-  const a = rnd() * 6.28, r = 50 + rnd() * 110, x = Math.cos(a) * r, z = Math.sin(a) * r, y = 48 + rnd() * 18;
-  const w = 12 + rnd() * 18, d = 7 + rnd() * 10;
-  const c1 = box(w, 3 + rnd() * 2, d, cloudMat); c1.position.set(x, y, z); add(c1);
-  const c2 = box(w * .55, 2.5, d * .6, cloudMat); c2.position.set(x + (rnd() - .5) * w * .3, y + 2.4, z + (rnd() - .5) * d * .3); add(c2);
-}
+addSky(rnd, [12, 17, -32], 16, 50, 160, 40, 58);
 
 // the ground under your middle: the sea and the pool go down to their floor, so you drop in when you step off the edge
 M.floor = (x, z) => inPool(x, z) ? POOL_F : kindAt(x, z) === SEA ? seaFloor(ci(x), ci(z)) : 0;

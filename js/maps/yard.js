@@ -1,6 +1,6 @@
 startMap('yard', {
   name: 'The Yard', size: 'small', half: 24,
-  env: { sky: 0x87ceeb, fog: 0x87ceeb, fogNear: 35, fogFar: 120, hemiSky: 0xffffff, hemiGround: 0x556633, hemi: 1.1, sunColor: 0xffffff, sun: 1.3 },
+  env: { sky: 0x87ceeb, fog: 0x87ceeb, fogNear: 35, fogFar: 120, hemiSky: 0xffffff, hemiGround: 0x556633, hemi: 1.1, sunColor: 0xffffff, sun: 1.3, sunDir: [10, 20, 5] },
   pads: [[12, 0], [-12, 0], [0, 12], [0, -12]],
   // [x, z, tall] (tall: 1 = double-height crate)
   crates: [[-20, 17, 1], [-11.5, 9, 0], [-7, 10, 0], [1.5, 7.5, 0], [12.5, -10.5, 0], [8.5, 8, 1], [7.5, -1.5, 0], [12.5, -15, 0], [17, 7.5, 0],
@@ -89,4 +89,5 @@ const bushes = [...scatter(40, 1.4, 1.2, 40), ...scatter(60, 4, 1.2, 100)].map((
 instanced(unit, leafMat, bushes);
 grassTufts(scatter(900, .7, .3, 70).map(([x, z]) => { const s = .8 + rnd() * .7; return [x, 0, z, 1.1 * s, 1 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]; }));
 addCrates(MAPS.yard.crates);
+addSky(seeded(4242), [3, 17, -36], 14, 45, 140, 38, 52);
 }
