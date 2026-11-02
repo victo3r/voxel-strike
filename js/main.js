@@ -237,7 +237,7 @@ const clock = new THREE.Clock();
 (function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), .05);
-  drownTick(dt);
+  drownTick(dt); musicTick();
   if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); return; }
   // the game keeps running while the menu is open (it isn't a pause). Only the zombie-waves shop and death screen stop it,
   // and with the mouse unlocked your keys are released, so you just stand there

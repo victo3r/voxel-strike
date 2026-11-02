@@ -532,7 +532,7 @@ function endMatch() {
   $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ◆</span></div>`
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ◆</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
-  sfx(place === 1 ? 'win' : 'lose');
+  sfx(place === 1 ? 'win' : 'lose'); musicEnd();
   if (ups) setTimeout(() => sfx('levelUp'), 700);
   document.exitPointerLock();
 }
@@ -558,4 +558,5 @@ function setupMode() {
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
+  musicMatch(mapId, mode);
 }

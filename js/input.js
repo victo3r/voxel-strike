@@ -26,9 +26,11 @@ const saveSens = () => { try { localStorage.setItem('voxelstrike-sens', JSON.str
 function renderSens() {
   for (const k in sens) { $('sens_' + k).value = sens[k]; $('sensV_' + k).textContent = sens[k].toFixed(2) + '×'; }
   $('vol').value = volume; $('volV').textContent = Math.round(volume * 100) + '%';
+  $('mvol').value = musicVol; $('mvolV').textContent = Math.round(musicVol * 100) + '%';
 }
 for (const k in sens) $('sens_' + k).addEventListener('input', e => { sens[k] = +e.target.value; saveSens(); renderSens(); });
 $('vol').addEventListener('input', e => { setVolume(+e.target.value); renderSens(); });
+$('mvol').addEventListener('input', e => { setMusicVolume(+e.target.value); renderSens(); });
 $('vol').addEventListener('change', () => sfx('ui'));
 renderSens();
 const held = a =>binds[a].some(c => c && keys[c]);
@@ -155,7 +157,7 @@ function showLobby(on) {
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
   vm.visible = !on;
-  if (on) { $('menu').style.display = 'none'; camera.fov = 75; camera.updateProjectionMatrix(); }
+  if (on) { $('menu').style.display = 'none'; camera.fov = 75; camera.updateProjectionMatrix(); musicLobby(); }
 }
 $('playBtn').addEventListener('click', () => {
   restart(); showLobby(false);

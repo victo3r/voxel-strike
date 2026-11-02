@@ -80,7 +80,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
     if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); }
     if (zz.type === 'bot') botDown(zz, by, head);
     else {
-      if (!by) sfx(head || zz.type === 'boss' ? 'killSpecial' : 'kill');
+      if (!by && zz.type === 'boss') sfx('killSpecial'); // regular zombies die too often for a kill sound; their death groan is enough
       if (zz.type === 'exploder') explode(zz); // shooting one still sets it off, so keep your distance
       else if (zz.type === 'boss') { sfx('bossRoar', { at: zz.g.position, far: 80, rate: .75 }); banner(`BOSS DOWN!\n+${zz.coins} ◆`); }
       else sfx('zDie', { at: zz.g.position, far: 35, rate: big ? .7 : 1 });
