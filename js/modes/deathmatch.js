@@ -126,7 +126,7 @@ function tagMat(name, css) { // name tag floating over its head, as wide as the 
 const YOU_T = { you: true }; // stands in for you whenever a bot is picking or tracking a target
 let recs = [], youRec = null, matchT = 0, killedBy = '', joins = [];
 function makeRecs() {
-  youRec = { name: myName, you: true, team: 0, css: '#ffd23f', score: 0, kills: 0, deaths: 0, streak: 0 };
+  youRec = { name: myName, you: true, team: 0, css: '#8ff0b6', score: 0, kills: 0, deaths: 0, streak: 0 };
   recs = [youRec]; joins = [];
   // bot 1 is there from the start with a NATO-alphabet name and never chats.
   // The others join spread across the first minute, a little randomly, with real-looking names (js/names.js).

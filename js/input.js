@@ -43,6 +43,7 @@ const saveGfx = () => { try { localStorage.setItem('voxelstrike-gfx', JSON.strin
 function renderGfx() {
   document.querySelectorAll('#gfxQ button').forEach(b => b.classList.toggle('sel', b.dataset.q === gfx.q));
   $('gfxDesc').textContent = GFX_DESC[gfx.q];
+  document.body.classList.toggle('lowfx', gfx.q === 'low'); // menus skip the background blur on low
   $('gfxRes').value = gfx.res; $('gfxResV').textContent = Math.round(gfx.res * 100) + '%';
   $('gfxFps').checked = gfx.fps; $('fps').style.display = gfx.fps ? '' : 'none';
   $('gfxNote').textContent = gfxQ().aa !== gfxAA ? 'Edge smoothing turns ' + (gfxQ().aa ? 'on' : 'off') + ' the next time you reload the page.' : '';
@@ -214,10 +215,10 @@ function renderPick() {
   $('pickTitle').textContent = m ? m.title || m.name : group ? group.name : 'SELECT MODE';
   $('pickBack').textContent = m || group ? '◀ ' + (m?.parent ? 'BLITZ' : 'MODES') : '◀ BACK';
   $('pickList').className = m ? 'maps' : 'modes';
-  const card = o => `<button data-mode="${o.id}" class="${o.id === mode || o.sub?.some(s => s.id === mode) ? 'sel' : ''}"><b>${o.name}</b><small>${o.desc}</small></button>`;
+  const card = o => `<button data-mode="${o.id}"><b>${o.name}</b><small>${o.desc}</small></button>`;
   $('pickList').innerHTML = m
     ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
-        return `<button data-map="${id}" class="${id === mapId ? 'sel' : ''}"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
+        return `<button data-map="${id}"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
     : (group ? group.sub : MODES).map(card).join('');
 }
 const pickOpen = () => $('pick').style.display === 'flex';

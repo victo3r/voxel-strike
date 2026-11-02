@@ -191,10 +191,10 @@ function renderShop() {
     const upg = isUpg(it), done = maxed(it);
     const off = done || (it.heal && P.hp >= P.max) || (it.refill && ammoFull()) || coins < priceOf(it);
     let label = it.name, desc = it.desc, cost = '◆ ' + priceOf(it);
-    if (it.gun !== undefined) label = `<small style="color:#ffd23f">${CATS[slotOf(it.gun)][1]}</small><br>${label}`;
+    if (it.gun !== undefined) label = `<small class="cat">${CATS[slotOf(it.gun)][1]}</small><br>${label}`;
     if (upg) {
       const g = it.gun, b = BASE[g], L = lvl[g] + 1;
-      label = `<small style="color:#ffd23f">${CATS[slotOf(g)][1]}</small><br>${it.name} <span style="color:#ffd23f">${stars(g)}</span>`;
+      label = `<small class="cat">${CATS[slotOf(g)][1]}</small><br>${it.name} <span class="cat">${stars(g)}</span>`;
       desc = done ? 'fully upgraded' : `dmg ${WEAPONS[g].dmg}→${Math.round(b.dmg * (1 + .25 * L))} · mag ${WEAPONS[g].mag}→${Math.round(b.mag * (1 + .25 * L))} · faster reload`;
       cost = done ? 'MAXED' : 'UPGRADE ◆ ' + priceOf(it);
     }
