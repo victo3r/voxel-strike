@@ -92,7 +92,7 @@ function update(dt) {
     }
     if (z.burn > 0) { // on fire: takes damage every quarter second until it burns out
       z.burn -= dt;
-      if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true); }
+      if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true, z.burnBy ?? null); }
       if (z.dead) continue;
     }
     if (z.type === 'bot') { updateBot(z, dt); continue; }
@@ -194,10 +194,12 @@ function update(dt) {
   for (let i = rockets.length - 1; i >= 0; i--) {
     const r = rockets[i], step = ROCKET_SPD * dt; r.life -= dt;
     ray2.set(r.m.position, r.dir); ray2.far = step;
-    const hit = ray2.intersectObjects(shotTargets(), false)[0];
-    if (hit || r.life <= 0) {
+    const hit = ray2.intersectObjects(targetsFor(r.by), false)[0];
+    const onYou = r.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    if (hit || onYou || r.life <= 0) {
       scene.remove(r.m); rockets.splice(i, 1);
-      blast(hit ? hit.point.clone() : r.m.position.clone(), ROCKET_R, r.dmg, ROCKET_SELF);
+      // your rocket hurts you up to ROCKET_SELF. A bot's rocket hurts you as much as yours hurts a bot
+      blast(onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone(), ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);

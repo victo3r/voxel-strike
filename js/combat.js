@@ -63,47 +63,66 @@ function flame(w) {
     ray2.set(camera.position, to.divideScalar(d)); ray2.far = d;
     if (ray2.intersectObjects(crateMeshes, false).length) continue;
     hurtZombie(zz, w.dmg, c, false);
-    zz.burn = BURN_T; zz.burnDmg = w.dmg * .6;
+    zz.burn = BURN_T; zz.burnDmg = w.dmg * .6; zz.burnBy = null;
   }
 }
-const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 35; // speed, blast radius, most damage it can do to you
+// rockets and flares fired by a deathmatch bot (by = the bot) can hit you, and skip the bot that fired them.
+// Yours (by = null) fly out of the camera and never hit you.
+const youBox = new THREE.Box3(), youHitP = new THREE.Vector3();
+function rayHitsYou(r, far) { // distance along ray r to your body, or Infinity. The hit spot ends up in youHitP
+  if (respawnT > 0) return Infinity;
+  youBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); youBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25);
+  if (!r.intersectBox(youBox, youHitP)) return Infinity;
+  const d = r.origin.distanceTo(youHitP); return d <= far ? d : Infinity;
+}
+const targetsFor = by => by ? shotTargets().filter(o => o.userData.zombie !== by) : shotTargets();
+const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 35; // speed, blast radius, most damage it can do to whoever fired it
 const rockets = [];
-function fireRocket(w) {
-  camera.getWorldDirection(fwd);
+function fireRocket(w, from = null, dir = null, by = null) {
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const m = new THREE.Group(), body = box(.1, .1, .4, lam({ color: 0x4b5b3b })), tip = box(.12, .12, .12, lam({ color: 0xaa3333 }));
   tip.position.z = .24; m.add(body, tip);
-  m.position.copy(camera.position).addScaledVector(fwd, .6); m.lookAt(tmp.copy(m.position).add(fwd)); scene.add(m);
-  rockets.push({ m, dir: fwd.clone(), life: 3, dmg: w.dmg, smoke: 0 });
+  m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
+  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by });
 }
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, how fast it falls
-const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and most splash damage. Never hurts you, and the direct-hit target doesn't take it too
+const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and most splash damage. Never hurts whoever fired it, and the direct-hit target doesn't take it too
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
-function fireFlare(w) {
-  camera.getWorldDirection(fwd);
+function fireFlare(w, from = null, dir = null, by = null) {
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const m = box(.14, .14, .14, flareMat);
-  m.position.copy(camera.position).addScaledVector(fwd, .6); scene.add(m);
-  flares.push({ m, v: fwd.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0 });
+  m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
+  flares.push({ m, v: dir.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0, by });
 }
 function updateFlares(dt) {
   for (let i = flares.length - 1; i >= 0; i--) {
     const f = flares[i]; f.life -= dt; f.v.y -= FLARE_DROP * dt;
     const step = f.v.length() * dt;
     ray2.set(f.m.position, tmp.copy(f.v).normalize()); ray2.far = step;
-    const hit = ray2.intersectObjects(shotTargets(), false)[0];
-    if (hit || f.life <= 0) {
+    let hit = ray2.intersectObjects(targetsFor(f.by), false)[0];
+    const onYou = f.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    if (onYou) hit = null;
+    if (hit || onYou || f.life <= 0) {
       scene.remove(f.m); flares.splice(i, 1);
-      const p = hit ? hit.point : f.m.position;
+      const p = onYou ? youHitP.clone() : hit ? hit.point : f.m.position;
       burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8); sfx('flareHit', { at: p });
+      if (onYou) {
+        const head = p.y > P.pos.y + 1.45;
+        hurtPlayer(Math.round(f.dmg * (head ? 1.5 : 1)), false, f.by, head); burnYou(f.burnT, f.burn, f.by);
+      } else if (f.by && Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z) < FLARE_R + .3) { // a bot's flare landing next to you
+        const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
+        hurtPlayer(Math.round(FLARE_SPLASH * (1 - Math.min(1, pd / FLARE_R) * .6)), false, f.by);
+      }
       const zz = hit?.object.userData.zombie;
       if (zz && !zz.dead) {
         const head = !!hit.object.userData.head;
-        hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head);
-        if (!zz.dead) { zz.burn = Math.max(zz.burn || 0, f.burnT); zz.burnDmg = Math.max(zz.burnDmg || 0, f.burn); }
+        hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head, false, f.by);
+        if (!zz.dead) { zz.burn = Math.max(zz.burn || 0, f.burnT); zz.burnDmg = Math.max(zz.burnDmg || 0, f.burn); zz.burnBy = f.by; }
       }
       for (const o of zombies) {
-        if (o === zz || o.dead) continue;
+        if (o === zz || o === f.by || o.dead) continue;
         const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-        if (od < FLARE_R + o.r) hurtZombie(o, Math.round(FLARE_SPLASH * (1 - Math.min(1, od / FLARE_R) * .6)), c, false);
+        if (od < FLARE_R + o.r) hurtZombie(o, Math.round(FLARE_SPLASH * (1 - Math.min(1, od / FLARE_R) * .6)), c, false, false, f.by);
       }
       continue;
     }

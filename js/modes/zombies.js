@@ -63,7 +63,7 @@ function spawnZombie(type = pickType()) {
 // by = the deathmatch bot doing the damage, or null if it's you
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
   zz.hp -= dmg;
-  if (zz.type === 'bot') { // remember who's hurting it and how much they've done in the last 2s
+  if (zz.type === 'bot' && by !== zz) { // remember who's hurting it and how much they've done in the last 2s (not its own rocket)
     const who = by ?? YOU_T;
     if (zz.hitBy !== who || zz.hitByT <= 0) zz.hitDmg = 0;
     zz.hitBy = who; zz.hitByT = 2; zz.hitDmg += dmg;
@@ -147,16 +147,17 @@ function explode(z) {
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
-function blast(p, R, zDmg, pDmg, skip) {
+// by = the deathmatch bot whose rocket it was: it gets the kills, and takes no more than ROCKET_SELF itself, like you do from yours
+function blast(p, R, zDmg, pDmg, skip, by = null) {
   burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
-  if (pd < R && !dead && pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)));
+  if (pd < R && !dead && pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by);
   for (const o of zombies) {
     if (o === skip || o.dead) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-    if (od < R) hurtZombie(o, zDmg * (1 - od / R * .5), c, false);
+    if (od < R) hurtZombie(o, o === by ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
   }
 }
 
