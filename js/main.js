@@ -7,6 +7,18 @@ const runMul = w => mobMul(w) + youFx().spd; // your run speed: your gun's mobil
 // all round, and the red reticle drawn on its own canvas). Drawn one pixel at a time and blown up by RPX, so it's pixel art
 const RPX = () => Math.max(2, Math.round(innerHeight / 240));
 let scopeKind = '';
+// the zoom-in sound when you start aiming a scoped gun, the zoom-out when you stop (or a reload drops you out).
+// Switching guns doesn't play a zoom-out, and after a pause (dead, menus) it quietly catches up instead of playing
+let zoomedGun = null, zoomSeen = 0;
+function zoomSound(w) {
+  const now = performance.now(), want = w.zoom && aiming && reloading <= 0 ? w.id : null;
+  if (now - zoomSeen > 300) zoomedGun = want;
+  zoomSeen = now;
+  if (want === zoomedGun) return;
+  if (zoomedGun && zoomedGun === w.id) sfx('zout_' + zoomedGun);
+  if (want) sfx('zin_' + want);
+  zoomedGun = want;
+}
 function drawScope(kind) {
   scopeKind = kind;
   const c = $('scope'), px = RPX(), W = Math.ceil(innerWidth / px) | 1, H = Math.ceil(innerHeight / px) | 1;
@@ -119,6 +131,7 @@ function update(dt) {
     gunRound.position.z = reloading > 0 ? k / .4 * 10 * GPX : 0;
   }
   const hold = holdOf(w);
+  zoomSound(w);
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
   // zoom: how many times bigger things look through a holo sight or scope, so the view narrows to 1/zoom of the normal one
   const zoomFov = w.zoom ? 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(37.5)) / w.zoom)) : 0;

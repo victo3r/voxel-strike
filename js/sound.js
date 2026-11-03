@@ -300,6 +300,36 @@ const SOUNDS = {
     s.tone({ f: 2600, f2: 2400, d: .14, v: .25 }); s.tone({ f: 3900, d: .08, v: .15 });
     s.tone({ f: 160, f2: 70, d: .06, v: .6 });
   }],
+  // ---- aiming down a scope or holo sight (zin_ = in, zout_ = out). Same every time, no glassy ring ----
+  zin_sniper: [.4, .42, s => { // stock pulled into the shoulder, then the zoom ring turns three notches
+    s.hiss({ ft: 'bandpass', f: 500, f2: 1400, q: 1.5, a: .03, d: .07, v: .6, sweep: .09 });
+    s.thud({ t: .07, d: .03, f: 130, v: .9 });
+    s.clack({ t: .08, f: 1500, d: .014, v: .5, body: .5 });
+    for (let k = 0; k < 3; k++) s.clack({ t: .16 + k * .045, f: 3000 + k * 250, d: .005, v: .3 });
+  }],
+  zout_sniper: [.3, .36, s => { // ring clicks back, the stock leaves your shoulder
+    for (let k = 0; k < 2; k++) s.clack({ t: k * .04, f: 3200 - k * 250, d: .005, v: .28 });
+    s.hiss({ ft: 'bandpass', f: 1300, f2: 450, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
+    s.clack({ t: .11, f: 1300, d: .012, v: .3, body: .3 });
+  }],
+  zin_thrasher: [.3, .4, s => { // rifle snaps up and the holo sight blinks on with a short rising chirp
+    s.hiss({ ft: 'bandpass', f: 600, f2: 1800, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 });
+    s.clack({ t: .05, f: 1800, d: .012, v: .55, body: .4 });
+    s.tone({ type: 'square', f: 1100, f2: 1700, t: .07, a: .004, d: .05, v: .16, lp: 2600, glide: .04 });
+  }],
+  zout_thrasher: [.25, .34, s => { // the chirp drops as it shuts off and the rifle comes down
+    s.tone({ type: 'square', f: 1500, f2: 900, a: .004, d: .045, v: .14, lp: 2400, glide: .04 });
+    s.hiss({ ft: 'bandpass', f: 1600, f2: 550, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
+  }],
+  zin_hitman: [.22, .32, s => { // a light pistol: quick lift, small tick and a tiny high blip
+    s.hiss({ ft: 'bandpass', f: 900, f2: 2200, q: 1.6, a: .015, d: .045, v: .45, sweep: .05 });
+    s.clack({ t: .035, f: 2800, d: .007, v: .4 });
+    s.tone({ type: 'square', f: 1900, f2: 2400, t: .05, a: .003, d: .035, v: .12, lp: 3200, glide: .025 });
+  }],
+  zout_hitman: [.18, .28, s => {
+    s.tone({ type: 'square', f: 2200, f2: 1500, a: .003, d: .03, v: .1, lp: 3000, glide: .025 });
+    s.hiss({ ft: 'bandpass', f: 2000, f2: 800, q: 1.6, a: .01, d: .05, v: .4, sweep: .06 });
+  }],
   dry: [.1, .5, s => { s.clack({ f: 2800, d: .01, v: .8 }); }],
   equip: [.25, .4, s => { s.scrape({ d: .07, f: 1500, v: .4 }); s.clack({ t: .07, f: 2200, d: .015, v: .8, body: .3 }); }],
 
@@ -444,7 +474,7 @@ SOUNDS.splash = [1.1, .8, s => {
 const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
 // small close-up sounds (gun handling, voices, steps) get much less of the shared echo, so clicks don't smear into a ringing room
-const CLOSE = /^(r_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$)/;
+const CLOSE = /^(r_|zin_|zout_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$)/;
 // render every recipe into a buffer, scaled so its loudest point is the same for all of them
 const soundsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [len, v, build]], i) => {
   const c = new OfflineAudioContext(1, Math.ceil(SR * len), SR);
