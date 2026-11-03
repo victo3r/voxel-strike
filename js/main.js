@@ -1,20 +1,35 @@
 let stepT = 0, stepAlt = false; // footsteps: time until the next one, and which foot
+let jumpWas = false; // jump was held last frame (a double jump needs a fresh press)
+const runMul = w => mobMul(w) + youFx().spd; // your run speed: your gun's mobility plus your boots, added together
 
-// ---- the sniper scope and the holo reticles, drawn into small canvases one pixel at a time and blown up by RPX,
-// so they're pixel art like everything else. Cross lines with tick marks, no circles in the holo
+// ---- looking through a sight: every sight is a square window filling most of the screen, and you only see out of the window
+// (the gun is hidden). kind = 'scope' (sniper: black all round, black cross lines) or 'holo' (holo sights: the dark sight housing
+// all round, and the red reticle drawn on its own canvas). Drawn one pixel at a time and blown up by RPX, so it's pixel art
 const RPX = () => Math.max(2, Math.round(innerHeight / 240));
-function drawScope() {
+let scopeKind = '';
+function drawScope(kind) {
+  scopeKind = kind;
   const c = $('scope'), px = RPX(), W = Math.ceil(innerWidth / px) | 1, H = Math.ceil(innerHeight / px) | 1;
   c.width = W; c.height = H; c.style.setProperty('width', W * px + 'px', 'important'); c.style.setProperty('height', H * px + 'px', 'important');
-  const g = c.getContext('2d'), img = g.createImageData(W, H), d = img.data, cx = (W - 1) / 2, cy = (H - 1) / 2, R = Math.round(H * .32);
+  const holo = kind === 'holo', R = Math.round(H * (holo ? .45 : .4)); // half the window's side: holo windows are bigger
+  const g = c.getContext('2d'), img = g.createImageData(W, H), d = img.data, cx = (W - 1) / 2, cy = (H - 1) / 2;
   const put = (x, y, r, gr, b, a) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const k = (y * W + x) * 4; d[k] = r; d[k + 1] = gr; d[k + 2] = b; d[k + 3] = a; };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const r = Math.hypot(x - cx, y - cy);
-    if (r > R) put(x, y, 0, 0, 0, 255); // the tube
-    else if (r > R - 1.5) put(x, y, 22, 24, 26, 255); // its rim
-    else if (r > R - 4) put(x, y, 0, 0, 0, 110); // shadow round the edge of the lens
-    else if (r > R - 7) put(x, y, 0, 8, 20, 45);
+    const e = R - Math.max(Math.abs(x - cx), Math.abs(y - cy)); // how far inside the window's edge (negative = outside it)
+    if (holo) {
+      if (e < -3) put(x, y, 26, 26, 30, 255); // the sight's housing
+      else if (e < -1) put(x, y, 58, 58, 66, 255); // its lighter lip
+      else if (e < 0) put(x, y, 0, 0, 0, 255); // and the black edge of the glass
+      else if (e < 3) put(x, y, 0, 0, 0, 70);
+      else put(x, y, 40, 90, 120, 14); // a faint blue tint on the glass
+    } else {
+      if (e < 0) put(x, y, 0, 0, 0, 255); // the tube
+      else if (e < 1.5) put(x, y, 22, 24, 26, 255); // its rim
+      else if (e < 4) put(x, y, 0, 0, 0, 110); // shadow round the edge of the lens
+      else if (e < 7) put(x, y, 0, 8, 20, 45);
+    }
   }
+  if (holo) { g.putImageData(img, 0, 0); return; }
   const ink = (x, y) => put(cx + x, cy + y, 0, 0, 0, 255), post = Math.round(R * .45), step = Math.max(3, Math.round(R / 14));
   for (let k = -R; k <= R; k++) {
     if (Math.abs(k) < 2) continue; // a small open middle with a dot in it
@@ -28,26 +43,25 @@ function drawScope() {
   }
   g.putImageData(img, 0, 0);
 }
-// the holo reticle for a zoom level: broken cross lines with ticks, a square dot in the middle, and corner brackets on higher zooms
+// the holo reticle for a zoom level: a dot in the middle with a wide open gap round it, then short cross lines with a tick,
+// and higher zooms get longer lines with a second tick
 let holoZoom = 0;
 function drawHolo(zoom) {
   holoZoom = zoom;
-  const c = $('holo'), px = RPX(), N = 31, m = 15;
+  const c = $('holo'), px = RPX(), N = 41, m = 20;
   c.width = c.height = N; c.style.setProperty('width', N * px + 'px', 'important'); c.style.setProperty('height', N * px + 'px', 'important');
   const g = c.getContext('2d'); g.clearRect(0, 0, N, N);
-  const dot = (x, y, a = .95) => { g.fillStyle = `rgba(255,60,60,${a})`; g.fillRect(m + x, m + y, 1, 1); };
+  const dot = (x, y, a = .9) => { g.fillStyle = `rgba(255,60,60,${a})`; g.fillRect(m + x, m + y, 1, 1); };
+  const far = zoom >= 3 ? 15 : 12;
   const arm = (fx, fy) => { // one arm of the cross, going out along fx, fy
-    for (let r = 3; r <= 11; r++) if (r !== 7) dot(fx * r, fy * r);
-    for (const r of zoom >= 3 ? [5, 9] : [5]) { dot(fx * r + fy, fy * r + fx, .8); dot(fx * r - fy, fy * r - fx, .8); } // ticks across it
+    for (let r = 7; r <= far; r++) dot(fx * r, fy * r);
+    for (const r of zoom >= 3 ? [10, 13] : [10]) { dot(fx * r + fy, fy * r + fx, .7); dot(fx * r - fy, fy * r - fx, .7); } // ticks across it
   };
   arm(1, 0); arm(-1, 0); arm(0, 1); arm(0, -1);
   dot(0, 0, 1);
-  if (zoom >= 3) for (const sx of [-1, 1]) for (const sy of [-1, 1]) { // corner brackets
-    for (let k = 0; k < 3; k++) { dot(sx * (13 - k), sy * 13, .7); dot(sx * 13, sy * (13 - k), .7); }
-  }
 }
-drawScope(); drawHolo(2);
-addEventListener('resize', () => { drawScope(); drawHolo(holoZoom); });
+drawScope('scope'); drawHolo(2);
+addEventListener('resize', () => { drawScope(scopeKind); drawHolo(holoZoom); });
 function update(dt) {
   const down = pvp() && dmDown(dt);
   const w = WEAPONS[cur];
@@ -59,7 +73,7 @@ function update(dt) {
     P.yaw -= lx * ls; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ly * ls));
   }
   if (mx || mz) {
-    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * mobMul(w) * dt / len;
+    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) * dt / len;
     const dx = (mx * c + mz * s) * sp, dz = (-mx * s + mz * c) * sp;
     walkTo(P.pos, P.pos.x + dx, P.pos.z, .35, P.onGround);
     walkTo(P.pos, P.pos.x, P.pos.z + dz, .35, P.onGround);
@@ -72,18 +86,23 @@ function update(dt) {
     if (Math.abs(P.kx) + Math.abs(P.kz) < .2) P.kx = P.kz = 0;
   }
   launchMove(P, P.pos, .35, P.onGround, dt); // thrown by a rocket blast
-  if (held('jump') && P.onGround) { P.vy = 9; P.onGround = false; }
+  const jumpKey = held('jump');
+  if (jumpKey && P.onGround) { P.vy = 9; P.onGround = false; }
+  else if (jumpKey && !jumpWas && !P.onGround && !P.dj && youFx().dj) { // Raider Boots: press jump again in the air for a second jump
+    P.dj = true; P.vy = Math.max(P.vy, DJ_V); sfx('djump'); burst(tmp.set(P.pos.x, P.pos.y + .1, P.pos.z), 0xe8eef2, 6);
+  }
+  jumpWas = jumpKey;
   const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
   if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } } // bumped your head
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
   if (!wasAir && P.vy <= 0 && sticks(prevY - gy, P.onRamp)) P.pos.y = gy; // walking down stairs: stay on your feet. Off anything else you fall
-  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; } else P.onGround = false;
+  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; P.dj = false; } else P.onGround = false;
   if (inWater(P.pos.x, P.pos.z, P.pos.y)) drownYou();
   wetCheck(P, P.pos);
   easeLag(P.pos, dt);
   camera.position.set(P.pos.x, P.pos.y + 1.6 - (P.pos.lag || 0), P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
-  if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33 / mobMul(w); stepAlt = !stepAlt; sfx('step_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, P.pos.y)) + (stepAlt ? '' : '2'), { v: .75 }); } }
+  if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33 / runMul(w); stepAlt = !stepAlt; sfx('step_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, P.pos.y)) + (stepAlt ? '' : '2'), { v: .75 }); } }
   else stepT = .08; // first step comes right after you start moving
 
   cd -= dt;
@@ -104,11 +123,13 @@ function update(dt) {
   const zoomFov = w.zoom ? 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(37.5)) / w.zoom)) : 0;
   const fov = 75 - adsT * (w.zoom ? 75 - zoomFov : 20);
   if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }
-  const scoped = w.scope && adsT > .8, holo = !!(w.zoom && gunHolo) && adsT > .8;
+  // aimed in: the screen is the sight's window (the gun hides). Holo sights also get their red reticle
+  const holo = !!(w.zoom && gunHolo) && adsT > .8, scoped = holo || w.scope && adsT > .8;
+  if (scoped && scopeKind !== (holo ? 'holo' : 'scope')) drawScope(holo ? 'holo' : 'scope');
   $('scope').style.display = scoped ? 'block' : 'none';
   if (holo && w.zoom !== holoZoom) drawHolo(w.zoom);
   $('holo').style.display = holo ? 'block' : 'none';
-  $('cross').style.display = scoped || holo ? 'none' : '';
+  $('cross').style.display = scoped ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
   if (w.melee) { // blade tipped up a little out of your fist

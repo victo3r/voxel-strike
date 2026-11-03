@@ -225,13 +225,13 @@ const GUN_MODELS = {
   // edge along the bottom, straight spine along the top, the edge curving up to meet it at the tip
   knife({ p, mat }) {
     const brown = mat(0x5a3a1a), dbrown = mat(0x3a2412), steel = mat(0x8a8f96), blade = mat(0xc4cad2);
-    p(4, 4, 8, brown, 0, 0, 0); for (const z of [-2.5, 2.5]) p(4, 4, 1, dbrown, 0, 0, z); // handle and its wraps
-    p(6, 6, 2, steel, 0, 0, 5); // pommel
+    p(4, 4, 8, brown, 0, 1, 0); for (const z of [-2.5, 2.5]) p(4, 4, 1, dbrown, 0, 1, z); // handle and its wraps, a pixel up so it lines up with the blade
+    p(6, 6, 2, steel, 0, 1, 5); // pommel
     p(4, 10, 2, steel, 0, 1, -5); // crossguard, running up and down like the blade
     p(2, 5, 14, blade, 0, 1.5, -13); p(2, 2, 13, mat(0xf2f5f8), 0, -1, -12.5); // blade, bright sharp edge along the bottom
     p(2, 1, 10, mat(0x9aa3ad), 0, 1.5, -12); // fuller groove
     p(2, 4, 2, blade, 0, 2, -21); p(2, 2, 2, blade, 0, 3, -23); // tip
-    return { muzzle: [0, -24], grip: [6, 6, 10, 0, 0, 1], fore: null, bands: [-1.5, 1.5], band: [6, 6, 0] };
+    return { muzzle: [0, -24], grip: [6, 6, 10, 0, 1, 1], fore: null, bands: [-1.5, 1.5], band: [6, 6, 1] };
   },
   flame({ p, mat, dark, glow }) {
     const grey = mat(0x66666a), dk = mat(0x404044), red = mat(0xc43030);

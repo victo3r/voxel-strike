@@ -13,13 +13,13 @@ function mainStats(i) {
   const w = BASE[i], L = Math.max(0, gunUse(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), rl = w.reload * (1 - .15 * L);
   const per = s => s >= 20 ? Math.round(s) : +s.toFixed(1);
   return [
-    ['DAMAGE', w.beam ? Math.round(dmg / w.rate) : w.pellets > 1 ? `${dmg}×${w.pellets}` : dmg, w.beam ? '/ SEC' : ''],
+    ['DAMAGE', w.beam ? Math.round(dmg / w.rate) : dmg * w.pellets, w.beam ? '/ SEC' : ''], // a shotgun: every pellet hitting
     ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(w.rate, rl) : w.rate)), w.beam ? '' : '/ SEC'],
     ['CAPACITY', w.inf ? '∞' : magAt(w, L), ''],
     ['MOBILITY', w.mob ?? 60, ''],
   ];
 }
-const gunStats = i => mainStats(i).map(([k, v]) => `${k === 'FIRE RATE' ? 'RATE' : k === 'CAPACITY' ? 'CAP' : k.slice(0, 3)} ${v}`).join(' · ');
+const gunStats = i => mainStats(i).map(([k, v]) => `${{ DAMAGE: 'DMG', 'FIRE RATE': 'RATE', CAPACITY: 'CAP', MOBILITY: 'MOB' }[k]} ${v}`).join(' · ');
 // tags for how a gun works, listed under its description
 function gunAttrs(w) {
   const a = [];
@@ -67,19 +67,21 @@ const starTxt = i => BASE[i].start ? '' : '★'.repeat(gunUse(i)) + (gunStars(i)
 // the ◀ ▶ picker under your character for which star to use. k = what the arrows send, label = what's picked
 const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>◀</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>▶</button></div>`;
 // the armory's pages run down the left (the y axis). Each page has its own row of sections along the top (the x axis):
-// WEAPONS has the gun categories, WEAR has ARMOR (more things to wear can go in WEAR_CATS later)
+// WEAPONS has the gun categories, WEAR has ARMOR and BOOTS (more things to wear can go in WEAR_CATS later)
 const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
-const WEAR_CATS = [['armor', 'ARMOR']];
-// armorPrev = the star you're looking at in the armor details (your character wears it), armorCard = the Basic Armor card is picked
-let armPage = 'weapons', wearCat = 'armor', armorPrev = 0, armorCard = false;
+const WEAR_CATS = [['armor', 'ARMOR'], ['boots', 'BOOTS']];
+// armorPrev = the star you're looking at in the armor details (your character wears it), armorCard = the Basic Armor card is picked,
+// bootSel = the boots card you clicked (index into BOOTS, -1 = none yet)
+let armPage = 'weapons', wearCat = 'armor', armorPrev = 0, armorCard = false, bootSel = -1;
 const myArmor = () => prof.armor | 0;
+const anyBoots = () => BOOTS.some(B => bootStars(B.id));
 const pageIcon = p => p === 'weapons' ? SPRITES[loadoutGun('primary')] : armorSprite(Math.max(0, wornArmor() - 1));
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
   $('armPages').innerHTML = PAGES.map(([p, label]) =>
-    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}${p === 'wear' && !myArmor() ? ' dim' : ''}"><img${p === 'wear' ? ' class="ai"' : ''} src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
+    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}${p === 'wear' && !myArmor() && !anyBoots() ? ' dim' : ''}"><img${p === 'wear' ? ' class="ai"' : ''} src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
   if (armPage === 'wear') { renderWear(); return; }
-  heroArmor(wornArmor());
+  heroArmor(wornArmor()); heroBoots(wornBoots());
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img src="${SPRITES[loadoutGun(c)]}"><span>${label}</span></button>`).join('');
   const eq = loadoutGun(armCat);
@@ -98,7 +100,7 @@ function renderArmory() {
 }
 // the buttons for the picked gun, under your character (in a match, under where he'd stand)
 function renderAct() {
-  if (armPage === 'wear') { renderArmorAct(); return; }
+  if (armPage === 'wear') { if (wearCat === 'boots') renderBootAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
   let btns;
   if (isLocked(i)) btns = `<button disabled>🔒 UNLOCKS AT LVL ${w.unlock}</button>`;
@@ -135,11 +137,14 @@ const ARMOR_DESC = 'Worn in bot matches. Your armor bar fills every time you spa
   'You can wear any star you own. Bots roll their own armor, never better than what you wear.';
 const armorStat = T => `+${T.hp} ARMOR` + (T.dr ? ` · −${Math.round(T.dr * 100)}% DAMAGE` : '');
 function renderWear() {
-  const n = myArmor(), w = wornArmor(), T = armorOf(w || 1);
+  const n = myArmor(), w = wornArmor(), T = armorOf(w || 1), on = wornBoots();
+  const tabIcon = c => c === 'armor' ? armorSprite(Math.max(0, w - 1)) : on ? bootSprite(on.id, on.st) : bootSprite(BOOTS[0].id, 1);
   $('armTabs').innerHTML = WEAR_CATS.map(([c, label]) =>
-    `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="ai" src="${armorSprite(Math.max(0, w - 1))}"><span>${label}</span></button>`).join('');
+    `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="ai" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
+  if (wearCat === 'boots') { renderBoots(); return; }
+  heroBoots(on);
   if (armDet) renderArmorDetail();
   else {
     const locked = !n && prof.lv < T.unlock, tag = n ? 'WEARING' : locked ? `🔒 LVL ${T.unlock}` : COIN + T.price;
@@ -186,6 +191,93 @@ function renderArmorAct() {
 function wearStar(s) {
   const n = myArmor(); s = Math.max(1, Math.min(n, s)); if (s === wornArmor()) return;
   prof.armorUse = s === n ? 0 : s; saveProf(); armorSync(false); sfx('equip');
+}
+// ---- WEAR page, BOOTS: one card per pair. Click one to pick it (your character tries it on), click it again for its details.
+// The buttons under him buy, wear, take off and upgrade it, and pick which of its stars you wear
+const BOOTS_DESC = 'Wear one pair at a time, in every mode. What they do adds on top of your armor and your gun\'s mobility. ' +
+  'Bots can roll boots too, never better than yours.';
+const BOOT_DESC = {
+  warrior: 'Steel greaves for fighters. Every weapon you use does more damage, and every hit you take is cut a little more, on top of your armor.',
+  raider: 'Light running boots with a wing on each ankle. You run faster, and you can jump a second time in the air: press jump again.',
+};
+const pct = v => Math.round(v * 100) + '%';
+// what a pair does at st stars, as short labels
+function bootLines(B, st) {
+  const L = st - 1, o = [];
+  if (B.spd) o.push(['SPEED', '+' + pct(B.spd[L])]);
+  if (B.dmg) o.push(['DAMAGE', '+' + pct(B.dmg[L])]);
+  if (B.dr) o.push(['DAMAGE CUT', pct(B.dr[L])]);
+  if (B.dj) o.push(['JUMPS', '2']);
+  return o;
+}
+const bootSmall = (B, st) => bootLines(B, st).map(([k, v]) => k === 'JUMPS' ? 'DOUBLE JUMP' : `${v} ${k === 'DAMAGE CUT' ? 'DMG CUT' : k === 'DAMAGE' ? 'DMG' : k}`).join(' · ');
+const bootLocked = B => !bootStars(B.id) && prof.lv < B.unlock;
+const bootUpg = B => Math.round(B.price * UPG[bootStars(B.id) - 1]);
+const bootStarTxt = id => { const st = bootStars(id), u = bootUse(id); return '★'.repeat(u) + (st > u ? `<i>${'★'.repeat(st - u)}</i>` : '') + '☆'.repeat(3 - st); };
+const bootList = () => BOOTS.map((B, i) => i).sort((a, b) => BOOTS[a].unlock - BOOTS[b].unlock);
+function renderBoots() {
+  const on = wornBoots();
+  if (!BOOTS[bootSel]) bootSel = on ? BOOT_I[on.id] : bootList()[0];
+  const B = BOOTS[bootSel];
+  if (armDet) renderBootDetail();
+  else $('armList').innerHTML = `<p class="wd">${BOOTS_DESC}</p>` + bootList().map(i => {
+    const K = BOOTS[i], st = bootStars(K.id), worn = prof.bootOn === K.id && st;
+    const tag = bootLocked(K) ? `🔒 LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
+    return `<div class="card${bootLocked(K) ? ' locked' : ''}${i === bootSel ? ' sel' : ''}${worn ? ' on' : ''}" data-boot="${i}">` +
+      (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${bootSprite(K.id, Math.max(1, bootUse(K.id)))}">` +
+      `<div class="cn">${K.name} <span class="st">${bootStarTxt(K.id)}</span></div><small>${bootSmall(K, Math.max(1, bootUse(K.id)))}</small></div>`;
+  }).join('');
+  heroArmor(wornArmor());
+  heroBoots({ id: B.id, st: Math.max(1, bootUse(B.id)) }); // he tries on the pair you picked
+  renderAct();
+  if (inLobby) heroGun(-1);
+}
+function renderBootDetail() {
+  const B = BOOTS[bootSel], st = Math.max(1, bootUse(B.id)), have = bootStars(B.id);
+  const per = (k, a) => [k + ' BY STAR', a.map(v => (k === 'SPEED' || k === 'DAMAGE' ? '+' : '') + pct(v)).join(' / ')];
+  const specs = [];
+  if (B.spd) specs.push(per('SPEED', B.spd));
+  if (B.dmg) specs.push(per('DAMAGE', B.dmg));
+  if (B.dr) specs.push(per('DAMAGE CUT', B.dr));
+  specs.push(['UNLOCKS AT', 'LVL ' + B.unlock], ['PRICE', COIN + B.price],
+    ['STATUS', prof.bootOn === B.id && have ? 'WEARING' : have ? 'OWNED' : bootLocked(B) ? '🔒 LOCKED' : 'NOT OWNED']);
+  $('armDet').innerHTML = `<button id="detBack">◀ BACK</button><div id="detView"></div>` +
+    `<div class="dn">${B.name} <span class="st">${bootStarTxt(B.id)}</span></div>` +
+    `<div class="ms" style="grid-template-columns:repeat(${bootLines(B, st).length},1fr)">${bootLines(B, st).map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>` +
+    `<p>${BOOT_DESC[B.id] ?? ''}</p><div class="ds">${specs.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
+  pvShow('boots:' + B.id + st, g => bootsModel(B.id, st, g), .6); // turned a little, so you see the front and the outside
+}
+function renderBootAct() {
+  const B = BOOTS[bootSel] ?? BOOTS[0], st = bootStars(B.id), worn = prof.bootOn === B.id && st;
+  let btns;
+  if (bootLocked(B)) btns = `<button disabled>🔒 UNLOCKS AT LVL ${B.unlock}</button>`;
+  else if (!st) btns = `<button data-bbuy="1" ${prof.coins < B.price ? 'disabled' : ''}>BUY ${COIN}${B.price}</button>`;
+  else {
+    btns = worn ? '<button data-boff="1">TAKE OFF</button>' : '<button data-bwear="1">WEAR</button>';
+    if (st < 3) btns += `<button data-bup="1" ${prof.coins < bootUpg(B) ? 'disabled' : ''}>${'★'.repeat(st + 1)} ${COIN}${bootUpg(B)}</button>`;
+  }
+  const u = bootUse(B.id), pick = st > 1 ? lvPick('bu', 'USING ' + '★'.repeat(u), u <= 1, u >= st) : '';
+  $('armAct').innerHTML = `<div class="an">${B.name} <span class="st">${bootStarTxt(B.id)}</span></div>${pick}<div class="ab">${btns}</div>`;
+  placeAct();
+}
+// the boots buttons. Everything about boots is read live (js/boots.js youFx), so changes mid-match take effect straight away
+function bootClick(d) {
+  const B = BOOTS[bootSel]; if (!B) return;
+  const st = bootStars(B.id);
+  if (d.bbuy) {
+    if (st || prof.coins < B.price || prof.lv < B.unlock) return;
+    prof.coins -= B.price; prof.boots[B.id] = 1; prof.bootOn = B.id; sfx('buy');
+  } else if (d.bup) {
+    if (!st || st >= 3 || prof.coins < bootUpg(B)) return;
+    prof.coins -= bootUpg(B); prof.boots[B.id] = st + 1; delete prof.bootUse[B.id]; sfx('upgrade'); // the new star goes straight on
+  } else if (d.bwear) { prof.bootOn = B.id; sfx('equip'); }
+  else if (d.boff) { prof.bootOn = ''; sfx('equip'); }
+  else if (d.bu) { // which of its stars you wear (your best = no pick saved)
+    const u = Math.max(1, Math.min(st, bootUse(B.id) + +d.bu));
+    if (u === st) delete prof.bootUse[B.id]; else prof.bootUse[B.id] = u;
+    sfx('equip');
+  }
+  saveProf(); showProf();
 }
 // changed armor during a match: it's on right away. A worse one cuts the bar down to its size.
 // fill: you just bought a star, so the new part of the bar comes filled (switching between stars you own never fills it)
@@ -250,14 +342,16 @@ function armSync(i, how) {
 $('armList').addEventListener('click', e => {
   const c = e.target.closest('.card'); if (!c) return;
   if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = wornArmor() || 1; } else armorCard = true; sfx('ui'); renderArmory(); return; }
+  if (c.dataset.boot) { const i = +c.dataset.boot; if (i === bootSel) armDet = true; else bootSel = i; sfx('ui'); renderArmory(); return; }
   const i = +c.dataset.i;
   if (i === armSel) armDet = true; else armSel = i;
   sfx('ui'); renderArmory();
 });
 function armClick(e) {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
-  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; armSel = -1; sfx('ui'); } }
-  else if (b.dataset.wc) { wearCat = b.dataset.wc; armDet = false; sfx('ui'); }
+  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; armSel = -1; bootSel = -1; sfx('ui'); } }
+  else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; armorPrev = 0; bootSel = -1; sfx('ui'); } }
+  else if (b.dataset.bbuy || b.dataset.bup || b.dataset.bwear || b.dataset.boff || b.dataset.bu) bootClick(b.dataset);
   else if (b.dataset.av) { armorStep(+b.dataset.av); return; }
   else if (b.dataset.wa) wearStar(wornArmor() + +b.dataset.wa);
   else if (b.dataset.wear) wearStar(+b.dataset.wear);
@@ -300,11 +394,11 @@ function armShow(on) {
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
 function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; armShow(true); renderArmory(); }
-function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; heroArmor(wornArmor()); }
+function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; bootSel = -1; heroArmor(wornArmor()); heroBoots(wornBoots()); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // stopPropagation so the click doesn't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => {
-  if (armOpen && armDet && armPage === 'wear' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { armorStep(e.code === 'ArrowLeft' ? -1 : 1); return; }
+  if (armOpen && armDet && armPage === 'wear' && wearCat === 'armor' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { armorStep(e.code === 'ArrowLeft' ? -1 : 1); return; }
   if (e.code !== 'Escape' || !armOpen || $('binds').style.display === 'flex') return;
   if (armDet) { armDet = false; renderArmory(); } else closeArmory();
 });

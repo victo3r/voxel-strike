@@ -201,6 +201,7 @@ function dressHero() {
   hero.clear();
   heroCh = buildChar(prof.look, 1 / 16, true);
   dressArmor(heroCh, heroArmorN = wornArmor());
+  dressBoots(heroCh, heroBootsB = wornBoots());
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
   $('lookName').textContent = lookChoices()[lookIndex()]?.name ?? 'CUSTOM';
@@ -208,6 +209,10 @@ function dressHero() {
 // the armor he's wearing: the star you wear, or the one you're looking at in the armory
 let heroArmorN = 0;
 function heroArmor(n) { if (heroCh && n !== heroArmorN) { dressArmor(heroCh, heroArmorN = n); } }
+// the boots he's wearing: yours, or the pair you're looking at in the armory ({ id, st } or null)
+let heroBootsB = null;
+const bootKey = b => b ? b.id + b.st : '';
+function heroBoots(b) { if (heroCh && bootKey(b) !== bootKey(heroBootsB)) dressBoots(heroCh, heroBootsB = b); }
 function pickLook(step) {
   const list = lookChoices(), i = Math.max(0, lookIndex());
   prof.look = { ...list[(i + step + list.length) % list.length].look }; saveProf(); dressHero(); sfx('ui');

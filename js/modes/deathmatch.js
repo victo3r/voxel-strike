@@ -109,7 +109,8 @@ function botLoadout() {
   // W = its stats with those stars
   const stars = {}, W = {};
   for (const g of load) { const top = Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
-  return { load, taste, stars, W, armor: botArmor() };
+  const boots = botBoots(); // fx = what its boots do (js/boots.js), used for its speed, damage, damage cut and double jump
+  return { load, taste, stars, W, armor: botArmor(), boots, fx: bootFx(boots) };
 }
 
 const BOT_U = 1.85 / 33; // one skin pixel on a bot: 33 pixels tall (with the neck) = 1.85, same height as you
@@ -261,6 +262,7 @@ function makeBot(rec) {
   const [x, z] = spawnSpot(rec);
   const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(rec.armor);
   if (arm) dressArmor(ch, rec.armor, teamMode() ? TEAMS[rec.team].shirts[0] : null);
+  dressBoots(ch, rec.boots);
   g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
   // both arms forward holding the gun, swung up and down with the aim from the shoulders
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
@@ -570,7 +572,7 @@ function updateBot(b, dt) {
   }
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
-    const s = BOT.speed * mobMul(W) * dt / ml; mx *= s; mz *= s;
+    const s = BOT.speed * (mobMul(W) + b.rec.fx.spd) * dt / ml; mx *= s; mz *= s;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
     if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded, into)) bump = true;
     if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded, into)) bump = true;
@@ -580,7 +582,9 @@ function updateBot(b, dt) {
       if (!b.vy && Math.random() < .4) b.jumpT = 0; // sometimes tries hopping over what it's stuck on
     }
     // hops now and then like a player, more often mid-fight. Not while a sniper is lining up a shot
-    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? 1.5 + Math.random() * 3.5 : 4 + Math.random() * 8; b.vy = 9; }
+    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? 1.5 + Math.random() * 3.5 : 4 + Math.random() * 8; b.vy = 9; b.dj = b.rec.fx.dj && Math.random() < .6 ? 1 : 0; }
+    // Raider Boots: most of its hops get a second jump near the top
+    if (b.dj === 1 && b.vy && b.vy > -2 && b.vy < 2) { b.dj = 2; b.vy = DJ_V; sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // a footstep each time a leg swings through

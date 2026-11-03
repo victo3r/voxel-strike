@@ -64,8 +64,10 @@ function spawnZombie(type = pickType()) {
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
   if (!Number.isFinite(dmg)) return; // a bad number here would leave it with NaN health, and then nothing could ever kill it
   if (zz.type === 'bot' && friendly(by, zz)) return; // team modes: no friendly fire
-  if (zz.type === 'bot') { // bots wear armor like yours: the cut first, then the armor bar soaks what's left
-    dmg *= 1 - zz.dr;
+  // boots that add damage (yours, or the bot's that hit it). Health isn't rounded, so even a few % on a small hit counts
+  dmg *= 1 + (by ? by.rec?.fx.dmg ?? 0 : youFx().dmg);
+  if (zz.type === 'bot') { // bots wear armor like yours: the cut first (armor and boots add up), then the armor bar soaks what's left
+    dmg *= 1 - zz.dr - zz.rec.fx.dr;
     const soak = Math.min(zz.armor, dmg); zz.armor -= soak; zz.hp -= dmg - soak;
   } else zz.hp -= dmg;
   const dies = zz.hp <= 0 && !zz.dead;
@@ -96,7 +98,8 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
 // pierce = damage that skips armor and hits HP directly. by = the deathmatch bot that shot you. head = it was a headshot
 function hurtPlayer(d, pierce = false, by = null, head = false) {
   if (respawnT > 0 || matchOver || by && friendly(by, YOU_T)) return; // by = null is your own rocket, that still hurts
-  d *= 1 - P.dr; // worn armor from Amethyst up cuts every hit (health can go fractional, the HUD rounds it up)
+  if (by?.rec) d *= 1 + by.rec.fx.dmg; // a bot in damage boots
+  d *= 1 - P.dr - youFx().dr; // worn armor from Amethyst up and Warrior Boots cut every hit, added together (health can go fractional, the HUD rounds it up)
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;
   hurtSfx(P, soak === d ? 'armorHit' : head ? 'hurtHead' : 'hurt');

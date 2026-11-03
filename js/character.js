@@ -297,8 +297,9 @@ function buildChar(look, U = 1 / 16, own = false) {
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
   const parts = [head, neck, body, armRM, armLM, legRM, legLM];
   // ch.armor = the armor it's wearing (js/armor.js dressArmor): the chestplate rides on the body, each shoulder pad on its arm
-  const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null };
-  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); };
+  // ch.boots = the boots (js/boots.js dressBoots), one on each leg
+  const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null, boots: null };
+  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); };
   return ch;
 }
 

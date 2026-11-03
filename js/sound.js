@@ -293,6 +293,7 @@ const SOUNDS = {
     s.hiss({ ft: 'highpass', f: 4000, d: .08, v: .35 });
   }],
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
+  djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // Raider Boots' second jump: a quick puff of air
   swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife whoosh
   slash: [.2, .6, s => { // knife connecting: a metal "shing" and a thud
     s.hiss({ ft: 'highpass', f: 3000, f2: 6000, d: .06, v: .8 });
