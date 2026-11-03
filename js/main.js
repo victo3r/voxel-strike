@@ -77,12 +77,15 @@ addEventListener('resize', () => { drawScope(scopeKind); drawHolo(holoZoom); });
 function update(dt) {
   const down = pvp() && dmDown(dt);
   const w = WEAPONS[cur];
+  if (down) aimOn = false;
   if (!down) {
+  aaTarget(); // which enemy aim assist is helping with this frame (input.js)
   const mx = held('right') - held('left'), mz = held('back') - held('fwd');
   const lx = held('lookR') - held('lookL'), ly = held('lookU') - held('lookD');
   if (lx || ly) {
     const ls = 2.4 * sens.keys * dt * camera.fov / 75;
-    P.yaw -= lx * ls; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ly * ls));
+    const [ay, ap] = aaLook(-lx * ls, ly * ls, dt);
+    P.yaw += ay; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ap));
   }
   if (mx || mz) {
     const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) * dt / len;
@@ -119,7 +122,7 @@ function update(dt) {
 
   cd -= dt;
   if (w.auto && held('shoot')) shoot();
-  aiming = held('aim');
+  aiming = opts.toggleAim ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * 8);
   tickCross(dt, BASE[cur]);
@@ -206,7 +209,7 @@ function update(dt) {
     }
     if (z.type === 'bot') { updateBot(z, dt); continue; }
     settle(z, dt);
-    if (inWater(z.g.position.x, z.g.position.z, z.g.position.y)) { drownZombie(z); continue; }
+    if (inSea(z.g.position.x, z.g.position.z, z.g.position.y)) { drownZombie(z); continue; } // zombies can't wade: any of the sea gets them
     const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = P.pos.y - z.g.position.y;
     const way = MAP.nav?.(z.g.position, P.pos); // a different floor of a building: head for the stairs first
     const wx = way ? way.x - z.g.position.x : dx, wz = way ? way.z - z.g.position.z : dz, wd = Math.hypot(wx, wz) || .001;
@@ -364,9 +367,9 @@ function fpsTick(raw) {
   drownTick(dt); musicTick();
   if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
-  // the game keeps running while the menu is open (it isn't a pause). Only the zombie-waves shop and death screen stop it,
-  // and with the mouse unlocked your keys are released, so you just stand there
-  const live = !dead && !shopOpen && !matchOver;
+  // zombie waves pauses while the menu (or settings) is open. Bot matches keep running behind the menu, the way an online
+  // match would: with the mouse unlocked your keys are released, so you just stand there
+  const live = !dead && !shopOpen && !matchOver && (pvp() || locked);
   if (live) update(dt);
   soundTick(dt, live);
   // bots and zombies are drawn a little low for a moment after stepping up a ledge, so they climb it smoothly

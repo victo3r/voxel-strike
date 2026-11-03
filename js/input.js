@@ -28,6 +28,73 @@ function renderSens() {
   $('vol').value = volume; $('volV').textContent = Math.round(volume * 100) + '%';
   $('mvol').value = musicVol; $('mvolV').textContent = Math.round(musicVol * 100) + '%';
 }
+// other control options, per device like sensitivity. aa = aim assist (0 off, 1 low, 2 medium), toggleAim = press aim once
+// to aim and again to stop (instead of holding it), wheel = the scroll wheel switches guns
+const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true };
+let opts = { ...DEFAULT_OPTS };
+try { const o = JSON.parse(localStorage.getItem('voxelstrike-opts')); if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k]; } catch {}
+const saveOpts = () => { try { localStorage.setItem('voxelstrike-opts', JSON.stringify(opts)); } catch {} };
+const AA_DESC = ['Off.', 'Your aim slows a little near an enemy and gets a small nudge toward them while you move onto them.', 'Like low, but stronger.'];
+function renderOpts() {
+  document.querySelectorAll('#aaQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.aa));
+  $('aaDesc').textContent = AA_DESC[opts.aa] + (opts.aa ? ' Fast flicks get no help, so it does very little for a mouse.' : '');
+  $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel;
+}
+$('aaQ').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || +b.dataset.v === opts.aa) return; opts.aa = +b.dataset.v; saveOpts(); renderOpts(); sfx('ui'); });
+$('optToggleAim').addEventListener('change', e => { opts.toggleAim = e.target.checked; aimOn = false; saveOpts(); });
+$('optWheel').addEventListener('change', e => { opts.wheel = e.target.checked; saveOpts(); });
+let aimOn = false; // toggle aim: whether you're aimed in right now
+renderOpts();
+
+// ---- aim assist. Mostly "sticky": inside a small zone round an enemy your aim slows down, and while you're already moving
+// toward them it adds a small pull, never more than a share of your own movement, so it never moves your aim on its own.
+// Both fade out as you turn faster, so a flick gets nothing. The zone is measured on screen, so it shrinks when you zoom in.
+// It helps on every enemy that has a red outline (not teammates, not enemies hidden by a Raider Hood) and only if you can see them.
+// zone = degrees from the edge of their body, slow = how much slower your aim gets right on them, pull = the most pull as a
+// share of how far you moved. Full help under SLOW_V radians a second of turning, none past FAST_V
+const AA = [null, { zone: 3.5, slow: .25, pull: .2 }, { zone: 5, slow: .4, pull: .35 }];
+const AA_SLOW_V = 1.2, AA_FAST_V = 3.5, AA_RANGE = 80;
+let aaT = null, aaLastT = 0;
+const aaV = new THREE.Vector3(), aaRay = new THREE.Raycaster();
+const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+// how far your crosshair is from the enemy's body, as [yaw, pitch] you'd have to turn. 0, 0 = it's on them
+function aaErr(t) {
+  let ey = wrapA(t.yaw - P.yaw); ey = Math.sign(ey) * Math.max(0, Math.abs(ey) - t.w);
+  const ep = P.pitch < t.bot ? t.bot - P.pitch : P.pitch > t.top ? t.top - P.pitch : 0;
+  return [ey, ep];
+}
+// once a frame: the closest enemy inside the zone that you can see
+function aaTarget() {
+  aaT = null;
+  const L = AA[opts.aa]; if (!L || !locked || respawnT > 0) return;
+  const c = camera.position, zone = THREE.MathUtils.degToRad(L.zone) * camera.fov / 75, near = [];
+  for (const z of zombies) {
+    if (z.dead || !z.glowMs || !z.glowOn) continue;
+    const p = z.g.position, s = z.scale || 1, dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz);
+    if (d > AA_RANGE || d < .3) continue;
+    const t = { z, zone, yaw: Math.atan2(-dx, -dz), w: Math.atan(.3 * s / d), bot: Math.atan2(p.y + .2 * s - c.y, d), top: Math.atan2(p.y + 1.85 * s - c.y, d) };
+    const e = Math.hypot(...aaErr(t)); if (e < zone) near.push([e, t]);
+  }
+  near.sort((a, b) => a[0] - b[0]);
+  for (const [, t] of near.slice(0, 3)) {
+    const p = t.z.g.position, to = aaV.set(p.x, p.y + 1.1 * (t.z.scale || 1), p.z).sub(c), d = to.length();
+    aaRay.set(c, to.divideScalar(d)); aaRay.far = d;
+    if (!aaRay.intersectObjects(crateMeshes, false).length) { aaT = t; return; }
+  }
+}
+// your look movement this event (yaw, pitch, in radians) over dt seconds, with aim assist added
+function aaLook(dy, dp, dt) {
+  const L = AA[opts.aa], a = Math.hypot(dy, dp);
+  if (!L || !aaT || !a) return [dy, dp];
+  const k = camera.fov / 75, v = a / Math.max(dt, .001);
+  const fade = Math.max(0, Math.min(1, (AA_FAST_V * k - v) / ((AA_FAST_V - AA_SLOW_V) * k)));
+  const [ey, ep] = aaErr(aaT), err = Math.hypot(ey, ep), close = 1 - err / aaT.zone;
+  if (!fade || close <= 0) return [dy, dp];
+  const slow = 1 - L.slow * fade * close; dy *= slow; dp *= slow;
+  if (err > 0 && dy * ey + dp * ep > 0) { const amt = Math.min(err, L.pull * a * fade * close); dy += ey / err * amt; dp += ep / err * amt; }
+  return [dy, dp];
+}
+
 for (const k in sens) $('sens_' + k).addEventListener('input', e => { sens[k] = +e.target.value; saveSens(); renderSens(); });
 $('vol').addEventListener('input', e => { setVolume(+e.target.value); renderSens(); });
 $('mvol').addEventListener('input', e => { setMusicVolume(+e.target.value); renderSens(); });
@@ -95,7 +162,7 @@ function showSetTab(t) {
 $('setTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.t !== setTab) { showSetTab(b.dataset.t); sfx('ui'); } });
 function openSettings() { $('acctErr').textContent = ''; showSetTab(setTab); $('binds').style.display = 'flex'; }
 $('ctrlBtn').addEventListener('click', e => { e.stopPropagation(); openSettings(); });
-$('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); sens = { ...DEFAULT_SENS }; saveSens(); renderSens(); renderHelp(); renderBinds(); });
+$('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); sens = { ...DEFAULT_SENS }; saveSens(); renderSens(); opts = { ...DEFAULT_OPTS }; aimOn = false; saveOpts(); renderOpts(); renderHelp(); renderBinds(); });
 renderHelp();
 const closeBinds = () => { rebinding = null; $('binds').style.display = 'none'; $('acctPass').value = ''; };
 $('bindX').addEventListener('click', closeBinds);
@@ -106,9 +173,13 @@ function press(code) { // one-shot actions fire on the press, held actions are r
   if (isBind('chat', code)) { openChat(); if (chatting) return; }
   if (isBind('shoot', code)) shoot();
   if (isBind('reload', code)) reload();
-  if (isBind('next', code)) cycle(1);
-  if (isBind('prev', code)) cycle(-1);
-  for (let s = 0; s < CATS.length; s++) if (isBind('slot' + (s + 1), code)) selectSlot(s);
+  if (isBind('aim', code) && opts.toggleAim) aimOn = !aimOn;
+  const sw = opts.wheel || !code.startsWith('Wheel'); // scroll can be turned off for switching guns
+  const before = cur;
+  if (sw && isBind('next', code)) cycle(1);
+  if (sw && isBind('prev', code)) cycle(-1);
+  for (let s = 0; s < CATS.length; s++) if (sw && isBind('slot' + (s + 1), code)) selectSlot(s);
+  if (cur !== before) aimOn = false; // a new gun comes out un-aimed
 }
 addEventListener('keydown', e => {
   if (rebinding) {
@@ -126,7 +197,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys[e.code] = false);
 addEventListener('mousedown', e => {
   const code = 'Mouse' + e.button;
-  if (rebinding) { if (!e.target.closest('#bindReset,#bindX,#setTabs,.sliders')) { e.preventDefault(); assign(code); } return; }
+  if (rebinding) { if (!e.target.closest('#bindReset,#bindX,#setTabs,.sliders,.seg,.tick')) { e.preventDefault(); assign(code); } return; }
   if (chatting) { e.preventDefault(); return; } // clicking while typing doesn't shoot or steal focus from the chat box
   keys[code] = true; press(code);
 });
@@ -150,8 +221,10 @@ addEventListener('mousemove', e => {
   if (m > 250 && m > lastMove * 8 + 60) { lastMove = m; return; } // only ever skips one event in a row
   lastMove = m;
   const s = .0022 * sens.mouse * camera.fov / 75; // slower aim when zoomed
-  P.yaw -= dx * s;
-  P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch - dy * s));
+  const gap = e.timeStamp - aaLastT; aaLastT = e.timeStamp; // time since the last movement, for how fast you're turning
+  const [ay, ap] = aaLook(-dx * s, -dy * s, gap > 0 && gap < 100 ? gap / 1000 : 1 / 60);
+  P.yaw += ay;
+  P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ap));
 });
 let wheelT = 0;
 addEventListener('wheel', e => {
@@ -171,11 +244,12 @@ document.addEventListener('pointerlockchange', () => {
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
   if (locked) closeArmory();
   if (!locked) {
-    // the menu doesn't pause: the match keeps running behind it
+    // zombie waves pauses behind the menu; bot matches keep running (see the loop in main.js)
     for (const k in keys) keys[k] = false;
+    aimOn = false;
     // zombie waves death: the title says so, and clicking the background starts a new run
-    $('menuTitle').textContent = dead ? 'YOU DIED' : 'MENU';
-    $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : '';
+    $('menuTitle').textContent = dead ? 'YOU DIED' : pvp() ? 'MENU' : 'PAUSED';
+    $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : pvp() ? '' : 'Click to resume';
     $('armBtn').style.display = pvp() ? '' : 'none'; // zombie waves has its own shop between waves
     renderHelp();
   }
@@ -359,6 +433,6 @@ function restart() {
   wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = '';
   WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); cancelReload(); soundsOff(); newBest = false;
   emptyPads();
-  cur = gi('voxel'); resetSlots(); buildGun(); renderHotbar();
+  cur = gi('voxel'); aimOn = false; resetSlots(); buildGun(); renderHotbar();
   setupMode();
 }

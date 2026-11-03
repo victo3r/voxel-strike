@@ -74,8 +74,12 @@ function slideOut(pos, nx, nz, r, h) {
 }
 // deep water (MAP.water): nobody can swim, so whoever ends up in it drowns. Only your middle counts, so you can stand right at the edge
 const inWater = (x, z, feet) => !!MAP.water?.(x, z, feet);
-// walkTo for bots and zombies: they won't step into water themselves, or jump over it (they check where they'd land)
-const overWater = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, 0, feet));
+// any of the sea, shallow parts too (MAP.sea, or the same as MAP.water on maps without shallows). You and bots can wade
+// in the shallows, but zombies drown in them, and spawns, bots and zombies keep out of them
+const inSea = (x, z, feet) => !!(MAP.sea ?? MAP.water)?.(x, z, feet);
+// walkTo for bots and zombies: they won't step into the sea themselves, or jump over it (they check where they'd land)
+const overWater = (x, z, feet) => MAP.water && inSea(x, z, groundAt(x, z, 0, feet));
+const overDeep = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, 0, feet));
 // water you can go into without drowning (MAP.wet: the resort's pool). Spawns stay out of it
 const poolAt = (x, z) => !!MAP.wet?.(x, z, groundAt(x, z, 0, 0));
 // splash going into it, for you and for a bot or zombie (o.wet remembers whether it was already in).
@@ -91,7 +95,8 @@ const dropsIn = (x, z, r, feet) => MAP.trapped({ x, y: groundAt(x, z, r, feet), 
 function walkDry(pos, nx, nz, r, grounded, into) {
   const ox = pos.x, oy = pos.y, oz = pos.z, lag = pos.lag, wasIn = !into && MAP.trapped?.(pos);
   if (!walkTo(pos, nx, nz, r, grounded)) return false;
-  const sea = overWater(pos.x, pos.z, pos.y) && !overWater(ox, oz, oy);
+  // knocked into the shallows, it can walk about in them (and hop back out), but never on into the deep part
+  const sea = overWater(pos.x, pos.z, pos.y) && !overWater(ox, oz, oy) || overDeep(pos.x, pos.z, pos.y) && !overDeep(ox, oz, oy);
   if (!sea && (into || !MAP.trapped || wasIn || !dropsIn(pos.x, pos.z, r, pos.y))) return true;
   pos.x = ox; pos.y = oy; pos.z = oz; pos.lag = lag; return false;
 }

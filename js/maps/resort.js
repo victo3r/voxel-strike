@@ -938,10 +938,11 @@ addSky(rnd, [12, 17, -32], 16, 50, 160, 40, 58);
 
 // the ground under your middle: the sea and the pool go down to their floor, so you drop in when you step off the edge
 M.floor = (x, z) => inPool(x, z) ? POOL_F : kindAt(x, z) === SEA ? seaFloor(ci(x), ci(z)) : 0;
-// the sea drowns you once you're half a block below the water. The pool doesn't
-M.water = (x, z, feet) => !inPool(x, z) && kindAt(x, z) === SEA && feet < WATER_Y - .5;
-// below the pool's surface: for the splash going in, and the blue tint when your eyes are under
-M.wet = (x, z, y) => inPool(x, z) && y < POOL_Y;
+// only the deepest step of the sea (out past the 1- and 2-block shallows) drowns you, once you're half a block under. The pool doesn't
+M.sea = (x, z, feet) => !inPool(x, z) && kindAt(x, z) === SEA && feet < WATER_Y - .5;
+M.water = (x, z, feet) => M.sea(x, z, feet) && seaFloor(ci(x), ci(z)) <= -SEA_D;
+// below the pool's or the shallows' surface: for the splash going in, and the blue tint when your eyes are under
+M.wet = (x, z, y) => inPool(x, z) ? y < POOL_Y : kindAt(x, z) === SEA && y < WATER_Y && !M.water(x, z, y);
 M.trapped = POOL_LOW; // in the pool: bots use the steps to get out even while they can see their target
 // a building's stairs, door or steps out of the pool on the way to a target. Whichever building the walker is in comes first
 const lhNav = M.nav;

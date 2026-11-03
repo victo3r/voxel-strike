@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=89">
+<link id="css" rel="stylesheet" href="css/style.css?v=90">
 </head>
 <body class="boot">
 <div id="hud">
@@ -69,6 +69,12 @@
             <span>Mouse sensitivity</span><input id="sens_mouse" type="range" min="0.1" max="3" step="0.05"><b id="sensV_mouse"></b>
             <span>Arrow-key look speed</span><input id="sens_keys" type="range" min="0.1" max="3" step="0.05"><b id="sensV_keys"></b>
           </div>
+          <h2>AIM ASSIST</h2>
+          <div id="aaQ" class="seg"><button data-v="0">OFF</button><button data-v="1">LOW</button><button data-v="2">MEDIUM</button></div>
+          <small id="aaDesc"></small>
+          <h2>OPTIONS</h2>
+          <label class="tick"><input id="optToggleAim" type="checkbox"> Toggle aim (press once to aim, again to stop)</label>
+          <label class="tick"><input id="optWheel" type="checkbox"> Scroll wheel switches guns</label>
           <h2>KEYS</h2>
           <small>Click a box, then press a key, mouse button or scroll. Backspace clears it, Esc cancels.</small>
           <div id="bindList"></div>
@@ -130,7 +136,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 89;
+const V = 90;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js'];
 for (const src of FILES) {
