@@ -186,6 +186,7 @@ const SHOP = [
   { gun: 'ar', price: 90, desc: 'full auto, 30 mag' },
   { gun: 'eradicator', price: 280, desc: '120 round bullet hose' },
   { gun: 'sniper', price: 140, desc: `${BASE[gi('sniper')].dmg} dmg, aim to scope` },
+  { gun: 'semisniper', price: 200, desc: `${BASE[gi('semisniper')].dmg} dmg, 10 shot semi-auto` },
   { gun: 'flame', price: 200, desc: 'burns everything in front of you' },
   { gun: 'flare', price: 120, desc: 'one fiery shot that sets them on fire' },
   { gun: 'rocket', price: 450, desc: 'big splash damage, shoot the ground to rocket jump' },

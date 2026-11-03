@@ -44,6 +44,7 @@ const DESC = {
   ar: 'A reliable rifle that handles every range well. A solid pick for any fight.',
   thrasher: 'A hard-hitting rifle that tears through fights, with a holo sight on the top rail for picking people off at range.',
   sniper: 'A bolt-action rifle that hits hard from across the map. Aim to look through the scope.',
+  semisniper: 'A semi-auto sniper with a 10-round mag. Each shot hits a little softer than the bolt-action, but you can fire again almost right away.',
   eradicator: 'A minigun that shreds anything in front of it. Reloading the belt takes a long time, so make it count.',
   knife: 'Always with you and never runs out. It\'s the quickest way to get around the map.',
   flame: 'Sprays a short cone of fire that hits everything in front of you and sets it burning. Its fuel tank refills when you reload.',

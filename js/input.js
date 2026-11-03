@@ -53,7 +53,7 @@ renderOpts();
 // zone = degrees from the edge of their body, slow = how much slower your aim gets right on them, pull = the most pull as a
 // share of how far you moved, follow = how much of the enemy's own sideways movement your aim keeps up with while you're
 // moving your aim (only then). Full help under SLOW_V radians a second of turning, none past FAST_V
-const AA = [null, { zone: 4.5, slow: .35, pull: .45, follow: .35 }, { zone: 6.5, slow: .5, pull: .75, follow: .6 }];
+const AA = [null, { zone: 4.5, slow: .35, pull: .45, follow: .35 }, { zone: 5.5, slow: .42, pull: .6, follow: .45 }];
 const AA_SLOW_V = 2, AA_FAST_V = 5.5, AA_RANGE = 80, AA_ACTIVE_MS = 150;
 let aaT = null, aaLastT = 0, aaMoveAt = -1e9, aaFade = 0, aaPrev = null;
 const aaV = new THREE.Vector3(), aaRay = new THREE.Raycaster();

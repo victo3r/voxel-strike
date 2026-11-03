@@ -250,6 +250,13 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 300, f2: 60, d: .15, v: .3, lp: 800 });
     s.boltUp(.55); s.boltDown(.72);
   }],
+  semisniper: [.55, .9, s => { // a tighter, punchier crack than the bolt-action and a shorter boom, then the action snaps back on its own
+    s.hiss({ ft: 'highpass', f: 3400, d: .025, v: 1 });
+    s.hiss({ f: 3600, f2: 220, d: .32, v: .75 });
+    s.tone({ f: 130, f2: 40, d: .26, v: .9 });
+    s.tone({ type: 'square', f: 360, f2: 90, d: .09, v: .28, lp: 1100 });
+    s.clack({ t: .07, f: 2300, d: .012, v: .5, body: .3 }); s.clack({ t: .1, f: 3000, d: .01, v: .35 });
+  }],
   eradicator: [.12, .32, s => { // tiny "tk" with a thump; the motor whir is a separate live sound
     s.hiss({ ft: 'bandpass', f: 1500, f2: 700, d: .045, v: .9 });
     s.tone({ f: 150, f2: 70, d: .05, v: .8 });
@@ -312,6 +319,17 @@ const SOUNDS = {
     s.hiss({ ft: 'bandpass', f: 1300, f2: 450, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
     s.clack({ t: .11, f: 1300, d: .012, v: .3, body: .3 });
   }],
+  zin_semisniper: [.32, .4, s => { // stock into the shoulder, then two quick notches on the zoom ring
+    s.hiss({ ft: 'bandpass', f: 550, f2: 1500, q: 1.5, a: .025, d: .06, v: .55, sweep: .08 });
+    s.thud({ t: .06, d: .025, f: 150, v: .8 });
+    s.clack({ t: .07, f: 1700, d: .012, v: .45, body: .4 });
+    for (let k = 0; k < 2; k++) s.clack({ t: .14 + k * .04, f: 3400 + k * 300, d: .005, v: .28 });
+  }],
+  zout_semisniper: [.25, .34, s => {
+    s.clack({ f: 3500, d: .005, v: .26 });
+    s.hiss({ ft: 'bandpass', f: 1400, f2: 500, q: 1.5, a: .02, d: .07, v: .45, sweep: .09 });
+    s.clack({ t: .09, f: 1400, d: .012, v: .28, body: .3 });
+  }],
   zin_thrasher: [.3, .4, s => { // rifle snaps up and the holo sight blinks on with a short rising chirp
     s.hiss({ ft: 'bandpass', f: 600, f2: 1800, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 });
     s.clack({ t: .05, f: 1800, d: .012, v: .55, body: .4 });
@@ -344,6 +362,7 @@ const SOUNDS = {
   r_ar: [1.4, .45, s => { s.magOut(.15); s.magIn(.7); s.rack(1.05); }],
   r_thrasher: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.clack({ t: .82, f: 1800, d: .015, v: .5, body: .3 }); s.rack(1.12); }],
   r_sniper: [2, .45, s => { s.boltUp(.15); s.magOut(.45); s.magIn(1.1); s.boltDown(1.6); }],
+  r_semisniper: [1.8, .45, s => { s.magOut(.2); s.magIn(.9); s.clack({ t: 1.0, f: 1600, d: .015, v: .5, body: .3 }); s.rack(1.4); }],
   r_eradicator: [2.6, .45, s => { s.latch(.2); s.rattle(.9); s.rattle(1.4); s.latch(2.0); s.tone({ type: 'sawtooth', f: 60, f2: 180, t: 2.15, a: .2, d: .2, v: .15, lp: 900 }); }],
   r_flame: [2.2, .45, s => { s.latch(.15); s.hiss({ ft: 'highpass', f: 3000, t: .45, a: .05, d: .35, v: .5 }); s.thunk(1.2); s.latch(1.75); s.clack({ t: 1.95, f: 4000, d: .008, v: .5 }); s.hiss({ t: 1.98, f: 400, f2: 1200, d: .15, v: .5 }); }],
   r_rocket: [2.6, .45, s => { s.latch(.3); s.hiss({ ft: 'bandpass', f: 600, f2: 300, q: 2, t: 1.0, a: .1, d: .25, v: .5 }); s.thunk(1.35); s.latch(2.1); }],

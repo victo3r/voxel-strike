@@ -73,12 +73,12 @@ const BOT_PICKS = {
   backup: ['voxel', 'voxel', 'hitman'],
   melee: ['knife'],
   special: ['flame', 'heatray'],
-  sniper: ['sniper'],
+  sniper: ['sniper', 'sniper', 'semisniper'],
   premium: ['flare', 'flare', 'rocket'],
 };
 // the distance a bot tries to keep from its target with each gun [closest, furthest]
 const BOT_KEEP = {
-  voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32],
+  voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
 };
 // how good each gun is at a distance (higher = better). A bot holds whichever of its guns scores best,
@@ -94,6 +94,7 @@ const GUN_FIT = {
   thrasher: d => d < 3 ? .6 : d < 24 ? .92 : .65,
   eradicator: d => d < 16 ? .95 : .5,
   sniper: d => d > 20 ? 1.1 : d > 14 ? .6 : d > 8 ? .25 : .1,
+  semisniper: d => d > 18 ? 1.05 : d > 12 ? .7 : d > 7 ? .35 : .15,
   rocket: d => d < 5 ? 0 : d < 22 ? .72 : .4,
   flare: d => d < 3 ? .1 : d < 20 ? .6 : .35,
 };

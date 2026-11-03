@@ -57,6 +57,7 @@ const CROSSES = {
   flame: () => [...xDot(), ...xArcs(18, DIAG, 40)],
   heatray: () => [...xDot(), ...xLines(3, 3), ...xArcs(10, DIAG, 44)], // a small ring with a tight cross inside for the beam
   sniper: () => [...xDot(), ...xLines(10, 5, 2, 'lrd')], // a dot with posts left, right and below
+  semisniper: () => [...xDot(), ...xLines(8, 5, 2, 'lrd')],
   flare: () => [...xDot(), ...xCorners(8, 4)], // explosives: square corners, bigger for a bigger blast
   rocket: () => [...xDot(), ...xCorners(13, 5)],
 };

@@ -26,8 +26,9 @@ const BASE = [
   { id: 'flame', hold: 'rifle', name: 'Flamethrower', cat: 'special', start: true, mob: 60, flame: true, dmg: 5, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, model: 'flame' },
   { id: 'rocket', hold: 'shoulder', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, mob: 55, rocket: true, dmg: 150, rate: 1.1, mag: 1, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, model: 'rocket' },
   // flare gun: burn = damage per quarter second, burnT = seconds
-  { id: 'flare', hold: 'pistol', name: 'Flare Gun', cat: 'premium', start: true, mob: 65, flare: true, dmg: 40, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, model: 'flare' },
+  { id: 'flare', hold: 'pistol', name: 'Flare Gun', cat: 'premium', start: true, mob: 65, flare: true, dmg: 65, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, model: 'flare' },
   { id: 'thrasher', hold: 'rifle', name: 'Thrasher', cat: 'primary', unlock: 2, price: 50, mob: 60, zoom: 3, dmg: 12, rate: .08, mag: 35, reload: 1.5, pellets: 1, spread: .006, auto: true, color: 0x3c3c44, len: .6 },
+  { id: 'semisniper', hold: 'rifle', name: 'Semi Auto Sniper Rifle', cat: 'sniper', unlock: 4, price: 100, mob: 55, zoom: 4, dmg: 60, rate: 1 / 1.8, mag: 10, reload: 1.8, pellets: 1, spread: 0, auto: false, color: 0x3e3f44, len: .9, scope: true },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
@@ -306,6 +307,23 @@ const GUN_MODELS = {
     p(4, 4, 4, dk, 0, -5, -2); p(4, 3, 4, dk, 0, -8.5, -1); // pistol grip
     p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
     return { muzzle: [1, -38], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 10, 0, 0, -21], bands: [-3, -14], band: [8, 8, 0], holo: [7, -10] };
+  },
+  // a dark grey semi-auto sniper with tan furniture, a straight box mag, a scope with a green lens and a muzzle brake
+  semisniper({ p, mat, dark, glow }) {
+    const body = mat(0x3e3f44), tan = mat(0xb39a6b), dtan = mat(0x8a744c), vent = mat(0x1a1a1e);
+    p(4, 6, 10, tan, 0, -1, 5); p(4, 8, 1, dark, 0, -1, 10.5); p(4, 2, 6, dtan, 0, 3, 4); // stock, butt pad, cheek riser
+    p(6, 6, 16, body, 0, 0, -8); p(4, 1, 16, dark, 0, 3.5, -8); // receiver and top rail
+    p(3, 3, 3, mat(0x9a9a9a), 4.5, 1, -4); // charging handle on the right
+    p(4, 4, 16, mat(0x2a2a2e), 0, 6, -10); p(6, 6, 2, dark, 0, 6, -1); p(6, 6, 2, dark, 0, 6, -19); // scope tube and bells
+    p(4, 4, 1, glow(0x6bff9a), 0, 6, -19.5); // lens
+    p(2, 2, 2, dark, 0, 3, -5); p(2, 2, 2, dark, 0, 3, -15); // scope mounts
+    p(6, 6, 12, tan, 0, 0, -22); for (const z of [-19, -22, -25]) p(6, 2, 1, vent, 0, 0, z); // handguard and its vents
+    p(4, 4, 14, mat(GUN_STEEL), 0, 1, -35); // barrel
+    p(6, 6, 4, body, 0, 1, -44); p(6, 2, 1, vent, 0, 1, -43.5); // muzzle brake and its port
+    p(4, 8, 5, dark, 0, -7, -11); p(4, 1, 5, dtan, 0, -8.5, -11); // straight box mag with a tan band
+    p(4, 4, 4, dtan, 0, -5, -2); p(4, 3, 4, dtan, 0, -8.5, -1); // pistol grip
+    p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
+    return { muzzle: [1, -46], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 12, 0, 0, -22], bands: [-6, -15], band: [8, 8, 0] };
   },
   // a copper beam rifle. A big magnifying glass lies on top facing the sky to catch sunlight, and the barrel focuses that heat
   // into the beam: cooling fins down the barrel, a glowing tip, and a glowing heat cell under the body
