@@ -4,7 +4,6 @@
 const ICON_ART = {
   star: ['.....#.....', '....###....', '....###....', '###########', '.#########.', '..#######..', '...#####...', '..###.###..', '..##...##..', '.##.....##.'],
   lock: ['..#####..', '.##...##.', '.#.....#.', '.#.....#.', '#########', '#########', '####.####', '####.####', '####.####', '#########', '#########'],
-  dice: ['.##########.', '############', '##..####..##', '##..####..##', '############', '#####..#####', '#####..#####', '############', '##..####..##', '##..####..##', '############', '.##########.'],
   cloud: ['.....####.....', '....######....', '.##.#######...', '#############.', '##############', '##############', '.############.'],
   left: ['....#', '...##', '..###', '.####', '#####', '.####', '..###', '...##', '....#'],
   close: ['##....##', '###..###', '.######.', '..####..', '..####..', '.######.', '###..###', '##....##'],
@@ -14,6 +13,14 @@ const ICON_ART = {
   inf: ['.###.....###.', '##.##...##.##', '#...##.##...#', '#....###....#', '#...##.##...#', '##.##...##.##', '.###.....###.'],
   skull: ['.#######.', '#########', '#########', '##..#..##', '##..#..##', '####.####', '.#######.', '..#.#.#..', '..#####..'],
   head: ['.....#.....', '...#####...', '..#..#..#..', '.#...#...#.', '.#.......#.', '#####.#####', '.#.......#.', '.#...#...#.', '..#..#..#..', '...#####...', '.....#.....'],
+};
+// full-color icons (drawn as they are, not in the text color). Each letter is a color from the icon's palette
+const ICON_PIX = {
+  // a die seen from above and to the right: 5 on the front, 1 on top, 2 on the side, lit from above
+  dice: { pal: { o: '#141414', w: '#e9e9e9', l: '#ffffff', s: '#a9aeb7', p: '#1c1c1c', q: '#2e2f33' }, rows: [
+    '...oooooooooooo', '..ollllpplllloo', '.olllllllllloso', 'oooooooooooosso', 'owwwwwwwwwwosso', 'owppwwwwppwosso',
+    'owppwwwwppwosqo', 'owwwwwwwwwwosso', 'owwwwppwwwwosso', 'owwwwppwwwwosso', 'owwwwwwwwwwosqo', 'owppwwwwppwosso',
+    'owppwwwwppwoso.', 'owwwwwwwwwwoo..', 'oooooooooooo...'] },
 };
 // the hollow star (a star you don't own yet): just the edge of the filled one
 ICON_ART.starO = ICON_ART.star.map((row, y, a) => [...row].map((ch, x) => ch === '#' && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dy]) => a[y + dy]?.[x + dx] !== '#') ? '#' : '.').join(''));
@@ -28,9 +35,15 @@ ICON_ART.down = [...ICON_ART.up].reverse();
     rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === '#') g.fillRect(x * S, y * S, S, S); }));
     css.push(`.ic-${name}{--m:url(${c.toDataURL()});--ar:${w / rows.length}}`);
   }
+  for (const [name, { pal, rows }] of Object.entries(ICON_PIX)) {
+    const w = Math.max(...rows.map(r => r.length)), c = document.createElement('canvas'); c.width = w * S; c.height = rows.length * S;
+    const g = c.getContext('2d');
+    rows.forEach((row, y) => [...row].forEach((ch, x) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x * S, y * S, S, S); } }));
+    css.push(`.ic-${name}{--m:url(${c.toDataURL()});--ar:${w / rows.length}}`);
+  }
   const st = document.createElement('style'); st.textContent = css.join('\n'); document.head.append(st);
 }
-const ico = (name, cls = '') => `<span class="ic ic-${name}${cls ? ' ' + cls : ''}"><i></i></span>`;
+const ico = (name, cls = '') => `<span class="ic ic-${name}${ICON_PIX[name] ? ' px' : ''}${cls ? ' ' + cls : ''}"><i></i></span>`;
 // a row of max stars: the ones in use, then ones you own but aren't using (dimmed), then hollow ones you don't own
 const starRow = (used, owned = used, max = owned) => ico('star').repeat(used) + ico('star', 'dim').repeat(Math.max(0, owned - used)) + ico('starO').repeat(Math.max(0, max - owned));
 // buttons in index.html that are just an icon, or an icon and a word

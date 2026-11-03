@@ -135,6 +135,10 @@ function tagMat(name, css) { // name tag floating over its head, as wide as the 
 
 const YOU_T = { you: true }; // stands in for you whenever a bot is picking or tracking a target
 let recs = [], youRec = null, matchT = 0, killedBy = '', joins = [];
+const youHelpers = new Set(); // the bots that hurt you this life (assists)
+// killCam = while you're dead, the bot that killed you: the camera turns to watch it (dmDown)
+let killCam = null;
+const ASSIST_PTS = 15;
 function makeRecs() {
   youRec = { name: myName, you: true, team: 0, css: '#8ff0b6', score: 0, kills: 0, deaths: 0, streak: 0 };
   recs = [youRec]; joins = [];
@@ -182,8 +186,14 @@ function feed(html) {
   setTimeout(() => d.remove(), 5000);
 }
 // someone died. killer = a record, or null if nobody gets credit (your own rocket)
-function scoreKill(killer, victim, head) {
+// helpers = everyone who hurt the victim this life: each one that isn't the killer gets an assist (+15, points modes only)
+function scoreKill(killer, victim, head, helpers) {
   victim.deaths++; victim.streak = 0;
+  if (helpers && !MR.kills) for (const h of helpers) {
+    if (h === killer || h === victim || !recs.includes(h)) continue;
+    h.score += ASSIST_PTS; h.assists = (h.assists ?? 0) + 1;
+    if (h.you) toast('+' + ASSIST_PTS + ' ASSIST', '#e8e8e8');
+  }
   if (killer && killer !== victim) {
     killer.kills++; killer.streak++;
     const st = STREAKS[killer.streak];
@@ -277,6 +287,7 @@ function makeBot(rec) {
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, armor: arm ? arm.hp : 0, maxArmor: arm ? arm.hp : 0, dr: arm ? arm.dr : 0, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, fireEnd: 'flameEnd', leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
+  if (!friendly(rec, YOU_T)) addOutline(b); // enemies glow red (before the gun goes in its hands, so the gun isn't outlined)
   b.gun = pickGun(b, HUNT_D); b.ammo = mags[b.gun]; // spawns holding whatever it likes best for running into someone
   holdGun(b);
   b.parts.forEach(p => p.userData.zombie = b);
@@ -290,7 +301,7 @@ function botDown(b, by, head, nobody = false) {
   b.rec.wait = MR.bot + DIE_T; // its angel floats away first
   if (!nobody) sfx('die', { at: b.g.position, far: 40 });
   if (!b.drowned) angel(b); // one that drowned just sinks
-  scoreKill(nobody ? null : by ? by.rec : youRec, b.rec, head);
+  scoreKill(nobody ? null : by ? by.rec : youRec, b.rec, head, b.helpers);
 }
 // dying: the bot turns into a see-through angel (white glow, halo, wings, arms out) that floats up and fades away.
 // main.js moves it (angelTick) and takes it out after DIE_T
@@ -331,12 +342,14 @@ function angelGone(b) { b.angel.mats.forEach(m => m.dispose()); b.angel = null; 
 // you died in deathmatch (called from hurtPlayer). by = the bot that got you, or nothing if it was your own rocket
 function youDown(by) {
   respawnT = YOU_RESPAWN; killedBy = by ? by.rec.name : ''; P.burn = 0;
-  scoreKill(by ? by.rec : null, youRec, false);
+  scoreKill(by ? by.rec : null, youRec, false, youHelpers);
+  killCam = by && !friendly(by, YOU_T) ? { b: by, at: by.g.position.clone(), yaw: P.yaw, pitch: P.pitch } : null;
 }
 function respawnYou() {
   const [x, z] = spawnSpot(YOU_T);
   Object.assign(P, { drowned: false, burn: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
+  youHelpers.clear(); killCam = null;
   cancelReload(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
 
@@ -620,6 +633,17 @@ function dmDown(dt) {
   // you float up like the bots' angels do, looking down at where you were. Drowned: you sink instead (drownTick)
   const t = YOU_RESPAWN - respawnT, f = Math.min(1, t / 1.2);
   if (P.drowned) { camera.position.set(P.pos.x, P.pos.y + .35, P.pos.z); camera.rotation.set(P.pitch, P.yaw, .4); }
+  else if (killCam) {
+    // killed by a bot: rise up a little and turn to watch it. If it dies or respawns, keep looking where it was last
+    const k = killCam, b = k.b;
+    if (!b.dead && b.rec.b === b) k.at.copy(b.g.position);
+    camera.position.set(P.pos.x, P.pos.y + 1.6 + f * f * .3 + Math.min(t, 1) * .6, P.pos.z);
+    const dx = k.at.x - camera.position.x, dz = k.at.z - camera.position.z, dy = k.at.y + 1.4 - camera.position.y;
+    const wantYaw = Math.atan2(-dx, -dz), wantPitch = Math.max(-1.2, Math.min(1.2, Math.atan2(dy, Math.hypot(dx, dz))));
+    const e = 1 - Math.exp(-dt * 6);
+    k.yaw += Math.atan2(Math.sin(wantYaw - k.yaw), Math.cos(wantYaw - k.yaw)) * e; k.pitch += (wantPitch - k.pitch) * e;
+    camera.rotation.set(k.pitch, k.yaw, 0);
+  }
   else { camera.position.set(P.pos.x, P.pos.y + 1.6 + f * f * .5 + Math.min(t, 1.5) * 1.2, P.pos.z); camera.rotation.set(P.pitch + (-.9 - P.pitch) * f, P.yaw, 0); }
   const b = $('banner'); b.textContent = `${killedBy ? 'KILLED BY ' + killedBy : 'YOU DIED'}\n${Math.ceil(respawnT)}`; b.style.opacity = 1;
   return true;
@@ -669,7 +693,7 @@ function giveGun(g) {
 }
 // called at the end of restart(): sets up whichever mode you picked in the lobby
 function setupMode() {
-  matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = '';
+  matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = ''; youHelpers.clear(); killCam = null;
   MR = RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join;
   BOT_COUNT = MR.players[MAP.size] - 1;
   $('post').style.display = 'none'; $('board').style.display = 'none'; $('banner').style.opacity = 0; // clears "KILLED BY" if you left while dead

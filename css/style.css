@@ -135,6 +135,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 .ic{display:inline-block;height:.9em;width:calc(.9em * var(--ar,1));vertical-align:-.08em;filter:drop-shadow(.11em .11em 0 rgba(0,0,0,.75));font-style:normal}
 .ic>i{display:block;width:100%;height:100%;background:currentColor;-webkit-mask:var(--m) center/100% 100% no-repeat;mask:var(--m) center/100% 100% no-repeat;image-rendering:pixelated}
 .st .ic+.ic{margin-left:.08em}
+.ic.px>i{background:var(--m) center/100% 100% no-repeat;-webkit-mask:none;mask:none}
 .ic.dim{opacity:.35}
 button .ic{pointer-events:none}
 .kf .ic-head{color:#ffd23f}.kf .ic-skull{color:#e8e8e8}
@@ -215,7 +216,8 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #nameRow{display:flex;gap:6px;width:250px}
 #nameIn{flex:1;min-width:0;font:bold 16px monospace;padding:6px 9px;background:var(--glass);color:#fff;border:3px solid var(--line-dim);outline:none;text-shadow:2px 2px 0 #000}
 #nameIn:focus{border-color:var(--line)}
-#nameDice{font-size:16px;padding:0 10px}
+#nameDice{font-size:16px;padding:0;width:38px;height:38px;flex:none}
+#nameIn{height:38px;box-sizing:border-box}
 #prof{display:flex;align-items:center;gap:16px}
 .lv{display:grid;grid-template-columns:auto 130px;column-gap:9px;align-items:center}
 .lv b{grid-row:span 2;font-size:20px}
@@ -319,7 +321,8 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #cloudBtn{font:bold 15px monospace;width:40px;height:32px;padding:0;line-height:0;display:flex;align-items:center;justify-content:center}
 #cloudBtn .ic{vertical-align:0;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.7))}
 #nameDice,#custRand{display:flex;align-items:center;justify-content:center;line-height:0}
-#nameDice .ic,#custRand .ic{height:1.1em;vertical-align:0}
+#nameDice .ic,#custRand .ic{height:22px;width:22px;vertical-align:0;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.6))}
+#custRand{align-self:stretch;aspect-ratio:1;padding:0!important;flex:none}
 #cloudBtn.guest{color:var(--muted);border-style:dashed;border-color:var(--line-dim)}
 #cloudBtn.saved{color:var(--acc-lt)}
 #cloudBtn.saving{color:#fff;animation:cloudpulse 1s ease-in-out infinite}

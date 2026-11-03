@@ -328,3 +328,39 @@ function randomLook(seedStr, topC) {
     bigEyes: r() < (girl ? .4 : .2),
   };
 }
+
+// ---- enemy outlines: a red glow round every enemy (bots that aren't on your team, and zombies).
+// Each mesh gets a copy of itself drawn inside-out in flat red, a little bigger, so only a rim shows around the edges.
+// outlineTick resizes the rims every frame so they stay about 2 screen pixels wide at any distance
+const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0xff2424, side: THREE.BackSide, fog: false, toneMapped: false });
+const _ows = new THREE.Vector3(), _ocam = new THREE.Vector3();
+const noRay = () => {};
+// call before anything you don't want outlined (the gun) is added to g
+function addOutline(z) {
+  z.g.updateMatrixWorld(true);
+  const ms = []; z.g.traverse(o => { if (o.isMesh) ms.push(o); });
+  z.hulls = ms.map(m => {
+    const geo = m.geometry; geo.boundingBox ?? geo.computeBoundingBox();
+    const bb = geo.boundingBox, h = new THREE.Mesh(geo, OUTLINE_MAT);
+    h.raycast = noRay; h.userData.hull = true;
+    m.getWorldScale(_ows);
+    h.userData.o = { s: bb.getSize(new THREE.Vector3()), c: bb.getCenter(new THREE.Vector3()), ws: (_ows.x + _ows.y + _ows.z) / 3 };
+    m.add(h); return h;
+  });
+}
+function outlineTick(cam) {
+  cam.getWorldPosition(_ocam);
+  const pulse = .5 + .5 * Math.sin(performance.now() * .004);
+  OUTLINE_MAT.color.setRGB(1, .02 + pulse * .05, .02 + pulse * .05);
+  for (const z of zombies) {
+    if (!z.hulls) continue;
+    const on = !z.dead;
+    const w = Math.max(.025, z.g.position.distanceTo(_ocam) * .0042); // ~2-3px wide (75° view, 720px tall)
+    for (const h of z.hulls) {
+      h.visible = on; if (!on) continue;
+      const { s, c, ws } = h.userData.o, t = w / ws;
+      const sx = s.x ? 1 + 2 * t / s.x : 1, sy = s.y ? 1 + 2 * t / s.y : 1, sz = s.z ? 1 + 2 * t / s.z : 1;
+      h.scale.set(sx, sy, sz); h.position.set(c.x * (1 - sx), c.y * (1 - sy), c.z * (1 - sz));
+    }
+  }
+}

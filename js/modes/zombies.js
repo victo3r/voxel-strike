@@ -48,6 +48,7 @@ function makeZombie(x, z, type) {
     r: .3 * T.scale, reach: Math.max(1.1, 1.1 * T.scale), t: Math.random() * 6, atk: 0, flash: 0, dead: 0,
     fuse: 0, beepT: 0, chargeT: 2 + Math.random() * 2, charging: 0, wind: 0, stun: 0, glow: 0, cdx: 0, cdz: 0, hitP: false };
   zz.parts.forEach(p => p.userData.zombie = zz);
+  addOutline(zz);
   zombies.push(zz);
 }
 function spawnZombie(type = pickType()) {
@@ -76,6 +77,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
     const who = by ?? YOU_T;
     if (zz.hitBy !== who || zz.hitByT <= 0) zz.hitDmg = 0;
     zz.hitBy = who; zz.hitByT = 2; zz.hitDmg += dmg;
+    (zz.helpers ??= new Set()).add(by ? by.rec : youRec); // everyone who hurt it this life, for assists (a new bot body each life)
   }
   const big = zz.type === 'brute' || zz.type === 'boss';
   if (quiet) burst(point, 0xff7a1a, 2);
@@ -101,6 +103,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
 function hurtPlayer(d, pierce = false, by = null, head = false) {
   if (respawnT > 0 || matchOver || by && friendly(by, YOU_T)) return; // by = null is your own rocket, that still hurts
   if (by?.rec) d *= 1 + by.rec.fx.dmg; // a bot in damage boots
+  if (by?.rec) youHelpers.add(by.rec); // for assists, cleared when you respawn
   d *= 1 - P.dr - youFx().dr; // worn armor from Amethyst up and Warrior Boots cut every hit, added together (health can go fractional, the HUD rounds it up)
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;

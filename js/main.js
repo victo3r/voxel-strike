@@ -359,6 +359,7 @@ function fpsTick(raw) {
   // bots and zombies are drawn a little low for a moment after stepping up a ledge, so they climb it smoothly
   const lagged = zombies.filter(z => z.g.position.lag), realY = lagged.map(z => z.g.position.y);
   for (const z of lagged) z.g.position.y -= z.g.position.lag;
+  outlineTick(camera);
   renderer.render(scene, camera);
   lagged.forEach((z, k) => z.g.position.y = realY[k]);
 })();

@@ -366,6 +366,11 @@ function updateLobby(dt) {
   }
   holdG.visible = e > .01; holdG.scale.setScalar(Math.min(1, e * 2.5));
   torso.scale.z = 1 + Math.sin(t * 1.6) * .02;
+  // legs: a slow weight shift from side to side, a little sway forward and back, and every 7 seconds a small step in place,
+  // left and right foot in turn. The spread (LEG_SPREAD) stays underneath it all
+  const shift = Math.sin(t * .8) * .035, rock = Math.sin(t * .6) * .03, sp = (t + 3) % 7, lift = sp < .7 ? Math.sin(sp / .7 * Math.PI) * .3 : 0, left = ((t + 3) / 7 | 0) % 2;
+  heroCh.legR.rotation.set(rock - (left ? 0 : lift), 0, -LEG_SPREAD + shift);
+  heroCh.legL.rotation.set(-rock - (left ? lift : 0), 0, LEG_SPREAD + shift);
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   // fade the head back to center as the cursor moves behind the body, so it never flips across at ±180°
   const away = Math.abs(rel), look = away < 1.2 ? 1 : Math.max(0, 1 - (away - 1.2) / 1.4);
