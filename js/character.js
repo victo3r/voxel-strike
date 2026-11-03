@@ -302,8 +302,9 @@ function buildChar(look, U = 1 / 16, own = false) {
   const parts = [head, neck, body, armRM, armLM, legRM, legLM];
   // ch.armor = the armor it's wearing (js/armor.js dressArmor): the chestplate rides on the body, each shoulder pad on its arm
   // ch.boots = the boots (js/boots.js dressBoots), one on each leg
-  const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null, boots: null };
-  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); };
+  // ch.hat = the hat (js/hats.js dressHat), on the head
+  const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null, boots: null, hat: null };
+  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); ch.hat?.mat.dispose(); };
   return ch;
 }
 
@@ -340,12 +341,16 @@ function addOutline(z) {
   z.glowMs = []; z.g.traverse(o => { if (o.isMesh) { o.layers.enable(GLOW_LAYER); z.glowMs.push(o); } });
   z.glowOn = true;
 }
-// turns the glow off on dead enemies (their angel shouldn't glow). Returns how many enemies glow
-function outlineTick() {
+// turns the glow off on dead enemies (their angel shouldn't glow), and on enemies in a Raider Hood when they're further from you
+// than its stealth range (half a block either side of it, so it doesn't flicker when they stand right on the line).
+// Returns how many enemies glow
+function outlineTick(cam) {
   let n = 0;
   for (const z of zombies) {
     if (!z.glowMs) continue;
-    const on = !z.dead;
+    let on = !z.dead;
+    const far = z.rec?.fx.stealth;
+    if (on && far) { const d = cam.position.distanceTo(z.g.position); on = z.glowOn ? d <= far + .5 : d < far - .5; }
     if (on !== z.glowOn) { z.glowOn = on; for (const m of z.glowMs) on ? m.layers.enable(GLOW_LAYER) : m.layers.disable(GLOW_LAYER); }
     if (on) n++;
   }
@@ -384,7 +389,7 @@ const _gsz = new THREE.Vector2(), _gcc = new THREE.Color();
 function glowPass(src, dst, mat) { glowQuad.material = mat; renderer.setRenderTarget(dst); renderer.render(glowScene, glowCam); }
 // draw the glow over what's already on screen. Call right after rendering the scene
 function outlineRender(cam) {
-  if (!outlineTick()) return;
+  if (!outlineTick(cam)) return;
   renderer.getDrawingBufferSize(_gsz);
   const k = gfx.q === 'low' ? .35 : .5, w = Math.max(1, Math.round(_gsz.x * k)), h = Math.max(1, Math.round(_gsz.y * k));
   if (glowRT[0].width !== w || glowRT[0].height !== h) glowRT.forEach(t => t.setSize(w, h));

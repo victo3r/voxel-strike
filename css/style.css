@@ -167,7 +167,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #armDet .at span{font:bold 11px monospace;padding:3px 8px;border:2px solid var(--acc);color:var(--acc-lt);background:rgba(47,191,113,.15)}
 #armList .card img{width:96px;height:48px;image-rendering:pixelated}
 #armList .cn{font-size:17px;font-weight:bold;text-align:center}
-#armList .st{color:var(--acc-lt);font-size:13px}
+#armList .st{color:var(--acc-lt);font-size:13px}#armList .cn .st{display:block;margin-top:2px}
 #armList small{color:var(--silver);font-size:12px}
 #armory button{font-family:monospace}
 #armX{margin-left:auto;font:bold 15px monospace;padding:7px 10px}

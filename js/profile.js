@@ -7,10 +7,10 @@ const lvBonus = lv => 5 * (lv - 1); // coins for reaching level lv: 5 at level 2
 // loadout: category -> weapon id, the one gun per category you take into a match (missing = that category's starter)
 // use: weapon id -> the stars you take into a match when that's fewer than you own (missing = all of them)
 // armor: stars on your armor, 0 = none (js/armor.js ARMOR_TIERS). armorUse: the star you wear when it's lower than that (0 = your best)
-// boots: boot id -> stars you own (js/boots.js). bootUse: boot id -> the stars you wear when fewer. bootOn: the pair you wear ('' = none)
+// boots: boot id -> stars you own (js/boots.js). bootUse: boot id -> the stars you wear when fewer. bootOn: the pair you wear ('' = none). hats, hatUse, hatOn: the same for hats (js/hats.js)
 // v = save format version, so later changes can upgrade old saves instead of wiping them
-let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, boots: {}, bootUse: {}, bootOn: '' }; // xp = progress toward the next level
-try { const s = JSON.parse(localStorage.getItem('voxelstrike-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, boots: { ...s.boots }, bootUse: { ...s.bootUse } }; } catch {}
+let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '' }; // xp = progress toward the next level
+try { const s = JSON.parse(localStorage.getItem('voxelstrike-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, boots: { ...s.boots }, bootUse: { ...s.bootUse }, hats: { ...s.hats }, hatUse: { ...s.hatUse } }; } catch {}
 let onSave = () => {}; // js/cloud.js sets this to upload the change when you're signed in
 const saveProf = () => { try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {} onSave(); };
 

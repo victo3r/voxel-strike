@@ -25,8 +25,7 @@ function bootFx(b) {
   const L = b.st - 1;
   return { spd: B.spd?.[L] ?? 0, dmg: B.dmg?.[L] ?? 0, dr: B.dr?.[L] ?? 0, dj: !!B.dj };
 }
-// yours, read live, so changing boots mid-match takes effect straight away
-const youFx = () => bootFx(wornBoots());
+// youFx (what you're wearing, boots and hat together) is in js/hats.js
 const DJ_V = 8.5; // the second jump's upward speed (the first is 9)
 // a bot's boots for the match: none (BOOT_BARE of the time) or any pair you own, at any stars up to the ones you wear on it.
 // Never better than yours

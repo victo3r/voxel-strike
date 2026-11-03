@@ -187,8 +187,31 @@ function heroGun(i) {
   makeGun(i, g, Math.max(0, gunUse(i) - 1)); // gold bands for the stars you use, like in your hands
   g.scale.setScalar(GUN_S);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
-  pose = { pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, sh: holdOf(BASE[i]) === 'shoulder' };
+  const kind = holdOf(BASE[i]);
+  pose = { pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, sh: kind === 'shoulder', hv: kind === 'heavy' };
   holdG.add(g);
+  fid = { k: 'heft', t0: performance.now() / 1000 + .3 }; // a new gun: he feels its weight as it comes up
+}
+// fidgets: every few seconds he does one thing with the gun, taking turns: rolls it over to look at its side, lowers it for a moment,
+// gives it a quick shake, or bounces it in his hands to feel its weight. Big guns move less
+const FIDGETS = ['look', 'lower', 'shake', 'heft', 'look', 'shake', 'lower', 'heft'], FID_T = { look: 2, lower: 2.8, shake: 1, heft: .9 };
+let fid = null, fidN = 0, fidNext = 0;
+const SH_MID = new THREE.Vector3(0, SH_R[1] / 16, 0), X_AX = new THREE.Vector3(1, 0, 0), _wq = new THREE.Quaternion(), _fr = new THREE.Vector3();
+const smooth = x => x * x * (3 - 2 * x);
+// how far the fidget moves the gun at time t: low = turned down about his shoulders, roll = about its barrel, wy/wz = a wiggle about his fist
+function fidgetAt(t, sh, hv) {
+  const o = { low: 0, roll: 0, wy: 0, wz: 0 };
+  if (!fid && t >= fidNext) fid = { k: FIDGETS[fidN++ % FIDGETS.length], t0: t };
+  if (!fid) return o;
+  const p = (t - fid.t0) / FID_T[fid.k], big = sh || hv ? .55 : 1;
+  if (p >= 1) { fid = null; fidNext = t + 1.6 + (fidN % 3) * .6; return o; }
+  if (p <= 0) return o;
+  const env = Math.sin(p * Math.PI);
+  if (fid.k === 'look') o.roll = sh ? 0 : .4 * env * env;
+  else if (fid.k === 'lower') o.low = .65 * big * (p < .22 ? smooth(p / .22) : p > .72 ? smooth((1 - p) / .28) : 1); // down, a moment, back up
+  else if (fid.k === 'shake') { o.wy = .07 * big * env * Math.sin(p * Math.PI * 10); o.wz = .05 * big * env * Math.sin(p * Math.PI * 8 + 1); }
+  else o.low = .1 * big * Math.sin(p * Math.PI * 2) ** 2 * (1 - .4 * p); // heft: two little dips
+  return o;
 }
 // the hold eases between guns instead of snapping (these follow pose)
 const hPos = new THREE.Vector3(-.4, .6, .2), hQ = new THREE.Quaternion(), hFR = new THREE.Vector3(-.4, .8, .3), hFL = new THREE.Vector3(.4, .8, .3);
@@ -202,6 +225,7 @@ function dressHero() {
   heroCh = buildChar(prof.look, 1 / 16, true);
   dressArmor(heroCh, heroArmorN = wornArmor());
   dressBoots(heroCh, heroBootsB = wornBoots());
+  dressHat(heroCh, heroHatH = wornHat());
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
 }
@@ -212,6 +236,9 @@ function heroArmor(n) { if (heroCh && n !== heroArmorN) { dressArmor(heroCh, her
 let heroBootsB = null;
 const bootKey = b => b ? b.id + b.st : '';
 function heroBoots(b) { if (heroCh && bootKey(b) !== bootKey(heroBootsB)) dressBoots(heroCh, heroBootsB = b); }
+// the hat he's wearing, the same way
+let heroHatH = null;
+function heroHat(h) { if (heroCh && bootKey(h) !== bootKey(heroHatH)) dressHat(heroCh, heroHatH = h); }
 // puts on look i of lookChoices() (the armory's WEAR > SKINS cards)
 function wearLook(i) {
   const p = lookChoices()[i]; if (!p || i === lookIndex()) return;
@@ -351,17 +378,19 @@ function updateLobby(dt) {
     hPos.lerp(pose.pos, k); hQ.slerp(pose.q, k); hFR.lerp(pose.fR, k); hTurn += (pose.turn - hTurn) * k;
     if (pose.fL) hFL.lerp(pose.fL, k);
     hLK += ((pose.fL ? 1 : 0) - hLK) * k;
-    // he keeps moving it a little, pivoting on his right fist: a slow drift, and every 9 seconds he rolls it a little about
-    // its barrel to look at its side. A gun on his shoulder only drifts a little
-    const sh = !!pose.sh, a = sh ? .35 : 1, ph = t % 9, look = sh ? 0 : ph < 2 ? Math.sin(ph / 2 * Math.PI) ** 2 : 0;
+    // he keeps moving it a little, pivoting on his right fist (a slow drift), plus the fidgets above. A gun on his shoulder only drifts a little
+    const sh = !!pose.sh, a = sh ? .35 : 1, f = fidgetAt(t, sh, pose.hv);
     sway.setFromEuler(_e.set(a * (.025 * Math.sin(t * .9 + 1) + .01 * Math.sin(t * 2.3)),
-      a * (.04 * Math.sin(t * .7) + .015 * Math.sin(t * 1.9)), a * .03 * Math.sin(t * .5), 'YXZ'));
-    _lq.setFromAxisAngle(_ax.set(0, 0, -1).applyQuaternion(hQ), .4 * look);
+      a * (.04 * Math.sin(t * .7) + .015 * Math.sin(t * 1.9)) + f.wy, a * .03 * Math.sin(t * .5) + f.wz, 'YXZ'));
+    _lq.setFromAxisAngle(_ax.set(0, 0, -1).applyQuaternion(hQ), f.roll);
     const tq = _tq.copy(sway).multiply(_lq);
-    const gp = _p.copy(hPos).sub(hFR).applyQuaternion(tq).add(hFR);
-    _l.copy(hFL).sub(hFR).applyQuaternion(tq).add(hFR);
-    armL.quaternion.slerp(armTo(SHR, hFR, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * hLK); // armL is his right arm (heroCh.armR)
-    holdG.quaternion.copy(LOW_Q).slerp(_q.copy(tq).multiply(hQ), e);
+    // lowering turns the gun and both fists down about the line through his shoulders, so his arms keep their length
+    _wq.setFromAxisAngle(X_AX, f.low);
+    const down = v => v.sub(SH_MID).applyQuaternion(_wq).add(SH_MID);
+    const gp = down(_p.copy(hPos).sub(hFR).applyQuaternion(tq).add(hFR));
+    down(_l.copy(hFL).sub(hFR).applyQuaternion(tq).add(hFR)); down(_fr.copy(hFR));
+    armL.quaternion.slerp(armTo(SHR, _fr, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * hLK); // armL is his right arm (heroCh.armR)
+    holdG.quaternion.copy(LOW_Q).slerp(_q.copy(_wq).multiply(tq).multiply(hQ), e);
     holdG.position.copy(LOW_P).lerp(gp, e);
   }
   holdG.visible = e > .01; holdG.scale.setScalar(Math.min(1, e * 2.5));

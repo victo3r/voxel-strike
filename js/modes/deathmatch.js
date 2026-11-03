@@ -109,8 +109,10 @@ function botLoadout() {
   // W = its stats with those stars
   const stars = {}, W = {};
   for (const g of load) { const top = Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
-  const boots = botBoots(); // fx = what its boots do (js/boots.js), used for its speed, damage, damage cut and double jump
-  return { load, taste, stars, W, armor: botArmor(), boots, fx: bootFx(boots) };
+  // boots and a hat, rolled the same way. fx = what they do together (js/hats.js gearFx): speed, damage, damage cut, double jump,
+  // headshot block, half-damage hits and stealth
+  const boots = botBoots(), hat = botHat();
+  return { load, taste, stars, W, armor: botArmor(), boots, hat, fx: gearFx(boots, hat) };
 }
 
 const BOT_U = 1.85 / 33; // one skin pixel on a bot: 33 pixels tall (with the neck) = 1.85, same height as you
@@ -272,7 +274,7 @@ function makeBot(rec) {
   const [x, z] = spawnSpot(rec);
   const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(rec.armor);
   if (arm) dressArmor(ch, rec.armor, teamMode() ? TEAMS[rec.team].shirts[0] : null);
-  dressBoots(ch, rec.boots);
+  dressBoots(ch, rec.boots); dressHat(ch, rec.hat);
   g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
   // both arms forward holding the gun, swung up and down with the aim from the shoulders
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);

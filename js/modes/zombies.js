@@ -65,6 +65,7 @@ function spawnZombie(type = pickType()) {
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
   if (!Number.isFinite(dmg)) return; // a bad number here would leave it with NaN health, and then nothing could ever kill it
   if (zz.type === 'bot' && friendly(by, zz)) return; // team modes: no friendly fire
+  if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // its hat: a helmet can stop a headshot, a hood can halve the hit
   // boots that add damage (yours, or the bot's that hit it). Health isn't rounded, so even a few % on a small hit counts
   dmg *= 1 + (by ? by.rec?.fx.dmg ?? 0 : youFx().dmg);
   if (zz.type === 'bot') { // bots wear armor like yours: the cut first (armor and boots add up), then the armor bar soaks what's left
@@ -104,10 +105,11 @@ function hurtPlayer(d, pierce = false, by = null, head = false) {
   if (respawnT > 0 || matchOver || by && friendly(by, YOU_T)) return; // by = null is your own rocket, that still hurts
   if (by?.rec) d *= 1 + by.rec.fx.dmg; // a bot in damage boots
   if (by?.rec) youHelpers.add(by.rec); // for assists, cleared when you respawn
+  const wasHead = head; [d, head] = gearHit(youFx(), d, head); // your hat: Warrior Helmet can stop a headshot, Raider Hood can halve the hit
   d *= 1 - P.dr - youFx().dr; // worn armor from Amethyst up and Warrior Boots cut every hit, added together (health can go fractional, the HUD rounds it up)
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;
-  hurtSfx(P, soak === d ? 'armorHit' : head ? 'hurtHead' : 'hurt');
+  hurtSfx(P, soak === d || wasHead && !head ? 'armorHit' : head ? 'hurtHead' : 'hurt'); // a headshot your helmet stopped clanks
   if (P.hp <= 0) sfx('die');
   $('hit').style.background = soak === d ? '#c9ced6' : 'red'; // silver flash = armor took all of it
   $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
