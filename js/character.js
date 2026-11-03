@@ -329,38 +329,82 @@ function randomLook(seedStr, topC) {
   };
 }
 
-// ---- enemy outlines: a red glow round every enemy (bots that aren't on your team, and zombies).
-// Each mesh gets a copy of itself drawn inside-out in flat red, a little bigger, so only a rim shows around the edges.
-// outlineTick resizes the rims every frame so they stay about 2 screen pixels wide at any distance
-const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0xff2424, side: THREE.BackSide, fog: false, toneMapped: false });
-const _ows = new THREE.Vector3(), _ocam = new THREE.Vector3();
-const noRay = () => {};
-// call before anything you don't want outlined (the gun) is added to g
+// ---- enemy glow: a soft red haze just outside every enemy (bots that aren't on your team, and zombies).
+// Drawn on screen after the scene: the enemies' shape is drawn white into a small mask (with everything else drawn black first,
+// so walls in front still hide them), the mask is blurred, and the blur is laid over the picture everywhere outside the shape.
+// So it's one smooth glow round the whole body, not a rim round every box, and it's the same few pixels wide at any distance
+const GLOW_LAYER = 2;
+const GLOW_C = new THREE.Vector3(1, .16, .12), GLOW_A = .65; // color and how strong it is at the edge
+// call before anything you don't want glowing (the gun) is added to g
 function addOutline(z) {
-  z.g.updateMatrixWorld(true);
-  const ms = []; z.g.traverse(o => { if (o.isMesh) ms.push(o); });
-  z.hulls = ms.map(m => {
-    const geo = m.geometry; geo.boundingBox ?? geo.computeBoundingBox();
-    const bb = geo.boundingBox, h = new THREE.Mesh(geo, OUTLINE_MAT);
-    h.raycast = noRay; h.userData.hull = true;
-    m.getWorldScale(_ows);
-    h.userData.o = { s: bb.getSize(new THREE.Vector3()), c: bb.getCenter(new THREE.Vector3()), ws: (_ows.x + _ows.y + _ows.z) / 3 };
-    m.add(h); return h;
-  });
+  z.glowMs = []; z.g.traverse(o => { if (o.isMesh) { o.layers.enable(GLOW_LAYER); z.glowMs.push(o); } });
+  z.glowOn = true;
 }
-function outlineTick(cam) {
-  cam.getWorldPosition(_ocam);
-  const pulse = .5 + .5 * Math.sin(performance.now() * .004);
-  OUTLINE_MAT.color.setRGB(1, .02 + pulse * .05, .02 + pulse * .05);
+// turns the glow off on dead enemies (their angel shouldn't glow). Returns how many enemies glow
+function outlineTick() {
+  let n = 0;
   for (const z of zombies) {
-    if (!z.hulls) continue;
+    if (!z.glowMs) continue;
     const on = !z.dead;
-    const w = Math.max(.025, z.g.position.distanceTo(_ocam) * .0042); // ~2-3px wide (75° view, 720px tall)
-    for (const h of z.hulls) {
-      h.visible = on; if (!on) continue;
-      const { s, c, ws } = h.userData.o, t = w / ws;
-      const sx = s.x ? 1 + 2 * t / s.x : 1, sy = s.y ? 1 + 2 * t / s.y : 1, sz = s.z ? 1 + 2 * t / s.z : 1;
-      h.scale.set(sx, sy, sz); h.position.set(c.x * (1 - sx), c.y * (1 - sy), c.z * (1 - sz));
-    }
+    if (on !== z.glowOn) { z.glowOn = on; for (const m of z.glowMs) on ? m.layers.enable(GLOW_LAYER) : m.layers.disable(GLOW_LAYER); }
+    if (on) n++;
   }
+  return n;
+}
+const glowRT = [0, 1, 2].map(() => new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true }));
+const maskBlack = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
+const maskWhite = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, depthFunc: THREE.LessEqualDepth });
+const glowQuadVS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }';
+// 9-tap gaussian along dir (in texels)
+const blurMat = new THREE.ShaderMaterial({
+  uniforms: { tex: { value: null }, dir: { value: new THREE.Vector2() } },
+  vertexShader: glowQuadVS, depthTest: false, depthWrite: false,
+  fragmentShader: `uniform sampler2D tex; uniform vec2 dir; varying vec2 vUv;
+    void main() {
+      float s = texture2D(tex, vUv).r * .227;
+      s += (texture2D(tex, vUv + dir * 1.385).r + texture2D(tex, vUv - dir * 1.385).r) * .316;
+      s += (texture2D(tex, vUv + dir * 3.231).r + texture2D(tex, vUv - dir * 3.231).r) * .070;
+      gl_FragColor = vec4(s, s, s, 1.);
+    }`,
+});
+const glowMat = new THREE.ShaderMaterial({
+  uniforms: { blur: { value: null }, mask: { value: null }, col: { value: GLOW_C }, a: { value: GLOW_A } },
+  vertexShader: glowQuadVS, transparent: true, depthTest: false, depthWrite: false,
+  fragmentShader: `uniform sampler2D blur, mask; uniform vec3 col; uniform float a; varying vec2 vUv;
+    void main() {
+      float g = texture2D(blur, vUv).r, inside = texture2D(mask, vUv).r;
+      g = smoothstep(0., .55, g) * (1. - inside); // fades out away from the body, nothing on the body itself
+      gl_FragColor = vec4(col, g * a);
+    }`,
+});
+const glowQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blurMat); glowQuad.frustumCulled = false;
+const glowScene = new THREE.Scene(); glowScene.add(glowQuad);
+const glowCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const _gsz = new THREE.Vector2(), _gcc = new THREE.Color();
+function glowPass(src, dst, mat) { glowQuad.material = mat; renderer.setRenderTarget(dst); renderer.render(glowScene, glowCam); }
+// draw the glow over what's already on screen. Call right after rendering the scene
+function outlineRender(cam) {
+  if (!outlineTick()) return;
+  renderer.getDrawingBufferSize(_gsz);
+  const k = gfx.q === 'low' ? .35 : .5, w = Math.max(1, Math.round(_gsz.x * k)), h = Math.max(1, Math.round(_gsz.y * k));
+  if (glowRT[0].width !== w || glowRT[0].height !== h) glowRT.forEach(t => t.setSize(w, h));
+  const bg = scene.background, auto = renderer.autoClear, cl = renderer.getClearAlpha(), layers = cam.layers.mask;
+  renderer.getClearColor(_gcc);
+  scene.background = null; renderer.setClearColor(0x000000, 1);
+  // 1) everything black, filling in depth. 2) the enemies again in white, only where they're the closest thing
+  renderer.setRenderTarget(glowRT[0]); renderer.clear();
+  scene.overrideMaterial = maskBlack; renderer.render(scene, cam);
+  renderer.autoClear = false; cam.layers.set(GLOW_LAYER);
+  scene.overrideMaterial = maskWhite; renderer.render(scene, cam);
+  scene.overrideMaterial = null; cam.layers.mask = layers; scene.background = bg;
+  // 3) blur it across, then down (twice each way for a wider, softer falloff)
+  blurMat.uniforms.dir.value.set(1 / w, 0); blurMat.uniforms.tex.value = glowRT[0].texture; glowPass(0, glowRT[1], blurMat);
+  blurMat.uniforms.dir.value.set(0, 1 / h); blurMat.uniforms.tex.value = glowRT[1].texture; glowPass(0, glowRT[2], blurMat);
+  blurMat.uniforms.dir.value.set(1.6 / w, 0); blurMat.uniforms.tex.value = glowRT[2].texture; glowPass(0, glowRT[1], blurMat);
+  blurMat.uniforms.dir.value.set(0, 1.6 / h); blurMat.uniforms.tex.value = glowRT[1].texture; glowPass(0, glowRT[2], blurMat);
+  // 4) over the screen, outside the bodies only, breathing a little
+  glowMat.uniforms.blur.value = glowRT[2].texture; glowMat.uniforms.mask.value = glowRT[0].texture;
+  glowMat.uniforms.a.value = GLOW_A * (.88 + .12 * Math.sin(performance.now() * .004));
+  glowPass(0, null, glowMat);
+  renderer.autoClear = auto; renderer.setClearColor(_gcc, cl);
 }
