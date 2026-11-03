@@ -8,25 +8,28 @@ const CAT_I = Object.fromEntries(CATS.map(([k], i) => [k, i]));
 // free = you start zombie waves with it (zombie waves sells everything else in its own shop)
 // inf = never runs out of ammo (just the knife)
 // unlock = account level you need before you can buy it in the armory. price = its armory price in account coins
-// mob = mobility: how fast you run while holding it, as a multiple of normal speed (1 if not set)
+// mob = mobility out of 100: how fast you run while holding it. 60 is normal speed, and every point is 1% faster or slower
 // hold = how it's carried: pistol, rifle, heavy, shoulder or melee (see HOLDS below)
-// zoom = aiming zooms this many times through a holo sight (the sniper's scope is its own thing). quiet = suppressed: heard from less far away
+// zoom = aiming zooms this many times: through a holo sight on guns that have one, through the scope on scope guns
+// quiet = suppressed: heard from less far away. action = how it fires, shown in its attributes (otherwise automatic or semi-auto)
 // beam = fires a constant beam, dmg every rate seconds while you hold the trigger, out to range. mag = its charge
 const BASE = [
-  { id: 'voxel', hold: 'pistol', name: 'Voxel Gun', cat: 'backup', start: true, free: true, dmg: 20, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3 },
-  { id: 'hitman', hold: 'pistol', name: 'Hitman', cat: 'backup', unlock: 3, price: 60, zoom: 2, quiet: true, dmg: 17, rate: .2, mag: 18, reload: 1.1, pellets: 1, spread: 0, auto: false, color: 0x2c2c30, len: .4 },
-  { id: 'heatray', hold: 'rifle', name: 'Heat Ray', cat: 'special', unlock: 4, price: 100, beam: true, dmg: 4, rate: .05, range: 30, mag: 100, reload: 2.0, pellets: 1, spread: 0, auto: true, color: 0xb5652b, len: .7 },
-  { id: 'shotgun', hold: 'rifle', name: 'Shotgun', cat: 'primary', start: true, dmg: 10, rate: .75, mag: 6, reload: 1.6, pellets: 9, spread: .07, auto: false, color: 0x6b4a2b, len: .6 },
-  { id: 'ar', hold: 'rifle', name: 'Assault Rifle', cat: 'primary', start: true, dmg: 12, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55 },
-  { id: 'sniper', hold: 'rifle', name: 'Sniper Rifle', cat: 'sniper', start: true, dmg: 80, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, scope: true },
-  { id: 'eradicator', hold: 'heavy', name: 'Eradicator', cat: 'primary', unlock: 12, price: 450, dmg: 9, rate: .05, mag: 120, reload: 2.6, pellets: 1, spread: .012, auto: true, color: 0x777777, len: .7 },
-  { id: 'knife', hold: 'melee', name: 'Combat Knife', cat: 'melee', start: true, free: true, inf: true, melee: true, mob: 1.2, dmg: 35, rate: .4, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xd8dde3, len: .3, model: 'knife' },
+  { id: 'voxel', hold: 'pistol', name: 'Voxel Gun', cat: 'backup', start: true, free: true, mob: 70, dmg: 20, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3 },
+  { id: 'hitman', hold: 'pistol', name: 'Hitman', cat: 'backup', unlock: 3, price: 60, mob: 70, zoom: 2, quiet: true, dmg: 17, rate: .2, mag: 18, reload: 1.1, pellets: 1, spread: 0, auto: false, color: 0x2c2c30, len: .4 },
+  { id: 'heatray', hold: 'rifle', name: 'Heat Ray Rifle', cat: 'special', unlock: 4, price: 100, mob: 60, beam: true, dmg: 4, rate: .05, range: 30, mag: 100, reload: 2.0, pellets: 1, spread: 0, auto: true, color: 0xb5652b, len: .7 },
+  { id: 'shotgun', hold: 'rifle', name: 'Shotgun', cat: 'primary', start: true, mob: 60, action: 'PUMP ACTION', dmg: 10, rate: .75, mag: 6, reload: 1.6, pellets: 9, spread: .07, auto: false, color: 0x6b4a2b, len: .6 },
+  { id: 'ar', hold: 'rifle', name: 'Assault Rifle', cat: 'primary', start: true, mob: 60, dmg: 12, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55 },
+  { id: 'sniper', hold: 'rifle', name: 'Sniper Rifle', cat: 'sniper', start: true, mob: 55, action: 'BOLT ACTION', zoom: 5, dmg: 80, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, scope: true },
+  { id: 'eradicator', hold: 'heavy', name: 'Eradicator', cat: 'primary', unlock: 12, price: 450, mob: 55, dmg: 9, rate: .05, mag: 120, reload: 2.6, pellets: 1, spread: .012, auto: true, color: 0x777777, len: .7 },
+  { id: 'knife', hold: 'melee', name: 'Combat Knife', cat: 'melee', start: true, free: true, inf: true, melee: true, mob: 80, dmg: 35, rate: .4, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xd8dde3, len: .3, model: 'knife' },
   // flamethrower: short cone that hits everything in front of you and sets it on fire. mag = fuel
-  { id: 'flame', hold: 'rifle', name: 'Flamethrower', cat: 'special', start: true, flame: true, dmg: 5, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, model: 'flame' },
-  { id: 'rocket', hold: 'shoulder', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, rocket: true, dmg: 150, rate: 1.1, mag: 1, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, model: 'rocket' },
+  { id: 'flame', hold: 'rifle', name: 'Flamethrower', cat: 'special', start: true, mob: 60, flame: true, dmg: 5, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, model: 'flame' },
+  { id: 'rocket', hold: 'shoulder', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, mob: 55, rocket: true, dmg: 150, rate: 1.1, mag: 1, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, model: 'rocket' },
   // flare gun: burn = damage per quarter second, burnT = seconds
-  { id: 'flare', hold: 'pistol', name: 'Flare Gun', cat: 'premium', start: true, flare: true, dmg: 40, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, model: 'flare' },
+  { id: 'flare', hold: 'pistol', name: 'Flare Gun', cat: 'premium', start: true, mob: 65, flare: true, dmg: 40, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, model: 'flare' },
+  { id: 'thrasher', hold: 'rifle', name: 'Thrasher', cat: 'primary', unlock: 2, price: 50, mob: 60, zoom: 3, dmg: 12, rate: .08, mag: 35, reload: 1.5, pellets: 1, spread: .006, auto: true, color: 0x3c3c44, len: .6 },
 ];
+const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
 const gi = id => W_ID[id]; // weapon id -> its index in BASE/WEAPONS
 // star upgrades: getting a gun gives ★, then two flat upgrades to ★★ and ★★★
@@ -56,32 +59,6 @@ function loadoutGun(cat) { // the gun in your loadout for this category. Falls b
   return i !== undefined && BASE[i].cat === cat && hasGun(i) ? i : BASE.findIndex(w => w.cat === cat && w.start);
 }
 
-// hotbar sprites: little pixel drawings on a 24x12 grid, [x, y, w, h, color], keyed by weapon id
-const SPRITE_RECTS = {
-  voxel: [[6, 3, 12, 3, '#666'], [6, 3, 12, 1, '#888'], [16, 2, 2, 1, '#222'], [7, 6, 4, 5, '#2a2a2a'], [11, 6, 3, 1, '#444'], [13, 6, 1, 2, '#444']],
-  shotgun: [[0, 4, 6, 3, '#6b4a2b'], [0, 6, 2, 2, '#6b4a2b'], [5, 3, 7, 4, '#555'], [10, 4, 14, 2, '#333'], [13, 6, 6, 2, '#8a6a45'], [6, 7, 2, 3, '#3a2a1a']],
-  ar: [[0, 4, 5, 3, '#2f3b2f'], [5, 3, 10, 3, '#3d4d3d'], [15, 4, 9, 1, '#222'], [9, 6, 3, 5, '#222'], [6, 6, 2, 3, '#222'], [8, 2, 4, 1, '#222']],
-  sniper: [[0, 4, 6, 3, '#3a2a1a'], [6, 4, 8, 2, '#1a1a1a'], [14, 4, 10, 1, '#111'], [7, 1, 8, 2, '#333'], [14, 1, 1, 2, '#6cf'], [9, 3, 1, 1, '#111'], [12, 3, 1, 1, '#111'], [7, 6, 2, 3, '#111']],
-  eradicator: [[3, 3, 9, 6, '#777'], [12, 3, 12, 1, '#555'], [12, 5, 12, 1, '#444'], [12, 7, 12, 1, '#555'], [19, 2, 2, 7, '#333'], [5, 1, 5, 2, '#333'], [1, 8, 5, 4, '#5a5a2a']],
-  knife: [[1, 5, 7, 3, '#5a3a1a'], [2, 6, 5, 1, '#3a2a1a'], [8, 3, 2, 7, '#888'], [10, 4, 11, 3, '#d8dde3'], [10, 7, 10, 1, '#9aa3ad'], [21, 5, 2, 2, '#d8dde3'], [23, 6, 1, 1, '#d8dde3']],
-  flame: [[1, 3, 5, 7, '#c33'], [2, 4, 1, 4, '#e66'], [6, 4, 10, 3, '#555'], [16, 4, 6, 2, '#333'], [22, 3, 2, 4, '#222'], [23, 1, 1, 2, '#fa3'], [9, 7, 2, 3, '#222'], [5, 9, 4, 1, '#222']],
-  rocket: [[2, 3, 18, 5, '#4b5b3b'], [6, 3, 1, 5, '#333'], [15, 3, 1, 5, '#333'], [20, 4, 3, 3, '#a33'], [23, 5, 1, 1, '#a33'], [8, 8, 2, 3, '#222'], [12, 8, 2, 3, '#222'], [10, 1, 3, 2, '#222']],
-  flare: [[4, 3, 14, 4, '#c8402a'], [4, 3, 14, 1, '#e8684a'], [17, 2, 5, 6, '#3a3a3a'], [21, 3, 1, 4, '#fa3'], [6, 7, 4, 5, '#2a2a2a'], [10, 7, 3, 1, '#444'], [12, 7, 1, 2, '#444']],
-  hitman: [[2, 4, 11, 3, '#3a3a40'], [2, 4, 11, 1, '#55555d'], [13, 3, 10, 5, '#26262b'], [16, 3, 1, 5, '#3c3c42'], [20, 3, 1, 5, '#3c3c42'],
-    [4, 0, 1, 4, '#222'], [9, 0, 1, 4, '#222'], [4, 0, 6, 1, '#222'], [6, 2, 2, 1, '#f33'], [3, 7, 4, 5, '#2a2a2a'], [7, 7, 3, 1, '#444'], [9, 7, 1, 2, '#444']],
-  heatray: [[0, 5, 4, 3, '#5a3a22'], [4, 4, 10, 4, '#b5652b'], [4, 4, 10, 1, '#d98a4a'], [5, 1, 9, 2, '#c9a43a'], [6, 1, 7, 1, '#fff2a8'], [8, 3, 3, 1, '#333'],
-    [14, 5, 8, 2, '#777'], [16, 4, 1, 4, '#b5652b'], [19, 4, 1, 4, '#b5652b'], [22, 5, 2, 2, '#ffb347'], [5, 8, 2, 4, '#3a2a1a'], [9, 8, 3, 2, '#ffd23f'], [12, 8, 3, 2, '#3a3a3a']],
-};
-// drawn one pixel in from the edge, then every empty pixel touching the gun turns black: the same black edge the 3D models have
-const SPRITES = BASE.map(w => SPRITE_RECTS[w.id]).map(rects => {
-  const W = 26, H = 14, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d'); for (const [x, y, w, h, col] of rects) { g.fillStyle = col; g.fillRect(x + 1, y + 1, w, h); }
-  const img = g.getImageData(0, 0, W, H), d = img.data, solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && d[(y * W + x) * 4 + 3] > 0;
-  const edge = [];
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!solid(x, y) && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) edge.push(x, y);
-  g.fillStyle = '#000'; for (let k = 0; k < edge.length; k += 2) g.fillRect(edge[k], edge[k + 1], 1, 1);
-  return c.toDataURL();
-});
 function renderHotbar() {
   $('hotbar').innerHTML = CATS.map(([, label], s) => {
     const i = slotGun[s], key = nice(binds['slot' + (s + 1)][0] || binds['slot' + (s + 1)][1]);
@@ -301,15 +278,34 @@ const GUN_MODELS = {
     p(4, 4, 14, slide, 0, 2, -7); p(4, 1, 14, mat(0x55555d), 0, 3.5, -7); // slide and its lighter top
     for (const z of [-1.5, -3.5]) p(4, 2, 1, dark, 0, 2.5, z); // grip serrations at the back of the slide
     p(4, 2, 12, dark, 0, -1, -6); // frame
-    p(6, 6, 12, can, 0, 2, -20); for (const z of [-15.5, -20, -24.5]) p(6, 6, 1, ring, 0, 2, z); // suppressor and its rings
-    p(2, 2, 1, mat(0x0c0c0c), 0, 2, -25.5); // its bore
-    p(6, 1, 6, dark, 0, 4.5, -6); // holo sight: mount, then an open window framed by two posts and a hood
-    for (const x of [-3.5, 3.5]) p(1, 6, 2, dark, x, 8, -6.5);
-    p(8, 1, 2, dark, 0, 11.5, -6.5);
-    p(2, 1, 1, glow(0xff3333), 0, 5.5, -4.5); // the emitter that throws the red dot
+    p(6, 6, 18, can, 0, 2, -23); for (const z of [-16.5, -23, -29.5]) p(6, 6, 1, ring, 0, 2, z); // suppressor and its rings
+    p(2, 2, 1, mat(0x0c0c0c), 0, 2, -32.5); // its bore
+    p(6, 1, 4, dark, 0, 4.5, -6); // holo sight: mount, then an open window framed by two posts and a hood
+    for (const x of [-2.5, 2.5]) p(1, 4, 2, dark, x, 7, -6);
+    p(6, 1, 2, dark, 0, 9.5, -6);
+    p(1, 1, 1, glow(0xff3333), .5, 5.5, -4.5); // the emitter that throws the reticle
     p(1, 1, 4, dark, 0, -4.5, -7); p(1, 2, 1, dark, 0, -3, -9.5); p(1, 2, 1, mat(0x777777), 0, -3, -6.5); // trigger guard and trigger
     p(4, 3, 4, grip, 0, -3.5, -3); p(4, 3, 4, grip, 0, -6.5, -2); p(4, 1, 4, dark, 0, -8.5, -2); // grip
-    return { muzzle: [2, -27], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -13], band: [6, 8, 1], holo: [8, -6] };
+    return { muzzle: [2, -34], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -13], band: [6, 8, 1], holo: [7, -6] };
+  },
+  // a black rifle with orange stripes, a straight box mag, a toothed muzzle brake and a holo sight on the top rail
+  thrasher({ p, mat, dark, glow }) {
+    const body = mat(0x3c3c44), dk = mat(0x2b2b31), acc = mat(0xe0632a), vent = mat(0x141418);
+    p(4, 6, 9, dk, 0, 0, 4.5); p(4, 8, 1, dark, 0, -1, 9.5); p(4, 1, 7, acc, 0, .5, 4.5); // stock, butt, stripe
+    p(6, 6, 16, body, 0, 0, -8); p(6, 1, 12, acc, 0, -.5, -8); // receiver and its stripe
+    p(4, 1, 14, dark, 0, 3.5, -8); // top rail
+    p(6, 1, 4, dark, 0, 4.5, -10); // holo sight: mount, two posts and a hood, open in the middle
+    for (const x of [-2.5, 2.5]) p(1, 4, 2, dark, x, 7, -10);
+    p(6, 1, 2, dark, 0, 9.5, -10);
+    p(1, 1, 1, glow(0xff3333), .5, 5.5, -8.5); // the emitter that throws the reticle
+    p(6, 6, 10, dk, 0, 0, -21); for (const z of [-18, -21, -24]) p(6, 2, 1, vent, 0, 0, z); // handguard and its vents
+    p(4, 4, 6, mat(GUN_STEEL), 0, 1, -29); // barrel
+    p(6, 6, 4, dk, 0, 1, -34); p(6, 2, 1, vent, 0, 1, -33.5); // muzzle brake and its port
+    for (const y of [-1.5, 3.5]) p(4, 1, 2, dark, 0, y, -37); // its teeth
+    p(4, 8, 5, dark, 0, -7, -10.5); p(4, 1, 5, acc, 0, -8.5, -10.5); // straight box mag with an orange band
+    p(4, 4, 4, dk, 0, -5, -2); p(4, 3, 4, dk, 0, -8.5, -1); // pistol grip
+    p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
+    return { muzzle: [1, -38], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 10, 0, 0, -21], bands: [-3, -14], band: [8, 8, 0], holo: [7, -10] };
   },
   // a copper beam rifle. A big magnifying glass lies on top facing the sky to catch sunlight, and the barrel focuses that heat
   // into the beam: cooling fins down the barrel, a glowing tip, and a glowing heat cell under the body
@@ -354,6 +350,35 @@ function gunPieces(i, stars) { // runs gun i's model: its pieces, its sub-parts'
   for (let s = 0; s < stars; s++) c.p(bw, bh, 2, gold, 0, by, m.bands[s]); // one gold band per upgrade
   return { m, main, subs };
 }
+// hotbar and armory sprites: gun i's 3D model seen side-on from its right, muzzle pointing right, one sprite pixel per gun pixel.
+// Each pixel is the nearest face's color with the same shading and black outline rule as the model, so the sprite always matches it.
+// The canvas is padded to 2:1 so every sprite fits the 2:1 image boxes the same way
+const spriteCol = new THREE.Color();
+function gunSprite(i) {
+  const { main, subs } = gunPieces(i, 0);
+  for (const s of subs) for (const [w, h, d, m, x, y, z] of s.list) main.push([w, h, d, m, x + s.at[0], y + s.at[1], z + s.at[2]]);
+  const { lo, NX, NY, NZ, at } = voxelGrid(main), px = [];
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = NX - 1; x >= 0; x--) {
+    const m = at(x, y, z); if (!m) continue;
+    const P = gunPal[m];
+    let col = '#000';
+    if (P.glow || (at(x, y + 1, z) && at(x, y - 1, z) && at(x, y, z + 1) && at(x, y, z - 1))) {
+      const h = Math.imul(x * 73856093 ^ y * 19349663 ^ z * 83492791 ^ 2654435761, 1597334677) >>> 0;
+      col = spriteCol.copy(P.c).multiplyScalar(P.glow ? 1 : .82 + (h % 1000) / 1000 * .18).getStyle();
+    }
+    const sx = NZ - 1 - z, sy = NY - 1 - y;
+    px.push(sx, sy, col);
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+    break;
+  }
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, W = Math.max(w, 2 * h), H = Math.max(h, Math.ceil(W / 2));
+  const ox = ((W - w) >> 1) - x0, oy = ((H - h) >> 1) - y0;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  for (let k = 0; k < px.length; k += 3) { g.fillStyle = px[k + 2]; g.fillRect(px[k] + ox, px[k + 1] + oy, 1, 1); }
+  return c.toDataURL();
+}
 function gunGeos(i, stars) {
   const { m, main } = gunPieces(i, stars), px = gunPx(i);
   const part = s => {
@@ -364,6 +389,7 @@ function gunGeos(i, stars) {
   };
   return { m, main: voxelGeos(main, px), spin: part(m.spin), round: part(m.round) };
 }
+const SPRITES = BASE.map((w, i) => gunSprite(i));
 const gunBox = (b, px) => b && { c: [b[3] * px, b[4] * px, b[5] * px], h: [b[0] / 2 * px, b[1] / 2 * px, b[2] / 2 * px] };
 function makeGun(i, g, stars) {
   const b = gunGeoCache[BASE[i].id + ':' + stars] ??= gunGeos(i, stars), px = gunPx(i);

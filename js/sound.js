@@ -236,6 +236,13 @@ const SOUNDS = {
     s.tone({ f: 170, f2: 60, d: .06, v: .9 });
     s.click({ f: 4000, v: .35 });
   }],
+  thrasher: [.2, .42, s => { // like the AR's "pap" but grittier: a raspy square-wave crunch and a brighter, rougher crack
+    s.hiss({ ft: 'bandpass', f: 2600, f2: 1100, q: .7, d: .065, v: .9 });
+    s.tone({ f: 190, f2: 65, d: .055, v: .85 });
+    s.tone({ type: 'square', f: 230, f2: 90, d: .05, v: .32, lp: 2200 });
+    s.tone({ type: 'sawtooth', f: 115, f2: 70, d: .04, v: .2, lp: 1400 });
+    s.click({ f: 4800, v: .4 });
+  }],
   sniper: [1.05, 1, s => { // sharp crack, rolling boom, then the bolt cycles
     s.hiss({ ft: 'highpass', f: 3000, d: .03, v: 1 });
     s.hiss({ f: 4000, f2: 150, d: .6, v: .9 });
@@ -304,6 +311,7 @@ const SOUNDS = {
   }],
   r_shotgun: [1.6, .45, s => { for (const t of [.15, .45, .75, 1.05]) s.shell(t); s.pump(1.3); }],
   r_ar: [1.4, .45, s => { s.magOut(.15); s.magIn(.7); s.rack(1.05); }],
+  r_thrasher: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.clack({ t: .82, f: 1800, d: .015, v: .5, body: .3 }); s.rack(1.12); }],
   r_sniper: [2, .45, s => { s.boltUp(.15); s.magOut(.45); s.magIn(1.1); s.boltDown(1.6); }],
   r_eradicator: [2.6, .45, s => { s.latch(.2); s.rattle(.9); s.rattle(1.4); s.latch(2.0); s.tone({ type: 'sawtooth', f: 60, f2: 180, t: 2.15, a: .2, d: .2, v: .15, lp: 900 }); }],
   r_flame: [2.2, .45, s => { s.latch(.15); s.hiss({ ft: 'highpass', f: 3000, t: .45, a: .05, d: .35, v: .5 }); s.thunk(1.2); s.latch(1.75); s.clack({ t: 1.95, f: 4000, d: .008, v: .5 }); s.hiss({ t: 1.98, f: 400, f2: 1200, d: .15, v: .5 }); }],

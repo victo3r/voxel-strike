@@ -7,45 +7,56 @@ const gunUse = i => { const st = gunStars(i), u = prof.use?.[BASE[i].id]; return
 const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
 const inMatch = () => !inLobby && pvp() && !matchOver;
 
-// a gun's stats at the stars you're using
-function gunStats(i) {
-  const w = BASE[i], L = Math.max(0, gunUse(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), mag = magAt(w, L);
-  const mob = w.mob && w.mob !== 1 ? ` · SPEED ${w.mob > 1 ? '+' : ''}${Math.round((w.mob - 1) * 100)}%` : '';
-  if (w.melee) return `DMG ${dmg} · MELEE${mob}`;
-  const rl = +(w.reload * (1 - .15 * L)).toFixed(1);
-  if (w.beam) return `${Math.round(dmg / w.rate)} DMG/s · RANGE ${w.range} · CHARGE ${mag}`;
-  if (w.mag === 1) return `DMG ${dmg} · RELOAD ${rl}s${mob}`; // one shot per reload, so fire rate doesn't mean much
-  const rate = (1 / w.rate).toFixed(w.rate < .2 ? 0 : 1) + '/s';
-  return `DMG ${w.pellets > 1 ? dmg + '×' + w.pellets : dmg} · ${rate} · ${w.flame ? 'FUEL' : 'MAG'} ${mag}${mob}`;
+// the four main stats at the stars you're using: damage, fire rate, capacity (mag size) and mobility.
+// [label, value, unit]. One-shot guns fire once per reload, so that's their fire rate. A beam fires nonstop
+function mainStats(i) {
+  const w = BASE[i], L = Math.max(0, gunUse(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), rl = w.reload * (1 - .15 * L);
+  const per = s => s >= 20 ? Math.round(s) : +s.toFixed(1);
+  return [
+    ['DAMAGE', w.beam ? Math.round(dmg / w.rate) : w.pellets > 1 ? `${dmg}×${w.pellets}` : dmg, w.beam ? '/ SEC' : ''],
+    ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(w.rate, rl) : w.rate)), w.beam ? '' : '/ SEC'],
+    ['CAPACITY', w.inf ? '∞' : magAt(w, L), ''],
+    ['MOBILITY', w.mob ?? 60, ''],
+  ];
+}
+const gunStats = i => mainStats(i).map(([k, v]) => `${k === 'FIRE RATE' ? 'RATE' : k === 'CAPACITY' ? 'CAP' : k.slice(0, 3)} ${v}`).join(' · ');
+// tags for how a gun works, listed under its description
+function gunAttrs(w) {
+  const a = [];
+  if (w.melee) a.push('MELEE');
+  else if (w.beam) a.push('BEAM');
+  else if (w.action) a.push(w.action);
+  else if (w.auto) a.push('AUTOMATIC');
+  else if (w.mag > 1) a.push('SEMI-AUTO');
+  if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : 'HOLO SIGHT');
+  if (w.quiet) a.push('SUPPRESSED');
+  if (w.rocket) a.push('ROCKET', 'EXPLOSIVE');
+  if (w.flame || w.flare) a.push('FIRE');
+  if (w.flare) a.push('SPLASH');
+  if (w.inf) a.push('INFINITE');
+  return a;
 }
 const DESC = {
-  voxel: 'Your starting pistol. Semi-automatic with no spread at all, so every shot lands exactly where you aim. A dependable backup for when your primary runs dry.',
-  hitman: 'A suppressed pistol with a holo sight. Aim to look through it at 2× zoom. It hits a little lighter than the Voxel Gun but fires faster from a bigger magazine, and its quiet shots don\'t carry far.',
-  heatray: 'A big magnifying glass on top gathers sunlight, and the barrel focuses that heat into a beam. Hold the trigger to keep it on target. It never spreads, and it reaches 30 blocks.',
-  shotgun: 'Fires 9 pellets in a wide spread with every pump. Devastating up close and weak at range, so get in close before you pull the trigger.',
-  ar: 'Fully automatic with a 30-round magazine and only a little spread. It handles every range well, and aiming tightens the spread even more.',
-  sniper: 'A bolt-action rifle that hits for 80 with no spread, scoped or not. Aim to look through the scope and pick people off from across the map.',
-  eradicator: 'A minigun with a 120-round belt that shreds anything in front of it. Its spread is small, but reloading the belt takes a long time.',
-  knife: 'Always with you and never runs out. You run 20% faster while holding it, so it\'s the quickest way to get around the map.',
+  voxel: 'Your starting pistol, with a teal energy core. A dependable backup for when your primary runs dry.',
+  hitman: 'A suppressed pistol with a holo sight on the slide. Its quiet shots don\'t carry far, so people won\'t hear you coming.',
+  heatray: 'A big magnifying glass on top gathers sunlight, and the barrel focuses that heat into a beam. Hold the trigger to keep it on target.',
+  shotgun: 'A pump shotgun that fires a burst of pellets every shot. Devastating up close and weak at range, so get in close before you pull the trigger.',
+  ar: 'A reliable rifle that handles every range well. A solid pick for any fight.',
+  thrasher: 'A hard-hitting rifle that tears through fights, with a holo sight on the top rail for picking people off at range.',
+  sniper: 'A bolt-action rifle that hits hard from across the map. Aim to look through the scope.',
+  eradicator: 'A minigun that shreds anything in front of it. Reloading the belt takes a long time, so make it count.',
+  knife: 'Always with you and never runs out. It\'s the quickest way to get around the map.',
   flame: 'Sprays a short cone of fire that hits everything in front of you and sets it burning. Its fuel tank refills when you reload.',
   rocket: 'Fires a rocket that explodes on impact and hurts everyone in the blast. The blast also throws you, so you can rocket jump with it.',
   flare: 'Fires a burning flare that sets whoever it hits on fire, with a small splash around the hit. It holds one flare, so make it count.',
 };
-// every stat for the details view, at the stars you're using
+// the rest of the stats for the details view, at the stars you're using
 function gunSpecs(i) {
-  const w = BASE[i], L = Math.max(0, gunUse(i) - 1), out = [];
-  const dmg = Math.round(w.dmg * (1 + .25 * L)), mag = magAt(w, L), rl = +(w.reload * (1 - .15 * L)).toFixed(1);
-  if (w.beam) out.push(['DAMAGE', Math.round(dmg / w.rate) + ' / SEC']);
-  else out.push(['DAMAGE', w.pellets > 1 ? `${dmg} × ${w.pellets} PELLETS` : dmg]);
-  if (w.mag !== 1 && !w.beam) out.push([w.melee ? 'SWINGS' : 'FIRE RATE', (1 / w.rate).toFixed(w.rate < .2 ? 0 : 1) + ' / SEC']); // one-shot guns fire once per reload
-  if (!w.melee) out.push([w.flame ? 'FUEL' : w.beam ? 'CHARGE' : 'MAGAZINE', mag], ['RELOAD', rl + 's']);
-  if (!w.melee && !w.flame) out.push(['SPREAD', !w.spread ? 'NONE' : w.spread < .02 ? 'LOW' : 'WIDE']);
-  if (w.zoom) out.push(['SIGHT', w.zoom + '× HOLO']);
-  if (w.quiet) out.push(['SOUND', 'SUPPRESSED']);
+  const w = BASE[i], L = Math.max(0, gunUse(i) - 1), out = [], rl = +(w.reload * (1 - .15 * L)).toFixed(1);
+  if (!w.melee) out.push(['RELOAD', rl + 's']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
   if (w.rocket) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
   if (w.flare) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`], ['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
-  if (w.mob && w.mob !== 1) out.push(['RUN SPEED', `${w.mob > 1 ? '+' : ''}${Math.round((w.mob - 1) * 100)}%`]);
   if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }
@@ -109,7 +120,9 @@ function placeAct() {
 function renderDetail() {
   const i = armSel, w = BASE[i];
   $('armDet').innerHTML = `<button id="detBack">◀ BACK</button><div id="detView"></div>` +
-    `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div><p>${DESC[w.id] ?? ''}</p>` +
+    `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div>` +
+    `<div class="ms">${mainStats(i).map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>` +
+    `<p>${DESC[w.id] ?? ''}</p><div class="at">${gunAttrs(w).map(a => `<span>${a}</span>`).join('')}</div>` +
     `<div class="ds">${gunSpecs(i).map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
   pvShow(i + ':' + gunUse(i), g => makeGun(i, g, Math.max(0, gunUse(i) - 1), false), -Math.PI / 2); // starts side-on, muzzle to the right
 }

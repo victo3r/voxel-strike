@@ -1,4 +1,53 @@
 let stepT = 0, stepAlt = false; // footsteps: time until the next one, and which foot
+
+// ---- the sniper scope and the holo reticles, drawn into small canvases one pixel at a time and blown up by RPX,
+// so they're pixel art like everything else. Cross lines with tick marks, no circles in the holo
+const RPX = () => Math.max(2, Math.round(innerHeight / 240));
+function drawScope() {
+  const c = $('scope'), px = RPX(), W = Math.ceil(innerWidth / px) | 1, H = Math.ceil(innerHeight / px) | 1;
+  c.width = W; c.height = H; c.style.setProperty('width', W * px + 'px', 'important'); c.style.setProperty('height', H * px + 'px', 'important');
+  const g = c.getContext('2d'), img = g.createImageData(W, H), d = img.data, cx = (W - 1) / 2, cy = (H - 1) / 2, R = Math.round(H * .32);
+  const put = (x, y, r, gr, b, a) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const k = (y * W + x) * 4; d[k] = r; d[k + 1] = gr; d[k + 2] = b; d[k + 3] = a; };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const r = Math.hypot(x - cx, y - cy);
+    if (r > R) put(x, y, 0, 0, 0, 255); // the tube
+    else if (r > R - 1.5) put(x, y, 22, 24, 26, 255); // its rim
+    else if (r > R - 4) put(x, y, 0, 0, 0, 110); // shadow round the edge of the lens
+    else if (r > R - 7) put(x, y, 0, 8, 20, 45);
+  }
+  const ink = (x, y) => put(cx + x, cy + y, 0, 0, 0, 255), post = Math.round(R * .45), step = Math.max(3, Math.round(R / 14));
+  for (let k = -R; k <= R; k++) {
+    if (Math.abs(k) < 2) continue; // a small open middle with a dot in it
+    ink(k, 0); ink(0, k);
+    if (Math.abs(k) > post) for (const o of [-1, 1]) { ink(k, o); if (k > 0) ink(o, k); } // thick posts left, right and below
+  }
+  ink(0, 0);
+  for (let n = 1; n * step < post; n++) for (const s of [-1, 1]) { // tick marks along the lines, every other one longer
+    const t = n * step * s, L = n % 2 ? 1 : 2;
+    for (let o = 1; o <= L; o++) { ink(t, o); ink(t, -o); ink(o, t); ink(-o, t); }
+  }
+  g.putImageData(img, 0, 0);
+}
+// the holo reticle for a zoom level: broken cross lines with ticks, a square dot in the middle, and corner brackets on higher zooms
+let holoZoom = 0;
+function drawHolo(zoom) {
+  holoZoom = zoom;
+  const c = $('holo'), px = RPX(), N = 31, m = 15;
+  c.width = c.height = N; c.style.setProperty('width', N * px + 'px', 'important'); c.style.setProperty('height', N * px + 'px', 'important');
+  const g = c.getContext('2d'); g.clearRect(0, 0, N, N);
+  const dot = (x, y, a = .95) => { g.fillStyle = `rgba(255,60,60,${a})`; g.fillRect(m + x, m + y, 1, 1); };
+  const arm = (fx, fy) => { // one arm of the cross, going out along fx, fy
+    for (let r = 3; r <= 11; r++) if (r !== 7) dot(fx * r, fy * r);
+    for (const r of zoom >= 3 ? [5, 9] : [5]) { dot(fx * r + fy, fy * r + fx, .8); dot(fx * r - fy, fy * r - fx, .8); } // ticks across it
+  };
+  arm(1, 0); arm(-1, 0); arm(0, 1); arm(0, -1);
+  dot(0, 0, 1);
+  if (zoom >= 3) for (const sx of [-1, 1]) for (const sy of [-1, 1]) { // corner brackets
+    for (let k = 0; k < 3; k++) { dot(sx * (13 - k), sy * 13, .7); dot(sx * 13, sy * (13 - k), .7); }
+  }
+}
+drawScope(); drawHolo(2);
+addEventListener('resize', () => { drawScope(); drawHolo(holoZoom); });
 function update(dt) {
   const down = pvp() && dmDown(dt);
   const w = WEAPONS[cur];
@@ -10,7 +59,7 @@ function update(dt) {
     P.yaw -= lx * ls; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ly * ls));
   }
   if (mx || mz) {
-    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * (w.mob || 1) * dt / len;
+    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * mobMul(w) * dt / len;
     const dx = (mx * c + mz * s) * sp, dz = (-mx * s + mz * c) * sp;
     walkTo(P.pos, P.pos.x + dx, P.pos.z, .35, P.onGround);
     walkTo(P.pos, P.pos.x, P.pos.z + dz, .35, P.onGround);
@@ -34,7 +83,7 @@ function update(dt) {
   easeLag(P.pos, dt);
   camera.position.set(P.pos.x, P.pos.y + 1.6 - (P.pos.lag || 0), P.pos.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
-  if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33 / (w.mob || 1); stepAlt = !stepAlt; sfx('step_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, P.pos.y)) + (stepAlt ? '' : '2'), { v: .75 }); } }
+  if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33 / mobMul(w); stepAlt = !stepAlt; sfx('step_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, P.pos.y)) + (stepAlt ? '' : '2'), { v: .75 }); } }
   else stepT = .08; // first step comes right after you start moving
 
   cd -= dt;
@@ -51,12 +100,13 @@ function update(dt) {
   }
   const hold = holdOf(w);
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
-  // zoom: a holo sight's zoom is how many times bigger things look, so the view narrows to 1/zoom of the normal one
+  // zoom: how many times bigger things look through a holo sight or scope, so the view narrows to 1/zoom of the normal one
   const zoomFov = w.zoom ? 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(37.5)) / w.zoom)) : 0;
-  const fov = 75 - adsT * (w.scope ? 57 : w.zoom ? 75 - zoomFov : 20);
+  const fov = 75 - adsT * (w.zoom ? 75 - zoomFov : 20);
   if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }
   const scoped = w.scope && adsT > .8, holo = !!(w.zoom && gunHolo) && adsT > .8;
   $('scope').style.display = scoped ? 'block' : 'none';
+  if (holo && w.zoom !== holoZoom) drawHolo(w.zoom);
   $('holo').style.display = holo ? 'block' : 'none';
   $('cross').style.display = scoped || holo ? 'none' : '';
   vm.visible = !scoped;

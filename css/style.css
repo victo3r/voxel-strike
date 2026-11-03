@@ -16,6 +16,9 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #cross:before,#cross:after{content:"";position:absolute;background:var(--c,#fff)}
 #cross:before{left:8px;top:0;width:2px;height:18px}
 #cross:after{top:8px;left:0;width:18px;height:2px}
+/* the sniper scope and the holo reticle: drawn small in js (main.js drawScope / drawHolo) and blown up with hard pixel edges */
+#scope,#holo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;image-rendering:pixelated;pointer-events:none}
+#holo{filter:drop-shadow(0 0 3px rgba(255,40,40,.75))}
 #hp{position:absolute;left:20px;bottom:20px;color:#ff5a5a}
 #ammo{position:absolute;right:20px;bottom:20px;text-align:right}
 #arm{position:absolute;left:20px;bottom:50px;color:#c9ced6}
@@ -46,12 +49,6 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #shop button.own{border-color:var(--acc);opacity:.7}
 #shop small{color:var(--silver);font-size:13px}
 #shop .cat{color:var(--acc-lt)}
-#scope{position:absolute;inset:0;display:none;background:radial-gradient(circle,transparent 0 31vh,#111 31.5vh 32.5vh,#000 33vh)}
-/* the holo sight's red dot and ring, seen through the window on the Hitman */
-#holo{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;display:none;border:2px solid rgba(255,60,60,.75);border-radius:50%;box-sizing:border-box;filter:drop-shadow(0 0 3px rgba(255,40,40,.8))}
-#holo:before{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#ff4040}
-#scope:before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:#000}
-#scope:after{content:"";position:absolute;top:50%;left:0;right:0;height:2px;margin-top:-1px;background:#000}
 
 /* settings */
 #binds{position:fixed;inset:0;display:none;align-items:center;justify-content:center;color:#fff;text-shadow:2px 2px 0 #000;z-index:10;padding:12px;box-sizing:border-box}
@@ -150,6 +147,15 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #armDet p{margin:0;font-size:14px;line-height:1.45;color:var(--silver)}
 #armDet .ds{display:grid;grid-template-columns:auto 1fr;gap:5px 18px;margin-top:6px;font-size:14px}
 #armDet .ds span{color:var(--muted)}
+/* the four main stats, big, in a row */
+#armDet .ms{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#armDet .ms div{display:flex;flex-direction:column;align-items:center;padding:6px 2px;background:rgba(0,0,0,.22);border:2px solid var(--line)}
+#armDet .ms span{font-size:11px;color:var(--muted)}
+#armDet .ms b{font:bold 22px monospace;color:#fff}
+#armDet .ms small{font-size:11px;color:var(--silver)}
+/* attributes: how the gun works */
+#armDet .at{display:flex;flex-wrap:wrap;gap:6px}
+#armDet .at span{font:bold 11px monospace;padding:3px 8px;border:2px solid var(--acc);color:var(--acc-lt);background:rgba(47,191,113,.15)}
 #armList .card img{width:96px;height:48px;image-rendering:pixelated}
 #armList .cn{font-size:17px;font-weight:bold;text-align:center}
 #armList .st{color:var(--acc-lt);font-size:13px}

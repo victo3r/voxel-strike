@@ -69,7 +69,7 @@ const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res
 // BOT_PICKS = what it can roll for each category (a name listed twice is twice as likely)
 // Its stars on each gun and its armor are rolled too, anywhere from none up to what you're using, never more
 const BOT_PICKS = {
-  primary: ['shotgun', 'ar', 'ar', 'eradicator'],
+  primary: ['shotgun', 'ar', 'ar', 'thrasher', 'eradicator'],
   backup: ['voxel', 'voxel', 'hitman'],
   melee: ['knife'],
   special: ['flame', 'heatray'],
@@ -78,7 +78,7 @@ const BOT_PICKS = {
 };
 // the distance a bot tries to keep from its target with each gun [closest, furthest]
 const BOT_KEEP = {
-  voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], eradicator: [6, 12], sniper: [16, 32],
+  voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
 };
 // how good each gun is at a distance (higher = better). A bot holds whichever of its guns scores best,
@@ -91,6 +91,7 @@ const GUN_FIT = {
   hitman: d => d < 18 ? .55 : .4,
   heatray: d => d < 3 ? .5 : d < 25 ? .85 : .2,
   ar: d => d < 3 ? .6 : d < 20 ? .9 : .55,
+  thrasher: d => d < 3 ? .6 : d < 24 ? .92 : .65,
   eradicator: d => d < 16 ? .95 : .5,
   sniper: d => d > 20 ? 1.1 : d > 14 ? .6 : d > 8 ? .25 : .1,
   rocket: d => d < 5 ? 0 : d < 22 ? .72 : .4,
@@ -569,7 +570,7 @@ function updateBot(b, dt) {
   }
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
-    const s = BOT.speed * (W.mob || 1) * dt / ml; mx *= s; mz *= s;
+    const s = BOT.speed * mobMul(W) * dt / ml; mx *= s; mz *= s;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
     if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded, into)) bump = true;
     if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded, into)) bump = true;
