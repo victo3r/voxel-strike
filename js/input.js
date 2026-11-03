@@ -34,7 +34,7 @@ const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true };
 let opts = { ...DEFAULT_OPTS };
 try { const o = JSON.parse(localStorage.getItem('voxelstrike-opts')); if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k]; } catch {}
 const saveOpts = () => { try { localStorage.setItem('voxelstrike-opts', JSON.stringify(opts)); } catch {} };
-const AA_DESC = ['Off.', 'Your aim slows a little near an enemy and gets a small nudge toward them while you move onto them.', 'Like low, but stronger.'];
+const AA_DESC = ['Off.', 'Near an enemy your aim slows down, gets pulled toward them while you move onto them, and turns with them a bit while you track.', 'Like low, but stronger.'];
 function renderOpts() {
   document.querySelectorAll('#aaQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.aa));
   $('aaDesc').textContent = AA_DESC[opts.aa] + (opts.aa ? ' Fast flicks get no help, so it does very little for a mouse.' : '');
@@ -51,10 +51,11 @@ renderOpts();
 // Both fade out as you turn faster, so a flick gets nothing. The zone is measured on screen, so it shrinks when you zoom in.
 // It helps on every enemy that has a red outline (not teammates, not enemies hidden by a Raider Hood) and only if you can see them.
 // zone = degrees from the edge of their body, slow = how much slower your aim gets right on them, pull = the most pull as a
-// share of how far you moved. Full help under SLOW_V radians a second of turning, none past FAST_V
-const AA = [null, { zone: 3.5, slow: .25, pull: .2 }, { zone: 5, slow: .4, pull: .35 }];
-const AA_SLOW_V = 1.2, AA_FAST_V = 3.5, AA_RANGE = 80;
-let aaT = null, aaLastT = 0;
+// share of how far you moved, follow = how much of the enemy's own sideways movement your aim keeps up with while you're
+// moving your aim (only then). Full help under SLOW_V radians a second of turning, none past FAST_V
+const AA = [null, { zone: 4.5, slow: .35, pull: .45, follow: .35 }, { zone: 6.5, slow: .5, pull: .75, follow: .6 }];
+const AA_SLOW_V = 2, AA_FAST_V = 5.5, AA_RANGE = 80, AA_ACTIVE_MS = 150;
+let aaT = null, aaLastT = 0, aaMoveAt = -1e9, aaFade = 0, aaPrev = null;
 const aaV = new THREE.Vector3(), aaRay = new THREE.Raycaster();
 const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
 // how far your crosshair is from the enemy's body, as [yaw, pitch] you'd have to turn. 0, 0 = it's on them
@@ -65,6 +66,21 @@ function aaErr(t) {
 }
 // once a frame: the closest enemy inside the zone that you can see
 function aaTarget() {
+  aaPick();
+  // follow: if it's the same enemy as last frame and you've been moving your aim just now, turn with them a bit
+  const L = AA[opts.aa], t = aaT;
+  if (!t) { aaPrev = null; return; }
+  const mid = (t.bot + t.top) / 2;
+  if (aaPrev && aaPrev.z === t.z && performance.now() - aaMoveAt < AA_ACTIVE_MS && aaFade > 0) {
+    const dy = wrapA(t.yaw - aaPrev.yaw), dp = mid - aaPrev.mid;
+    if (Math.abs(dy) < .15 && Math.abs(dp) < .15) { // a bigger jump is a respawn or teleport, not movement
+      const close = 1 - Math.hypot(...aaErr(t)) / t.zone, k = L.follow * aaFade * Math.max(0, close);
+      P.yaw += dy * k; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + dp * k));
+    }
+  }
+  aaPrev = { z: t.z, yaw: t.yaw, mid };
+}
+function aaPick() {
   aaT = null;
   const L = AA[opts.aa]; if (!L || !locked || respawnT > 0) return;
   const c = camera.position, zone = THREE.MathUtils.degToRad(L.zone) * camera.fov / 75, near = [];
@@ -88,6 +104,7 @@ function aaLook(dy, dp, dt) {
   if (!L || !aaT || !a) return [dy, dp];
   const k = camera.fov / 75, v = a / Math.max(dt, .001);
   const fade = Math.max(0, Math.min(1, (AA_FAST_V * k - v) / ((AA_FAST_V - AA_SLOW_V) * k)));
+  aaMoveAt = performance.now(); aaFade = fade;
   const [ey, ep] = aaErr(aaT), err = Math.hypot(ey, ep), close = 1 - err / aaT.zone;
   if (!fade || close <= 0) return [dy, dp];
   const slow = 1 - L.slow * fade * close; dy *= slow; dp *= slow;

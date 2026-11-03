@@ -63,16 +63,24 @@ const CROSSES = {
 const crossFor = w => (CROSSES[w.id] ?? (w.hold === 'pistol' || w.melee ? CROSSES.voxel : CROSSES.ar))();
 // shooting kicks the crosshair out a few pixels (everything but the center dot moves away from the middle), then it settles back.
 // The offset is rounded to whole pixels so it stays crisp
-let crossId = '', crossRects = [], crossOff = -1, crossK = 0;
+let crossId = '', crossRects = [], crossOff = -1, crossK = 0, crossRed = false, crossRedWas = false;
+// the crosshair turns red while it's right on an enemy you can see (not teammates, not a Raider Hood wearer past their stealth range)
+const crossRay = new THREE.Raycaster(), crossNdc = new THREE.Vector2();
+function crossOnEnemy(w) {
+  if (respawnT > 0) return false;
+  crossRay.setFromCamera(crossNdc, camera); crossRay.far = w.melee ? w.range : 150;
+  const zz = crossRay.intersectObjects(shotTargets(), false)[0]?.object.userData.zombie;
+  return !!zz && !zz.dead && !(zz.type === 'bot' && friendly(null, zz)) && (!zz.glowMs || zz.glowOn);
+}
 const CROSS_BACK = 26; // pixels per second it settles back
 function crossKick(px, max = 6) { if (crossK < max) crossK = Math.min(max, crossK + px); }
 function kickFor(w) { return w.melee ? 2 : w.rocket || w.flare || w.scope || w.pellets > 1 ? 4 : 2.5; }
-function tickCross(dt, w) { if (crossK > 0) crossK = Math.max(0, crossK - dt * CROSS_BACK); drawCross(w); }
+function tickCross(dt, w) { if (crossK > 0) crossK = Math.max(0, crossK - dt * CROSS_BACK); crossRed = crossOnEnemy(w); drawCross(w); }
 function drawCross(w) {
   const off = Math.round(crossK);
-  if (w.id === crossId && off === crossOff) return;
+  if (w.id === crossId && off === crossOff && crossRed === crossRedWas) return;
   if (w.id !== crossId) { crossId = w.id; crossRects = crossFor(w); }
-  crossOff = off;
+  crossOff = off; crossRedWas = crossRed;
   const cv = $('cross'), dpr = Math.max(1, Math.round(devicePixelRatio || 1)), g = cv.getContext('2d'), c = CROSS_S / 2;
   if (cv.width !== CROSS_S * dpr) { cv.width = cv.height = CROSS_S * dpr; cv.style.width = cv.style.height = CROSS_S + 'px'; }
   // each piece moves straight out along its axis, or diagonally if it's off both axes, so lines, corners and arcs keep their shape
@@ -83,7 +91,7 @@ function drawCross(w) {
   });
   g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, CROSS_S, CROSS_S);
   g.fillStyle = 'rgba(0,0,0,.55)'; for (const [x, y, rw, rh] of rects) g.fillRect(c + x - 1, c + y - 1, rw + 2, rh + 2);
-  g.fillStyle = '#fff'; for (const [x, y, rw, rh] of rects) g.fillRect(c + x, c + y, rw, rh);
+  g.fillStyle = crossRed ? '#ff3b3b' : '#fff'; for (const [x, y, rw, rh] of rects) g.fillRect(c + x, c + y, rw, rh);
 }
 
 // ---- hit markers: four diagonal lines that shoot out from round the crosshair and fade. White = body, gold = headshot, red = it died.
