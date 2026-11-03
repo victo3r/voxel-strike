@@ -452,7 +452,7 @@ function buildGun() {
   vm.traverse(o => { if (o.geometry && o !== flashMesh && !o.userData.shared) o.geometry.dispose(); });
   vm.clear(); flashMesh.visible = false;
   const { muzzle: [my, mz], grip, fore, spin, round, holo } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
-  gunSpin = spin; gunRound = round; gunHolo = holo;
+  gunSpin = spin; gunRound = round; gunHolo = holo; drawCross(BASE[cur]);
   vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
   if (fore && arms[1]) vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]);
   if (WEAPONS[cur].melee) return;

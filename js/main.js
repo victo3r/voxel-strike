@@ -147,7 +147,6 @@ function update(dt) {
     if (hold === 'pistol') vm.position.y += .09 * (1 - adsT); // a pistol sits higher so your fist under its grip is on screen
     if (w.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // aiming raises the holo sight's window onto the middle of the screen
   }
-  if ((crossT -= dt) <= 0) $('cross').style.setProperty('--c', '#fff');
   }
 
   if (pvp()) { updateDM(dt); if (matchOver) return; }

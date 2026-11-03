@@ -67,19 +67,19 @@ const starTxt = i => BASE[i].start ? '' : '★'.repeat(gunUse(i)) + (gunStars(i)
 // the ◀ ▶ picker under your character for which star to use. k = what the arrows send, label = what's picked
 const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>◀</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>▶</button></div>`;
 // the armory's pages run down the left (the y axis). Each page has its own row of sections along the top (the x axis):
-// WEAPONS has the gun categories, WEAR has ARMOR and BOOTS (more things to wear can go in WEAR_CATS later)
+// WEAPONS has the gun categories, WEAR has SKINS, ARMOR and BOOTS (more things to wear can go in WEAR_CATS later)
 const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
-const WEAR_CATS = [['armor', 'ARMOR'], ['boots', 'BOOTS']];
+const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS']];
 // armorPrev = the star you're looking at in the armor details (your character wears it), armorCard = the Basic Armor card is picked,
 // bootSel = the boots card you clicked (index into BOOTS, -1 = none yet)
-let armPage = 'weapons', wearCat = 'armor', armorPrev = 0, armorCard = false, bootSel = -1;
+let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, bootSel = -1;
 const myArmor = () => prof.armor | 0;
 const anyBoots = () => BOOTS.some(B => bootStars(B.id));
 const pageIcon = p => p === 'weapons' ? SPRITES[loadoutGun('primary')] : armorSprite(Math.max(0, wornArmor() - 1));
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
   $('armPages').innerHTML = PAGES.map(([p, label]) =>
-    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}${p === 'wear' && !myArmor() && !anyBoots() ? ' dim' : ''}"><img${p === 'wear' ? ' class="ai"' : ''} src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
+    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}"><img${p === 'wear' ? ' class="ai"' : ''} src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
   if (armPage === 'wear') { renderWear(); return; }
   heroArmor(wornArmor()); heroBoots(wornBoots());
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
@@ -100,7 +100,7 @@ function renderArmory() {
 }
 // the buttons for the picked gun, under your character (in a match, under where he'd stand)
 function renderAct() {
-  if (armPage === 'wear') { if (wearCat === 'boots') renderBootAct(); else renderArmorAct(); return; }
+  if (armPage === 'wear') { if (wearCat === 'boots') renderBootAct(); else if (wearCat === 'skins') renderSkinAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
   let btns;
   if (isLocked(i)) btns = `<button disabled>🔒 UNLOCKS AT LVL ${w.unlock}</button>`;
@@ -138,11 +138,13 @@ const ARMOR_DESC = 'Worn in bot matches. Your armor bar fills every time you spa
 const armorStat = T => `+${T.hp} ARMOR` + (T.dr ? ` · −${Math.round(T.dr * 100)}% DAMAGE` : '');
 function renderWear() {
   const n = myArmor(), w = wornArmor(), T = armorOf(w || 1), on = wornBoots();
-  const tabIcon = c => c === 'armor' ? armorSprite(Math.max(0, w - 1)) : on ? bootSprite(on.id, on.st) : bootSprite(BOOTS[0].id, 1);
+  const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, w - 1)) : on ? bootSprite(on.id, on.st) : bootSprite(BOOTS[0].id, 1);
   $('armTabs').innerHTML = WEAR_CATS.map(([c, label]) =>
-    `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="ai" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
+    `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="${c === 'skins' ? 'hd' : 'ai'}" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
+  if (wearCat === 'skins') armDet = false; // skins have no details view
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
+  if (wearCat === 'skins') { renderSkins(); return; }
   if (wearCat === 'boots') { renderBoots(); return; }
   heroBoots(on);
   if (armDet) renderArmorDetail();
@@ -192,13 +194,61 @@ function wearStar(s) {
   const n = myArmor(); s = Math.max(1, Math.min(n, s)); if (s === wornArmor()) return;
   prof.armorUse = s === n ? 0 : s; saveProf(); armorSync(false); sfx('equip');
 }
+// ---- WEAR page, SKINS: one card per look (the presets, plus your own once you've made one). Click one to put it on.
+// In the lobby, the last card (and the button under him) opens the customizer
+const SKINS_DESC = 'Pick how your character looks. In the lobby, CUSTOMIZE lets you make your own.';
+// a look seen from the front, Minecraft-style: head, neck, body with an arm each side, two legs, cut straight from its skin.
+// Skin pixels are scaled up K times with a black outline round the outside, like the other sprites
+const lookSpriteCache = new Map();
+function skinSprite(look, head) {
+  const key = (head ? 'h' : 'b') + lookKey(look);
+  if (lookSpriteCache.has(key)) return lookSpriteCache.get(key);
+  const src = skinTexture(look).image, W = head ? 8 : 16, H = head ? 8 : 33, K = 4;
+  const c = document.createElement('canvas'); c.width = W + 2; c.height = H + 2;
+  const g = c.getContext('2d'), cut = (sx, sy, w, h, x, y) => g.drawImage(src, sx, sy, w, h, x + 1, y + 1, w, h);
+  if (head) cut(8, 8, 8, 8, 0, 0);
+  else { // the character's right side is on your left, as if he's facing you
+    cut(8, 8, 8, 8, 4, 0); cut(36, 4, 4, 1, 6, 8); cut(20, 20, 8, 12, 4, 9);
+    cut(44, 20, 4, 12, 0, 9); cut(36, 52, 4, 12, 12, 9); cut(4, 20, 4, 12, 4, 21); cut(20, 52, 4, 12, 8, 21);
+  }
+  const d = g.getImageData(0, 0, W + 2, H + 2), a = (x, y) => x >= 0 && y >= 0 && x < W + 2 && y < H + 2 && d.data[(y * (W + 2) + x) * 4 + 3] > 0;
+  const out = document.createElement('canvas'); out.width = (W + 2) * K; out.height = (H + 2) * K;
+  const o = out.getContext('2d');
+  for (let y = 0; y < H + 2; y++) for (let x = 0; x < W + 2; x++) {
+    const i = (y * (W + 2) + x) * 4;
+    if (a(x, y)) o.fillStyle = `rgb(${d.data[i]},${d.data[i + 1]},${d.data[i + 2]})`;
+    else if (a(x - 1, y) || a(x + 1, y) || a(x, y - 1) || a(x, y + 1)) o.fillStyle = '#000';
+    else continue;
+    o.fillRect(x * K, y * K, K, K);
+  }
+  const url = out.toDataURL(); lookSpriteCache.set(key, url); return url;
+}
+const lookSprite = L => skinSprite(L, false), headSprite = L => skinSprite(L, true);
+function renderSkins() {
+  const list = lookChoices(), on = lookIndex();
+  $('armList').innerHTML = `<p class="wd">${SKINS_DESC}</p>` + list.map((p, i) =>
+    `<div class="card${i === on ? ' sel on' : ''}" data-skin="${i}">${i === on ? '<span class="tag">WEARING</span>' : ''}` +
+    `<img class="sk" src="${lookSprite(p.look)}"><div class="cn">${p.name}</div></div>`).join('') +
+    (inLobby ? '<div class="card" data-cust="1"><span class="plus">✎</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '');
+  heroArmor(wornArmor()); heroBoots(wornBoots());
+  renderAct();
+  if (inLobby) heroGun(-1); // he puts the gun away and faces you
+}
+function renderSkinAct() {
+  const p = lookChoices()[lookIndex()];
+  $('armAct').innerHTML = `<div class="an">${p?.name ?? 'CUSTOM'}</div>` + (inLobby ? '<div class="ab"><button data-cust="1">✎ CUSTOMIZE</button></div>' : '');
+  placeAct();
+}
+// out of the armory and into the customizer (lobby.js), which comes back here when you're done
+function openCust() { closeArmory(); showCust(true); }
+
 // ---- WEAR page, BOOTS: one card per pair. Click one to pick it (your character tries it on), click it again for its details.
 // The buttons under him buy, wear, take off and upgrade it, and pick which of its stars you wear
 const BOOTS_DESC = 'Wear one pair at a time, in every mode. What they do adds on top of your armor and your gun\'s mobility. ' +
   'Bots can roll boots too, never better than yours.';
 const BOOT_DESC = {
   warrior: 'Steel greaves for fighters. Every weapon you use does more damage, and every hit you take is cut a little more, on top of your armor.',
-  raider: 'Light running boots with a wing on each ankle. You run faster, and you can jump a second time in the air: press jump again.',
+  raider: 'High-top runners with a wing on each ankle. You run faster, and you can jump a second time in the air: press jump again.',
 };
 const pct = v => Math.round(v * 100) + '%';
 // what a pair does at st stars, as short labels
@@ -341,6 +391,8 @@ function armSync(i, how) {
 // click a card to pick it (your character holds it), click it again for its details
 $('armList').addEventListener('click', e => {
   const c = e.target.closest('.card'); if (!c) return;
+  if (c.dataset.cust) { openCust(); return; }
+  if (c.dataset.skin) { wearLook(+c.dataset.skin); renderArmory(); return; }
   if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = wornArmor() || 1; } else armorCard = true; sfx('ui'); renderArmory(); return; }
   if (c.dataset.boot) { const i = +c.dataset.boot; if (i === bootSel) armDet = true; else bootSel = i; sfx('ui'); renderArmory(); return; }
   const i = +c.dataset.i;
@@ -349,6 +401,7 @@ $('armList').addEventListener('click', e => {
 });
 function armClick(e) {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.cust) { openCust(); return; }
   if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; armSel = -1; bootSel = -1; sfx('ui'); } }
   else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; armorPrev = 0; bootSel = -1; sfx('ui'); } }
   else if (b.dataset.bbuy || b.dataset.bup || b.dataset.bwear || b.dataset.boff || b.dataset.bu) bootClick(b.dataset);
@@ -390,7 +443,7 @@ armIcon();
 function armShow(on) {
   $('armory').style.display = on ? 'flex' : 'none';
   $('armAct').style.display = on ? 'flex' : 'none';
-  if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; $('lookPick').style.display = on ? 'none' : ''; }
+  if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; }
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
 function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; armShow(true); renderArmory(); }

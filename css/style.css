@@ -12,10 +12,11 @@ body.lowfx{--ov:.62;--blur:none}
 html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:monospace;user-select:none}
 canvas{width:100vw!important;height:100vh!important;display:block}
 #hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:2px 2px 0 #000;font-size:22px;font-weight:bold}
-#cross{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px}
-#cross:before,#cross:after{content:"";position:absolute;background:var(--c,#fff)}
-#cross:before{left:8px;top:0;width:2px;height:18px}
-#cross:after{top:8px;left:0;width:18px;height:2px}
+/* each gun's crosshair is drawn in js (hud.js drawCross) */
+#cross{position:absolute;left:50%;top:50%;width:80px!important;height:80px!important;margin:-40px 0 0 -40px;pointer-events:none} /* !important beats the full-screen canvas rule */
+/* hit markers: four lines turned to the diagonals, each pivoting on the middle of the screen (hud.js hitMarker moves them out) */
+#hm{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2}
+#hm i{position:absolute;left:-1px;top:0;width:2px;height:8px;opacity:0;transform-origin:50% 0;box-shadow:0 0 0 1px rgba(0,0,0,.55)}
 /* the sniper scope and the holo reticle: drawn small in js (main.js drawScope / drawHolo) and blown up with hard pixel edges */
 #scope,#holo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;image-rendering:pixelated;pointer-events:none}
 #holo{filter:drop-shadow(0 0 3px rgba(255,40,40,.75))}
@@ -33,9 +34,9 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 /* shared menu pieces */
 #menu,#shop,#post,#binds,#pick{background:rgba(22,28,32,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
 #menuTitle,#shop h1,#setHead h1,#armory h1,#pickTitle,#postPlace,#menu #msg{color:#fff;text-shadow:4px 4px 0 var(--acc-dk)}
-#menu button,#shop button,#binds button,#post button,#armory button,#custBtns button,#pickBack,#lookPick button,#nameDice,#cloudBtn,.cv button{
+#menu button,#shop button,#binds button,#post button,#armory button,#custBtns button,#pickBack,#nameDice,#cloudBtn,.cv button{
   background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
-#menu button:hover,#shop button:hover:not(:disabled),#binds button:hover,#post button:hover,#armory button:hover:not(:disabled),#custBtns button:hover,#pickBack:hover,#lookPick button:hover,#nameDice:hover,#cloudBtn:hover,.cv button:hover:not(:disabled){background:var(--hov)}
+#menu button:hover,#shop button:hover:not(:disabled),#binds button:hover,#post button:hover,#armory button:hover:not(:disabled),#custBtns button:hover,#pickBack:hover,#nameDice:hover,#cloudBtn:hover,.cv button:hover:not(:disabled){background:var(--hov)}
 
 #menu{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;cursor:pointer;text-shadow:2px 2px 0 #000}
 #menu p{font-size:18px;margin:6px}
@@ -260,9 +261,10 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 /* character stage + customizer */
 #stage{flex:1;position:relative;cursor:grab;touch-action:none}
 #stage:active{cursor:grabbing}
-#lookPick{position:absolute;left:50%;bottom:3%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;cursor:default}
-#lookPick button{font:bold 18px monospace;width:40px;height:36px}
-#lookName{min-width:120px;text-align:center;font:bold 16px monospace;letter-spacing:2px;color:#fff;text-shadow:2px 2px 0 #000}
+/* WEAR > SKINS cards: a tall front-view sprite of each look (armory.js lookSprite) */
+#armList .card img.sk{width:38px;height:78px}
+#armList .card .plus{display:flex;align-items:center;justify-content:center;width:78px;height:78px;font-size:40px;color:var(--silver)}
+#armTabs img.hd{width:30px}
 #custPanel{display:none;width:min(460px,46vw);box-sizing:border-box;padding:20px 26px;flex-direction:column;overflow-y:auto;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);-webkit-mask-image:linear-gradient(90deg,#000 93%,transparent);mask-image:linear-gradient(90deg,#000 93%,transparent)}
 #custPanel>*{flex-shrink:0}
 #custRows{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:center;margin:auto 0 0}

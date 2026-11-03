@@ -227,7 +227,6 @@ const pickOpen = () => $('pick').style.display === 'flex';
 function showPick(on) {
   $('pick').style.display = on ? 'flex' : 'none';
   $('lobbyUI').style.display = on ? 'none' : '';
-  $('lookPick').style.display = on ? 'none' : '';
   if (on) { pickMode = null; renderPick(); }
 }
 $('playBtn').addEventListener('click', () => { showPick(true); sfx('ui'); });

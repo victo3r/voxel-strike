@@ -300,7 +300,7 @@ function angel(b) {
   if (b.gunM) b.gunM.visible = false;
   b.aim.rotation.x = 0; b.aim.position.z = 0; b.g.rotation.x = b.g.rotation.z = 0;
   b.aim.children.forEach(a => { if (a !== b.gunM) a.rotation.set(0, 0, 0); });
-  b.pivR.rotation.set(0, 0, 0); b.pivL.rotation.set(0, 0, 0); b.headPiv.rotation.set(-.25, 0, 0); // looking up
+  b.pivR.rotation.set(0, 0, -LEG_SPREAD); b.pivL.rotation.set(0, 0, LEG_SPREAD); b.headPiv.rotation.set(-.25, 0, 0); // looking up
   for (const m of b.mats) { m.transparent = true; m.opacity = .6; m.depthWrite = false; m.emissive.setHex(0x8a8a8a); m.needsUpdate = true; }
   const glow = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false });
   const haloMat = glow(0xffe27a, .95), wingMat = glow(0xffffff, .7), extra = [];

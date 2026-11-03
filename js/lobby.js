@@ -204,7 +204,6 @@ function dressHero() {
   dressBoots(heroCh, heroBootsB = wornBoots());
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
-  $('lookName').textContent = lookChoices()[lookIndex()]?.name ?? 'CUSTOM';
 }
 // the armor he's wearing: the star you wear, or the one you're looking at in the armory
 let heroArmorN = 0;
@@ -213,12 +212,11 @@ function heroArmor(n) { if (heroCh && n !== heroArmorN) { dressArmor(heroCh, her
 let heroBootsB = null;
 const bootKey = b => b ? b.id + b.st : '';
 function heroBoots(b) { if (heroCh && bootKey(b) !== bootKey(heroBootsB)) dressBoots(heroCh, heroBootsB = b); }
-function pickLook(step) {
-  const list = lookChoices(), i = Math.max(0, lookIndex());
-  prof.look = { ...list[(i + step + list.length) % list.length].look }; saveProf(); dressHero(); sfx('ui');
+// puts on look i of lookChoices() (the armory's WEAR > SKINS cards)
+function wearLook(i) {
+  const p = lookChoices()[i]; if (!p || i === lookIndex()) return;
+  prof.look = { ...p.look }; saveProf(); dressHero(); sfx('equip');
 }
-$('lookPrev').onclick = () => pickLook(-1); $('lookNext').onclick = () => pickLook(1);
-$('lookPick').addEventListener('pointerdown', e => e.stopPropagation()); // clicking the arrows shouldn't start spinning him
 dressHero();
 
 // ---- customizer: replaces the lobby panel while it's open, the character updates as you change things ----
@@ -288,13 +286,13 @@ function showCust(on) {
   $('custPanel').style.display = on ? 'flex' : 'none';
   $('lobbyUI').style.display = on ? 'none' : '';
   $('lobby').classList.toggle('cust', on);
-  $('lookPick').style.display = on ? 'none' : '';
   if (on) renderCust();
   sfx('ui');
 }
-$('lookEdit').onclick = () => showCust(true);
-$('custDone').onclick = () => showCust(false);
-addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && custOpen()) showCust(false); });
+// the customizer opens from the armory (WEAR > SKINS > CUSTOMIZE), and closing it goes back there
+function custClose() { showCust(false); armPage = 'wear'; wearCat = 'skins'; openArmory(); }
+$('custDone').onclick = custClose;
+addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && custOpen()) { e.stopImmediatePropagation(); custClose(); } }); // stop: the armory's Esc would close it again
 
 const REST = .45; // default 3/4 view
 const ARM_REST = 1.45; // in the armory he aims off to the right and a little away, so you see the gun side-on and him from the front 3/4

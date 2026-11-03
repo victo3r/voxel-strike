@@ -41,7 +41,8 @@ function botBoots() {
 // ---- the model: voxel pixel art like the armor (armor.js), in armor pixels (half a skin pixel each), measured from the hip,
 // where the leg pivots: the leg is x -4..4, y -24..0, z -4..4 (+z is the front, +x the character's left).
 // s = 1 for the left leg, -1 for the right (the outside of the leg is +x on the left boot). Each boot wraps the bottom of the leg,
-// standing a pixel off it, with a toe out the front and a dark sole. Higher stars look fancier
+// standing a pixel off it, with a toe out the front and a sole. Higher stars look fancier.
+// The inside of a boot (-x) never goes past x = -5: the legs tilt apart (LEG_SPREAD), and anything wider there would touch the other boot
 function bootPieces(id, st, s = 1) {
   const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a));
   const shell = (top, c, sole, toe) => {
@@ -49,22 +50,30 @@ function bootPieces(id, st, s = 1) {
     B(-5, 5, -24, -21, -5, toe, sole);
   };
   if (id === 'raider') {
-    // light running boots: slate with a teal tongue and a teal toe, and a white wing off the outside of the ankle.
-    // Each star adds a feather to the wing, and the third star turns it gold
-    const C = hex([74, 80, 98]), HI = hex([124, 132, 156]), TEAL = hex([38, 196, 184]), SOLE = hex([228, 228, 232]);
-    shell(-14, C, SOLE, 8);
-    B(-5, 5, -17, -14, -5, 5, HI); B(-6, 6, -16, -14, -6, 6, HI); // padded collar round the top
-    B(-2, 2, -21, -15, 5, 6, TEAL); B(-5, 5, -21, -18, 6, 8, TEAL); // tongue and toe cap
-    const wing = st >= 3 ? hex([236, 190, 60]) : hex([238, 240, 244]), wdk = st >= 3 ? hex([180, 128, 24]) : hex([176, 182, 196]);
-    B(4, 7, -20, -20 + 3 * st, -4, -1, wdk); // the wing's root
-    for (let k = 0; k < st; k++) B(5, 7, -20 + 3 * k, -17 + 3 * k, -7 - 2 * k, -1, k % 2 ? wdk : wing); // feathers, longer going up
+    // high-top runners: charcoal, a thick white sole with a teal stripe along it, white laces, a teal collar, tongue and heel tab,
+    // a teal speed stripe slanting back along the outside, and a wing off the outside of the ankle.
+    // Each star adds a feather to the wing, each one longer than the one below; at ★★★ the wing turns gold
+    const C = hex([56, 62, 78]), HI = hex([92, 102, 124]), TEAL = hex([34, 200, 186]), SOLE = hex([236, 236, 240]);
+    B(-5, 5, -24, -14, -5, 5, C); B(-5, 5, -24, -19, 5, 8, C); // upper and toe box
+    B(-5, 5, -24, -22, -5, 8, SOLE); B(-5, 5, -22, -21, -5, 8, TEAL); // sole, and the stripe along its top
+    B(-5, 5, -21, -19, 7, 8, HI); // toe cap
+    // laces and the stripe are painted into the boot's surface: raised a single pixel, they'd be all outline (black)
+    for (const y of [-19, -17, -15]) B(-2, 2, y, y + 1, 4, 5, SOLE); // laces
+    B(-5, 5, -15, -14, -5, 5, TEAL); B(-2, 2, -15, -12, 3, 5, TEAL); B(-2, 2, -16, -12, -5, -3, TEAL); // collar, tongue, heel tab
+    [[2, 5], [0, 3], [-2, 1], [-4, -1]].forEach(([z0, z1], k) => B(4, 5, -21 + k, -20 + k, z0, z1, TEAL)); // speed stripe up the outside
+    const W = st >= 3 ? hex([240, 196, 64]) : hex([240, 242, 246]), WD = st >= 3 ? hex([178, 128, 26]) : hex([168, 176, 192]);
+    B(5, 7, -18, -14, -4, -1, WD); // the wing's root
+    for (let k = 0; k < st; k++) { // feathers: two pixels tall (light on top, shaded under), swept back, a darker tip
+      const y = -16 + 2 * k, back = -8 - 2 * k;
+      B(5, 7, y, y + 1, back, -1, WD); B(5, 7, y + 1, y + 2, back, -1, W); B(5, 7, y, y + 2, back, back + 1, WD);
+    }
   } else {
     // steel greaves up the shin with a red cuff. ★★ adds a raised plate down the shin, ★★★ a ridge on it and a gold cuff
     const C = hex([150, 156, 166]), HI = hex([204, 210, 220]), DK = hex([90, 96, 108]), SOLE = hex([52, 52, 58]);
     const CUFF = st >= 3 ? hex([226, 178, 40]) : hex([158, 34, 40]);
     shell(-10, C, SOLE, 9);
     B(-5, 5, -21, -18, 5, 9, DK); // toe cap
-    B(-6, 6, -13, -10, -6, 6, CUFF); // the cuff
+    B(-5, 6, -13, -10, -6, 6, CUFF); // the cuff (flush on the inside, see above)
     B(-5, 5, -19, -16, -5, 5, DK); // a strap round the ankle
     if (st >= 2) B(-3, 3, -18, -13, 5, 7, HI); // shin plate
     if (st >= 3) B(-1, 1, -17, -13, 7, 8, DK); // its ridge
@@ -84,9 +93,10 @@ function dressBoots(ch, b) {
   const mat = armorMat(), meshes = [[ch.legL, 1], [ch.legR, -1]].map(([leg, s]) => { const m = new THREE.Mesh(bootGeo(b.id, b.st, s, ch.U), mat); leg.add(m); return m; });
   ch.mats.push(mat); ch.boots = { mat, meshes, key: b.id + b.st };
 }
-// both boots side by side, for the armory's spinning preview (the legs pivot 2 skin pixels either side of the middle)
+// both boots side by side, for the armory's spinning preview: where they'd be on the legs, which pivot 2 skin pixels either side
+// of the middle and tilt apart (the boot model's origin is the hip, so turning it turns it about the hip)
 function bootsModel(id, st, g) {
-  for (const s of [1, -1]) { const m = new THREE.Mesh(bootGeo(id, st, s, 1 / 16), gunLit); m.position.x = s * 2 / 16; g.add(m); }
+  for (const s of [1, -1]) { const m = new THREE.Mesh(bootGeo(id, st, s, 1 / 16), gunLit); m.position.x = s * 2 / 16; m.rotation.z = s * LEG_SPREAD; g.add(m); }
 }
 // icon: the left boot seen from the outside (so you see the wing), toe pointing right, 4 screen pixels per armor pixel,
 // with the same black outline as the armor icons. Every star of a pair is drawn in the same frame

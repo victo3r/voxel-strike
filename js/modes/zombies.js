@@ -80,10 +80,12 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
   const big = zz.type === 'brute' || zz.type === 'boss';
   if (quiet) burst(point, 0xff7a1a, 2);
   else {
-    zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4); if (!by) setCross('#f44');
+    zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4);
     // the hit sound comes from whoever got hit (zombies sound lower), so it's quiet when they're far away
     hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
   }
+  // your hit marker: red if it died (burns too), else gold for a headshot, white for the body. Burn ticks alone don't show one
+  if (!by && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
   if (dies) {
     if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); }
     if (zz.type === 'bot') botDown(zz, by, head);
@@ -231,4 +233,3 @@ $('next').addEventListener('click', () => {
   lockMouse();
 });
 function banner(text, html = false) { const b = $('banner'); b[html ? 'innerHTML' : 'textContent'] = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }
-let crossT = 0; function setCross(c) { $('cross').style.setProperty('--c', c); crossT = .08; }

@@ -278,6 +278,9 @@ function skinBox(w, h, d, U, faces) {
 }
 const partBox = (w, h, d, u, v, U) => { const R = regions(u, v, w, h, d); return skinBox(w, h, d, U, [R.left, R.right, R.top, R.bottom, R.front, R.back]); };
 
+// each leg tilts out from the hip by this much (radians), so the feet stand a little apart and boots don't run into each other.
+// Three applies rotation.z before rotation.x, so a leg swinging forward and back keeps its tilt
+const LEG_SPREAD = .11;
 // U = size of one skin pixel in world units (1/16 = 2 blocks tall).
 // Returns the group plus the pivots you animate: headPiv (neck), armR/armL (shoulders), legR/legL (hips).
 // parts = the meshes bullets can hit; mats = materials to flash when hurt.
@@ -293,6 +296,7 @@ function buildChar(look, U = 1 / 16, own = false) {
   const head = mesh(partBox(8, 8, 8, 0, 0, U), headPiv, 0, 4, 0); head.userData.head = true;
   const pivot = (x, y) => { const p = new THREE.Group(); p.position.set(x * U, y * U, 0); g.add(p); return p; };
   const armR = pivot(-6, 22), armL = pivot(6, 22), legR = pivot(-2, 12), legL = pivot(2, 12);
+  legR.rotation.z = -LEG_SPREAD; legL.rotation.z = LEG_SPREAD; // feet a little apart. Walking only swings rotation.x, so this stays
   const armRM = mesh(partBox(4, 12, 4, 40, 16, U), armR, 0, -4, 0), armLM = mesh(partBox(4, 12, 4, 32, 48, U), armL, 0, -4, 0);
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
   const parts = [head, neck, body, armRM, armLM, legRM, legLM];
