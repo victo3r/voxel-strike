@@ -11,12 +11,18 @@ function xLines(gap, len, t = 2, which = 'udlr') {
   if (which.includes('u')) o.push([-t / 2, -gap - len, t, len]);
   return o;
 }
-// pieces of a circle of radius r: one arc span degrees wide round each angle in at (0 = right, 90 = down)
+// pieces of a circle of radius r: one arc span degrees wide round each angle in at (0 = right, 90 = down).
+// Drawn as a pixel-art circle on a grid of t-sized blocks (a one-block-wide stepped ring), so it looks pixelated like the rest
 function xArcs(r, at, span, t = 2) {
-  const o = [], seen = new Set();
-  for (const c of at) for (let a = c - span / 2; a <= c + span / 2; a += 1) {
-    const x = Math.round(Math.cos(a * Math.PI / 180) * r - t / 2), y = Math.round(Math.sin(a * Math.PI / 180) * r - t / 2);
-    if (!seen.has(x + ',' + y)) { seen.add(x + ',' + y); o.push([x, y, t, t]); }
+  const R = Math.max(1, Math.round(r / t)), pts = new Set();
+  for (let x = 0, y = R, d = 1 - R; x <= y; x++) { // midpoint circle: one octant, mirrored to the other seven
+    for (const [a, b] of [[x, y], [y, x], [-x, y], [-y, x], [x, -y], [y, -x], [-x, -y], [-y, -x]]) pts.add(a + ',' + b);
+    if (d < 0) d += 2 * x + 3; else { d += 2 * (x - y) + 5; y--; }
+  }
+  const o = [];
+  for (const p of pts) {
+    const [gx, gy] = p.split(',').map(Number), a = (Math.atan2(gy, gx) * 180 / Math.PI + 360) % 360;
+    if (at.some(c => Math.abs(((a - c) % 360 + 540) % 360 - 180) <= span / 2)) o.push([gx * t - t / 2, gy * t - t / 2, t, t]);
   }
   return o;
 }
@@ -50,17 +56,31 @@ const CROSSES = {
   shotgun: () => [...xDot(), ...xArcs(15, DIAG, 50)], // a broken ring about the size of the pellet spread
   flame: () => [...xDot(), ...xArcs(18, DIAG, 40)],
   heatray: () => [...xDot(), ...xLines(3, 3), ...xArcs(10, DIAG, 44)], // a small ring with a tight cross inside for the beam
-  sniper: () => [...xDot(), ...xArcs(6, [0], 360), ...xLines(10, 5, 2, 'lrd')], // a small circle, posts left, right and below
+  sniper: () => [...xDot(), ...xLines(10, 5, 2, 'lrd')], // a dot with posts left, right and below
   flare: () => [...xDot(), ...xCorners(8, 4)], // explosives: square corners, bigger for a bigger blast
   rocket: () => [...xDot(), ...xCorners(13, 5)],
 };
 const crossFor = w => (CROSSES[w.id] ?? (w.hold === 'pistol' || w.melee ? CROSSES.voxel : CROSSES.ar))();
-let crossId = '';
+// shooting kicks the crosshair out a few pixels (everything but the center dot moves away from the middle), then it settles back.
+// The offset is rounded to whole pixels so it stays crisp
+let crossId = '', crossRects = [], crossOff = -1, crossK = 0;
+const CROSS_BACK = 26; // pixels per second it settles back
+function crossKick(px, max = 6) { if (crossK < max) crossK = Math.min(max, crossK + px); }
+function kickFor(w) { return w.melee ? 2 : w.rocket || w.flare || w.scope || w.pellets > 1 ? 4 : 2.5; }
+function tickCross(dt, w) { if (crossK > 0) crossK = Math.max(0, crossK - dt * CROSS_BACK); drawCross(w); }
 function drawCross(w) {
-  if (w.id === crossId) return;
-  crossId = w.id;
-  const cv = $('cross'), dpr = Math.max(1, Math.round(devicePixelRatio || 1)), g = cv.getContext('2d'), rects = crossFor(w), c = CROSS_S / 2;
-  cv.width = cv.height = CROSS_S * dpr; cv.style.width = cv.style.height = CROSS_S + 'px';
+  const off = Math.round(crossK);
+  if (w.id === crossId && off === crossOff) return;
+  if (w.id !== crossId) { crossId = w.id; crossRects = crossFor(w); }
+  crossOff = off;
+  const cv = $('cross'), dpr = Math.max(1, Math.round(devicePixelRatio || 1)), g = cv.getContext('2d'), c = CROSS_S / 2;
+  if (cv.width !== CROSS_S * dpr) { cv.width = cv.height = CROSS_S * dpr; cv.style.width = cv.style.height = CROSS_S + 'px'; }
+  // each piece moves straight out along its axis, or diagonally if it's off both axes, so lines, corners and arcs keep their shape
+  const diag = Math.round(off * .75);
+  const rects = !off ? crossRects : crossRects.map(([x, y, rw, rh]) => {
+    const mx = x + rw / 2, my = y + rh / 2, sx = Math.abs(mx) > 1.5 ? Math.sign(mx) : 0, sy = Math.abs(my) > 1.5 ? Math.sign(my) : 0, k = sx && sy ? diag : off;
+    return [x + sx * k, y + sy * k, rw, rh];
+  });
   g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, CROSS_S, CROSS_S);
   g.fillStyle = 'rgba(0,0,0,.55)'; for (const [x, y, rw, rh] of rects) g.fillRect(c + x - 1, c + y - 1, rw + 2, rh + 2);
   g.fillStyle = '#fff'; for (const [x, y, rw, rh] of rects) g.fillRect(c + x, c + y, rw, rh);

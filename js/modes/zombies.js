@@ -195,7 +195,7 @@ const isUpg = it => it.gun !== undefined && owned[it.gun];
 const maxed = it => (isUpg(it) && lvl[it.gun] >= 2) || (it.armor && P.maxArmor >= ARMOR_CAP);
 const priceOf = it => it.armor ? it.price + armorBought * 25 : isUpg(it) ? Math.round(it.price * (lvl[it.gun] ? 1.25 : .75)) : it.price;
 function renderShop() {
-  $('shopInfo').innerHTML = `Wave ${wave} cleared! +${bonus} bonus   ·   <span class="pc">${COIN}${coins}</span>   ·   ♥ ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ⛨ ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
+  $('shopInfo').innerHTML = `Wave ${wave} cleared! +${bonus} bonus   ·   <span class="pc">${COIN}${coins}</span>   ·   ${ico('heart')} ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ${ico('shield')} ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
   $('items').innerHTML = SHOP.map((it, i) => {
     const upg = isUpg(it), done = maxed(it);
     const off = done || (it.heal && P.hp >= P.max) || (it.refill && ammoFull()) || coins < priceOf(it);
@@ -204,7 +204,7 @@ function renderShop() {
     if (upg) {
       const g = it.gun, b = BASE[g], L = lvl[g] + 1;
       label = `<small class="cat">${CATS[slotOf(g)][1]}</small><br>${it.name} <span class="cat">${stars(g)}</span>`;
-      desc = done ? 'fully upgraded' : `dmg ${WEAPONS[g].dmg}→${Math.round(b.dmg * (1 + .25 * L))} · mag ${WEAPONS[g].mag}→${magAt(b, L)} · faster reload`;
+      desc = done ? 'fully upgraded' : `dmg ${WEAPONS[g].dmg} ${ico('right')} ${Math.round(b.dmg * (1 + .25 * L))} · mag ${WEAPONS[g].mag} ${ico('right')} ${magAt(b, L)} · faster reload`;
       cost = done ? 'MAXED' : 'UPGRADE ' + COIN + priceOf(it);
     }
     if (it.armor && done) { desc = `armor maxed at ${ARMOR_CAP}`; cost = 'MAXED'; }

@@ -251,7 +251,7 @@ function renderCust() {
     const v = custVal(r, L), i = C_ROWS.indexOf(r);
     let ctl;
     if (r.opts) ctl = r.opts.map(([o, n]) => `<button data-r="${i}" data-v="${enc(o)}" class="${o === v ? 'sel' : ''}" ${r.off?.(o, L) ? 'disabled title="Needs a hairstyle that leaves the brow row clear, and no glasses"' : ''}>${n}</button>`).join('');
-    else if (r.cycle) ctl = `<button data-r="${i}" data-step="-1">◀</button><span class="cyc">${(r.cycle.find(([o]) => o === v) ?? r.cycle[0])[1]}</span><button data-r="${i}" data-step="1">▶</button>`;
+    else if (r.cycle) ctl = `<button data-r="${i}" data-step="-1">${ico('left')}</button><span class="cyc">${(r.cycle.find(([o]) => o === v) ?? r.cycle[0])[1]}</span><button data-r="${i}" data-step="1">${ico('right')}</button>`;
     else {
       const list = r.swatch ?? CLOTH.map(c => [c, hexCss(c)]), mine = list.some(([o]) => o === v);
       ctl = list.map(([o, css]) => `<button class="sw${o === v ? ' sel' : ''}" data-r="${i}" data-v="${enc(o)}" style="background:${css}"></button>`).join('')

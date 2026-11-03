@@ -15,7 +15,7 @@ function mainStats(i) {
   return [
     ['DAMAGE', w.beam ? Math.round(dmg / w.rate) : dmg * w.pellets, w.beam ? '/ SEC' : ''], // a shotgun: every pellet hitting
     ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(w.rate, rl) : w.rate)), w.beam ? '' : '/ SEC'],
-    ['CAPACITY', w.inf ? '∞' : magAt(w, L), ''],
+    ['CAPACITY', w.inf ? ico('inf') : magAt(w, L), ''],
     ['MOBILITY', w.mob ?? 60, ''],
   ];
 }
@@ -63,9 +63,9 @@ function gunSpecs(i) {
 const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
 const isLocked = i => !hasGun(i) && prof.lv < (BASE[i].unlock ?? 0);
 // stars you're using, then stars you own but left off (dimmed), then ones you haven't bought
-const starTxt = i => BASE[i].start ? '' : '★'.repeat(gunUse(i)) + (gunStars(i) > gunUse(i) ? `<i>${'★'.repeat(gunStars(i) - gunUse(i))}</i>` : '') + '☆'.repeat(3 - gunStars(i));
+const starTxt = i => BASE[i].start ? '' : starRow(gunUse(i), gunStars(i), 3);
 // the ◀ ▶ picker under your character for which star to use. k = what the arrows send, label = what's picked
-const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>◀</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>▶</button></div>`;
+const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>${ico('left')}</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>${ico('right')}</button></div>`;
 // the armory's pages run down the left (the y axis). Each page has its own row of sections along the top (the x axis):
 // WEAPONS has the gun categories, WEAR has SKINS, ARMOR and BOOTS (more things to wear can go in WEAR_CATS later)
 const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
@@ -90,7 +90,7 @@ function renderArmory() {
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
   else $('armList').innerHTML = catList().map(i => {
-    const w = BASE[i], tag = isLocked(i) ? `🔒 LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
+    const w = BASE[i], tag = isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
     return `<div class="card${isLocked(i) ? ' locked' : ''}${i === armSel ? ' sel' : ''}${i === eq ? ' on' : ''}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img src="${SPRITES[i]}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div><small>${gunStats(i)}</small></div>`;
@@ -103,13 +103,13 @@ function renderAct() {
   if (armPage === 'wear') { if (wearCat === 'boots') renderBootAct(); else if (wearCat === 'skins') renderSkinAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
   let btns;
-  if (isLocked(i)) btns = `<button disabled>🔒 UNLOCKS AT LVL ${w.unlock}</button>`;
+  if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
   else if (!hasGun(i)) btns = `<button data-buy="${i}" ${prof.coins < w.price ? 'disabled' : ''}>BUY ${COIN}${w.price}</button>`;
   else {
     btns = i === eq ? '<button class="eq" disabled>EQUIPPED</button>' : `<button data-eq="${i}">EQUIP</button>`;
-    if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${'★'.repeat(st + 1)} ${COIN}${upgPrice(i)}</button>`;
+    if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${upgPrice(i)}</button>`;
   }
-  const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + '★'.repeat(u), u <= 1, u >= st) : '';
+  const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   $('armAct').innerHTML = `<div class="an">${w.name} <span class="st">${starTxt(i)}</span></div>${pick}<div class="ab">${btns}</div>`;
   placeAct();
 }
@@ -121,7 +121,7 @@ function placeAct() {
 }
 function renderDetail() {
   const i = armSel, w = BASE[i];
-  $('armDet').innerHTML = `<button id="detBack">◀ BACK</button><div id="detView"></div>` +
+  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"></div>` +
     `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div>` +
     `<div class="ms">${mainStats(i).map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>` +
     `<p>${DESC[w.id] ?? ''}</p><div class="at">${gunAttrs(w).map(a => `<span>${a}</span>`).join('')}</div>` +
@@ -149,7 +149,7 @@ function renderWear() {
   heroBoots(on);
   if (armDet) renderArmorDetail();
   else {
-    const locked = !n && prof.lv < T.unlock, tag = n ? 'WEARING' : locked ? `🔒 LVL ${T.unlock}` : COIN + T.price;
+    const locked = !n && prof.lv < T.unlock, tag = n ? 'WEARING' : locked ? `${ico('lock')} LVL ${T.unlock}` : COIN + T.price;
     $('armList').innerHTML = `<p class="wd">${ARMOR_DESC}</p>` +
       `<div class="card${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${n ? ' on' : ''}" data-armor="1"><span class="tag">${tag}</span>` +
       `<img class="ai" src="${armorSprite((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div>` +
@@ -160,14 +160,14 @@ function renderWear() {
   if (inLobby) heroGun(-1); // he puts the gun away and stands facing you, so you see the armor
 }
 // the armor's stars like a gun's: the one you wear, the better ones you own (dimmed), then the ones you don't have
-const armorStarTxt = () => { const n = myArmor(), w = wornArmor(); return '★'.repeat(w) + (n > w ? `<i>${'★'.repeat(n - w)}</i>` : '') + '☆'.repeat(ARMOR_MAX - n); };
+const armorStarTxt = () => starRow(wornArmor(), myArmor(), ARMOR_MAX);
 function renderArmorDetail() {
   const s = armorPrev, T = armorOf(s), n = myArmor();
-  const state = s === wornArmor() ? 'WEARING' : s <= n ? 'OWNED' : prof.lv < T.unlock ? '🔒 LOCKED' : 'NOT OWNED';
+  const state = s === wornArmor() ? 'WEARING' : s <= n ? 'OWNED' : prof.lv < T.unlock ? ico('lock') + ' LOCKED' : 'NOT OWNED';
   const desc = `Star ${s} of ${ARMOR_ITEM}. You spawn with a ${T.hp} armor bar that takes hits before your health` +
     (T.dr ? `, and every hit you take is cut by ${Math.round(T.dr * 100)}%.` : '.');
-  $('armDet').innerHTML = `<button id="detBack">◀ BACK</button>` +
-    `<div id="detView"><button class="arw l" data-av="-1" ${s <= 1 ? 'disabled' : ''}>◀</button><button class="arw r" data-av="1" ${s >= ARMOR_MAX ? 'disabled' : ''}>▶</button></div>` +
+  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button>` +
+    `<div id="detView"><button class="arw l" data-av="-1" ${s <= 1 ? 'disabled' : ''}>${ico('left')}</button><button class="arw r" data-av="1" ${s >= ARMOR_MAX ? 'disabled' : ''}>${ico('right')}</button></div>` +
     `<div class="dn">${T.name} <span class="st">${armorStars(s)}</span></div><p>${desc}</p><div class="ds">` +
     [['ARMOR BAR', '+' + T.hp], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE'], ['UNLOCKS AT', 'LVL ' + T.unlock],
       ['PRICE', COIN + T.price], ['STATUS', state]].map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('') + '</div>';
@@ -183,8 +183,8 @@ function renderArmorAct() {
   let btns = '';
   if (armDet && armorPrev && armorPrev <= n && armorPrev !== w) btns += `<button data-wear="${armorPrev}">WEAR ${armorOf(armorPrev).name.toUpperCase()}</button>`;
   if (!next) btns += '<button class="eq" disabled>MAXED</button>';
-  else if (prof.lv < next.unlock) btns += `<button disabled>🔒 ${n ? next.name.toUpperCase() + ' ' : ''}AT LVL ${next.unlock}</button>`;
-  else btns += `<button data-arm="1" ${prof.coins < next.price ? 'disabled' : ''}>${n ? '★'.repeat(n + 1) + ' ' + next.name.toUpperCase() : 'BUY'} ${COIN}${next.price}</button>`;
+  else if (prof.lv < next.unlock) btns += `<button disabled>${ico('lock')} ${n ? next.name.toUpperCase() + ' ' : ''}AT LVL ${next.unlock}</button>`;
+  else btns += `<button data-arm="1" ${prof.coins < next.price ? 'disabled' : ''}>${n ? starRow(n + 1) + ' ' + next.name.toUpperCase() : 'BUY'} ${COIN}${next.price}</button>`;
   const pick = !armDet && n > 1 ? lvPick('wa', 'WEARING ' + armorOf(w).name.toUpperCase(), w <= 1, w >= n) : '';
   $('armAct').innerHTML = `<div class="an">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div>${pick}<div class="ab">${btns}</div>`;
   placeAct();
@@ -229,14 +229,14 @@ function renderSkins() {
   $('armList').innerHTML = `<p class="wd">${SKINS_DESC}</p>` + list.map((p, i) =>
     `<div class="card${i === on ? ' sel on' : ''}" data-skin="${i}">${i === on ? '<span class="tag">WEARING</span>' : ''}` +
     `<img class="sk" src="${lookSprite(p.look)}"><div class="cn">${p.name}</div></div>`).join('') +
-    (inLobby ? '<div class="card" data-cust="1"><span class="plus">✎</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '');
+    (inLobby ? '<div class="card" data-cust="1"><span class="plus">' + ico('pencil') + '</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '');
   heroArmor(wornArmor()); heroBoots(wornBoots());
   renderAct();
   if (inLobby) heroGun(-1); // he puts the gun away and faces you
 }
 function renderSkinAct() {
   const p = lookChoices()[lookIndex()];
-  $('armAct').innerHTML = `<div class="an">${p?.name ?? 'CUSTOM'}</div>` + (inLobby ? '<div class="ab"><button data-cust="1">✎ CUSTOMIZE</button></div>' : '');
+  $('armAct').innerHTML = `<div class="an">${p?.name ?? 'CUSTOM'}</div>` + (inLobby ? '<div class="ab"><button data-cust="1">' + ico('pencil') + ' CUSTOMIZE</button></div>' : '');
   placeAct();
 }
 // out of the armory and into the customizer (lobby.js), which comes back here when you're done
@@ -263,7 +263,7 @@ function bootLines(B, st) {
 const bootSmall = (B, st) => bootLines(B, st).map(([k, v]) => k === 'JUMPS' ? 'DOUBLE JUMP' : `${v} ${k === 'DAMAGE CUT' ? 'DMG CUT' : k === 'DAMAGE' ? 'DMG' : k}`).join(' · ');
 const bootLocked = B => !bootStars(B.id) && prof.lv < B.unlock;
 const bootUpg = B => Math.round(B.price * UPG[bootStars(B.id) - 1]);
-const bootStarTxt = id => { const st = bootStars(id), u = bootUse(id); return '★'.repeat(u) + (st > u ? `<i>${'★'.repeat(st - u)}</i>` : '') + '☆'.repeat(3 - st); };
+const bootStarTxt = id => starRow(bootUse(id), bootStars(id), 3);
 const bootList = () => BOOTS.map((B, i) => i).sort((a, b) => BOOTS[a].unlock - BOOTS[b].unlock);
 function renderBoots() {
   const on = wornBoots();
@@ -272,7 +272,7 @@ function renderBoots() {
   if (armDet) renderBootDetail();
   else $('armList').innerHTML = `<p class="wd">${BOOTS_DESC}</p>` + bootList().map(i => {
     const K = BOOTS[i], st = bootStars(K.id), worn = prof.bootOn === K.id && st;
-    const tag = bootLocked(K) ? `🔒 LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
+    const tag = bootLocked(K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
     return `<div class="card${bootLocked(K) ? ' locked' : ''}${i === bootSel ? ' sel' : ''}${worn ? ' on' : ''}" data-boot="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${bootSprite(K.id, Math.max(1, bootUse(K.id)))}">` +
       `<div class="cn">${K.name} <span class="st">${bootStarTxt(K.id)}</span></div><small>${bootSmall(K, Math.max(1, bootUse(K.id)))}</small></div>`;
@@ -290,8 +290,8 @@ function renderBootDetail() {
   if (B.dmg) specs.push(per('DAMAGE', B.dmg));
   if (B.dr) specs.push(per('DAMAGE CUT', B.dr));
   specs.push(['UNLOCKS AT', 'LVL ' + B.unlock], ['PRICE', COIN + B.price],
-    ['STATUS', prof.bootOn === B.id && have ? 'WEARING' : have ? 'OWNED' : bootLocked(B) ? '🔒 LOCKED' : 'NOT OWNED']);
-  $('armDet').innerHTML = `<button id="detBack">◀ BACK</button><div id="detView"></div>` +
+    ['STATUS', prof.bootOn === B.id && have ? 'WEARING' : have ? 'OWNED' : bootLocked(B) ? ico('lock') + ' LOCKED' : 'NOT OWNED']);
+  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"></div>` +
     `<div class="dn">${B.name} <span class="st">${bootStarTxt(B.id)}</span></div>` +
     `<div class="ms" style="grid-template-columns:repeat(${bootLines(B, st).length},1fr)">${bootLines(B, st).map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>` +
     `<p>${BOOT_DESC[B.id] ?? ''}</p><div class="ds">${specs.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
@@ -300,13 +300,13 @@ function renderBootDetail() {
 function renderBootAct() {
   const B = BOOTS[bootSel] ?? BOOTS[0], st = bootStars(B.id), worn = prof.bootOn === B.id && st;
   let btns;
-  if (bootLocked(B)) btns = `<button disabled>🔒 UNLOCKS AT LVL ${B.unlock}</button>`;
+  if (bootLocked(B)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${B.unlock}</button>`;
   else if (!st) btns = `<button data-bbuy="1" ${prof.coins < B.price ? 'disabled' : ''}>BUY ${COIN}${B.price}</button>`;
   else {
     btns = worn ? '<button data-boff="1">TAKE OFF</button>' : '<button data-bwear="1">WEAR</button>';
-    if (st < 3) btns += `<button data-bup="1" ${prof.coins < bootUpg(B) ? 'disabled' : ''}>${'★'.repeat(st + 1)} ${COIN}${bootUpg(B)}</button>`;
+    if (st < 3) btns += `<button data-bup="1" ${prof.coins < bootUpg(B) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${bootUpg(B)}</button>`;
   }
-  const u = bootUse(B.id), pick = st > 1 ? lvPick('bu', 'USING ' + '★'.repeat(u), u <= 1, u >= st) : '';
+  const u = bootUse(B.id), pick = st > 1 ? lvPick('bu', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   $('armAct').innerHTML = `<div class="an">${B.name} <span class="st">${bootStarTxt(B.id)}</span></div>${pick}<div class="ab">${btns}</div>`;
   placeAct();
 }

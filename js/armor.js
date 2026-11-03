@@ -33,7 +33,7 @@ const ARMOR_ITEM = 'Basic Armor';
 // the four gems set into Champion armor
 const GEMS = { am: [178, 122, 238], ru: [228, 58, 76], em: [58, 204, 112], di: [134, 234, 246] };
 const armorOf = n => ARMOR_TIERS[n - 1] ?? null;
-const armorStars = n => '★'.repeat(n) + '☆'.repeat(ARMOR_MAX - n);
+const armorStars = n => starRow(n, n, ARMOR_MAX);
 // the star you've picked to wear (0 = none): your best unless you picked a lower one
 const wornArmor = () => { const n = Math.min(ARMOR_MAX, prof.armor | 0), u = prof.armorUse | 0; return u ? Math.min(u, n) : n; };
 // the tier worn in this match: yours in bot matches, none in zombie waves

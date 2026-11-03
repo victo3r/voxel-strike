@@ -43,7 +43,7 @@ const statsAt = (i, L) => { const b = BASE[i]; return { ...b, dmg: Math.round(b.
 function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, mag: s.mag, reload: s.reload }); }
 // deathmatch: starters have no stars. Zombie waves: everything you buy in its shop can be starred
 const upgradable = i => mode === 'zombies' ? !BASE[i].free : !BASE[i].start;
-const stars = i => upgradable(i) ? '★'.repeat(lvl[i] + 1) + '☆'.repeat(2 - lvl[i]) : '';
+const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
 let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0;
 const ammo = WEAPONS.map(w => w.mag);
 const resMax = i => BASE[i].inf ? Infinity : WEAPONS[i].mag * 4;

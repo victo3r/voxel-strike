@@ -60,7 +60,7 @@ const isBind = (a, code) => binds[a].includes(code);
 function nice(code) {
   if (!code) return '—';
   const named = { Mouse0: 'Left Click', Mouse1: 'Middle Click', Mouse2: 'Right Click', Mouse3: 'Mouse 4', Mouse4: 'Mouse 5',
-    WheelUp: 'Scroll Up', WheelDown: 'Scroll Down', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+    WheelUp: 'Scroll Up', WheelDown: 'Scroll Down', ArrowUp: ico('up'), ArrowDown: ico('down'), ArrowLeft: ico('left'), ArrowRight: ico('right'),
     ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl', AltLeft: 'L Alt', AltRight: 'R Alt' };
   return named[code] ?? code.replace(/^Key|^Digit/, '');
 }
@@ -214,7 +214,7 @@ let pickMode = null; // null = choosing a mode, a mode with sub = choosing its v
 function renderPick() {
   const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
   $('pickTitle').textContent = m ? m.title || m.name : group ? group.name : 'SELECT MODE';
-  $('pickBack').textContent = m || group ? '◀ ' + (m?.parent ? 'BLITZ' : 'MODES') : '◀ BACK';
+  $('pickBack').innerHTML = ico('left') + ' ' + (m || group ? (m?.parent ? 'BLITZ' : 'MODES') : 'BACK');
   $('pickList').className = m ? 'maps' : 'modes';
   const card = o => `<button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b><small>${o.desc}</small></button>`;
   // map cards show a picture of the map (img/maps/, taken from above in the game itself)
@@ -249,7 +249,7 @@ $('pickList').addEventListener('click', e => {
   showPick(false); restart(); showLobby(false); lockMouse();
 });
 addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && pickOpen()) $('pickBack').click(); });
-// your name: saves when you click away or press Enter. Blank goes back to the old one. 🎲 rolls a random one.
+// your name: saves when you click away or press Enter. Blank goes back to the old one. The dice rolls a random one.
 $('nameIn').value = myName;
 const saveName = () => { $('nameIn').value = setMyName($('nameIn').value); };
 $('nameIn').addEventListener('change', saveName);

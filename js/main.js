@@ -110,6 +110,7 @@ function update(dt) {
   aiming = held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * 8);
+  tickCross(dt, BASE[cur]);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // eradicator barrels wind down after you stop firing
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
   if (gunRound) { // the rocket: gone once fired, slides back into the tube near the end of the reload
@@ -320,11 +321,10 @@ function update(dt) {
     if (p.life <= 0 || p.m.position.y < 0) { scene.remove(p.m); parts.splice(i, 1); }
   }
 
-  $('hp').textContent = `♥ ${Math.ceil(P.hp)}`;
-  $('arm').textContent = P.maxArmor ? `⛨ ${Math.ceil(P.armor)}` : '';
-  const spare = reserve[cur] === Infinity ? '∞' : reserve[cur];
-  $('ammo').textContent = `${w.name} ${stars(cur)}\n${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : ammo[cur] + ' / ' + spare}`;
-  $('ammo').style.whiteSpace = 'pre';
+  setHTML($('hp'), ico('heart') + Math.ceil(P.hp));
+  setHTML($('arm'), P.maxArmor ? ico('shield') + Math.ceil(P.armor) : '');
+  const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
+  setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : ammo[cur] + ' / ' + spare}`);
   if (!pvp()) $('top').innerHTML = `WAVE ${wave}   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`; // deathmatch fills the top in updateDM
 }
 

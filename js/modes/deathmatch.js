@@ -195,7 +195,7 @@ function scoreKill(killer, victim, head) {
       sfx(head || st ? 'killSpecial' : 'kill'); // any streak or headshot gets the special one
     }
   }
-  feed(killer && killer !== victim ? `${nameTag(killer)} ${head ? '⌖' : '✖'} ${nameTag(victim)}` : `${nameTag(victim)} ✖`);
+  feed(killer && killer !== victim ? `${nameTag(killer)} ${head ? ico('head') : ico('skull')} ${nameTag(victim)}` : `${nameTag(victim)} ${ico('skull')}`);
   const st = killer && killer !== victim && STREAKS[killer.streak];
   if (st) feed(`${nameTag(killer)} <b style="color:#ffd23f">${st[1]}!</b>`);
 }

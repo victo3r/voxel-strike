@@ -11,7 +11,7 @@ function shoot() {
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);
   else {
-    kick = 1; flashMesh.visible = true; flashLight.intensity = 3;
+    kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w));
     sfx(w.id);
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);
@@ -34,7 +34,7 @@ function shoot() {
 }
 // knife: a few short rays around the crosshair so you don't need pixel-perfect aim. Hits one zombie per swing
 function stab(w) {
-  cd = w.rate; kick = 1; sfx('swing');
+  cd = w.rate; kick = 1; sfx('swing'); crossKick(kickFor(w));
   const targets = shotTargets();
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
@@ -47,7 +47,7 @@ const BURN_T = 2.5; // how long a zombie keeps burning after you stop hitting it
 const flames = [], flameGeo = new THREE.BoxGeometry(.18, .18, .18);
 const flameMats = [0xffdd55, 0xff8a1a, 0xff4a1a].map(color => new THREE.MeshBasicMaterial({ color }));
 function flame(w) {
-  kick = .3; flameHeld = .12; // keeps the fire sound going (sound.js)
+  kick = .3; flameHeld = .12; crossKick(.5, 2); // keeps the fire sound going (sound.js)
   camera.getWorldDirection(fwd);
   flashMesh.getWorldPosition(tmp);
   for (let k = 0; k < 2; k++) {
@@ -69,7 +69,7 @@ function flame(w) {
 }
 // heat ray: a straight beam from the gun to whatever's under your crosshair (out to its range), doing its damage every tick
 function heatBeam(w) {
-  kick = .12; beamHeld = .12; // keeps the hum going (sound.js)
+  kick = .12; beamHeld = .12; crossKick(.4, 1.5); // keeps the hum going (sound.js)
   camera.getWorldDirection(fwd);
   ray2.setFromCamera(ndc.set(0, 0), camera); ray2.far = w.range;
   const hit = ray2.intersectObjects(shotTargets(), false)[0];
