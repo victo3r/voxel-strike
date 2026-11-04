@@ -255,10 +255,29 @@ $('menu').addEventListener('click', () => {
   if (dead) restart();
   lockMouse();
 });
+// Switching windows (Alt+Tab, a click on another window, another tab) unlocks the mouse just like Esc does. A match that keeps
+// running without you (online, bots) then stays in view behind a slim CLICK TO PLAY bar instead of the menu covering it, so you
+// can keep an eye on it from the other window. The bar's MENU button, or Esc, opens the menu; Esc in the game opens it straight
+// away as before. The browser's blur can land just before or just after the unlock, so each handler looks for the other within AWAY_MS.
+let blurAt = -1e9, unlockAt = -1e9;
+const AWAY_MS = 300;
+const runsBehindMenu = () => pvp() && !dead && !shopOpen && !inLobby && !matchOver; // zombie waves pauses instead, so it keeps its menu
+function showAway(on) { $('away').style.display = on ? 'flex' : 'none'; if (on) $('menu').style.display = 'none'; }
+addEventListener('blur', () => {
+  blurAt = performance.now();
+  if (!locked && blurAt - unlockAt < AWAY_MS && runsBehindMenu() && $('menu').style.display !== 'none') showAway(true); // the unlock landed first
+});
+$('away').addEventListener('click', () => lockMouse());
+const awayMenu = () => { showAway(false); $('menu').style.display = 'flex'; };
+$('awayMenu').addEventListener('click', e => { e.stopPropagation(); awayMenu(); });
+addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && !locked && $('away').style.display === 'flex') awayMenu(); });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
   net.onLock?.(locked); // online: locking the mouse is also when you ask to spawn (js/net.js)
-  $('menu').style.display = locked || shopOpen || inLobby || matchOver ? 'none' : 'flex';
+  if (!locked) unlockAt = performance.now();
+  const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS); // the window went too, or just did
+  showAway(away);
+  $('menu').style.display = locked || away || shopOpen || inLobby || matchOver ? 'none' : 'flex';
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
   if (locked) closeArmory();
   if (!locked) {
@@ -273,14 +292,14 @@ document.addEventListener('pointerlockchange', () => {
   }
 });
 // if the browser refuses to re-lock the mouse, show the menu so you can click back in
-document.addEventListener('pointerlockerror', () => { if (!shopOpen && !inLobby && !matchOver) { $('menuTitle').textContent = 'MENU'; $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex'; } });
+document.addEventListener('pointerlockerror', () => { if (!shopOpen && !inLobby && !matchOver) { showAway(false); $('menuTitle').textContent = 'MENU'; $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex'; } });
 
 function showLobby(on) {
   inLobby = on;
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
   vm.visible = !on;
-  if (on) { $('menu').style.display = 'none'; camera.fov = 75; camera.updateProjectionMatrix(); musicLobby(); armIcon(); }
+  if (on) { $('menu').style.display = 'none'; showAway(false); camera.fov = 75; camera.updateProjectionMatrix(); musicLobby(); armIcon(); }
 }
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); restart(); showLobby(true); });
 

@@ -84,6 +84,11 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #menu #msg:empty{display:none}
 #menuTitle{font-size:56px;margin:0 0 6px}
 #menuBtns{display:flex;flex-direction:column;gap:10px;margin-top:12px;width:220px}
+/* the window lost focus mid-match (Alt+Tab): a running match stays in view behind this slim bar instead of the menu (input.js). Sits above the hotbar */
+#away{position:fixed;inset:0;display:none;align-items:flex-end;justify-content:center;padding-bottom:92px;box-sizing:border-box;cursor:pointer}
+#awayBar{display:flex;align-items:center;gap:14px;padding:8px 10px 8px 18px;background:rgba(20,26,30,.88);border:3px solid var(--line-dim);color:#fff;font:bold 18px monospace;letter-spacing:2px;text-shadow:2px 2px 0 #000}
+#awayBar button{font:bold 14px monospace;padding:5px 12px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
+#awayBar button:hover{background:var(--hov)}
 #menuBtns button{margin:0;width:100%}
 
 /* hotbar (in-game HUD, not a menu) */
