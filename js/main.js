@@ -102,9 +102,9 @@ function update(dt) {
   }
   launchMove(P, P.pos, .35, P.onGround, dt); // thrown by a rocket blast
   const jumpKey = held('jump');
-  if (jumpKey && P.onGround) { P.vy = 9; P.onGround = false; }
+  if (jumpKey && P.onGround) { P.vy = 9; P.onGround = false; net.ev('jump'); }
   else if (jumpKey && !jumpWas && !P.onGround && !P.dj && youFx().dj) { // Raider Boots: press jump again in the air for a second jump
-    P.dj = true; P.vy = Math.max(P.vy, DJ_V); sfx('djump'); burst(tmp.set(P.pos.x, P.pos.y + .1, P.pos.z), 0xe8eef2, 6);
+    P.dj = true; P.vy = Math.max(P.vy, DJ_V); sfx('djump'); burst(tmp.set(P.pos.x, P.pos.y + .1, P.pos.z), 0xe8eef2, 6); net.ev('djump');
   }
   jumpWas = jumpKey;
   const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
@@ -197,6 +197,7 @@ function update(dt) {
       if (z.dead > 1.5) { if (z.angel) angelGone(z); scene.remove(z.g); zombies.splice(i, 1); }
       continue;
     }
+    if (z.remote) { net.applyRemote(z, dt); continue; } // another player online: moved by what the server sends, nothing here touches it
     if (!(z.hp > 0)) { // safety net: still standing with no (or broken) health. Finish it off, credited to whoever hit it last
       z.hp = 0; hurtZombie(z, 1, z.g.position.clone().setY(z.g.position.y + 1), false, true, z.hitBy && z.hitBy !== YOU_T ? z.hitBy : null);
       continue;
@@ -308,11 +309,14 @@ function update(dt) {
     const r = rockets[i], step = ROCKET_SPD * dt; r.life -= dt;
     ray2.set(r.m.position, r.dir); ray2.far = step;
     const hit = ray2.intersectObjects(targetsFor(r.by), false)[0];
-    const onYou = r.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    const onYou = !r.ghost && r.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
     if (hit || onYou || r.life <= 0) {
       scene.remove(r.m); rockets.splice(i, 1);
+      if (r.ghost) continue; // someone else's online: the server's boom says where it really went off
+      const at = onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone();
+      net.boom(r.id, at);
       // your rocket hurts you up to ROCKET_SELF. A bot's rocket hurts you as much as yours hurts a bot
-      blast(onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone(), ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, true);
+      blast(at, ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, true, r.id);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);

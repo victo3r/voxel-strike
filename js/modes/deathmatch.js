@@ -254,7 +254,7 @@ function pickGun(b, d) {
   let best = b.gun, bestS = -1;
   for (const g of b.rec.load) {
     const w = BASE[g], left = g === b.gun ? b.ammo : b.mags[g];
-    let s = GUN_FIT[w.id](d) * b.rec.taste[w.id];
+    let s = GUN_FIT[w.id](d) * (b.rec.taste?.[w.id] ?? 1); // (another player's record has no tastes)
     if (!w.inf && left <= 0) s *= .35;
     if (g === b.gun) s *= 1.15;
     if (s > bestS) { bestS = s; best = g; }
@@ -271,8 +271,9 @@ function botEquip(b, g) {
   const W = b.rec.W[g];
   if (!W.inf && b.ammo <= 0) { b.reload = SWAP_T + W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); } // picked up an empty one: reload it
 }
-function makeBot(rec) {
-  const [x, z] = spawnSpot(rec);
+// spot = where to put it ({x, z, yaw?}): online, where the server says. Otherwise it picks a spawn spot itself
+function makeBot(rec, spot) {
+  const [x, z] = spot ? [spot.x, spot.z] : spawnSpot(rec);
   const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(rec.armor);
   if (arm) dressArmor(ch, rec.armor, teamMode() ? TEAMS[rec.team].shirts[0] : null);
   dressBoots(ch, rec.boots); dressHat(ch, rec.hat);
@@ -283,10 +284,10 @@ function makeBot(rec) {
   ch.headPiv.rotation.order = 'YXZ';
   const tag = new THREE.Sprite(rec.tag); tag.scale.set(rec.tagW, .25, 1); tag.position.y = 2.25;
   g.add(tag); scene.add(g);
-  const yaw = Math.atan2(-x, -z);
+  const yaw = spot?.yaw ?? Math.atan2(-x, -z);
   g.rotation.y = yaw;
   const mags = {}; for (const i of rec.load) mags[i] = rec.W[i].mag; // every gun full on respawn
-  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec,
+  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec, pid: rec.pid, remote: !!rec.remote,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, armor: arm ? arm.hp : 0, maxArmor: arm ? arm.hp : 0, dr: arm ? arm.dr : 0, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, fireEnd: 'flameEnd', leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
@@ -297,13 +298,20 @@ function makeBot(rec) {
   zombies.push(b); rec.b = b;
   return b;
 }
-// a bot died (called from hurtZombie). by = the bot that killed it, or null if it was you. nobody = it drowned, no credit
-function botDown(b, by, head, nobody = false) {
+// the look and sound of a bot dying: tag and muzzle off, its fire or beam cut, a death cry, and the angel (unless it drowned).
+// nobody = it drowned (no cry). Online, net.js calls this when the server says someone died
+function botDownFx(b, nobody = false) {
+  b.hp = Math.min(b.hp, 0); b.dead ||= .0001; // (whatever killed it offline has set these already)
   b.tag.visible = false; b.flashM.visible = false;
   if (b.fireOn > 0) { b.fireOn = 0; sfx(b.fireEnd, { at: b.g.position, far: 50 }); }
-  b.rec.wait = MR.bot + DIE_T; // its angel floats away first
+  const bm = beams.get(b); if (bm) { scene.remove(bm.g); beams.delete(b); } // its heat ray beam goes with it
   if (!nobody) sfx('die', { at: b.g.position, far: 40 });
   if (!b.drowned) angel(b); // one that drowned just sinks
+}
+// a bot died (called from hurtZombie). by = the bot that killed it, or null if it was you. nobody = it drowned, no credit
+function botDown(b, by, head, nobody = false) {
+  botDownFx(b, nobody);
+  b.rec.wait = MR.bot + DIE_T; // its angel floats away first
   scoreKill(nobody ? null : by ? by.rec : youRec, b.rec, head, b.helpers);
 }
 // dying: the bot turns into a see-through angel (white glow, halo, wings, arms out) that floats up and fades away.
@@ -341,16 +349,22 @@ function angelTick(b, t) {
   for (const m of b.mats) m.opacity = .6 * o;
   a.mats[0].opacity = .95 * o; a.mats[1].opacity = .7 * o;
 }
-function angelGone(b) { b.angel.mats.forEach(m => m.dispose()); b.angel = null; }
-// you died in deathmatch (called from hurtPlayer). by = the bot that got you, or nothing if it was your own rocket
-function youDown(by) {
-  respawnT = YOU_RESPAWN; killedBy = by ? by.rec.name : ''; P.burn = 0;
-  scoreKill(by ? by.rec : null, youRec, false, youHelpers);
+function angelGone(b) { b.angel.mats.forEach(m => m.dispose()); b.angel = null; const bm = beams.get(b); if (bm) { scene.remove(bm.g); beams.delete(b); } }
+// you're down: the respawn wait starts, the banner names who got you and the camera turns to watch them (dmDown). No scoring here.
+// by = the bot (or online, the player) that got you, or nothing if it was your own rocket
+function youDownFx(by) {
+  respawnT = YOU_RESPAWN; killedBy = by ? by.rec.name : ''; P.burn = 0; P.hp = 0;
   killCam = by && !friendly(by, YOU_T) ? { b: by, at: by.g.position.clone(), yaw: P.yaw, pitch: P.pitch } : null;
 }
-function respawnYou() {
-  const [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { drowned: false, burn: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
+// you died in deathmatch (called from hurtPlayer). by = the bot that got you, or nothing if it was your own rocket
+function youDown(by) {
+  youDownFx(by);
+  scoreKill(by ? by.rec : null, youRec, false, youHelpers);
+}
+// x, z, yaw = where you come back (online: where the server put you). Otherwise it picks a spot
+function respawnYou(x, z, yaw) {
+  if (x == null) [x, z] = spawnSpot(YOU_T);
+  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   youHelpers.clear(); killCam = null;
   cancelReload(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
@@ -420,8 +434,8 @@ function botStab(b, W, t, dist) {
   if (dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing) return;
   const at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
   sfx('slash', { at, far: 20 });
-  if (t.you) hurtPlayer(Math.round(W.dmg * BOT.dmgMul), false, b);
-  else hurtZombie(t, W.dmg * BOT.dmgMul, at, false, false, b);
+  if (t.you) hurtPlayer(Math.round(W.dmg * BOT.dmgMul), false, b, false, 1);
+  else hurtZombie(t, W.dmg * BOT.dmgMul, at, false, false, b, 1);
 }
 // flamethrower: a short cone in front of it that hits you and every other bot in it (not through walls) and sets them on fire
 const coneV = new THREE.Vector3(), flameV = new THREE.Vector3();
@@ -443,8 +457,8 @@ function botFlame(b, W) {
     if (along <= 0 || along > W.range) continue;
     if (Math.sqrt(Math.max(0, d * d - along * along)) > .5 + along * .15 + .3) continue; // how far it is from the middle of the cone
     if (!clearLine(eye, c)) continue;
-    if (o.you) { hurtPlayer(W.dmg, false, b); burnYou(BURN_T, W.dmg * .6, b); }
-    else { hurtZombie(o, W.dmg, c, false, false, b); o.burn = BURN_T; o.burnDmg = W.dmg * .6; o.burnBy = b; }
+    if (o.you) { hurtPlayer(W.dmg, false, b, false, 3); applyBurn(P, BURN_T, W.dmg * .6, b, 'flame'); }
+    else { hurtZombie(o, W.dmg, c, false, false, b, 3); applyBurn(o, BURN_T, W.dmg * .6, b, 'flame'); }
   }
 }
 function botFire(b, W, dist) {
@@ -486,10 +500,10 @@ function botFire(b, W, dist) {
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45;
-      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head);
+      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head, 0);
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
-      if (!zz.dead) hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b);
+      if (!zz.dead) hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, 0);
     } else burst(wall.point, 0x999999, 2);
   }
 }
@@ -630,6 +644,7 @@ function updateBot(b, dt) {
 function dmDown(dt) {
   if (respawnT <= 0) return false;
   respawnT -= dt;
+  if (net.on) respawnT = Math.max(respawnT, .01); // online you only come back when the server says so (spawn -> respawnYou)
   if (respawnT <= 0) { respawnYou(); return false; }
   adsT = 0; if (camera.fov !== 75) { camera.fov = 75; camera.updateProjectionMatrix(); }
   $('scope').style.display = $('holo').style.display = 'none'; $('cross').style.display = 'none'; vm.visible = false;
@@ -648,12 +663,13 @@ function dmDown(dt) {
     camera.rotation.set(k.pitch, k.yaw, 0);
   }
   else { camera.position.set(P.pos.x, P.pos.y + 1.6 + f * f * .5 + Math.min(t, 1.5) * 1.2, P.pos.z); camera.rotation.set(P.pitch + (-.9 - P.pitch) * f, P.yaw, 0); }
-  const b = $('banner'); b.textContent = `${killedBy ? 'KILLED BY ' + killedBy : 'YOU DIED'}\n${Math.ceil(respawnT)}`; b.style.opacity = 1;
+  const b = $('banner'); b.textContent = net.on && net.banner ? net.banner : `${killedBy ? 'KILLED BY ' + killedBy : 'YOU DIED'}\n${Math.ceil(respawnT)}`; b.style.opacity = 1;
   return true;
 }
 let lastTop = '', lastBoard = '', lastSec = 0;
 function updateDM(dt) {
   if (matchOver) return; // the mouse can stay locked for a frame or two after the end, don't pay out twice
+  if (net.on) { net.matchTick(dt); return; } // online: the server runs the match (clock, joins, scores); net.js draws it
   while (joins.length && MATCH_T - matchT >= joins[0].at) joinBot(joins.shift());
   chatTick(dt); burnTick(dt);
   for (const r of recs) if (!r.you && (!r.b || r.b.dead) && (r.wait -= dt) <= 0) makeBot(r); // bots come back after their body falls
@@ -671,14 +687,15 @@ function updateDM(dt) {
   if (show) { const h = boardHTML(); if (h !== lastBoard) $('board').innerHTML = lastBoard = h; }
   if (matchT <= 0) endMatch();
 }
-function endMatch() {
+// results = what the server says it was, online: { place, won, xp, gold, lead }. Offline it works them out here
+function endMatch(results) {
   matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('banner').style.opacity = 0;
-  const place = ranked().indexOf(youRec) + 1, lead = teamLead();
+  const place = results ? results.place : ranked().indexOf(youRec) + 1, lead = results ? results.lead : teamLead();
   $('postSub').textContent = MR.name + ' OVER';
   $('postPlace').textContent = MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
   $('postBoard').innerHTML = boardHTML();
-  const won = MR.team ? lead > 0 : place === 1;
-  const [xp, gold] = MR.team ? teamReward(lead) : rewardFor(place), { ups, bonus } = grant(xp, gold);
+  const won = results ? results.won : MR.team ? lead > 0 : place === 1;
+  const [xp, gold] = results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place), { ups, bonus } = grant(xp, gold);
   $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ${COIN}</span></div>`
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ${COIN}</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
@@ -686,8 +703,8 @@ function endMatch() {
   if (ups) setTimeout(() => sfx('levelUp'), 700);
   document.exitPointerLock();
 }
-$('againBtn').addEventListener('click', () => { restart(); lockMouse(); });
-$('postLobby').addEventListener('click', () => { restart(); showLobby(true); });
+$('againBtn').addEventListener('click', () => { if (net.on) { net.again(); return; } restart(); lockMouse(); });
+$('postLobby').addEventListener('click', () => { net.leave(); restart(); showLobby(true); });
 
 // deathmatch: a gun from your account, at the stars you picked to use (gunUse, js/armory.js), with full ammo
 function giveGun(g) {
@@ -698,12 +715,13 @@ function giveGun(g) {
 function setupMode() {
   matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = ''; youHelpers.clear(); killCam = null;
   MR = RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join;
-  BOT_COUNT = MR.players[MAP.size] - 1;
+  BOT_COUNT = net.on ? 0 : MR.players[MAP.size] - 1; // online the room is other people
   $('post').style.display = 'none'; $('board').style.display = 'none'; $('banner').style.opacity = 0; // clears "KILLED BY" if you left while dead
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
   $('chat').style.display = pvp() ? '' : 'none';
   if (pvp()) {
-    makeRecs(); matchT = MATCH_T; wearArmor();
+    if (net.on) { net.roster(); joins = []; } else makeRecs(); // online: the roster is the room's players (net.js keeps recs and youRec)
+    matchT = MATCH_T; wearArmor();
     BASE.forEach((w, g) => { if (hasGun(g)) giveGun(g); });
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
     cur = slotGun[0]; buildGun(); renderHotbar();

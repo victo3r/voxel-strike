@@ -257,6 +257,7 @@ $('menu').addEventListener('click', () => {
 });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
+  net.onLock?.(locked); // online: locking the mouse is also when you ask to spawn (js/net.js)
   $('menu').style.display = locked || shopOpen || inLobby || matchOver ? 'none' : 'flex';
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
   if (locked) closeArmory();
@@ -281,7 +282,7 @@ function showLobby(on) {
   vm.visible = !on;
   if (on) { $('menu').style.display = 'none'; camera.fov = 75; camera.updateProjectionMatrix(); musicLobby(); armIcon(); }
 }
-$('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); restart(); showLobby(true); });
+$('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); restart(); showLobby(true); });
 
 // PLAY: pick a mode, then one of the maps that mode can be played on. Picking the map starts the match.
 // A mode with `sub` opens a second page to pick between its versions (Blitz: free for all or team) before the maps.
@@ -296,39 +297,80 @@ const MODES = [
     { id: 'blitz', name: 'FREE FOR ALL', title: 'BLITZ · FREE FOR ALL', desc: 'Everyone for themselves. Most kills wins', maps: ALL_MAPS },
     { id: 'blitzTeam', name: 'TEAM', title: 'BLITZ · TEAM', desc: 'Blue vs red. The team with the most kills wins', maps: ALL_MAPS },
   ] },
+  { id: 'private', name: 'PRIVATE MATCH', desc: 'Make a room for your friends, or join one with a code', priv: true },
 ];
-const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : [m]); // the ones you can actually start
+const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : m.priv ? [] : [m]); // the ones you can actually start
 if (!MAPS[mapId]) mapId = 'yard';
 const savedMode = localStorage.getItem('voxelstrike-mode');
 if (PLAY_MODES.some(m => m.id === savedMode)) mode = savedMode;
-let pickMode = null; // null = choosing a mode, a mode with sub = choosing its version, otherwise the mode whose maps are listed
+// pickMode: null = choosing a mode, a mode with sub = choosing its version, a playable mode = choosing its map,
+// 'private' = CREATE / JOIN, 'privCreate' = choosing the mode for a private room, 'privJoin' = typing a friend's code.
+// pickPriv = the match being set up is a private room (always online, so the ONLINE / VS BOTS pill is hidden)
+let pickMode = null, pickPriv = false;
+// ONLINE / VS BOTS on the map page. Remembered per device; online unless this network can't open a socket (net.wsOk, js/net.js)
+const onlinePref = () => { if (net.wsOk === false) return false; const s = localStorage.getItem('voxelstrike-online'); return s === null ? true : s === '1'; };
+function renderPill() {
+  const on = onlinePref(), blocked = net.wsOk === false;
+  document.querySelectorAll('#pickPill button').forEach(b => { b.classList.toggle('sel', (b.dataset.on === '1') === on); b.disabled = blocked && b.dataset.on === '1'; });
+  $('pillNote').textContent = blocked ? 'Online play is not available on this network' : on ? 'Play against other people' : 'A match against bots on this device';
+}
+$('pickPill').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  localStorage.setItem('voxelstrike-online', b.dataset.on); renderPill(); sfx('ui');
+});
+const PRIV_CARDS = [
+  { id: 'privCreate', name: 'CREATE ROOM', desc: 'Pick a mode and a map, then share the code with your friends' },
+  { id: 'privJoin', name: 'JOIN WITH CODE', desc: 'Type the 6-letter code a friend gave you' },
+];
 function renderPick() {
   const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
-  $('pickTitle').textContent = m ? m.title || m.name : group ? group.name : 'SELECT MODE';
-  $('pickBack').innerHTML = ico('left') + ' ' + (m || group ? (m?.parent ? 'BLITZ' : 'MODES') : 'BACK');
-  $('pickList').className = m ? 'maps' : 'modes';
+  const priv = pickMode === 'private', join = pickMode === 'privJoin', create = pickMode === 'privCreate';
+  $('pickTitle').textContent = m ? m.title || m.name : group ? group.name : priv ? 'PRIVATE MATCH' : join ? 'JOIN WITH A CODE' : create ? 'PRIVATE · SELECT MODE' : 'SELECT MODE';
+  const back = m ? (m.parent ? 'BLITZ' : pickPriv ? 'PRIVATE' : 'MODES') : group ? (pickPriv ? 'PRIVATE' : 'MODES') : priv ? 'MODES' : join || create ? 'PRIVATE' : 'BACK';
+  $('pickBack').innerHTML = ico('left') + ' ' + back;
+  $('pickList').className = m ? 'maps' : join ? 'code' : 'modes';
+  const pill = !!m && m.id !== 'zombies' && !pickPriv;
+  $('pickPill').style.display = pill ? '' : 'none'; if (pill) renderPill();
   const card = o => `<button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b><small>${o.desc}</small></button>`;
+  if (join) {
+    $('pickList').innerHTML = `<div class="codeBox"><p>Ask a friend for their room code</p><div><input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" autocapitalize="characters"><button id="codeGo">JOIN</button></div><p id="codeErr"></p></div>`;
+    $('codeIn').focus(); return;
+  }
   // map cards show a picture of the map (img/maps/, taken from above in the game itself)
   $('pickList').innerHTML = m
     ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
         return `<button data-map="${id}" style="background-image:linear-gradient(transparent 45%,rgba(0,0,0,.72)),url('img/maps/${id}.jpg?v=${V_MAPS}')"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
-    : (group ? group.sub : MODES).map(card).join('');
+    : (priv ? PRIV_CARDS : group ? group.sub : create ? MODES.filter(x => x.id !== 'zombies' && !x.priv) : MODES).map(card).join('');
 }
 const pickOpen = () => $('pick').style.display === 'flex';
 function showPick(on) {
   $('pick').style.display = on ? 'flex' : 'none';
   $('lobbyUI').style.display = on ? 'none' : '';
-  if (on) { pickMode = null; renderPick(); }
+  if (on) { pickMode = null; pickPriv = false; renderPick(); }
 }
-$('playBtn').addEventListener('click', () => { showPick(true); sfx('ui'); });
+$('playBtn').addEventListener('click', () => { showPick(true); net.probe?.(); sfx('ui'); });
 $('pickBack').addEventListener('click', () => {
-  if (pickMode) { pickMode = PLAY_MODES.find(m => m.id === pickMode)?.parent ?? null; renderPick(); } else showPick(false);
-  sfx('ui');
+  const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
+  if (pickMode === 'private') pickMode = null;
+  else if (pickMode === 'privJoin' || pickMode === 'privCreate') { pickMode = 'private'; pickPriv = false; }
+  else if (m) pickMode = m.parent ?? (pickPriv ? 'privCreate' : null);
+  else if (group) pickMode = pickPriv ? 'privCreate' : null;
+  else { showPick(false); sfx('ui'); return; }
+  renderPick(); sfx('ui');
 });
+function joinWithCode() {
+  const code = ($('codeIn')?.value || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
+  if (code.length !== 6) { $('codeErr').textContent = 'A code is 6 letters and numbers'; return; }
+  $('codeErr').textContent = ''; sfx('ui'); net.start({ code });
+}
 $('pickList').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
+  if (e.target.closest('#codeGo')) return joinWithCode();
+  const b = e.target.closest('button'); if (!b || !(b.dataset.mode || b.dataset.map)) return;
   if (b.dataset.mode) {
-    pickMode = b.dataset.mode;
+    const id = b.dataset.mode;
+    if (id === 'private') { pickMode = 'private'; pickPriv = false; renderPick(); sfx('ui'); return; }
+    if (id === 'privCreate' || id === 'privJoin') { pickMode = id; pickPriv = id === 'privCreate'; renderPick(); sfx('ui'); return; }
+    pickMode = id;
     const m = PLAY_MODES.find(m => m.id === pickMode);
     if (m) { // a mode you can play (not the Blitz page): remember it, then show its maps
       mode = pickMode; localStorage.setItem('voxelstrike-mode', mode);
@@ -337,8 +379,11 @@ $('pickList').addEventListener('click', e => {
     renderPick(); sfx('ui'); return;
   }
   mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId);
+  // online: net.js finds a room and starts the match itself (and drops back to a bot match if it can't)
+  if (mode !== 'zombies' && (pickPriv || onlinePref())) { net.start({ mode, map: mapId, create: pickPriv }); return; }
   showPick(false); restart(); showLobby(false); lockMouse();
 });
+$('pickList').addEventListener('keydown', e => { if (e.target.id === 'codeIn' && (e.code === 'Enter' || e.code === 'NumpadEnter')) { e.preventDefault(); joinWithCode(); } });
 addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && pickOpen()) $('pickBack').click(); });
 // your name: saves when you click away or press Enter. Blank goes back to the old one. The dice rolls a random one.
 $('nameIn').value = myName;
@@ -416,6 +461,15 @@ const BOLT_ICON = [
   '....KKKKKK.', '...KyyyyyK.', '...KyyyyK..', '..KyyyyK...', '..KyyyKKKKK', '.KyyyyyyyyK',
   '.KKKKKyyyK.', '.....KyyK..', '....KyyK...', '....KyK....', '...KyK.....', '...KK......',
 ];
+// a padlock (private matches) and a key (join with a code)
+const LOCK_ICON = [
+  '....KKKK....', '...KbbbbK...', '..KbbKKbbK..', '..KbK..KbK..', '..KbK..KbK..', '.KKKKKKKKKK.',
+  '.KyyyyyyyyK.', '.KyyyKKyyyK.', '.KyyyKKyyyK.', '.KyyyyKyyyK.', '.KyyyyyyyyK.', '.KKKKKKKKKK.',
+];
+const KEY_ICON = [
+  '..KKKK......', '.KyyyyK.....', 'KyyKKyyK....', 'KyyK.KyyK...', 'KyyKKyyKK...', '.KyyyyKyyK..',
+  '..KKKKKyyyK.', '......KyyyK.', '......KyyKyK', '......KyyK.K', '......KyyKKK', '......KKK...',
+];
 const iconFigure = c => ['KKKKKKK', 'KhhhhhK', 'KsssssK', 'KsKsKsK', 'KsssssK', 'KKKKKKK', `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, 'KKKKKKK'];
 const TEAM_ICON = iconFigure('b').map((r, k) => r + '..' + iconFigure('r')[k]);
 const MODE_ICONS = {
@@ -435,10 +489,14 @@ const MODE_ICONS = {
   ], { K: '#000', w: '#fff3c4' }),
   blitz: artIcon(BOLT_ICON, { K: '#000', y: '#ffd23a' }),
   blitzTeam: artIcon(BOLT_ICON, { K: '#000', y: (x, y) => x + y < 11 ? '#3d7ce6' : '#e0453a' }),
+  private: artIcon(LOCK_ICON, { K: '#000', y: '#e0b84a', b: '#aab2bc' }),
+  privCreate: artIcon(LOCK_ICON, { K: '#000', y: '#e0b84a', b: '#aab2bc' }),
+  privJoin: artIcon(KEY_ICON, { K: '#000', y: '#e0b84a' }),
 };
 showLobby(true);
 
-function restart() {
+// spot = where to stand ({ x, y, z, yaw }) when the server has already picked your place, instead of the middle of the map
+function restart(spot) {
   zombies.forEach(z => scene.remove(z.g)); zombies.length = 0;
   booms.forEach(b => scene.remove(b.m)); booms.length = 0;
   rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;
@@ -447,6 +505,7 @@ function restart() {
   parts.forEach(p => scene.remove(p.m)); parts.length = 0;
   useMap(mapId); setupPads();
   Object.assign(P, { drowned: false, burn: 0, vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, 0, 0); P.pos.lag = 0;
+  if (spot) { P.pos.set(spot.x, spot.y ?? 0, spot.z); P.yaw = spot.yaw ?? 0; }
   wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = '';
   WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); cancelReload(); soundsOff(); newBest = false;
   emptyPads();

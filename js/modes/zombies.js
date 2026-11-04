@@ -60,11 +60,26 @@ function spawnZombie(type = pickType()) {
     if (!blocked(x, z, r0, 0) && !overWater(x, z, 0) && !poolAt(x, z) && Math.hypot(x - P.pos.x, z - P.pos.z) > (MAP.water ? 14 : 10)) return makeZombie(x, z, type);
   }
 }
+// the look and sound of a hit on a zombie or bot: sparks for burn ticks, else a red flash, a splash of blood and a grunt
+function hitFx(zz, point, head, quiet) {
+  if (quiet) { burst(point, 0xff7a1a, 2); return; }
+  const big = zz.type === 'brute' || zz.type === 'boss';
+  zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4);
+  // the hit sound comes from whoever got hit (zombies sound lower), so it's quiet when they're far away
+  hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
+}
 // quiet = burn damage: small orange sparks, no red flash or hit marker
 // by = the deathmatch bot doing the damage, or null if it's you
-function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
+// kind = what did it, for online play (0 bullet, 1 knife, 2 beam tick, 3 flame tick, 4 rocket splash, 5 flare, 6 flare splash),
+// pj = the rocket or flare's id when it was one
+function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0) {
   if (!Number.isFinite(dmg)) return; // a bad number here would leave it with NaN health, and then nothing could ever kill it
   if (zz.type === 'bot' && friendly(by, zz)) return; // team modes: no friendly fire
+  if (net.on && zz.remote) { // online: the server owns its health. Show the hit, and tell the server what you claim you did
+    if (!quiet) { hitFx(zz, point, head, false); if (!by) hitMarker(head ? 'head' : 'body'); }
+    net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj });
+    return;
+  }
   if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // its hat: a helmet can stop a headshot, a hood can halve the hit
   // boots that add damage (yours, or the bot's that hit it). Health isn't rounded, so even a few % on a small hit counts
   dmg *= 1 + (by ? by.rec?.fx.dmg ?? 0 : youFx().dmg);
@@ -81,12 +96,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
     (zz.helpers ??= new Set()).add(by ? by.rec : youRec); // everyone who hurt it this life, for assists (a new bot body each life)
   }
   const big = zz.type === 'brute' || zz.type === 'boss';
-  if (quiet) burst(point, 0xff7a1a, 2);
-  else {
-    zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4);
-    // the hit sound comes from whoever got hit (zombies sound lower), so it's quiet when they're far away
-    hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
-  }
+  hitFx(zz, point, head, quiet);
   // your hit marker: red if it died (burns too), else gold for a headshot, white for the body. Burn ticks alone don't show one
   if (!by && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
   if (dies) {
@@ -100,28 +110,48 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null) {
     }
   }
 }
+// the look and sound of a hit on you: a grunt (a clank when your armor or helmet took it), and a flash of the screen
+// (silver when the armor took all of it). silver defaults to armorOnly; hurtPlayer keeps them apart (a helmet-stopped headshot clanks but flashes red)
+function youHitFx(head, armorOnly, silver = armorOnly) {
+  hurtSfx(P, armorOnly ? 'armorHit' : head ? 'hurtHead' : 'hurt');
+  if (P.hp <= 0) sfx('die');
+  $('hit').style.background = silver ? '#c9ced6' : 'red';
+  $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
+}
 // pierce = damage that skips armor and hits HP directly. by = the deathmatch bot that shot you. head = it was a headshot
-function hurtPlayer(d, pierce = false, by = null, head = false) {
+// kind and pj: what did it, for online play (see hurtZombie)
+function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0) {
   if (respawnT > 0 || matchOver || by && friendly(by, YOU_T)) return; // by = null is your own rocket, that still hurts
+  if (net.on) { // online: the server decides what you took (it comes back as a dmg event). Send the claim (e.g. your own rocket)
+    net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj });
+    return;
+  }
   if (by?.rec) d *= 1 + by.rec.fx.dmg; // a bot in damage boots
   if (by?.rec) youHelpers.add(by.rec); // for assists, cleared when you respawn
   const wasHead = head; [d, head] = gearHit(youFx(), d, head); // your hat: Warrior Helmet can stop a headshot, Raider Hood can halve the hit
   d *= 1 - P.dr - youFx().dr; // worn armor from Amethyst up and Warrior Boots cut every hit, added together (health can go fractional, the HUD rounds it up)
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;
-  hurtSfx(P, soak === d || wasHead && !head ? 'armorHit' : head ? 'hurtHead' : 'hurt'); // a headshot your helmet stopped clanks
-  if (P.hp <= 0) sfx('die');
-  $('hit').style.background = soak === d ? '#c9ced6' : 'red'; // silver flash = armor took all of it
-  $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
+  youHitFx(head, soak === d || wasHead && !head, soak === d); // a headshot your helmet stopped clanks; silver flash = armor took all of it
   if (P.hp <= 0 && pvp()) { P.hp = 0; youDown(by); return; }
   if (P.hp <= 0 && !dead) { P.hp = 0; dead = true; saveBest(); document.exitPointerLock(); }
+}
+// set someone on fire: t seconds of it, dmgPerTick every quarter second. by = who lit them (null = you), gunId = what with
+// ('flame' or 'flare', for online play). max = keep whichever is longer/stronger if they're already burning (a flare does)
+function applyBurn(victim, t, dmgPerTick, by, gunId, max = false) {
+  if (net.on) { net.burn(victim, gunId); return; } // online: the server runs the burn
+  if (victim === P) { burnYou(t, dmgPerTick, by); return; }
+  if (max) { victim.burn = Math.max(victim.burn || 0, t); victim.burnDmg = Math.max(victim.burnDmg || 0, dmgPerTick); }
+  else { victim.burn = t; victim.burnDmg = dmgPerTick; }
+  victim.burnBy = by;
 }
 // fell into deep water: a splash, then you're out, whatever your HP and armor
 function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 14); } // at the surface, you've already gone under
 function drownYou() {
-  if (respawnT > 0 || matchOver || dead) return;
+  if (respawnT > 0 || matchOver || dead || P.drowned) return;
   sfx('splash'); splash(P.pos);
   P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0; P.drowned = true;
+  if (net.on) { P.drownFlag = true; return; } // online: you tell the server (a flag in your next packet) and it calls it. You sink meanwhile
   if (pvp()) { youDown(null); return; }
   dead = true; saveBest(); document.exitPointerLock();
 }
@@ -163,11 +193,29 @@ function explode(z) {
 // an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
 // by = the deathmatch bot whose rocket it was: it gets the kills, and takes no more than ROCKET_SELF itself, like you do from yours.
 // rocket = it was a rocket, so it also throws everyone in it (rocket jumping, see launch in combat.js). Exploders don't
-function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false) {
+// the look and sound of an explosion at p: sparks, smoke, a growing fireball and a bang
+function blastFx(p, R) {
   burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
+}
+// pj = the rocket's id, for online play
+function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
+  blastFx(p, R);
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
+  if (net.on) { // online: the server works out who it hurt from your claims. Only your own rocket throws you, right away
+    const gun = rocket ? 'rocket' : 'flare', kind = rocket ? 4 : 6;
+    if (pd < R && !dead && respawnT <= 0) {
+      if (pDmg) net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj });
+      if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true);
+    }
+    for (const o of zombies) {
+      if (o === skip || o.dead || !o.remote) continue;
+      const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
+      if (od < R) net.claim(o, { kind, point: c, gun, pj });
+    }
+    return;
+  }
   if (pd < R && !dead && respawnT <= 0) {
     if (pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by);
     if (rocket && respawnT <= 0 && !dead && !(by && friendly(by, YOU_T))) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, !by);

@@ -5,7 +5,7 @@ const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought yet (starter
 // the stars you take into a match: all of them unless you picked fewer (prof.use). Bots never roll more than this
 const gunUse = i => { const st = gunStars(i), u = prof.use?.[BASE[i].id]; return u ? Math.max(1, Math.min(st, u)) : st; };
 const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
-const inMatch = () => !inLobby && pvp() && !matchOver;
+const inMatch = () => !inLobby && pvp() && !matchOver && !net.on; // online, what you buy applies from your next match
 
 // the four main stats at the stars you're using: damage, fire rate, capacity (mag size) and mobility.
 // [label, value, unit]. One-shot guns fire once per reload, so that's their fire rate. A beam fires nonstop

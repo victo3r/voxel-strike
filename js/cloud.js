@@ -159,7 +159,7 @@ renderAcct();
 if (auth) { if (sync.user !== auth.user) { sync.user = auth.user; saveSync(); } pull(); }
 // pick up progress from your other devices when you come back to this tab or sit in the lobby
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') pull();
+  if (document.visibilityState === 'visible') { if (inLobby) pull(); } // not mid-match: a pulled save would swap your gear under you
   else if (sync.dirty) push(true); // closing or switching away: send anything unsaved
 });
 setInterval(() => { if (inLobby && !document.hidden) { if (sync.dirty) push(); else pull(); } }, 30000);

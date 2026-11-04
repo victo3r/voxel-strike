@@ -6,7 +6,7 @@ function shoot() {
   if (cd > 0 || reloading > 0 || respawnT > 0) return;
   if (w.melee) return stab(w);
   if (ammo[cur] <= 0) { if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
-  ammo[cur]--; cd = w.rate;
+  ammo[cur]--; cd = w.rate; net.shot(w);
   if (gunSpin) gunSpinV = 30;
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);
@@ -25,7 +25,7 @@ function shoot() {
         const hit = ray.intersectObjects(targets, false)[0];
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
-        if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head); }
+        if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 0); }
         else burst(hit.point, 0x999999, 2);
       }
     }
@@ -34,12 +34,12 @@ function shoot() {
 }
 // knife: a few short rays around the crosshair so you don't need pixel-perfect aim. Hits one zombie per swing
 function stab(w) {
-  cd = w.rate; kick = 1; sfx('swing'); crossKick(kickFor(w));
+  cd = w.rate; kick = 1; sfx('swing'); crossKick(kickFor(w)); net.shot(w);
   const targets = shotTargets();
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
     const hit = ray2.intersectObjects(targets, false)[0], zz = hit?.object.userData.zombie;
-    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx('slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head); return; }
+    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx('slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1); return; }
     if (hit) return;
   }
 }
@@ -63,8 +63,8 @@ function flame(w) {
     if (off > .5 + along * .15 + zz.r) continue;
     ray2.set(camera.position, to.divideScalar(d)); ray2.far = d;
     if (ray2.intersectObjects(crateMeshes, false).length) continue;
-    hurtZombie(zz, w.dmg, c, false);
-    zz.burn = BURN_T; zz.burnDmg = w.dmg * .6; zz.burnBy = null;
+    hurtZombie(zz, w.dmg, c, false, false, null, 3);
+    applyBurn(zz, BURN_T, w.dmg * .6, null, 'flame');
   }
 }
 // heat ray: a straight beam from the gun to whatever's under your crosshair (out to its range), doing its damage every tick
@@ -75,7 +75,7 @@ function heatBeam(w) {
   const hit = ray2.intersectObjects(shotTargets(), false)[0];
   const end = hit ? hit.point : tmp.copy(camera.position).addScaledVector(fwd, w.range);
   const zz = hit?.object.userData.zombie;
-  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head); }
+  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); }
   if (hit && Math.random() < .35) burst(end, Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1); // scorching where it lands
   showBeam(null, flashMesh.getWorldPosition(beamFrom), end);
 }
@@ -136,51 +136,59 @@ function launchMove(o, pos, r, grounded, dt) {
   const k = Math.exp(-(grounded ? GROUND_DRAG : AIR_DRAG) * dt); o.lx *= k; o.lz *= k;
   if (Math.abs(o.lx) + Math.abs(o.lz) < .1) o.lx = o.lz = 0;
 }
-function fireRocket(w, from = null, dir = null, by = null) {
+// opts.ghost = someone else's rocket in an online match: it flies and looks the part, but the server says what it hit
+// (the explosion comes from their boom). opts.id = its id then; your own rockets get theirs from net.launch (0 offline)
+function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir);
   const m = new THREE.Group(), body = box(.1, .1, .4, lam({ color: 0x4b5b3b })), tip = box(.12, .12, .12, lam({ color: 0xaa3333 }));
   tip.position.z = .24; m.add(body, tip);
   m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
-  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by });
+  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id });
 }
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, how fast it falls
 const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and most splash damage. Never hurts whoever fired it, and the direct-hit target doesn't take it too
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
-function fireFlare(w, from = null, dir = null, by = null) {
+function fireFlare(w, from = null, dir = null, by = null, opts = {}) { // opts: see fireRocket
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir);
   const m = box(.14, .14, .14, flareMat);
   m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
-  flares.push({ m, v: dir.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0, by });
+  flares.push({ m, v: dir.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0, by, ghost: !!opts.ghost, id });
 }
+// the look and sound of a flare landing at p
+function flareFx(p) { burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8); sfx('flareHit', { at: p }); }
 function updateFlares(dt) {
   for (let i = flares.length - 1; i >= 0; i--) {
     const f = flares[i]; f.life -= dt; f.v.y -= FLARE_DROP * dt;
     const step = f.v.length() * dt;
     ray2.set(f.m.position, tmp.copy(f.v).normalize()); ray2.far = step;
     let hit = ray2.intersectObjects(targetsFor(f.by), false)[0];
-    const onYou = f.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    const onYou = !f.ghost && f.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
     if (onYou) hit = null;
     if (hit || onYou || f.life <= 0) {
       scene.remove(f.m); flares.splice(i, 1);
+      if (f.ghost) continue; // someone else's: the server's boom says where it really landed
       const p = onYou ? youHitP.clone() : hit ? hit.point : f.m.position;
-      burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8); sfx('flareHit', { at: p });
+      net.boom(f.id, p);
+      flareFx(p);
       if (onYou) {
         const head = p.y > P.pos.y + 1.45;
-        hurtPlayer(Math.round(f.dmg * (head ? 1.5 : 1)), false, f.by, head); burnYou(f.burnT, f.burn, f.by);
+        hurtPlayer(Math.round(f.dmg * (head ? 1.5 : 1)), false, f.by, head, 5, f.id); applyBurn(P, f.burnT, f.burn, f.by, 'flare');
       } else if (f.by && Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z) < FLARE_R + .3) { // a bot's flare landing next to you
         const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
-        hurtPlayer(Math.round(FLARE_SPLASH * (1 - Math.min(1, pd / FLARE_R) * .6)), false, f.by);
+        hurtPlayer(Math.round(FLARE_SPLASH * (1 - Math.min(1, pd / FLARE_R) * .6)), false, f.by, false, 6, f.id);
       }
       const zz = hit?.object.userData.zombie;
       if (zz && !zz.dead) {
         const head = !!hit.object.userData.head;
-        hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head, false, f.by);
-        if (!zz.dead && !(zz.type === 'bot' && friendly(f.by, zz))) { zz.burn = Math.max(zz.burn || 0, f.burnT); zz.burnDmg = Math.max(zz.burnDmg || 0, f.burn); zz.burnBy = f.by; }
+        hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head, false, f.by, 5, f.id);
+        if (!zz.dead && !(zz.type === 'bot' && friendly(f.by, zz))) applyBurn(zz, f.burnT, f.burn, f.by, 'flare', true);
       }
       for (const o of zombies) {
         if (o === zz || o === f.by || o.dead) continue;
         const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-        if (od < FLARE_R + o.r) hurtZombie(o, Math.round(FLARE_SPLASH * (1 - Math.min(1, od / FLARE_R) * .6)), c, false, false, f.by);
+        if (od < FLARE_R + o.r) hurtZombie(o, Math.round(FLARE_SPLASH * (1 - Math.min(1, od / FLARE_R) * .6)), c, false, false, f.by, 6, f.id);
       }
       continue;
     }

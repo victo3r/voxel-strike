@@ -2,6 +2,7 @@
 // or now and then a plain "?" / "ok" to anything else). Bots with names in another language usually answer in it.
 // The NATO-named bot never talks.
 let chatting = false, chatQ = [], chatGap = 0;
+const BOT_CHAT = false; // bots answering in chat is off: it gave the same replies every time, and online rooms have real people to talk to
 const CHAT_KEEP = 9; // seconds a line stays up before it fades (they all show while you're typing)
 const SAY = {
   en: { hi: ['hi', 'hey', 'yo', 'hello', 'sup', 'hii', 'gl hf', 'hey guys', 'heyy'], gg: ['gg', 'gg wp', 'ggs', 'good game', 'gg ez'],
@@ -70,7 +71,7 @@ function botsHear(text) {
 }
 
 function openChat() {
-  if (chatting || !pvp() || matchOver) return;
+  if (chatting || !pvp() || matchOver && !net.on) return;
   chatting = true; for (const k in keys) keys[k] = false;
   $('chat').classList.add('open'); $('chatIn').value = ''; $('chatIn').focus();
 }
@@ -83,7 +84,7 @@ $('chatIn').addEventListener('keydown', e => {
   if (e.code === 'Enter' || e.code === 'NumpadEnter') {
     e.preventDefault();
     const text = $('chatIn').value.replace(/\s+/g, ' ').trim().slice(0, 80);
-    if (text) { chatSay(youRec, text); botsHear(text); sfx('ui', { v: .5 }); }
+    if (text) { if (net.on) net.chat(text); else { chatSay(youRec, text); if (BOT_CHAT) botsHear(text); } sfx('ui', { v: .5 }); }
     closeChat();
   } else if (e.code === 'Escape') { e.preventDefault(); closeChat(); }
 });
