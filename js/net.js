@@ -14,6 +14,7 @@
 //   net.applyRemote(z, dt)   moves another player's body each frame
 //   net.roster()             setupMode: the players in the room become recs
 //   net.start(o) / again() / leave() / onLock(locked) / chat(text)
+//   net.room                 the room you're in (js/friends.js: JOIN / INVITE know who's already with you)
 const NET_V = 1;
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server (testing)
@@ -114,9 +115,9 @@ net = (() => {
   function start(o) {
     if (starting) return;
     if (api.on) leave(); // (PLAY AGAIN after a dropped match, or a new match from the lobby)
-    last = o; // kept for PLAY AGAIN (a private room's code lands on it once the room is made)
+    last = o; // kept for PLAY AGAIN (a private room's code lands on it once the room is made, a public room's name once you're in)
     const job = starting = { o, not: [], tries: 0, dead: false, timer: 0 };
-    showFinding(o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…');
+    showFinding(o.friend ? `JOINING ${o.friend.toUpperCase()}…` : o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…'); // friend: from the friends list
     job.timer = setTimeout(() => fail(job, 'Took too long to reach the servers'), 8000);
     findRoom(job).catch(e => fail(job, e?.message || 'Could not reach the servers'));
   }
@@ -132,6 +133,8 @@ net = (() => {
       r = await fetchJson('/play/private', { method: 'POST', body: JSON.stringify({ mode: o.mode, map: o.map }) });
       if (!r.room) throw new Error(r.error || 'Could not make a room');
       o.code = r.code;
+    } else if (o.room) { // a public room by name: a friend's, or the one you just played in (PLAY AGAIN keeps everyone together)
+      r = { room: o.room };
     } else {
       r = await fetchJson(`/play/find?mode=${encodeURIComponent(o.mode)}&map=${encodeURIComponent(o.map)}&not=${job.not.join(',')}`);
       if (!r.room) throw new Error(r.error || 'No room found');
@@ -174,7 +177,10 @@ net = (() => {
   function onClose(codeNum, reason, job) {
     const wasOn = api.on;
     if (job && !job.dead && !welcomed) { // never got in
-      if (codeNum === 4001 && job.tries++ < 3 && !job.o.code) { job.not.push(room); findRoom(job).catch(e => fail(job, e?.message || 'No room found')); return; }
+      if (codeNum === 4001 && job.tries++ < 3 && !job.o.code) { // full: look for another room of that mode and map
+        if (job.o.room) { job.o.room = null; netToast('That room is full — finding another', 3000); } else job.not.push(room);
+        findRoom(job).catch(e => fail(job, e?.message || 'No room found')); return;
+      }
       const why = { 4000: 'The game was updated. Reload the page to play online', 4001: 'That room is full', 4002: 'The server did not like that request', 4003: 'You were removed from that room', 4005: 'You joined from another tab' }[codeNum];
       fail(job, why || 'Could not connect');
       return;
@@ -201,7 +207,7 @@ net = (() => {
     if (ws) { try { ws.close(1000); } catch {} ws = null; }
     endOnline();
   }
-  function again() { if (!last) return; endOnline(); start(last.code ? { code: last.code } : { mode: last.mode, map: last.map }); }
+  function again() { if (!last) return; endOnline(); start(last.code ? { code: last.code } : { mode: last.mode, map: last.map, room: last.room }); }
 
   // ---- messages from the server
   function onMsg(m, job) {
@@ -238,6 +244,7 @@ net = (() => {
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     mode = w.mode; mapId = w.map;
     api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads);
+    if (last && !code && !rejoining) last.room = room; // PLAY AGAIN goes back to this room, so a group stays together
     // the roster: you, then everyone else, as bot-shaped records the rest of the game already understands
     for (const r of remotes.values()) dropBody(r);
     remotes.clear();
@@ -287,7 +294,7 @@ net = (() => {
     if (team !== undefined) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team colours on the shirt
     const tag = tagMat(name, css);
     if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; } // teammates' tags show through walls
-    return { pid: p.pid, uid: p.uid, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {},
+    return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {}, // fid: their player ID when signed in (js/friends.js)
       score: p.score | 0, kills: p.kills | 0, deaths: p.deaths | 0, assists: p.assists | 0, streak: p.streak | 0, alive: !!p.alive, b: null, wait: Infinity, remote: true };
   }
   function addRemote(p, announce) {
@@ -391,6 +398,7 @@ net = (() => {
     const won = MR.team ? lead > 0 : place === 1, [xp, gold] = m.rewards?.[pid] || [0, 0];
     phase = 'over'; alive = false; api.banner = '';
     endMatch({ place, won, xp, gold, lead, priv: !!m.priv });
+    if (typeof frPostButtons === 'function') frPostButtons(); // + ADD next to the players you could befriend (js/friends.js)
   }
   // ---- pickup pads: the server stocks them and says who got what (js/combat.js pads, js/main.js asks with pick when you stand on one)
   const padPos = new THREE.Vector3();
@@ -617,7 +625,7 @@ net = (() => {
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), probe, pick,
   });
   Object.defineProperties(api, { // read live (Object.assign would have copied them once)
-    pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt },
+    pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' },
   });
   return api;
 })();

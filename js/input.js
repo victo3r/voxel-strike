@@ -287,7 +287,7 @@ document.addEventListener('pointerlockchange', () => {
     // zombie waves death: the title says so, and clicking the background starts a new run
     $('menuTitle').textContent = dead ? 'YOU DIED' : pvp() ? 'MENU' : 'PAUSED';
     $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : pvp() ? '' : 'Click to resume';
-    $('armBtn').style.display = pvp() ? '' : 'none'; // zombie waves has its own shop between waves
+    $('armBtn').style.display = $('menuFriends').style.display = pvp() ? '' : 'none'; // zombie waves has its own shop between waves
     renderHelp();
   }
 });

@@ -2,12 +2,13 @@
 // Controls, sensitivity, volume and the last map you picked stay per device.
 // The server keeps a revision number that goes up on every save. A device only overwrites the cloud copy if nobody
 // else saved since it last synced; if someone did, whichever copy has more total progress wins.
-const CLOUD = 'https://sync.gemforge.org';
+const CLOUD = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || 'https://sync.gemforge.org'; // ?srv= points saves, friends and play at another server (testing)
 let auth = null, sync = { user: null, rev: 0, dirty: false };
 try { auth = JSON.parse(localStorage.getItem('voxelstrike-auth')); } catch {}
 try { sync = { ...sync, ...JSON.parse(localStorage.getItem('voxelstrike-sync')) }; } catch {}
 const saveSync = () => { try { localStorage.setItem('voxelstrike-sync', JSON.stringify(sync)); } catch {} };
 let changes = 0, busy = false, pushTimer = 0, cloudState = '', applying = false;
+let onAuth = () => {}; // js/friends.js sets this: the friend list refreshes when you sign in or out
 
 // lifetime coins earned, for comparing progress. Older saves didn't track it, so estimate it from coins + what the guns cost.
 if (prof.earned == null) {
@@ -114,6 +115,7 @@ async function pull() {
 
 // ---- account section of the settings page ----
 function renderAcct() {
+  onAuth();
   // the ☁ next to your level: grey and dashed for a guest, green when saved, pulsing yellow while saving, red when offline
   const cb = $('cloudBtn'), cs = !auth ? 'guest' : cloudState || 'saving';
   cb.className = cs;

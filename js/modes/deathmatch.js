@@ -176,7 +176,7 @@ function boardHTML() {
   // kill-only modes drop the score column (score = kills there)
   const cols = MR.kills ? ['KILLS', 'DEATHS'] : ['SCORE', 'KILLS', 'DEATHS'], cls = MR.kills ? 'lb k' : 'lb';
   const head = `<div class="r h"><span>#</span><span>PLAYER</span>${cols.map(c => `<span>${c}</span>`).join('')}</div>`;
-  const row = (r, i) => `<div class="r${r.you ? ' you' : ''}"><span>${i + 1}</span><span style="color:${r.css}">${r.name}</span>${MR.kills ? '' : `<span>${r.score}</span>`}<span>${r.kills}</span><span>${r.deaths}</span></div>`;
+  const row = (r, i) => `<div class="r${r.you ? ' you' : ''}"><span>${i + 1}</span><span style="color:${r.css}"${r.fid ? ` data-fid="${r.fid}"` : ''}>${r.name}</span>${MR.kills ? '' : `<span>${r.score}</span>`}<span>${r.kills}</span><span>${r.deaths}</span></div>`; // data-fid: a signed-in player online, the results screen adds a + ADD (js/friends.js)
   $('board').className = $('postBoard').className = cls;
   if (!MR.team) return head + ranked().map(row).join('');
   // team modes: a header per team with its kill total, then its players. Your team first
