@@ -373,7 +373,7 @@ function respawnYou(x, z, yaw) {
   Object.assign(P, { drowned: false, drownFlag: false, burn: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   youHelpers.clear(); killCam = null;
-  cancelReload(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
+  cancelReload(); recoilReset(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
 
 const eye = new THREE.Vector3(), beamTo = new THREE.Vector3(), aimV = new THREE.Vector3(), dirV = new THREE.Vector3(), hitV = new THREE.Vector3(), losDir = new THREE.Vector3();

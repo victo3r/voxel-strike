@@ -46,6 +46,19 @@ function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], {
 const upgradable = i => mode === 'zombies' ? !BASE[i].free : !BASE[i].start;
 const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
 let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0;
+// camera recoil (combat.js recoilKick, main.js recoilTick): a shot kicks the view up `up` degrees and a little to one side (`side`),
+// then it drifts back down at `back` (1 = a pistol's quick settle; lower is slower: the sniper doesn't kick far but eases back over
+// most of a second, scoped too). Aiming down sights softens a kick by ADS_SOFT. Camera-only: your aim ends up back where it was,
+// but a shot fired mid-kick goes where the camera points. Kept small on purpose, it's for feel. The knife has none
+const RECOIL = {
+  voxel: { up: 1.4, side: .3, back: 1 }, hitman: { up: 1.1, side: .25, back: 1 }, flare: { up: 2, side: .35, back: .8 },
+  ar: { up: .55, side: .25, back: 1 }, thrasher: { up: .5, side: .22, back: 1 }, eradicator: { up: .25, side: .2, back: 1.2 },
+  shotgun: { up: 2.8, side: .5, back: .6 }, rocket: { up: 2.6, side: .35, back: .5 },
+  sniper: { up: 1.8, side: .2, back: .28 }, semisniper: { up: 1.3, side: .18, back: .4 },
+  heatray: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 }, // every tick while held: a faint tremble
+};
+const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4; // rise: how fast the view gets to the kick (per second); back: the settle rate at back 1
+const rec = { tp: 0, ty: 0, p: 0, y: 0 }; // where the kick wants the view (pitch/yaw, degrees) and where the view is on its way there
 const ammo = WEAPONS.map(w => w.mag);
 const resMax = i => BASE[i].inf ? Infinity : WEAPONS[i].mag * 4;
 const reserve = WEAPONS.map(w => w.inf ? Infinity : 0);

@@ -116,7 +116,8 @@ function update(dt) {
   wetCheck(P, P.pos);
   easeLag(P.pos, dt);
   camera.position.set(P.pos.x, P.pos.y + 1.6 - (P.pos.lag || 0), P.pos.z);
-  camera.rotation.set(P.pitch, P.yaw, 0);
+  recoilTick(dt, w);
+  camera.rotation.set(P.pitch + rec.p * THREE.MathUtils.DEG2RAD, P.yaw + rec.y * THREE.MathUtils.DEG2RAD, 0); // the camera, not your aim, carries the recoil (combat.js recoilKick)
   if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33 / runMul(w); stepAlt = !stepAlt; sfx('step_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, P.pos.y)) + (stepAlt ? '' : '2'), { v: .75 }); } }
   else stepT = .08; // first step comes right after you start moving
 
@@ -124,7 +125,7 @@ function update(dt) {
   if (w.auto && held('shoot')) shoot();
   aiming = opts.toggleAim ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
-  kick = Math.max(0, kick - dt * 8);
+  kick = Math.max(0, kick - dt * (w.scope ? 4 : 8)); // the gun model settles; a sniper's slower
   tickCross(dt, BASE[cur]);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // eradicator barrels wind down after you stop firing
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
@@ -326,7 +327,7 @@ function update(dt) {
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, 0x888888, 1); }
   }
 
-  updateFlares(dt); beamTick(dt);
+  updateFlares(dt); beamTick(dt); tracerTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;

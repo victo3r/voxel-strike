@@ -1,6 +1,41 @@
 const ray = new THREE.Raycaster(), ray2 = new THREE.Raycaster(), ndc = new THREE.Vector2(), fwd = new THREE.Vector3(), tmp = new THREE.Vector3();
 // crateMeshes = whatever stops bullets on the loaded map (crates, tree trunks, rocks...), set by useMap in maps/world.js
 function shotTargets() { const t = [ground, ...crateMeshes]; for (const zz of zombies) if (!zz.dead) t.push(...zz.parts); return t; }
+// the camera kick of a shot (RECOIL in weapons.js), and the per-frame settle. Aim assist and the network read P.yaw/P.pitch, which
+// recoil never touches: it's an offset the camera adds (main.js), so what you see and where your rays go agree
+function recoilKick(w) {
+  const r = RECOIL[w.id]; if (!r) return;
+  const soft = 1 - adsT * ADS_SOFT;
+  rec.tp = Math.min(REC_MAX, rec.tp + r.up * soft);
+  rec.ty = Math.max(-REC_MAX / 2, Math.min(REC_MAX / 2, rec.ty + (Math.random() - .5) * 2 * r.side * soft));
+}
+function recoilTick(dt, w) {
+  const k = Math.exp(-(RECOIL[w.id]?.back ?? 1) * REC_BACK * dt), e = 1 - Math.exp(-REC_RISE * dt);
+  rec.tp *= k; rec.ty *= k;
+  rec.p += (rec.tp - rec.p) * e; rec.y += (rec.ty - rec.y) * e;
+}
+function recoilReset() { rec.tp = rec.ty = rec.p = rec.y = 0; }
+// tracers: a faint streak flying from your muzzle to where the shot lands. Only your own bullets get one (other players' and bots'
+// shots stay as they were), snipers have none, and the fast guns only trace some of their shots so the screen doesn't fill up
+const TRACER_SPD = 140, TRACER_LEN = 1.5, tracers = [], tracerPool = [];
+const tracerGeo = new THREE.BoxGeometry(1, 1, 1), tracerMat = new THREE.MeshBasicMaterial({ color: 0xffeab0, transparent: true, opacity: .4, depthWrite: false });
+const trFrom = new THREE.Vector3(), trTo = new THREE.Vector3();
+let tracerN = 0;
+function tracerOk(w, k) { return !w.scope && (w.pellets > 1 ? k % 3 === 0 : w.id !== 'eradicator' || (tracerN++ & 1) === 0); }
+function tracer(from, to) {
+  const len = from.distanceTo(to); if (len < TRACER_LEN + .5) return; // point blank: nothing to see
+  const m = tracerPool.pop() || new THREE.Mesh(tracerGeo, tracerMat);
+  m.position.copy(from); m.lookAt(to); m.scale.set(.04, .04, TRACER_LEN);
+  scene.add(m); tracers.push({ m, from: from.clone(), dir: to.clone().sub(from).divideScalar(len), d: TRACER_LEN / 2, len });
+}
+function tracerTick(dt) {
+  for (let i = tracers.length - 1; i >= 0; i--) {
+    const t = tracers[i]; t.d += TRACER_SPD * dt;
+    if (t.d >= t.len - TRACER_LEN / 2) { scene.remove(t.m); tracerPool.push(t.m); tracers.splice(i, 1); continue; }
+    t.m.position.copy(t.from).addScaledVector(t.dir, t.d);
+  }
+}
+function clearTracers() { for (const t of tracers) { scene.remove(t.m); tracerPool.push(t.m); } tracers.length = 0; }
 function shoot() {
   const w = WEAPONS[cur];
   if (cd > 0 || reloading > 0 || respawnT > 0) return;
@@ -11,18 +46,20 @@ function shoot() {
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);
   else {
-    kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w));
+    kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w)); recoilKick(w);
     sfx(w.id);
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);
     else {
       const targets = shotTargets();
+      flashMesh.getWorldPosition(trFrom); // the tracers start at the muzzle
       // only primaries spread (shotgun wide, rifle/minigun small); aiming halves it. Everything else is pinpoint, scoped or not.
       const spread = w.spread * (1 - adsT * .5);
       for (let i = 0; i < w.pellets; i++) {
         ndc.set((Math.random() - .5) * spread * 2, (Math.random() - .5) * spread * 2);
         ray.setFromCamera(ndc, camera);
         const hit = ray.intersectObjects(targets, false)[0];
+        if (tracerOk(w, i)) tracer(trFrom, hit ? hit.point : ray.ray.at(60, trTo));
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
         if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 0); }
@@ -47,7 +84,7 @@ const BURN_T = 2.5; // how long a zombie keeps burning after you stop hitting it
 const flames = [], flameGeo = new THREE.BoxGeometry(.18, .18, .18);
 const flameMats = [0xffdd55, 0xff8a1a, 0xff4a1a].map(color => new THREE.MeshBasicMaterial({ color }));
 function flame(w) {
-  kick = .3; flameHeld = .12; crossKick(.5, 2); // keeps the fire sound going (sound.js)
+  kick = .3; flameHeld = .12; crossKick(.5, 2); recoilKick(w); // keeps the fire sound going (sound.js)
   camera.getWorldDirection(fwd);
   flashMesh.getWorldPosition(tmp);
   for (let k = 0; k < 2; k++) {
@@ -69,7 +106,7 @@ function flame(w) {
 }
 // heat ray: a straight beam from the gun to whatever's under your crosshair (out to its range), doing its damage every tick
 function heatBeam(w) {
-  kick = .12; beamHeld = .12; crossKick(.4, 1.5); // keeps the hum going (sound.js)
+  kick = .12; beamHeld = .12; crossKick(.4, 1.5); recoilKick(w); // keeps the hum going (sound.js)
   camera.getWorldDirection(fwd);
   ray2.setFromCamera(ndc.set(0, 0), camera); ray2.far = w.range;
   const hit = ray2.intersectObjects(shotTargets(), false)[0];
