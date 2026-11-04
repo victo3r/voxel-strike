@@ -36,6 +36,9 @@ function netToast(text, ms = 3200) { // a message that shows over anything (lobb
 const safeCss = c => /^#[0-9a-fA-F]{3,8}$/.test(c || '') ? c : '#e8e8e8';
 const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000;
 const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
+// your camera looks along -sin/-cos of your yaw (main.js) but a character body faces +sin/+cos (deathmatch.js aimDir),
+// so another player's body is turned half a circle from the yaw they sent
+const bodyYaw = y => y + Math.PI;
 
 net = (() => {
   // ---- the clock: our best guess of the server's time, from pings (the one with the shortest round trip in the last 10 s
@@ -86,9 +89,9 @@ net = (() => {
   }
 
   // ---- what you take into the match: your name, look and gear, as ids the server knows
-  function myGear() {
+  function myGear() { // stars for every gun you own, not just the loadout: you can switch guns in the armory mid-match
     const load = CATS.map(([c]) => BASE[loadoutGun(c)].id), stars = {};
-    for (const [c] of CATS) { const i = loadoutGun(c); stars[BASE[i].id] = Math.max(0, Math.min(2, gunUse(i) - 1)); }
+    BASE.forEach((w, i) => { if (hasGun(i)) stars[w.id] = Math.max(0, Math.min(2, gunUse(i) - 1)); });
     return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load };
   }
   function hello(rejoin = null) {
@@ -213,9 +216,10 @@ net = (() => {
       case 'dmg': return damage(m);
       case 'die': return died(m);
       case 'score': return score(m.rows);
-      case 'phase': phase = m.phase; if (m.matchEnd) matchEnd = m.matchEnd; lastTop = ''; return;
+      case 'phase': phase = m.phase; if (m.matchEnd) matchEnd = m.matchEnd; lastTop = ''; if (m.solo) netToast('Everyone else left — the match ends in 30 seconds unless someone joins', 5000); return;
       case 'fire': return remoteFire(m);
       case 'boom': return remoteBoom(m);
+      case 'gear': return gearMsg(m);
       case 'chat': return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80));
       case 'over': return over(m);
       case 'kick': return;
@@ -255,22 +259,31 @@ net = (() => {
     send({ t: 'ping', c: localNow() });
   }
   // another player's record, shaped like a bot's (deathmatch.js joinBot/makeBot) so hits, outlines, tags and angels all work
-  function makeRemoteRec(p) {
-    const gear = p.gear || {}, name = cleanName(p.name) || 'Player';
-    const team = teamMode() ? (p.team === myTeamRaw ? 0 : 1) : undefined;
-    const css = team !== undefined ? TEAMS[team].css : safeCss(p.css);
+  // a player's gear as the rec fields the bot code reads: stars and stats by gun index, the loadout, boots, hat, armor tier and their effects
+  function gearFields(gear) {
+    gear = gear || {};
     const stars = {}, W = {};
     BASE.forEach((w, i) => { stars[i] = Math.max(0, Math.min(2, gear.stars?.[w.id] | 0)); W[i] = statsAt(i, stars[i]); });
     const load = CATS.map(([c], k) => { const i = gi(gear.load?.[k]); return i !== undefined && BASE[i].cat === c ? i : BASE.findIndex(w => w.cat === c && w.start); });
     const boots = gear.boots && bootOf(gear.boots.id) ? { id: gear.boots.id, st: Math.max(1, Math.min(3, gear.boots.st | 0)) } : null;
     const hat = gear.hat && hatOf(gear.hat.id) ? { id: gear.hat.id, st: Math.max(1, Math.min(3, gear.hat.st | 0)) } : null;
     const armor = Math.max(0, Math.min(ARMOR_MAX, gear.armor | 0));
+    return { stars, load, W, boots, hat, armor, fx: gearFx(boots, hat) };
+  }
+  function gearMsg(m) { // someone changed gear in the armory mid-match
+    if (m.pid === undefined) { P.maxArmor = m.maxArmor; P.armor = m.armor; return; } // the server's answer to your own change: the armor bar is its call
+    const r = remotes.get(m.pid); if (r) Object.assign(r.rec, gearFields(m.gear)); // their next body, and the next gun they pull out, use it
+  }
+  function makeRemoteRec(p) {
+    const name = cleanName(p.name) || 'Player';
+    const team = teamMode() ? (p.team === myTeamRaw ? 0 : 1) : undefined;
+    const css = team !== undefined ? TEAMS[team].css : safeCss(p.css);
     let look = p.look && typeof p.look === 'object' ? { ...p.look } : null;
     if (!look || typeof look.hair !== 'string' || typeof look.top !== 'string') look = randomLook(name, 0x6a6a72);
     if (team !== undefined) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team colours on the shirt
     const tag = tagMat(name, css);
     if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; } // teammates' tags show through walls
-    return { pid: p.pid, uid: p.uid, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, armor, boots, hat, stars, load, W, taste: {}, fx: gearFx(boots, hat),
+    return { pid: p.pid, uid: p.uid, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {},
       score: p.score | 0, kills: p.kills | 0, deaths: p.deaths | 0, assists: p.assists | 0, streak: p.streak | 0, alive: !!p.alive, b: null, wait: Infinity, remote: true };
   }
   function addRemote(p, announce) {
@@ -296,6 +309,7 @@ net = (() => {
   }
   // bodies: built with makeBot like a bot's, then driven from the network instead of the AI (main.js checks z.remote)
   function spawnBody(r, x, y, z, yaw = 0) {
+    yaw = bodyYaw(yaw);
     dropBody(r);
     const b = makeBot(r.rec, { x, y, z, yaw });
     b.remote = true; b.pid = r.rec.pid; b.aimYaw = yaw; b.aimPitch = 0;
@@ -401,7 +415,7 @@ net = (() => {
       if (!r.body) spawnBody(r, x, y, z, yaw); // joined mid-match before their spawn reached us
       const buf = r.buf;
       if (buf.length && ts <= buf[buf.length - 1].ts) continue; // out of order
-      buf.push({ ts, x, y, z, yaw, pitch, gun, flags });
+      buf.push({ ts, x, y, z, yaw: bodyYaw(yaw), pitch, gun, flags });
       while (buf.length > 2 && buf[1].ts < st - NET_HIST) buf.shift();
       r.fired += fd | 0; r.burn = burn | 0;
       const rl = !!(flags & 2); if (rl && !r.reloadWas) r.q |= 2; r.reloadWas = rl;
@@ -490,6 +504,11 @@ net = (() => {
     send(['s', ++seq, tc, r3(P.pos.x), r3(P.pos.y), r3(P.pos.z), r3(P.yaw), r3(P.pitch), BASE[cur].id, flags, f, h]);
   }
   setInterval(sendState, NET_RATE);
+  // the armory mid-match (a gun swapped into a slot, stars, armor, boots, a hat): every profile save during an online match sends
+  // the server your gear again, so its stats, armor and hat/boot effects match what you're using
+  let gearT = 0;
+  function gearChanged() { if (!api.on || !welcomed) return; clearTimeout(gearT); gearT = setTimeout(() => send({ t: 'gear', gear: myGear() }), 150); }
+  const onSave0 = onSave; onSave = () => { onSave0(); gearChanged(); };
   setInterval(() => { if (api.on) send({ t: 'ping', c: localNow() }); }, 1000);
   document.addEventListener('visibilitychange', () => { if (document.hidden && api.on) send({ t: 'afk' }); });
   function claim(victim, o = {}) {
@@ -540,7 +559,8 @@ net = (() => {
     if (phase === 'play' && sec <= 10 && sec !== lastSec && sec > 0) sfx('tick');
     lastSec = sec;
     const place = ranked().indexOf(youRec) + 1, others = remotes.size;
-    const clockHtml = phase !== 'play' ? `<div class="clock">${others ? 'STARTING SOON' : 'WAITING FOR PLAYERS'}</div>` : `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div>`;
+    const clockHtml = (phase !== 'play' ? `<div class="clock">${others ? 'STARTING SOON' : 'WAITING FOR PLAYERS'}</div>` : `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div>`)
+      + (phase === 'play' && !others ? '<div class="place">WAITING FOR PLAYERS</div>' : ''); // alone mid-match: the server wraps the match up in 30 s unless someone joins
     const top = clockHtml + (MR.team
       ? `<div class="teams"><b style="color:${TEAMS[0].css}">${TEAMS[0].name} ${teamKills(0)}</b>–<b style="color:${TEAMS[1].css}">${teamKills(1)} ${TEAMS[1].name}</b></div><div class="place">YOU: ${youRec.kills} KILLS</div>`
       : `<div class="place">${ord(place)} OF ${recs.length}  ·  ${MR.kills ? '' : youRec.score + ' PTS  ·  '}${youRec.kills} KILLS</div>`)
