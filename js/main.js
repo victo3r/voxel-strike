@@ -122,7 +122,7 @@ function update(dt) {
   else stepT = .08; // first step comes right after you start moving
 
   cd -= dt;
-  if (w.auto && held('shoot')) shoot();
+  if (autoFire(w) && held('shoot')) shoot();
   aiming = opts.toggleAim ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * (w.scope ? 4 : 8)); // the gun model settles; a sniper's slower

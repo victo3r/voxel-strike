@@ -27,6 +27,7 @@ function gunAttrs(w) {
   else if (w.beam) a.push('BEAM');
   else if (w.action) a.push(w.action);
   else if (w.auto) a.push('AUTOMATIC');
+  else if (autoFire(w)) a.push('RAPID FIRE'); // hold to keep shooting (weapons.js autoFire)
   else if (w.mag > 1) a.push('SEMI-AUTO');
   if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : 'HOLO SIGHT');
   if (w.quiet) a.push('SUPPRESSED');

@@ -31,6 +31,7 @@ const BASE = [
   { id: 'semisniper', hold: 'rifle', name: 'Semi Auto Sniper Rifle', cat: 'sniper', unlock: 4, price: 100, mob: 55, zoom: 4, dmg: 60, rate: 1 / 1.8, mag: 10, reload: 1.8, pellets: 1, spread: 0, auto: false, color: 0x3e3f44, len: .9, scope: true },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
+const autoFire = w => !!w.auto || w.rate < .25; // holding the trigger keeps shooting: automatics, and anything over 4 shots a second (the Hitman)
 const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
 const gi = id => W_ID[id]; // weapon id -> its index in BASE/WEAPONS
 // star upgrades: getting a gun gives ★, then two flat upgrades to ★★ and ★★★

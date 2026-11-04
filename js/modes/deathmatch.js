@@ -470,7 +470,7 @@ function botFlame(b, W) {
 function botFire(b, W, dist) {
   b.ammo--; b.muzzle = W.flame || W.beam ? 0 : .05;
   // a beam is held in long sweeps, everything else automatic in short bursts
-  if (W.auto) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
+  if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto guns: about as fast as a person clicks
   if (W.scope) b.aimT = 0;
   if (W.beam) { if (!(b.fireOn > 0)) sfx('heatStart', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = 'heatEnd'; }
