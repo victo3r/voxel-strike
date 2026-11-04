@@ -215,19 +215,25 @@ function scoreKill(killer, victim, head, helpers) {
 
 // spawning: somewhere open, as far from everyone else as it can find (in team modes, as far from the other team as it can).
 // who = YOU_T or the bot's record
-function spawnSpot(who) {
+// the n best of 60 random free spots, farthest from whoever would shoot `who` first, at least 4 blocks apart
+// (online the server takes one of them, the farthest from where it has the enemies: js/net.js tryReady)
+function spawnSpots(who, n = 1) {
   const others = [];
   if (who !== YOU_T && respawnT <= 0 && !friendly(who, YOU_T)) others.push(P.pos);
   for (const z of zombies) if (z.rec !== who && !z.dead && !friendly(who, z)) others.push(z.g.position);
-  let best = null, bestD = -1;
+  const found = [];
   for (let tries = 0; tries < 60; tries++) {
     const x = (Math.random() * 2 - 1) * (A - 2), z = (Math.random() * 2 - 1) * (A - 2);
     if (blocked(x, z, .45, 0) || MAP.land && !MAP.land(x, z) || overWater(x, z, 0) || poolAt(x, z)) continue; // not in the sea or the pool
     const d = others.length ? Math.min(...others.map(o => Math.hypot(x - o.x, z - o.z))) : 99;
-    if (d > bestD) { bestD = d; best = [x, z]; }
+    found.push([d, x, z]);
   }
-  return best ?? [0, 0];
+  found.sort((a, b) => b[0] - a[0]);
+  const out = [];
+  for (const [, x, z] of found) { if (out.every(([ox, oz]) => Math.hypot(x - ox, z - oz) >= 4)) out.push([x, z]); if (out.length >= n) break; }
+  return out.length ? out : [[0, 0]];
 }
+function spawnSpot(who) { return spawnSpots(who)[0]; }
 const FLASH_MAT = new THREE.MeshBasicMaterial({ color: 0xffdd55 });
 const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 // put gun b.gun in the bot's hands: the same model you see in your own hands, turned to point forward out of its hands
@@ -697,6 +703,7 @@ function endMatch(results) {
   const won = results ? results.won : MR.team ? lead > 0 : place === 1;
   const [xp, gold] = results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place), { ups, bonus } = grant(xp, gold);
   $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ${COIN}</span></div>`
+    + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ${COIN}</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
   sfx(won ? 'win' : 'lose'); musicEnd();

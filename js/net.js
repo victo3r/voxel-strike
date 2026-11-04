@@ -70,7 +70,7 @@ net = (() => {
   const remotes = new Map(); // pid -> { rec, body, buf: [positions], fired, burn, reloadWas, q: queued events }
   let roster = { recs: [], youRec: null };
   let lastTop = '', lastBoard = '', lastSec = 0;
-  const api = { on: false, banner: '', wsOk: null, code: null };
+  const api = { on: false, banner: '', wsOk: null, code: null, serverPads: false }; // serverPads: the server stocks the pads (false on a server from before increment B)
 
   function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
 
@@ -191,7 +191,7 @@ net = (() => {
     restart(); showLobby(true);
   }
   function endOnline() {
-    api.on = false; api.banner = ''; api.code = null; rejoinInfo = null; alive = false; respawnAt = 0; readySent = false;
+    api.on = false; api.banner = ''; api.code = null; api.serverPads = false; rejoinInfo = null; alive = false; respawnAt = 0; readySent = false;
     for (const r of remotes.values()) dropBody(r);
     remotes.clear(); hits = []; fired = 0; evFlags = 0;
     $('roomRow').style.display = 'none';
@@ -220,6 +220,9 @@ net = (() => {
       case 'fire': return remoteFire(m);
       case 'boom': return remoteBoom(m);
       case 'gear': return gearMsg(m);
+      case 'pad': return padMsg(m);
+      case 'picked': return usePickup(m.type, { hp: m.hp, armor: m.armor });
+      case 'warp': return warped(m);
       case 'chat': return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80));
       case 'over': return over(m);
       case 'kick': return;
@@ -234,7 +237,7 @@ net = (() => {
     rejoinInfo = { room, pid, key, tried: false };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     mode = w.mode; mapId = w.map;
-    api.on = true; api.code = code;
+    api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads);
     // the roster: you, then everyone else, as bot-shaped records the rest of the game already understands
     for (const r of remotes.values()) dropBody(r);
     remotes.clear();
@@ -250,6 +253,7 @@ net = (() => {
       restart(); // -> setupMode -> net.roster()
       showLobby(false);
     } else restart();
+    if (api.serverPads) w.pads.forEach((type, i) => { const p = pads[i]; if (p) { clearPad(p); if (type) spawnPickup(p, type); } }); // what the pads hold right now
     for (const r of remotes.values()) if (r.rec.alive && r.pos) spawnBody(r, ...r.pos);
     if (me?.alive && me.pos) { alive = true; readySent = false; respawnYou(me.pos[0], me.pos[2], me.pos[3]); P.pos.y = me.pos[1]; }
     else { alive = false; respawnT = .01; api.banner = 'JOINING…'; }
@@ -386,7 +390,26 @@ net = (() => {
     const lead = m.teams ? Math.sign((m.teams[myTeamRaw] | 0) - (m.teams[1 - myTeamRaw] | 0)) : 0;
     const won = MR.team ? lead > 0 : place === 1, [xp, gold] = m.rewards?.[pid] || [0, 0];
     phase = 'over'; alive = false; api.banner = '';
-    endMatch({ place, won, xp, gold, lead });
+    endMatch({ place, won, xp, gold, lead, priv: !!m.priv });
+  }
+  // ---- pickup pads: the server stocks them and says who got what (js/combat.js pads, js/main.js asks with pick when you stand on one)
+  const padPos = new THREE.Vector3();
+  function padMsg(m) {
+    const p = pads[m.i]; if (!p) return;
+    clearPad(p); p.claimAt = 0;
+    if (m.type) spawnPickup(p, m.type);
+    else if (m.by !== pid) sfx(m.was === 'health' ? 'pickHealth' : m.was === 'armor' ? 'pickArmor' : 'pickAmmo', { at: padPos.set(p.x, .6, p.z), far: 18, v: .6 }); // someone else grabbed it
+  }
+  function pick(p) {
+    if (!api.on || !alive || !p.item || !canPickup(p.type)) return;
+    const t = localNow(); if (p.claimAt && t - p.claimAt < 1200) return; // asked already, the answer is on its way
+    p.claimAt = t;
+    send({ t: 'pick', i: pads.indexOf(p) });
+  }
+  // the server didn't accept where you went (too fast, off the map, or packets from before a spawn reached it): back to where it last had you
+  function warped(m) {
+    if (!alive) return;
+    P.pos.set(m.x, m.y, m.z); P.pos.lag = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0;
   }
   function remoteFire(m) {
     const i = gi(m.g); if (i === undefined || !m.o || !m.d) return;
@@ -493,7 +516,7 @@ net = (() => {
 
   // ---- what you send: your position 20 times a second, with any shots and hits since the last one
   function sendState() {
-    if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby) return;
+    if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby || document.hidden) return; // hidden tab: nothing is sent, so the server parks you (afk) until you're back
     let flags = evFlags; evFlags = 0;
     if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8;
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
@@ -535,8 +558,10 @@ net = (() => {
   function tryReady() {
     if (!api.on || alive || readySent && localNow() - readyT < 3000 || !welcomed) return;
     if (respawnAt && now() < respawnAt - 150) return;
-    const [x, z] = spawnSpot(YOU_T), yaw = Math.atan2(x, z);
-    send({ t: 'ready', x: r2(x), z: r2(z), yaw: r3(yaw) });
+    // a few free spots, farthest from enemies first: the server takes the one farthest from where it has them
+    // (a server from before increment B reads the first one as x/z/yaw)
+    const spots = spawnSpots(YOU_T, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, 0))]);
+    send({ t: 'ready', spots, x: spots[0][0], z: spots[0][1], yaw: spots[0][2], y: spots[0][3] });
     readySent = true; readyT = localNow(); api.banner = 'SPAWNING…';
   }
   function onLock(isLocked) { if (!api.on) return; if (isLocked) tryReady(); }
@@ -589,7 +614,7 @@ net = (() => {
 
   Object.assign(api, {
     now, start, again, leave, onLock, claim, burn, shot: () => { if (api.on) fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
-    matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), probe,
+    matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), probe, pick,
   });
   Object.defineProperties(api, { // read live (Object.assign would have copied them once)
     pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt },

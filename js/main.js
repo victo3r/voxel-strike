@@ -295,7 +295,10 @@ function update(dt) {
   for (const p of pads) {
     if (!p.item) { if ((p.t -= dt) <= 0) spawnPickup(p); continue; }
     p.item.rotation.y += dt * 2; p.item.position.y = .6 + Math.sin(now * .003 + p.x) * .1;
-    if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 1 && P.pos.y < 1.5 && !down && usePickup(p.type)) { clearPad(p); p.t = RESPAWN + Math.random() * 10; }
+    if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 1 && P.pos.y < 1.5 && !down) {
+      if (net.on) net.pick(p); // online the server decides, and answers with picked + pad (js/net.js)
+      else if (usePickup(p.type)) { clearPad(p); p.t = RESPAWN + Math.random() * 10; }
+    }
   }
 
   for (let i = booms.length - 1; i >= 0; i--) {

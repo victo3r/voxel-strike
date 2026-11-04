@@ -220,24 +220,26 @@ function pickupType() { // ammo only once you own a gun that uses it, armor only
   if (P.maxArmor > 0) opts.push('armor', 'armor');
   return opts[Math.random() * opts.length | 0];
 }
-function spawnPickup(p) {
-  p.type = pickupType(); p.item = new THREE.Mesh(pickGeo, PICKUPS[p.type]);
+function spawnPickup(p, type) { // online the server says what it is (js/net.js)
+  p.type = type || pickupType(); p.item = new THREE.Mesh(pickGeo, PICKUPS[p.type]);
   p.item.position.set(p.x, .6, p.z); scene.add(p.item);
 }
 function clearPad(p) { if (p.item) { scene.remove(p.item); p.item = null; } }
-function emptyPads() { for (const p of pads) { clearPad(p); p.t = FIRST_SPAWN + Math.random() * 10; } }
+function emptyPads() { for (const p of pads) { clearPad(p); p.claimAt = 0; p.t = net.serverPads ? Infinity : FIRST_SPAWN + Math.random() * 10; } } // online the server restocks the pads (js/net.js), so the timer here never fires
 function rerollPads() { for (const p of pads) if (p.item) { clearPad(p); spawnPickup(p); } }
-function usePickup(type) {
-  if (type === 'health') {
-    if (P.hp >= P.max) return false;
-    P.hp = Math.min(P.max, P.hp + HEAL_PICK); toast(`+${HEAL_PICK} HP`, '#ff5a5a');
-  } else if (type === 'armor') {
-    if (P.armor >= P.maxArmor) return false;
-    P.armor = Math.min(P.maxArmor, P.armor + ARMOR_PICK); toast(`+${ARMOR_PICK} ARMOR`, '#c9ced6');
-  } else {
-    let got = false;
-    WEAPONS.forEach((w, i) => { if (!BASE[i].inf && owned[i] && reserve[i] < resMax(i)) { reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); got = true; } });
-    if (!got) return false;
+// would this pickup do anything right now? A full one stays on the pad (online the server runs the same test before it hands it over)
+function canPickup(type) {
+  if (type === 'health') return P.hp < P.max;
+  if (type === 'armor') return P.armor < P.maxArmor;
+  return WEAPONS.some((w, i) => !BASE[i].inf && owned[i] && reserve[i] < resMax(i));
+}
+// srv = online: the server already applied it and these are its new hp and armor (js/net.js picked). Ammo is always topped up here
+function usePickup(type, srv) {
+  if (!srv && !canPickup(type)) return false;
+  if (type === 'health') { P.hp = srv ? srv.hp : Math.min(P.max, P.hp + HEAL_PICK); toast(`+${HEAL_PICK} HP`, '#ff5a5a'); }
+  else if (type === 'armor') { P.armor = srv ? srv.armor : Math.min(P.maxArmor, P.armor + ARMOR_PICK); toast(`+${ARMOR_PICK} ARMOR`, '#c9ced6'); }
+  else {
+    WEAPONS.forEach((w, i) => { if (!BASE[i].inf && owned[i] && reserve[i] < resMax(i)) reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); });
     toast('+AMMO', '#ffd23f');
   }
   sfx(type === 'health' ? 'pickHealth' : type === 'armor' ? 'pickArmor' : 'pickAmmo'); return true;
