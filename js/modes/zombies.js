@@ -75,9 +75,9 @@ function hitFx(zz, point, head, quiet) {
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0) {
   if (!Number.isFinite(dmg)) return; // a bad number here would leave it with NaN health, and then nothing could ever kill it
   if (zz.type === 'bot' && friendly(by, zz)) return; // team modes: no friendly fire
-  if (net.on && zz.remote) { // online: the server owns its health. Show the hit, and tell the server what you claim you did
+  if (net.on && (zz.remote || zz.pid)) { // online: the server owns its health (other players, and the bots the room runs). Show the hit, and claim it
     if (!quiet) { hitFx(zz, point, head, false); if (!by) hitMarker(head ? 'head' : 'body'); }
-    net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj });
+    net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by }); // by: a bot I host did it
     return;
   }
   if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // its hat: a helmet can stop a headshot, a hood can halve the hit
@@ -123,7 +123,7 @@ function youHitFx(head, armorOnly, silver = armorOnly) {
 function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0) {
   if (respawnT > 0 || matchOver || by && friendly(by, YOU_T)) return; // by = null is your own rocket, that still hurts
   if (net.on) { // online: the server decides what you took (it comes back as a dmg event). Send the claim (e.g. your own rocket)
-    net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj });
+    net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by });
     return;
   }
   if (by?.rec) d *= 1 + by.rec.fx.dmg; // a bot in damage boots
@@ -139,7 +139,7 @@ function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0
 // set someone on fire: t seconds of it, dmgPerTick every quarter second. by = who lit them (null = you), gunId = what with
 // ('flame' or 'flare', for online play). max = keep whichever is longer/stronger if they're already burning (a flare does)
 function applyBurn(victim, t, dmgPerTick, by, gunId, max = false) {
-  if (net.on) { net.burn(victim, gunId); return; } // online: the server runs the burn
+  if (net.on) { net.burn(victim, gunId, by); return; } // online: the server runs the burn
   if (victim === P) { burnYou(t, dmgPerTick, by); return; }
   if (max) { victim.burn = Math.max(victim.burn || 0, t); victim.burnDmg = Math.max(victim.burnDmg || 0, dmgPerTick); }
   else { victim.burn = t; victim.burnDmg = dmgPerTick; }
@@ -170,9 +170,12 @@ function drownTick(dt) {
 }
 // a bot or zombie in the water. A zombie counts as your kill (you lured it in). A bot's death goes to nobody
 function drownZombie(z) {
-  if (z.dead) return;
+  if (z.dead || z.drownFlag) return;
   sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position); z.drowned = true;
-  if (z.type === 'bot') { z.hp = 0; z.dead = .0001; botDown(z, null, false, true); return; }
+  if (z.type === 'bot') {
+    if (net.on && z.pid) { z.drownFlag = true; return; } // a bot I host online: the flag goes in its next row and the server calls it
+    z.hp = 0; z.dead = .0001; botDown(z, null, false, true); return;
+  }
   if (z.type === 'exploder') z.boomed = true; // the water puts its fuse out
   hurtZombie(z, z.hp + 1, z.g.position.clone(), false, true);
 }
@@ -206,13 +209,13 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
   if (net.on) { // online: the server works out who it hurt from your claims. Only your own rocket throws you, right away
     const gun = rocket ? 'rocket' : 'flare', kind = rocket ? 4 : 6;
     if (pd < R && !dead && respawnT <= 0) {
-      if (pDmg) net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj });
+      if (pDmg) net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by });
       if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true);
     }
     for (const o of zombies) {
-      if (o === skip || o.dead || !o.remote) continue;
+      if (o === skip || o.dead || !o.pid) continue; // other players and the room's bots
       const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-      if (od < R) net.claim(o, { kind, point: c, gun, pj });
+      if (od < R) net.claim(o, { kind, point: c, gun, pj, by });
     }
     return;
   }

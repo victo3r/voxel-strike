@@ -117,7 +117,7 @@ const ARMOR_CAP = 100; // most armor you can buy up to (4 shop buys)
 const P = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, onGround: true, kx: 0, kz: 0 }; // kx/kz = knockback, dr = share of damage your worn armor takes off
 // online play (js/net.js replaces this). net.on = you're in an online match: the server owns everyone's health and the score,
 // and the hooks below (claim, burn, shot, launch, boom, ev, ...) send it what you did. Offline they do nothing
-let net = { on: false, serverPads: false, claim() {}, burn() {}, shot() {}, launch() { return 0; }, boom() {}, ev() {}, matchTick() {}, banner: '', again() {}, leave() {}, roster() {}, applyRemote() {}, pick() {} };
+let net = { on: false, host: false, serverPads: false, claim() {}, burn() {}, shot() {}, launch() { return 0; }, boom() {}, ev() {}, matchTick() {}, banner: '', again() {}, leave() {}, roster() {}, applyRemote() {}, pick() {} };
 const keys = {};
 let locked = false, dead = false, inLobby = true;
 // which mode you picked in the lobby: 'zombies', 'dm' (deathmatch), 'team' (team fight), 'blitz' (free for all) or 'blitzTeam'.

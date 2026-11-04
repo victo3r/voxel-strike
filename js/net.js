@@ -15,6 +15,7 @@
 //   net.roster()             setupMode: the players in the room become recs
 //   net.start(o) / again() / leave() / onLock(locked) / chat(text)
 //   net.room                 the room you're in (js/friends.js: JOIN / INVITE know who's already with you)
+//   net.host                 I run the room's bots (docs/spec-c.md): their AI is the offline one, the server owns their health and scores
 const NET_V = 1;
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server (testing)
@@ -62,6 +63,7 @@ net = (() => {
 
   // ---- state
   let ws = null, welcomed = false, pid = 0, key = '', room = '', code = null, myTeamRaw = 0;
+  let hostPid = 0; // whose client runs the room's bots (the server picks; see the bots section below)
   let phase = 'wait', matchEnd = 0, rulesCap = 0;
   let alive = false, respawnAt = 0, readySent = false, readyT = 0;
   let seq = 0, fired = 0, hits = [], evFlags = 0, pjSeq = 0, renderT = 0;
@@ -197,7 +199,7 @@ net = (() => {
     restart(); showLobby(true);
   }
   function endOnline() {
-    api.on = false; api.banner = ''; api.code = null; api.serverPads = false; rejoinInfo = null; alive = false; respawnAt = 0; readySent = false;
+    api.on = false; api.banner = ''; api.code = null; api.serverPads = false; rejoinInfo = null; alive = false; respawnAt = 0; readySent = false; hostPid = 0;
     for (const r of remotes.values()) dropBody(r);
     remotes.clear(); hits = []; fired = 0; evFlags = 0;
     $('roomRow').style.display = 'none';
@@ -227,8 +229,10 @@ net = (() => {
       case 'boom': return remoteBoom(m);
       case 'gear': return gearMsg(m);
       case 'pad': return padMsg(m);
-      case 'picked': return usePickup(m.type, { hp: m.hp, armor: m.armor });
+      case 'picked': return m.by ? botPicked(m) : usePickup(m.type, { hp: m.hp, armor: m.armor });
       case 'warp': return warped(m);
+      case 'host': return setHost(m.pid);
+      case 'fill': return fill(m.n | 0);
       case 'chat': return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80));
       case 'over': return over(m);
       case 'kick': return;
@@ -238,7 +242,7 @@ net = (() => {
   function welcome(w, job) {
     const rejoining = api.on;
     if (job) { job.dead = true; clearTimeout(job.timer); starting = null; }
-    welcomed = true; pid = w.pid; key = w.key; room = w.room; code = w.code || null; myTeamRaw = w.me?.team ?? 0;
+    welcomed = true; pid = w.pid; key = w.key; room = w.room; code = w.code || null; myTeamRaw = w.me?.team ?? 0; hostPid = w.host | 0;
     phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8;
     rejoinInfo = { room, pid, key, tried: false };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
@@ -294,12 +298,13 @@ net = (() => {
     if (team !== undefined) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team colours on the shirt
     const tag = tagMat(name, css);
     if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; } // teammates' tags show through walls
-    return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {}, // fid: their player ID when signed in (js/friends.js)
+    return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, bot: !!p.bot, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {}, // fid: their player ID when signed in (js/friends.js); bot: one of the room's bots
       score: p.score | 0, kills: p.kills | 0, deaths: p.deaths | 0, assists: p.assists | 0, streak: p.streak | 0, alive: !!p.alive, b: null, wait: Infinity, remote: true };
   }
   function addRemote(p, announce) {
     if (remotes.has(p.pid)) left(p.pid, 'replaced');
-    const rec = makeRemoteRec(p), r = { rec, body: null, buf: [], fired: 0, burn: 0, reloadWas: false, q: 0, pos: p.pos || null };
+    const rec = makeRemoteRec(p), r = { rec, body: null, buf: [], fired: 0, burn: 0, reloadWas: false, q: 0, pos: p.pos || null, hits: [], respawnAt: 0, readyAt: 0 };
+    if (rec.bot && hostPid === pid) hostRec(rec); // a bot of mine to run
     remotes.set(p.pid, r); roster.recs.push(rec);
     if (recs !== roster.recs) recs.push(rec);
     if (announce) { feed(`${nameTag(rec)} joined`); sfx('join'); }
@@ -323,7 +328,7 @@ net = (() => {
     yaw = bodyYaw(yaw);
     dropBody(r);
     const b = makeBot(r.rec, { x, y, z, yaw });
-    b.remote = true; b.pid = r.rec.pid; b.aimYaw = yaw; b.aimPitch = 0;
+    b.remote = !r.rec.hostBot; b.pid = r.rec.pid; b.aimYaw = yaw; b.aimPitch = 0; // a bot I host runs the offline AI instead of snapshots
     b.g.position.set(x, y, z); b.g.position.lag = 0; b.g.rotation.y = yaw - b.holdTurn;
     r.rec.b = b; r.body = b; r.rec.alive = true;
     r.buf = [{ ts: now(), x, y, z, yaw, pitch: 0, gun: BASE[b.gun].id, flags: 8 }];
@@ -362,6 +367,10 @@ net = (() => {
     r.rec.alive = true;
     const b = r.body; if (!b) return;
     b.hp = Math.max(m.hp, b.dead ? 0 : .01); b.armor = m.armor;
+    if (r.rec.hostBot && m.by && m.by !== m.v) { // my bot: it remembers who's hurting it, like offline (hurtZombie), so it fights back
+      const who = m.by === pid ? YOU_T : bodyOf(m.by);
+      if (who) { if (b.hitBy !== who || b.hitByT <= 0) b.hitDmg = 0; b.hitBy = who; b.hitByT = 2; b.hitDmg += m.d; }
+    }
     if (m.by === pid) return; // your own hits already showed their marker and flash when you fired
     hitFx(b, pt ? pt.clone() : b.g.position.clone().setY(b.g.position.y + 1.1), !!m.head, m.kind === 'burn');
   }
@@ -382,6 +391,7 @@ net = (() => {
       return;
     }
     const r = remotes.get(m.v); if (!r) return;
+    r.respawnAt = m.respawnAt || now() + 3000; r.readyAt = 0; // (a bot I host: hostTick asks for its spawn when this comes)
     const b = r.body; if (!b) { r.rec.alive = false; return; }
     b.hp = 0; b.dead = .0001; b.drowned = !!m.drowned;
     botDownFx(b, !!m.drowned);
@@ -408,17 +418,69 @@ net = (() => {
     if (m.type) spawnPickup(p, m.type);
     else if (m.by !== pid) sfx(m.was === 'health' ? 'pickHealth' : m.was === 'armor' ? 'pickArmor' : 'pickAmmo', { at: padPos.set(p.x, .6, p.z), far: 18, v: .6 }); // someone else grabbed it
   }
-  function pick(p) {
-    if (!api.on || !alive || !p.item || !canPickup(p.type)) return;
+  // by = one of my bots standing on it (its AI checked the pickup would do something); otherwise it's me
+  function pick(p, by) {
+    if (!api.on || !p.item) return;
+    let byPid = 0;
+    if (by) { if (!hostedOf(by)) return; byPid = by.pid; }
+    else if (!alive || !canPickup(p.type)) return;
     const t = localNow(); if (p.claimAt && t - p.claimAt < 1200) return; // asked already, the answer is on its way
     p.claimAt = t;
-    send({ t: 'pick', i: pads.indexOf(p) });
+    const m = { t: 'pick', i: pads.indexOf(p) }; if (byPid) m.by = byPid;
+    send(m);
   }
-  // the server didn't accept where you went (too fast, off the map, or packets from before a spawn reached it): back to where it last had you
+  function botPicked(m) { // the server handed a pickup to one of my bots
+    const b = remotes.get(m.by)?.body; if (!b || b.dead) return;
+    b.hp = m.hp; b.armor = m.armor;
+    sfx(m.type === 'health' ? 'pickHealth' : m.type === 'armor' ? 'pickArmor' : 'pickAmmo', { at: b.g.position, far: 25, v: .7 });
+  }
+  // the server didn't accept where you went (too fast, off the map, or packets from before a spawn reached it): back to where it last had you.
+  // by: one of my bots instead
   function warped(m) {
+    if (m.by) { const b = remotes.get(m.by)?.body; if (b && !b.dead) { b.g.position.set(m.x, m.y, m.z); b.g.position.lag = 0; b.vy = 0; b.lx = b.lz = 0; } return; }
     if (!alive) return;
     P.pos.set(m.x, m.y, m.z); P.pos.lag = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0;
   }
+  // ---- bots (docs/spec-c.md): a public room fills its empty slots with bots. One human is the host: its client runs their AI (the
+  // same bots as offline, deathmatch.js updateBot), streams them in its own packets and claims their hits; the server owns their
+  // health, scores and respawns like anyone's. Everyone else gets them as remote players. Hosting moves to another human when the
+  // host leaves or parks, so the bots carry on
+  const hostedOf = by => { const r = by && by.pid ? remotes.get(by.pid) : null; return r && r.rec.hostBot && r.body ? r : null; };
+  function hostRec(rec) { rec.hostBot = true; rec.remote = false; rec.taste = tasteFor(rec.load); rec.wait = Infinity; }
+  function setHost(h) {
+    hostPid = h | 0;
+    const mine = hostPid === pid;
+    for (const r of remotes.values()) {
+      if (!r.rec.bot || mine === !!r.rec.hostBot) continue;
+      const b = r.body, live = !!b && !b.dead;
+      const pos = live ? b.g.position.clone() : null, yaw = live ? b.aimYaw : 0, hp = live ? b.hp : 0, armor = live ? b.armor : 0;
+      if (mine) hostRec(r.rec); else { r.rec.hostBot = false; r.rec.remote = true; }
+      if (!live) continue;
+      dropBody(r); // the same bot carries on from where it stands, as an AI body of mine or a remote one
+      const nb = spawnBody(r, pos.x, pos.y, pos.z, wrapAng(yaw - Math.PI)); // (spawnBody turns a camera yaw into a body yaw)
+      nb.hp = hp; nb.armor = armor;
+    }
+  }
+  function fill(n) { // the room is short of bots and I'm the host: make them, rolled like offline bots (names, looks, gear)
+    if (hostPid !== pid || !api.on || n <= 0) return;
+    const next = nameMaker(recs.map(r => r.name)), bots = [];
+    for (let i = 0; i < Math.min(n, 7); i++) {
+      const name = next().name, [sr, sg, sb] = BOT_LOOKS[(recs.length + i) % BOT_LOOKS.length].shirt;
+      bots.push({ name, look: randomLook(name, sr << 16 | sg << 8 | sb), gear: botGearNet() });
+    }
+    send({ t: 'bot+', bots });
+  }
+  function hostTick() { // my bots without a body (new, or dead and due): ask the server to spawn them, offering free spots like for myself
+    const t = now(), lt = localNow();
+    for (const r of remotes.values()) {
+      if (!r.rec.hostBot || r.body) continue;
+      if (r.respawnAt && t < r.respawnAt - 150 || r.readyAt && lt - r.readyAt < 3000) continue;
+      r.readyAt = lt;
+      const spots = spawnSpots(r.rec, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, 0))]);
+      send({ t: 'ready', by: r.rec.pid, spots });
+    }
+  }
+  const botEye = new THREE.Vector3();
   function remoteFire(m) {
     const i = gi(m.g); if (i === undefined || !m.o || !m.d) return;
     const w = WEAPONS[i], by = bodyOf(m.pid), from = new THREE.Vector3(...m.o), dir = new THREE.Vector3(...m.d).normalize();
@@ -441,7 +503,7 @@ net = (() => {
     for (let i = 2; i < m.length; i++) {
       const [who, ts, x, y, z, yaw, pitch, gun, flags, fd, burn] = m[i];
       if (who === pid) continue;
-      const r = remotes.get(who); if (!r) continue;
+      const r = remotes.get(who); if (!r || r.rec.hostBot) continue; // (my own bots don't come back to me)
       r.rec.alive = true;
       if (!r.body) spawnBody(r, x, y, z, yaw); // joined mid-match before their spawn reached us
       const buf = r.buf;
@@ -532,7 +594,19 @@ net = (() => {
     const f = fired; fired = 0;
     clock.off += Math.max(-3, Math.min(3, clock.target - clock.off)); // slide, don't jump
     const tc = lastTc = Math.max(lastTc + 1, Math.round(now()));
-    send(['s', ++seq, tc, r3(P.pos.x), r3(P.pos.y), r3(P.pos.z), r3(P.yaw), r3(P.pitch), BASE[cur].id, flags, f, h]);
+    // the bots I host ride along: where each is, what it holds, and its shots and claims since the last packet
+    const botRows = [];
+    if (hostPid === pid) for (const r of remotes.values()) {
+      if (!r.rec.hostBot) continue;
+      const b = r.body;
+      if (!b || b.dead) { r.fired = 0; r.hits = []; continue; }
+      let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (b.aimT > 0) bf |= 1;
+      if (b.drownFlag) { bf |= 128; b.drownFlag = false; }
+      const q = b.g.position;
+      botRows.push([r.rec.pid, r3(q.x), r3(q.y), r3(q.z), r3(wrapAng(b.aimYaw - Math.PI)), r3(b.aimPitch), BASE[b.gun].id, bf, r.fired, r.hits]); // body yaw -> the camera yaw everyone sends
+      r.fired = 0; r.hits = [];
+    }
+    send(['s', ++seq, tc, r3(P.pos.x), r3(P.pos.y), r3(P.pos.z), r3(P.yaw), r3(P.pitch), BASE[cur].id, flags, f, h, botRows]);
   }
   setInterval(sendState, NET_RATE);
   // the armory mid-match (a gun swapped into a slot, stars, armor, boots, a hat): every profile save during an online match sends
@@ -542,25 +616,30 @@ net = (() => {
   const onSave0 = onSave; onSave = () => { onSave0(); gearChanged(); };
   setInterval(() => { if (api.on) send({ t: 'ping', c: localNow() }); }, 1000);
   document.addEventListener('visibilitychange', () => { if (document.hidden && api.on) send({ t: 'afk' }); });
+  // o.by = the bot of mine that did it (its claim goes in its own row, from its eye); nothing else's hits are mine to claim
   function claim(victim, o = {}) {
     if (!api.on) return;
     const vp = victim === P ? pid : victim?.pid; if (!vp) return;
+    const h = hostedOf(o.by); if (o.by && !h) return;
+    const list = h ? h.hits : hits;
     const pt = o.point || (victim === P ? centre.set(P.pos.x, P.pos.y + 1, P.pos.z) : victim.g.position), kind = o.kind | 0, gun = o.gun || BASE[cur].id;
-    const eye = camera.position;
+    const eye = h ? botEye.set(h.body.g.position.x, h.body.g.position.y + 1.6, h.body.g.position.z) : camera.position;
     if (kind === 0) { // one claim per shot and victim: pellets add up
-      const same = hits.find(c => c[0] === vp && c[6] === 0 && c[7] === gun && c[2] === (o.head ? 1 : 0) && c[12] === (o.pj | 0));
+      const same = list.find(c => c[0] === vp && c[6] === 0 && c[7] === gun && c[2] === (o.head ? 1 : 0) && c[12] === (o.pj | 0));
       if (same) { same[1] += o.pellets ?? 1; return; }
     }
-    hits.push([vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(renderT), o.pj | 0]);
+    list.push([vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(renderT), o.pj | 0]);
   }
-  const burn = (victim, gunId) => claim(victim, { kind: 7, gun: gunId, pellets: 1 });
-  function launchP(gunId, from, dir) {
+  const burn = (victim, gunId, by) => claim(victim, { kind: 7, gun: gunId, pellets: 1, by });
+  function launchP(gunId, from, dir, by) {
     if (!api.on) return 0;
-    const id = ++pjSeq;
-    send({ t: 'fire', id, g: gunId, o: [r2(from.x), r2(from.y), r2(from.z)], d: [r3(dir.x), r3(dir.y), r3(dir.z)] });
+    const h = hostedOf(by); if (by && !h) return 0;
+    const id = ++pjSeq, m = { t: 'fire', id, g: gunId, o: [r2(from.x), r2(from.y), r2(from.z)], d: [r3(dir.x), r3(dir.y), r3(dir.z)] };
+    if (h) m.by = by.pid;
+    send(m);
     return id;
   }
-  const boom = (id, p) => { if (api.on && id) send({ t: 'boom', id, p: [r2(p.x), r2(p.y), r2(p.z)] }); };
+  const boom = (id, p, by) => { if (!api.on || !id) return; const m = { t: 'boom', id, p: [r2(p.x), r2(p.y), r2(p.z)] }; if (by && by.pid) m.by = by.pid; send(m); };
 
   // ---- spawning: the server only puts you in once your mouse is locked and you say where (spawnSpot, like offline)
   function tryReady() {
@@ -578,6 +657,7 @@ net = (() => {
   function matchTick(dt) {
     if (!api.on) return;
     renderT = now() - interpDelay();
+    if (hostPid === pid) hostTick();
     matchT = phase === 'play' ? Math.max(0, (matchEnd - now()) / 1000) : MR.t;
     if (!alive) {
       if (respawnAt) {
@@ -621,11 +701,11 @@ net = (() => {
   setTimeout(probe, 300);
 
   Object.assign(api, {
-    now, start, again, leave, onLock, claim, burn, shot: () => { if (api.on) fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
+    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), probe, pick,
   });
   Object.defineProperties(api, { // read live (Object.assign would have copied them once)
-    pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' },
+    pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' }, host: { get: () => api.on && hostPid === pid },
   });
   return api;
 })();

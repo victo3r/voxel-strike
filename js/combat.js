@@ -177,7 +177,7 @@ function launchMove(o, pos, r, grounded, dt) {
 // (the explosion comes from their boom). opts.id = its id then; your own rockets get theirs from net.launch (0 offline)
 function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
-  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir);
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by); // by: a bot I host fired it
   const m = new THREE.Group(), body = box(.1, .1, .4, lam({ color: 0x4b5b3b })), tip = box(.12, .12, .12, lam({ color: 0xaa3333 }));
   tip.position.z = .24; m.add(body, tip);
   m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
@@ -188,7 +188,7 @@ const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and most splash damage.
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
 function fireFlare(w, from = null, dir = null, by = null, opts = {}) { // opts: see fireRocket
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
-  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir);
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
   const m = box(.14, .14, .14, flareMat);
   m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
   flares.push({ m, v: dir.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0, by, ghost: !!opts.ghost, id });
@@ -207,7 +207,7 @@ function updateFlares(dt) {
       scene.remove(f.m); flares.splice(i, 1);
       if (f.ghost) continue; // someone else's: the server's boom says where it really landed
       const p = onYou ? youHitP.clone() : hit ? hit.point : f.m.position;
-      net.boom(f.id, p);
+      net.boom(f.id, p, f.by);
       flareFx(p);
       if (onYou) {
         const head = p.y > P.pos.y + 1.45;

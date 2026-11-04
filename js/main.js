@@ -318,7 +318,7 @@ function update(dt) {
       scene.remove(r.m); rockets.splice(i, 1);
       if (r.ghost) continue; // someone else's online: the server's boom says where it really went off
       const at = onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone();
-      net.boom(r.id, at);
+      net.boom(r.id, at, r.by);
       // your rocket hurts you up to ROCKET_SELF. A bot's rocket hurts you as much as yours hurts a bot
       blast(at, ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, true, r.id);
       continue;

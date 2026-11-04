@@ -101,11 +101,20 @@ const GUN_FIT = {
 const HUNT_D = 8; // while it can't see anyone it holds what it'd want if someone came round a corner this far away
 const SWAP_T = .35; // a bot can't fire for this long after switching guns
 const pickOf = list => list[Math.random() * list.length | 0];
-function botLoadout() {
-  const load = CATS.map(([c]) => gi(pickOf(BOT_PICKS[c])));
-  // taste: a little random per gun, plus one category it really likes (so you get snipers, rushers, rocket spammers...)
+// taste: a little random per gun, plus one category it really likes (so you get snipers, rushers, rocket spammers...). load = gun indexes
+function tasteFor(load) {
   const fav = pickOf(['primary', 'primary', 'sniper', 'melee', 'special', 'premium']), taste = {};
   for (const g of load) taste[BASE[g].id] = (.85 + Math.random() * .3) * (BASE[g].cat === fav ? 1.3 : 1);
+  return taste;
+}
+// online the host makes the room's bots (js/net.js fill): their gear in the form the server takes, rolled like botLoadout's
+function botGearNet() {
+  const load = CATS.map(([c]) => pickOf(BOT_PICKS[c])), stars = {};
+  for (const id of load) { const top = Math.max(0, gunUse(gi(id)) - 1); stars[id] = Math.random() * (top + 1) | 0; }
+  return { armor: botArmor(), boots: botBoots(), hat: botHat(), stars, load };
+}
+function botLoadout() {
+  const load = CATS.map(([c]) => gi(pickOf(BOT_PICKS[c]))), taste = tasteFor(load);
   // stars: any number up to the ones you take into a match on that gun (none on guns you don't have, starters have none).
   // W = its stats with those stars
   const stars = {}, W = {};
@@ -433,7 +442,7 @@ function burnTick(dt) {
 }
 // knife: hits its target if it's close enough and in front of it
 function botStab(b, W, t, dist) {
-  b.cd = W.rate; b.stab = .2; sfx('swing', { at: b.g.position, far: 20 });
+  b.cd = W.rate; b.stab = .2; sfx('swing', { at: b.g.position, far: 20 }); net.shot(W, b);
   const p = tPos(t), pos = b.g.position, want = Math.atan2(p.x - pos.x, p.z - pos.z);
   // right on top of its target the direction to it is meaningless, so it counts as in front
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
@@ -468,7 +477,7 @@ function botFlame(b, W) {
   }
 }
 function botFire(b, W, dist) {
-  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : .05;
+  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : .05; net.shot(W, b); // online (a bot I host): the server counts its shots like mine
   // a beam is held in long sweeps, everything else automatic in short bursts
   if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto guns: about as fast as a person clicks
@@ -506,10 +515,10 @@ function botFire(b, W, dist) {
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45;
-      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head, 0);
+      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head, W.beam ? 2 : 0);
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
-      if (!zz.dead) hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, 0);
+      if (!zz.dead) hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, W.beam ? 2 : 0);
     } else burst(wall.point, 0x999999, 2);
   }
 }
@@ -633,9 +642,10 @@ function updateBot(b, dt) {
 
   for (const p of pads) {
     if (!p.item || Math.hypot(pos.x - p.x, pos.z - p.z) >= 1 || pos.y >= 1.5) continue;
-    if (p.type === 'health' && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK);
-    else if (p.type === 'armor' && b.armor < b.maxArmor) b.armor = Math.min(b.maxArmor, b.armor + ARMOR_PICK);
-    else continue;
+    if (!(p.type === 'health' && b.hp < b.maxHp || p.type === 'armor' && b.armor < b.maxArmor)) continue;
+    if (net.on) { net.pick(p, b); break; } // online the server hands it over (js/net.js picked, with by)
+    if (p.type === 'health') b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK);
+    else b.armor = Math.min(b.maxArmor, b.armor + ARMOR_PICK);
     sfx(p.type === 'health' ? 'pickHealth' : 'pickArmor', { at: pos, far: 25, v: .7 });
     clearPad(p); p.t = RESPAWN + Math.random() * 10;
     break;
