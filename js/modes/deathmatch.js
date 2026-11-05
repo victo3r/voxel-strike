@@ -1,12 +1,46 @@
 // The match starts with you + 1 bot, and the rest join over the first minute until the map's lobby is full.
 // Bots live in the zombies list (type 'bot'), so your bullets, knife, fire and rockets already hurt them.
-// react = how long a bot has to see its target before it shoots. turn = how fast its aim closes on what it's looking at (higher = snappier;
-// big turns are capped by botLook's turn speed).
-// lead = how far ahead of a moving target it aims. aimErr = random wobble on each shot, in radians.
 // dmgMul = bot guns do this much of their normal damage (to you and to other bots).
-// moveErr = extra wobble when the target is running (at full speed), so strafing really does make it miss more.
-// Bots have your stats (speed, damage, reload). What keeps them beatable is reaction time, aim lag and wobble, and bursts.
-const BOT = { hp: 100, speed: 6, react: .45, turn: 8, lead: .05, aimErr: .025, moveErr: .045, dmgMul: 1, respawn: 1.5 };
+// Bots have your stats (speed, damage, reload). What keeps them beatable is how well they play: SKILLS below.
+const BOT = { hp: 100, speed: 6, dmgMul: 1, respawn: 1.5 };
+// ---- skill levels. Every bot has the same stats; what differs is how well it plays. Each gets a level for the match (rollSkills):
+// 2 is the ordinary bot, 4 the rare one that never stops moving and rarely misses, 0 the one still finding the keys.
+// react = how long it has to see its target before it shoots. turn = how fast its aim closes on what it's looking at (higher = snappier;
+//   big turns are capped by botLook's turn speed). Its aim trails what it wants to look at by 1 / turn seconds, so someone moving
+//   across it, or its own strafing and hopping, pulls its shots behind: lead and self are how much of each it makes up for
+//   (0 = none, 1 = all of it). aimErr = random wobble on each shot, in radians. moveErr = extra wobble when the target is running
+//   (at full speed), so strafing really does make it miss more.
+// spd = how fast its head turns (times botLook's speeds), flick = how many of its turns are quick flicks.
+// stand = how often a strafe is "stand still", strafeT = how long each one lasts [least, spread] in seconds. plant = it stops to shoot
+//   instead of working the range. jumpF / jumpR = seconds between hops fighting / just running [least, spread], chain = how often
+//   a running hop is followed straight away by another. gaze = seconds between looks about [least, spread].
+// rest = with nobody about it stops every [least, spread] seconds for [least, spread] seconds. idle = it's the kind to stand
+//   looking at the ground now and then.
+// Measured (test/measure-bots.mjs ladder: one bot with an AR on the yard), levels 0 to 4 land about 12, 19, 26, 51 and 77% of their
+// bullets on a player who moves like most people do, and 13, 20, 25, 49 and 75% on one who never stops dodging. The single level
+// before this landed 28 and 26%. Retune with that script: the numbers move together, so check the whole ladder
+const SKILLS = [
+  { react: .8,  turn: 5.2, lead: .2,  self: 0,   aimErr: .06,  moveErr: .08,  spd: .75,  flick: .1,  stand: .7,  strafeT: [1.2, 1.8], plant: true,  jumpF: [6, 8],     jumpR: [10, 15], chain: 0,   gaze: [1.5, 3],  rest: [5, 6, 1, 1.5],   idle: true },
+  { react: .62, turn: 6,   lead: .28, self: 0,   aimErr: .05,  moveErr: .07,  spd: .9,   flick: .2,  stand: .4,  strafeT: [.7, 1.4],  plant: false, jumpF: [3, 5],     jumpR: [6, 10],  chain: .15, gaze: [1, 2.8],  rest: [10, 10, .8, 1], idle: true },
+  { react: .48, turn: 7.7, lead: .36, self: 0,   aimErr: .028, moveErr: .05,  spd: 1,    flick: .3,  stand: .15, strafeT: [.4, 1.1],  plant: false, jumpF: [1.5, 3.5], jumpR: [4, 8],   chain: .3,  gaze: [.8, 2.4], rest: null,             idle: true },
+  { react: .36, turn: 9.5, lead: .6,  self: .42, aimErr: .022, moveErr: .035, spd: 1.15, flick: .45, stand: .08, strafeT: [.35, .9],  plant: false, jumpF: [1.1, 2.4], jumpR: [2.5, 5], chain: .4,  gaze: [.6, 1.8], rest: null,             idle: true },
+  { react: .26, turn: 11,  lead: 1,   self: 1,   aimErr: .012, moveErr: .018, spd: 1.35, flick: .6,  stand: 0,   strafeT: [.25, .6],  plant: false, jumpF: [.6, 1.1],  jumpR: [1, 2.2], chain: .5,  gaze: [.35, .9], rest: null,             idle: false },
+];
+const SKILL_MID = 2, skillOf = b => SKILLS[b.rec.skill ?? SKILL_MID] ?? SKILLS[SKILL_MID];
+// the levels for a lobby of n bots: one 4 in CRACKED_P of games (never two), up to two 0s (at least one more often than not), now and
+// then a 3 and one or two 1s, the rest 2s, and always at least one 2 in a lobby of three or more. In a random order, so the best
+// one isn't always the first in
+const CRACKED_P = .4;
+function rollSkills(n) {
+  const out = [], most = n <= 3 ? 1 : 2;
+  const some = (lvl, p1, p2) => { const r = Math.random(); for (let c = Math.min(most, r < p2 ? 2 : r < p2 + p1 ? 1 : 0); c > 0; c--) out.push(lvl); };
+  if (Math.random() < CRACKED_P) out.push(4);
+  some(0, .45, .2); some(3, .3, .08); some(1, .35, .12);
+  out.length = Math.min(out.length, Math.max(0, n >= 3 ? n - 1 : n));
+  while (out.length < n) out.push(SKILL_MID);
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
 // target focus: a bot sticks with the enemy it's fighting. It only gives up after losing sight of it for LOSE_T seconds,
 // and only turns on someone else who's shooting it once they've done SWITCH_DMG damage within a couple of seconds.
 const LOSE_T = 2.5, SWITCH_DMG = 40;
@@ -157,11 +191,11 @@ function makeRecs() {
   recs = [youRec]; joins = [];
   // bot 1 is there from the start with a NATO-alphabet name and never chats.
   // The others join spread across the first minute, a little randomly, with real-looking names (js/names.js).
-  const next = nameMaker([myName]);
+  const next = nameMaker([myName]), skills = rollSkills(BOT_COUNT);
   for (let i = 0; i < BOT_COUNT; i++) {
     const at = i === 0 ? 0 : Math.min(JOIN_T - 2, Math.max(JOIN_T / 12,JOIN_T * i / BOT_COUNT + (Math.random() - .5) * JOIN_T / 6));
     const nm = i === 0 ? { name: defaultBotName(myName), lang: 'en', quiet: true } : next();
-    joins.push({ i, at, ...nm });
+    joins.push({ i, at, skill: skills[i], ...nm });
   }
   joins.sort((a, b) => a.at - b.at);
 }
@@ -172,7 +206,7 @@ function joinBot(j) {
   if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; }
   const [sr, sg, sb] = look.shirt;
   const r = { name: j.name, lang: j.lang, quiet: !!j.quiet, team, css: look.css, look: randomLook(j.name, sr << 16 | sg << 8 | sb), tag: tag.mat, tagW: tag.w,
-    score: 0, kills: 0, deaths: 0, streak: 0, b: null, wait: .5, ...botLoadout() };
+    score: 0, kills: 0, deaths: 0, streak: 0, b: null, wait: .5, skill: j.skill ?? SKILL_MID, ...botLoadout() };
   recs.push(r);
   if (MATCH_T - matchT > 1) { feed(`${nameTag(r)} joined`); sfx('join'); } // no message for the one that starts with you
 }
@@ -456,12 +490,13 @@ function roamGoal(b) {
   return { x: Math.max(-lim, Math.min(lim, x)), y, z: Math.max(-lim, Math.min(lim, z)), t: 4 + Math.random() * 5 };
 }
 // its head: never turns faster than this turn's speed (most turns unhurried, some quick flicks), a little uneven, and eases in on
-// what it's looking at the way BOT.turn always has. It picks a new speed each time what it wants to look at jumps
+// what it's looking at (its level's turn). It picks a new speed each time what it wants to look at jumps
 function botLook(b, wantYaw, wantPitch, dt) {
-  if (!b.turnSpd || Math.abs(angDiff(wantYaw, b.lookWas)) > .45) b.turnSpd = Math.random() < .3 ? 8 + Math.random() * 5 : 3 + Math.random() * 2.5;
+  const S = skillOf(b);
+  if (!b.turnSpd || Math.abs(angDiff(wantYaw, b.lookWas)) > .45) b.turnSpd = (Math.random() < S.flick ? 8 + Math.random() * 5 : 3 + Math.random() * 2.5) * S.spd;
   b.lookWas = wantYaw;
   const now = performance.now() * .001, uneven = Math.max(.35, .8 + .3 * Math.sin(now * 11 + b.t0) + .25 * Math.sin(now * 23 + b.t0 * 3));
-  const cap = b.turnSpd * uneven * dt, k = Math.min(1, dt * BOT.turn), dy = angDiff(wantYaw, b.aimYaw), dp = wantPitch - b.aimPitch;
+  const cap = b.turnSpd * uneven * dt, k = Math.min(1, dt * S.turn), dy = angDiff(wantYaw, b.aimYaw), dp = wantPitch - b.aimPitch;
   b.aimYaw += Math.sign(dy) * Math.min(Math.abs(dy) * k, cap);
   b.aimPitch += Math.sign(dp) * Math.min(Math.abs(dp) * k, cap * .7);
 }
@@ -469,7 +504,8 @@ function botAlert(b, x, z, err) { b.alertYaw = Math.atan2(x - b.g.position.x, z 
 // what's going on in its head besides its target (set up the first time it thinks)
 function botMind(b) {
   Object.assign(b, { noSeeT: 0, gazeT: 0, gazeYaw: 0, gazePitch: 0, alertT: 0, alertYaw: 0, idle: 0, idleNext: 20 + Math.random() * 70, roam: null,
-    lk: { x: 0, y: 0, z: 0 }, mvYaw: b.aimYaw, wob: 0, wobWant: 0, wobT: 0, turnSpd: 0, lookWas: b.aimYaw, heardAt: performance.now(), t0: Math.random() * 100 });
+    lk: { x: 0, y: 0, z: 0 }, mvYaw: b.aimYaw, wob: 0, wobWant: 0, wobT: 0, turnSpd: 0, lookWas: b.aimYaw, heardAt: performance.now(), t0: Math.random() * 100,
+    rest: 0, restNext: 3 + Math.random() * 8, vx: 0, vz: 0 }); // rest: stopped for a moment, vx / vz: how fast it's moving itself
 }
 
 function nearPad(pos, range) {
@@ -543,7 +579,7 @@ function botFire(b, W, dist) {
     b.pickT = Math.min(b.pickT, .15 + Math.random() * .25); // out: think about switching instead of standing there reloading
   }
   if (W.flame) return botFlame(b, W);
-  const err = BOT.aimErr + BOT.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
+  const S = skillOf(b), err = S.aimErr + S.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
   if (W.rocket || W.flare) { // these fly, so they come out of its eye line with the same wobble as a bullet
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
@@ -581,6 +617,7 @@ function updateBot(b, dt) {
   let W = b.rec.W[b.gun];
   const pos = b.g.position;
   if (b.gazeT === undefined) botMind(b);
+  const S = skillOf(b);
   eye.set(pos.x, pos.y + 1.6, pos.z);
   b.hitByT -= dt;
   if ((b.scanT -= dt) <= 0 || b.tgt && !tAlive(b.tgt)) {
@@ -598,7 +635,10 @@ function updateBot(b, dt) {
   b.lostT = sees || !t ? 0 : b.lostT + dt;
   // now and then, with nobody about, it just stands there for a few seconds looking at the ground (like someone in their settings)
   if (b.idle > 0) { b.idle -= dt; if (t || b.hitByT > 0) b.idle = 0; }
-  else if (!t && b.hitByT <= 0 && !b.vy && (b.idleNext -= dt) <= 0) { b.idle = 2 + Math.random() * 3; b.idleNext = 40 + Math.random() * 70; }
+  else if (S.idle && !t && b.hitByT <= 0 && !b.vy && (b.idleNext -= dt) <= 0) { b.idle = 2 + Math.random() * 3; b.idleNext = 40 + Math.random() * 70; }
+  // the less keen ones also stop for a moment every so often when they've nobody to fight (still looking about)
+  if (b.rest > 0) { b.rest -= dt; if (t) b.rest = 0; }
+  else if (S.rest && !t && b.idle <= 0 && (b.restNext -= dt) <= 0) { b.rest = S.rest[2] + Math.random() * S.rest[3]; b.restNext = S.rest[0] + Math.random() * S.rest[1]; }
   if (!t) {
     if (b.hitByT > 1.7 && b.hitBy && tAlive(b.hitBy)) { const q = tPos(b.hitBy); botAlert(b, q.x, q.z, .15); } // shot from where it can't see: it turns to look
     let near = null, nd = Infinity; // gunfire: it looks that way, and half the time heads over
@@ -638,15 +678,17 @@ function updateBot(b, dt) {
     if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
     b.lpx = tp.x; b.lpz = tp.z;
     // (it guesses the lead like a person would: somewhere between 60% and 120% of what's right, a new guess every shot)
-    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : 0, lead = fly ? fly * b.leadGuess : BOT.lead;
-    const tx = dx + b.pvx * lead, tz = dz + b.pvz * lead, th = Math.hypot(tx, tz);
+    // Bullets: its aim trails what it wants by `lag`, so it wants a point ahead by as much of that as its level makes up for:
+    // for the target's movement (lead), and for its own strafing and hopping (self)
+    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : 0, lag = 1 / S.turn;
+    const tx = dx + (fly ? b.pvx * fly * b.leadGuess : (b.pvx * S.lead - b.vx * S.self) * lag), tz = dz + (fly ? b.pvz * fly * b.leadGuess : (b.pvz * S.lead - b.vz * S.self) * lag), th = Math.hypot(tx, tz);
     wantYaw = Math.atan2(tx, tz);
-    wantPitch = Math.atan2(tp.y + (W.rocket ? .3 : 1.1) - pos.y - 1.6, th) + (W.flare ? Math.atan2(FLARE_DROP * fly * fly / 2, th) : 0);
+    wantPitch = Math.atan2(tp.y + (W.rocket ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (W.flare ? Math.atan2(FLARE_DROP * fly * fly / 2, th) : 0);
   } else {
     // nobody in sight: it looks where it's going and glances about, to the sides, now and then right round, a bit up or down
     // (nobody runs about staring dead ahead). Something it heard or that hit it takes its eyes first. Standing idle, it looks down
     if ((b.gazeT -= dt) <= 0) {
-      b.gazeT = .8 + Math.random() * 2.4;
+      b.gazeT = S.gaze[0] + Math.random() * S.gaze[1];
       const r = Math.random(), v = Math.random();
       b.gazeYaw = r < .12 ? (Math.random() < .5 ? -1 : 1) * (1.9 + Math.random()) : r < .55 ? (Math.random() * 2 - 1) * 1.1 : (Math.random() * 2 - 1) * .3;
       b.gazePitch = v < .15 ? -.45 - Math.random() * .3 : v < .3 ? .12 + Math.random() * .25 : -.1 + (Math.random() - .5) * .25;
@@ -668,7 +710,7 @@ function updateBot(b, dt) {
   if (b.round) b.round.visible = b.ammo > 0;
   // in range for this gun: knife = arm's reach, flamethrower = its flame, rocket = not close enough to blow itself up
   const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : true;
-  const ready = sees && b.seeT >= BOT.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
+  const ready = sees && b.seeT >= S.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
   b.aimT = ready && sniper ? b.aimT + dt : 0;
   if (ready && b.cd <= 0 && (!sniper || b.aimT >= SNIPE_T)) { if (W.melee) botStab(b, W, t, dist); else botFire(b, W, dist); }
 
@@ -677,8 +719,9 @@ function updateBot(b, dt) {
   let radial = 1, side = 0;
   if (sees) {
     radial = dist > keep[1] ? 1 : dist < keep[0] ? -1 : 0;
+    if (S.plant && radial && dist > keep[0] * .6 && dist < keep[1] * 1.6) radial = 0; // not one for working the range: near enough, it stops and shoots
     if (b.reload > 0 && dist < keep[1] + 4) radial = -1;
-    if ((b.strafeT -= dt) <= 0) { b.strafeT = .4 + Math.random() * 1.1; b.strafe = Math.random() < .15 ? 0 : Math.random() < .5 ? -1 : 1; }
+    if ((b.strafeT -= dt) <= 0) { b.strafeT = S.strafeT[0] + Math.random() * S.strafeT[1]; b.strafe = Math.random() < S.stand ? 0 : Math.random() < .5 ? -1 : 1; }
     side = b.strafe * (sniper && b.aimT > 0 ? .3 : 1);
   }
   const pad = !sees && b.hp < b.maxHp ? nearPad(pos, b.hp <= PAD_LOW ? PAD_FAR : PAD_NEAR) : null;
@@ -703,7 +746,7 @@ function updateBot(b, dt) {
     const ox = pos.x - P.pos.x, oz = pos.z - P.pos.z, od = Math.hypot(ox, oz);
     if (od < .75) { if (od > .001) { mx += ox / od * 2; mz += oz / od * 2; } else mx += 2; }
   }
-  if (b.idle > 0) mx = mz = 0;
+  if (b.idle > 0 || b.rest > 0) mx = mz = 0;
   else if (!sees && !way && !pad && b.detour <= 0 && Math.hypot(mx, mz) > .05) {
     // on its way somewhere with nobody to fight: not a ruler line. Its heading drifts to one side and the other, and it comes
     // round to a new direction in a curve instead of snapping onto it
@@ -720,20 +763,21 @@ function updateBot(b, dt) {
     if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded, into)) bump = true;
     if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded, into)) bump = true;
     if (bump && sees) b.strafe = -b.strafe;
+    if (dt > 0) { b.vx = (pos.x - ox) / dt; b.vz = (pos.z - oz) / dt; } // how fast it's really going, for its own aim (self)
     if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) {
       b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1;
       if (!b.vy && Math.random() < .4) b.jumpT = 0; // sometimes tries hopping over what it's stuck on
     }
     // hops now and then like a player, fighting or just running somewhere (then every so often, sometimes a few in a row),
     // more often mid-fight. Not while a sniper is lining up a shot
-    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? 1.5 + Math.random() * 3.5 : Math.random() < .3 ? .5 + Math.random() * .4 : 4 + Math.random() * 8; b.vy = 9; b.dj = b.rec.fx.dj && Math.random() < .6 ? 1 : 0; }
+    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? S.jumpF[0] + Math.random() * S.jumpF[1] : Math.random() < S.chain ? .5 + Math.random() * .4 : S.jumpR[0] + Math.random() * S.jumpR[1]; b.vy = 9; b.dj = b.rec.fx.dj && Math.random() < .6 ? 1 : 0; }
     // Raider Boots: most of its hops get a second jump near the top
     if (b.dj === 1 && b.vy && b.vy > -2 && b.vy < 2) { b.dj = 2; b.vy = DJ_V; sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // a footstep each time a leg swings through
     if (ph !== b.stepPh) { b.stepPh = ph; if (!b.vy) sfx('step_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)) + (ph ? '' : '2'), { at: pos, far: 22, v: .8 }); }
-  } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; }
+  } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; b.vx = b.vz = 0; }
   const air = b.vy < -6;
   settle(b, dt);
   if (inWater(pos.x, pos.z, pos.y)) { drownZombie(b); return; }

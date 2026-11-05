@@ -242,7 +242,7 @@ net = (() => {
   function welcome(w, job) {
     const rejoining = api.on;
     if (job) { job.dead = true; clearTimeout(job.timer); starting = null; }
-    welcomed = true; pid = w.pid; key = w.key; room = w.room; code = w.code || null; myTeamRaw = w.me?.team ?? 0; hostPid = w.host | 0;
+    welcomed = true; pid = w.pid; key = w.key; room = w.room; code = w.code || null; myTeamRaw = w.me?.team ?? 0; hostPid = w.host | 0; skillPool = null;
     phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8;
     rejoinInfo = { room, pid, key, tried: false };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
@@ -318,6 +318,7 @@ net = (() => {
   function left(who, reason) {
     const r = remotes.get(who); if (!r) return;
     dropBody(r); remotes.delete(who);
+    if (r.rec.hostBot && skillPool && r.rec.skill !== undefined) skillPool.push(r.rec.skill); // its level goes to the next bot I make
     const i = recs.indexOf(r.rec); if (i >= 0) recs.splice(i, 1);
     const j = roster.recs.indexOf(r.rec); if (j >= 0) roster.recs.splice(j, 1);
     if (reason !== 'replaced') feed(`${nameTag(r.rec)} left`);
@@ -446,10 +447,13 @@ net = (() => {
   // health, scores and respawns like anyone's. Everyone else gets them as remote players. Hosting moves to another human when the
   // host leaves or parks, so the bots carry on
   const hostedOf = by => { const r = by && by.pid ? remotes.get(by.pid) : null; return r && r.rec.hostBot && r.body ? r : null; };
-  function hostRec(rec) { rec.hostBot = true; rec.remote = false; rec.taste = tasteFor(rec.load); rec.wait = Infinity; }
+  // (its level for as long as I run it: from a roll for a full room of bots, js/modes/deathmatch.js rollSkills)
+  let skillPool = null;
+  function hostRec(rec) { rec.hostBot = true; rec.remote = false; rec.taste = tasteFor(rec.load); rec.wait = Infinity; skillPool ??= rollSkills(7); rec.skill = skillPool.length ? skillPool.pop() : SKILL_MID; }
   function setHost(h) {
     hostPid = h | 0;
     const mine = hostPid === pid;
+    if (mine) skillPool = null; // the bots are mine now: a fresh roll
     for (const r of remotes.values()) {
       if (!r.rec.bot || mine === !!r.rec.hostBot) continue;
       const b = r.body, live = !!b && !b.dead;

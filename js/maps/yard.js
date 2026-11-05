@@ -89,5 +89,15 @@ const bushes = [...scatter(40, 1.4, 1.2, 40), ...scatter(60, 4, 1.2, 100)].map((
 instanced(unit, leafMat, bushes);
 grassTufts(scatter(900, .7, .3, 70).map(([x, z]) => { const s = .8 + rnd() * .7; return [x, 0, z, 1.1 * s, 1 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]; }));
 addCrates(MAPS.yard.crates);
+// tall grass inside the fence too (on the detail settings that show it, like the other maps): clear of the pads, the crates and the fence
+const yardTufts = [];
+for (let tries = 0; yardTufts.length < 300 && tries < 6000; tries++) {
+  const x = (rnd() * 2 - 1) * (YA - .9), z = (rnd() * 2 - 1) * (YA - .9), s = .7 + rnd() * .6, hw = .6 * s;
+  if (MAPS.yard.pads.some(([px, pz]) => Math.hypot(px - x, pz - z) < 1.8)) continue;
+  if (building.solids.some(o => x + hw > o.minX && x - hw < o.maxX && z + hw > o.minZ && z - hw < o.maxZ)) continue;
+  yardTufts.push([x, 0, z, 1.1 * s, .85 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
+}
+grassTufts(yardTufts);
+MAPS.yard.tufts = yardTufts.length; // for the map checks
 addSky(seeded(4242), [3, 17, -36], 14, 45, 140, 38, 52);
 }

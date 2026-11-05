@@ -330,7 +330,8 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave();
 const ALL_MAPS = ['yard', 'forest', 'resort'];
 const V_MAPS = 3; // bump when the map pictures are retaken
 const MODES = [
-  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Your loadout against endless waves. Earn coins, beat a boss every 5 waves', maps: ALL_MAPS },
+  // zombie waves is on the yard only for now: zombies get stuck on the busier maps, which weren't laid out for them. More open maps for it later
+  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Your loadout against endless waves. Earn coins, beat a boss every 5 waves', maps: ['yard'] },
   { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ALL_MAPS },
   { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes, blue vs red. The team with the most kills wins', maps: ALL_MAPS },
   { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds. Rack up as many kills as you can', sub: [
