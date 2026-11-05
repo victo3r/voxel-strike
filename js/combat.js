@@ -41,7 +41,7 @@ function shoot() {
   if (cd > 0 || reloading > 0 || respawnT > 0) return;
   if (w.melee) return stab(w);
   if (ammo[cur] <= 0) { if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
-  ammo[cur]--; cd = w.rate; net.shot(w);
+  ammo[cur]--; cd = w.rate; net.shot(w); botHear(P.pos.x, P.pos.z, YOU_T, w.quiet); // bots hear it (deathmatch.js)
   if (gunSpin) gunSpinV = 30;
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);

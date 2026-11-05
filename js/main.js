@@ -83,7 +83,7 @@ function update(dt) {
   const mx = held('right') - held('left'), mz = held('back') - held('fwd');
   const lx = held('lookR') - held('lookL'), ly = held('lookU') - held('lookD');
   if (lx || ly) {
-    const ls = 2.4 * sens.keys * dt * camera.fov / 75;
+    const ls = 2.4 * sens.keys * dt * camera.fov / fovBase;
     const [ay, ap] = aaLook(-lx * ls, ly * ls, dt);
     P.yaw += ay; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ap));
   }
@@ -138,8 +138,8 @@ function update(dt) {
   zoomSound(w);
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
   // zoom: how many times bigger things look through a holo sight or scope, so the view narrows to 1/zoom of the normal one
-  const zoomFov = w.zoom ? 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(37.5)) / w.zoom)) : 0;
-  const fov = 75 - adsT * (w.zoom ? 75 - zoomFov : 20);
+  const zoomFov = w.zoom ? 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(fovBase / 2)) / w.zoom)) : 0;
+  const fov = fovBase - adsT * (w.zoom ? fovBase - zoomFov : 20);
   if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }
   // aimed in: the screen is the sight's window (the gun hides). Holo sights also get their red reticle
   const holo = !!(w.zoom && gunHolo) && adsT > .8, scoped = holo || w.scope && adsT > .8;

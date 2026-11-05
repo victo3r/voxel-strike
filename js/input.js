@@ -23,8 +23,14 @@ const DEFAULT_SENS = { mouse: 1, keys: 1 };
 let sens = { ...DEFAULT_SENS };
 try { const s = JSON.parse(localStorage.getItem('voxelstrike-sens')); if (s) for (const k in sens) if (s[k] > 0) sens[k] = s[k]; } catch {}
 const saveSens = () => { try { localStorage.setItem('voxelstrike-sens', JSON.stringify(sens)); } catch {} };
+// your field of view, in degrees up and down the screen (FOV_MIN to FOV_MAX). Sights and scopes zoom in from it, and looking
+// round slows down by the same amount when zoomed (camera.fov / fovBase), whatever it's set to
+const FOV_DEF = 75, FOV_MIN = 60, FOV_MAX = 90;
+let fovBase = FOV_DEF;
+try { const f = +localStorage.getItem('voxelstrike-fov'); if (f >= FOV_MIN && f <= FOV_MAX) fovBase = f; } catch {}
 function renderSens() {
   for (const k in sens) { $('sens_' + k).value = sens[k]; $('sensV_' + k).textContent = sens[k].toFixed(2) + '×'; }
+  $('fovIn').value = fovBase; $('fovV').textContent = fovBase + '°';
   $('vol').value = volume; $('volV').textContent = Math.round(volume * 100) + '%';
   $('mvol').value = musicVol; $('mvolV').textContent = Math.round(musicVol * 100) + '%';
 }
@@ -83,7 +89,7 @@ function aaTarget() {
 function aaPick() {
   aaT = null;
   const L = AA[opts.aa]; if (!L || !locked || respawnT > 0) return;
-  const c = camera.position, zone = THREE.MathUtils.degToRad(L.zone) * camera.fov / 75, near = [];
+  const c = camera.position, zone = THREE.MathUtils.degToRad(L.zone) * camera.fov / fovBase, near = [];
   for (const z of zombies) {
     if (z.dead || !z.glowMs || !z.glowOn) continue;
     const p = z.g.position, s = z.scale || 1, dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz);
@@ -102,7 +108,7 @@ function aaPick() {
 function aaLook(dy, dp, dt) {
   const L = AA[opts.aa], a = Math.hypot(dy, dp);
   if (!L || !aaT || !a) return [dy, dp];
-  const k = camera.fov / 75, v = a / Math.max(dt, .001);
+  const k = camera.fov / fovBase, v = a / Math.max(dt, .001);
   const fade = Math.max(0, Math.min(1, (AA_FAST_V * k - v) / ((AA_FAST_V - AA_SLOW_V) * k)));
   aaMoveAt = performance.now(); aaFade = fade;
   const [ey, ep] = aaErr(aaT), err = Math.hypot(ey, ep), close = 1 - err / aaT.zone;
@@ -113,6 +119,7 @@ function aaLook(dy, dp, dt) {
 }
 
 for (const k in sens) $('sens_' + k).addEventListener('input', e => { sens[k] = +e.target.value; saveSens(); renderSens(); });
+$('fovIn').addEventListener('input', e => { fovBase = Math.max(FOV_MIN, Math.min(FOV_MAX, +e.target.value || FOV_DEF)); try { localStorage.setItem('voxelstrike-fov', fovBase); } catch {} renderSens(); });
 $('vol').addEventListener('input', e => { setVolume(+e.target.value); renderSens(); });
 $('mvol').addEventListener('input', e => { setMusicVolume(+e.target.value); renderSens(); });
 $('vol').addEventListener('change', () => sfx('ui'));
@@ -179,7 +186,7 @@ function showSetTab(t) {
 $('setTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.t !== setTab) { showSetTab(b.dataset.t); sfx('ui'); } });
 function openSettings() { $('acctErr').textContent = ''; showSetTab(setTab); $('binds').style.display = 'flex'; }
 $('ctrlBtn').addEventListener('click', e => { e.stopPropagation(); openSettings(); });
-$('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); sens = { ...DEFAULT_SENS }; saveSens(); renderSens(); opts = { ...DEFAULT_OPTS }; aimOn = false; saveOpts(); renderOpts(); renderHelp(); renderBinds(); });
+$('bindReset').addEventListener('click', () => { rebinding = null; binds = copyBinds(DEFAULT_BINDS); saveBinds(); sens = { ...DEFAULT_SENS }; saveSens(); fovBase = FOV_DEF; try { localStorage.removeItem('voxelstrike-fov'); } catch {} renderSens(); opts = { ...DEFAULT_OPTS }; aimOn = false; saveOpts(); renderOpts(); renderHelp(); renderBinds(); });
 renderHelp();
 const closeBinds = () => { rebinding = null; $('binds').style.display = 'none'; $('acctPass').value = ''; };
 $('bindX').addEventListener('click', closeBinds);
@@ -246,7 +253,7 @@ addEventListener('mousemove', e => {
   // drop a lone spike far bigger than the movement just before it (browser glitch, not a real flick)
   if (m > 250 && m > lastMove * 8 + 60) { lastMove = m; return; } // only ever skips one event in a row
   lastMove = m;
-  const s = .0022 * sens.mouse * camera.fov / 75; // slower aim when zoomed
+  const s = .0022 * sens.mouse * camera.fov / fovBase; // slower aim when zoomed
   const gap = e.timeStamp - aaLastT; aaLastT = e.timeStamp; // time since the last movement, for how fast you're turning
   const [ay, ap] = aaLook(-dx * s, -dy * s, gap > 0 && gap < 100 ? gap / 1000 : 1 / 60);
   P.yaw += ay;
@@ -313,7 +320,7 @@ function showLobby(on) {
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
   vm.visible = !on;
-  if (on) { $('menu').style.display = 'none'; showAway(false); camera.fov = 75; camera.updateProjectionMatrix(); musicLobby(); armIcon(); }
+  if (on) { $('menu').style.display = 'none'; showAway(false); camera.fov = fovBase; camera.updateProjectionMatrix(); musicLobby(); armIcon(); }
 }
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); restart(); showLobby(true); });
 

@@ -74,6 +74,7 @@
           <div class="sliders">
             <span>Mouse sensitivity</span><input id="sens_mouse" type="range" min="0.1" max="3" step="0.05"><b id="sensV_mouse"></b>
             <span>Arrow-key look speed</span><input id="sens_keys" type="range" min="0.1" max="3" step="0.05"><b id="sensV_keys"></b>
+            <span>Field of view</span><input id="fovIn" type="range" min="60" max="90" step="1"><b id="fovV"></b>
           </div>
           <h2>AIM ASSIST</h2>
           <div id="aaQ" class="seg"><button data-v="0">OFF</button><button data-v="1">LOW</button><button data-v="2">MEDIUM</button></div>
@@ -150,7 +151,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 106;
+const V = 107;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
 for (const src of FILES) {

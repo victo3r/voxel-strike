@@ -1,6 +1,7 @@
 // The match starts with you + 1 bot, and the rest join over the first minute until the map's lobby is full.
 // Bots live in the zombies list (type 'bot'), so your bullets, knife, fire and rockets already hurt them.
-// react = how long a bot has to see its target before it shoots. turn = how fast its aim catches up (higher = snappier).
+// react = how long a bot has to see its target before it shoots. turn = how fast its aim closes on what it's looking at (higher = snappier;
+// big turns are capped by botLook's turn speed).
 // lead = how far ahead of a moving target it aims. aimErr = random wobble on each shot, in radians.
 // dmgMul = bot guns do this much of their normal damage (to you and to other bots).
 // moveErr = extra wobble when the target is running (at full speed), so strafing really does make it miss more.
@@ -399,13 +400,37 @@ function canSee(t) { // from the eye set up in updateBot: can it see the target'
   const p = tPos(t);
   return clearLine(eye, aimV.set(p.x, p.y + 1.1, p.z)) || clearLine(eye, aimV.set(p.x, p.y + 1.6, p.z));
 }
+// ---- what a bot knows. It has eyes in the front of its head only: it notices someone who is in front of it (BOT_FOV across, and
+// not far above or below where it's looking) with nothing in the way, or close enough to bump into, or who is shooting it. It hears
+// gunfire and looks that way. The longer it has found nobody, the wider it looks (up to BOT_FOV_WIDE), so a match never stalls
+const BOT_FOV = Math.PI / 2, BOT_FOV_WIDE = 3.4, WIDEN_AT = 14, WIDEN_T = 14, BOT_VFOV = .8, NEAR_SENSE = 2.5;
+const HEAR = 38, HEAR_QUIET = 12; // how far a shot carries to a bot's ears (suppressed guns and the flamethrower: the short one)
+const TURN_WALK = 3.2; // how fast its feet come round to a new direction when it's just going somewhere (radians a second)
+const angDiff = (a, c) => Math.atan2(Math.sin(a - c), Math.cos(a - c));
+function inView(b, t) {
+  const p = tPos(t), pos = b.g.position, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz);
+  if (d < NEAR_SENSE) return true;
+  const fov = BOT_FOV + Math.min(1, Math.max(0, (b.noSeeT - WIDEN_AT) / WIDEN_T)) * (BOT_FOV_WIDE - BOT_FOV);
+  return Math.abs(angDiff(Math.atan2(dx, dz), b.aimYaw)) < fov / 2 && Math.abs(Math.atan2(p.y + 1 - pos.y - 1.6, d) - b.aimPitch) < BOT_VFOV;
+}
+function enemiesOf(b) {
+  const out = [];
+  if (respawnT <= 0 && !friendly(b, YOU_T)) out.push(YOU_T);
+  for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) out.push(z);
+  return out;
+}
+// shots it can hear: the last few, each { x, z, who, quiet, at }. A gun firing on and on keeps updating its one entry
+const heard = [];
+function botHear(x, z, who, quiet) {
+  const now = performance.now(), last = heard[heard.length - 1];
+  if (last && last.who === who && now - last.at < 400) { last.x = x; last.z = z; last.at = now; last.quiet = !!quiet; return; }
+  heard.push({ x, z, who, quiet: !!quiet, at: now }); if (heard.length > 8) heard.shift();
+}
 // pick who to fight. Once it has seen its target it stays on it until the target dies or has been out of sight for LOSE_T,
-// unless someone else is hurting it badly (SWITCH_DMG). Otherwise: whoever shot it, else the closest one it can see,
-// else go hunting for the closest one.
+// unless someone else is hurting it badly (SWITCH_DMG). Otherwise: whoever is shooting it (if it can see them once it turns),
+// else the closest one it notices. Nobody noticed: nobody (it wanders, see roamGoal)
 function pickTarget(b) {
-  const pos = b.g.position, enemies = [];
-  if (respawnT <= 0 && !friendly(b, YOU_T)) enemies.push(YOU_T);
-  for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) enemies.push(z);
+  const pos = b.g.position, enemies = enemiesOf(b);
   if (!enemies.length) return null;
   const d = t => Math.hypot(tPos(t).x - pos.x, tPos(t).z - pos.z);
   const shooter = b.hitBy && b.hitByT > 0 && b.hitBy !== b.tgt && tAlive(b.hitBy) && canSee(b.hitBy) ? b.hitBy : null;
@@ -414,9 +439,37 @@ function pickTarget(b) {
     return b.tgt;
   }
   if (shooter) return shooter;
-  const seen = enemies.filter(canSee).sort((a, c) => d(a) - d(c));
-  if (seen.length) return seen[0];
-  return enemies.sort((a, c) => d(a) - d(c))[0];
+  return enemies.filter(t => inView(b, t) && canSee(t)).sort((a, c) => d(a) - d(c))[0] ?? null;
+}
+// where to wander next with nobody in sight: somewhere round an enemy (it has a feel for where the fight is, not for where they
+// stand), usually the nearest one, or now and then just off somewhere. The longer it finds nobody, the closer it guesses
+function roamGoal(b) {
+  const pos = b.g.position, en = enemiesOf(b), a = Math.random() * 6.283;
+  let x, y = pos.y, z;
+  if (en.length && Math.random() < .8) {
+    const d = t => Math.hypot(tPos(t).x - pos.x, tPos(t).z - pos.z);
+    en.sort((p, q) => d(p) - d(q));
+    const e = tPos(Math.random() < .6 ? en[0] : pickOf(en)), r = Math.max(3, 14 - b.noSeeT * .5) * (.4 + Math.random() * .6);
+    x = e.x + Math.cos(a) * r; z = e.z + Math.sin(a) * r; y = e.y;
+  } else { const r = 8 + Math.random() * 14; x = pos.x + Math.cos(a) * r; z = pos.z + Math.sin(a) * r; }
+  const lim = A - 2;
+  return { x: Math.max(-lim, Math.min(lim, x)), y, z: Math.max(-lim, Math.min(lim, z)), t: 4 + Math.random() * 5 };
+}
+// its head: never turns faster than this turn's speed (most turns unhurried, some quick flicks), a little uneven, and eases in on
+// what it's looking at the way BOT.turn always has. It picks a new speed each time what it wants to look at jumps
+function botLook(b, wantYaw, wantPitch, dt) {
+  if (!b.turnSpd || Math.abs(angDiff(wantYaw, b.lookWas)) > .45) b.turnSpd = Math.random() < .3 ? 8 + Math.random() * 5 : 3 + Math.random() * 2.5;
+  b.lookWas = wantYaw;
+  const now = performance.now() * .001, uneven = Math.max(.35, .8 + .3 * Math.sin(now * 11 + b.t0) + .25 * Math.sin(now * 23 + b.t0 * 3));
+  const cap = b.turnSpd * uneven * dt, k = Math.min(1, dt * BOT.turn), dy = angDiff(wantYaw, b.aimYaw), dp = wantPitch - b.aimPitch;
+  b.aimYaw += Math.sign(dy) * Math.min(Math.abs(dy) * k, cap);
+  b.aimPitch += Math.sign(dp) * Math.min(Math.abs(dp) * k, cap * .7);
+}
+function botAlert(b, x, z, err) { b.alertYaw = Math.atan2(x - b.g.position.x, z - b.g.position.z) + (Math.random() * 2 - 1) * err; b.alertT = .9 + Math.random() * .9; }
+// what's going on in its head besides its target (set up the first time it thinks)
+function botMind(b) {
+  Object.assign(b, { noSeeT: 0, gazeT: 0, gazeYaw: 0, gazePitch: 0, alertT: 0, alertYaw: 0, idle: 0, idleNext: 20 + Math.random() * 70, roam: null,
+    lk: { x: 0, y: 0, z: 0 }, mvYaw: b.aimYaw, wob: 0, wobWant: 0, wobT: 0, turnSpd: 0, lookWas: b.aimYaw, heardAt: performance.now(), t0: Math.random() * 100 });
 }
 
 function nearPad(pos, range) {
@@ -477,6 +530,7 @@ function botFlame(b, W) {
   }
 }
 function botFire(b, W, dist) {
+  botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);
   b.ammo--; b.muzzle = W.flame || W.beam ? 0 : .05; net.shot(W, b); // online (a bot I host): the server counts its shots like mine
   // a beam is held in long sweeps, everything else automatic in short bursts
   if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
@@ -526,30 +580,46 @@ function botFire(b, W, dist) {
 function updateBot(b, dt) {
   let W = b.rec.W[b.gun];
   const pos = b.g.position;
+  if (b.gazeT === undefined) botMind(b);
   eye.set(pos.x, pos.y + 1.6, pos.z);
   b.hitByT -= dt;
-  if ((b.scanT -= dt) <= 0 || !b.tgt || !tAlive(b.tgt)) {
+  if ((b.scanT -= dt) <= 0 || b.tgt && !tAlive(b.tgt)) {
     b.scanT = .3;
-    const t = pickTarget(b);
-    if (t !== b.tgt) { b.tgt = t; b.seeT = 0; b.aimT = 0; b.lostT = 0; b.engaged = false; b.pvx = b.pvz = 0; if (t) { b.lpx = tPos(t).x; b.lpz = tPos(t).z; } }
+    const was = b.tgt, t = pickTarget(b);
+    if (t !== was) {
+      if (!t && was && tAlive(was) && b.engaged) b.roam = { x: b.lk.x, y: b.lk.y, z: b.lk.z, t: 5 + Math.random() * 3 }; // lost it: go and look where it was
+      b.tgt = t; b.seeT = 0; b.aimT = 0; b.lostT = 0; b.engaged = false; b.pvx = b.pvz = 0;
+      if (t) { const q = tPos(t); b.lpx = b.lk.x = q.x; b.lpz = b.lk.z = q.z; b.lk.y = q.y; b.idle = 0; }
+    }
   }
-  const t = b.tgt;
-  if (!t) { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; return; }
-  const tp = tPos(t), dx = tp.x - pos.x, dz = tp.z - pos.z, dist = Math.hypot(dx, dz) || .001;
-  const sees = canSee(t);
+  const t = b.tgt, tp = t ? tPos(t) : null, sees = !!t && canSee(t);
+  if (sees) { b.lk.x = tp.x; b.lk.y = tp.y; b.lk.z = tp.z; b.engaged = true; b.noSeeT = 0; } else b.noSeeT += dt;
   b.seeT = sees ? b.seeT + dt : 0;
-  b.lostT = sees ? 0 : b.lostT + dt;
-  if (sees) b.engaged = true;
+  b.lostT = sees || !t ? 0 : b.lostT + dt;
+  // now and then, with nobody about, it just stands there for a few seconds looking at the ground (like someone in their settings)
+  if (b.idle > 0) { b.idle -= dt; if (t || b.hitByT > 0) b.idle = 0; }
+  else if (!t && b.hitByT <= 0 && !b.vy && (b.idleNext -= dt) <= 0) { b.idle = 2 + Math.random() * 3; b.idleNext = 40 + Math.random() * 70; }
+  if (!t) {
+    if (b.hitByT > 1.7 && b.hitBy && tAlive(b.hitBy)) { const q = tPos(b.hitBy); botAlert(b, q.x, q.z, .15); } // shot from where it can't see: it turns to look
+    let near = null, nd = Infinity; // gunfire: it looks that way, and half the time heads over
+    for (const h of heard) if (h.at > b.heardAt && h.who !== b && !friendly(b, h.who)) { const d = Math.hypot(h.x - pos.x, h.z - pos.z); if (d < (h.quiet ? HEAR_QUIET : HEAR) && d < nd) { nd = d; near = h; } }
+    b.heardAt = performance.now();
+    if (near) { botAlert(b, near.x, near.z, .3); if (Math.random() < .5) b.roam = { x: near.x + (Math.random() * 2 - 1) * 4, y: pos.y, z: near.z + (Math.random() * 2 - 1) * 4, t: 6 }; }
+    if (!b.roam || (b.roam.t -= dt) <= 0 || Math.hypot(b.roam.x - pos.x, b.roam.z - pos.z) < 2.5) b.roam = roamGoal(b);
+  }
+  // where it's headed: its target, where it last saw it once it can't, else its wander goal
+  const go = sees ? tp : t ? b.lk : b.roam;
+  const dx = go.x - pos.x, dz = go.z - pos.z, dist = Math.hypot(dx, dz) || .001;
 
   // which gun: every so often (and right after it runs dry) it picks the best one in its loadout for how far away its target is.
-  // While it's hunting and can't see anyone, it gets ready for a mid-range fight instead
+  // While it can't see anyone, it gets ready for a mid-range fight instead
   if ((b.pickT -= dt) <= 0) {
     b.pickT = sees ? .5 + Math.random() * .7 : 2 + Math.random() * 2;
-    botEquip(b, pickGun(b, sees || b.lostT < 1.5 ? dist : HUNT_D));
+    botEquip(b, pickGun(b, t && (sees || b.lostT < 1.5) ? dist : HUNT_D));
     W = b.rec.W[b.gun];
   }
   // out of the fight for a bit: it reloads what's in its hands, and the guns it switched away from empty get topped up
-  if (!sees && b.lostT > 1) {
+  if (!sees && (!t || b.lostT > 1)) {
     if (!W.inf && b.reload <= 0 && b.swap <= 0 && b.ammo < W.mag) { b.reload = W.reload; sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); }
     for (const g of b.rec.load) {
       const G = b.rec.W[g];
@@ -559,18 +629,34 @@ function updateBot(b, dt) {
   }
   const keep = BOT_KEEP[W.id], sniper = !!W.scope;
 
-  // aim: turns toward the target's chest and leads it a little, but lags behind. Changing direction makes it miss.
+  // aim, on a target it can see: at its chest, leading it a little, but lagging behind. Changing direction makes it miss.
   // Rockets and flares fly slower than bullets, so it leads those by how long they take to get there.
   // Rockets go at the feet (the blast still gets you), flares aim a little high to make up for the drop
-  if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
-  b.lpx = tp.x; b.lpz = tp.z;
-  // (it guesses the lead like a person would: somewhere between 60% and 120% of what's right, a new guess every shot)
-  const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : 0, lead = fly ? fly * b.leadGuess : BOT.lead;
-  const tx = dx + b.pvx * lead, tz = dz + b.pvz * lead, th = Math.hypot(tx, tz);
-  const wantYaw = Math.atan2(tx, tz), k = Math.min(1, dt * BOT.turn);
-  const wantPitch = Math.atan2(tp.y + (W.rocket ? .3 : 1.1) - pos.y - 1.6, th) + (W.flare ? Math.atan2(FLARE_DROP * fly * fly / 2, th) : 0);
-  b.aimYaw += Math.atan2(Math.sin(wantYaw - b.aimYaw), Math.cos(wantYaw - b.aimYaw)) * k;
-  b.aimPitch += (wantPitch - b.aimPitch) * k;
+  let wantYaw, wantPitch;
+  if (sees) {
+    if (b.seeT <= dt) { b.lpx = tp.x; b.lpz = tp.z; } // just came into sight: no speed worked out from where it was before
+    if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
+    b.lpx = tp.x; b.lpz = tp.z;
+    // (it guesses the lead like a person would: somewhere between 60% and 120% of what's right, a new guess every shot)
+    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : 0, lead = fly ? fly * b.leadGuess : BOT.lead;
+    const tx = dx + b.pvx * lead, tz = dz + b.pvz * lead, th = Math.hypot(tx, tz);
+    wantYaw = Math.atan2(tx, tz);
+    wantPitch = Math.atan2(tp.y + (W.rocket ? .3 : 1.1) - pos.y - 1.6, th) + (W.flare ? Math.atan2(FLARE_DROP * fly * fly / 2, th) : 0);
+  } else {
+    // nobody in sight: it looks where it's going and glances about, to the sides, now and then right round, a bit up or down
+    // (nobody runs about staring dead ahead). Something it heard or that hit it takes its eyes first. Standing idle, it looks down
+    if ((b.gazeT -= dt) <= 0) {
+      b.gazeT = .8 + Math.random() * 2.4;
+      const r = Math.random(), v = Math.random();
+      b.gazeYaw = r < .12 ? (Math.random() < .5 ? -1 : 1) * (1.9 + Math.random()) : r < .55 ? (Math.random() * 2 - 1) * 1.1 : (Math.random() * 2 - 1) * .3;
+      b.gazePitch = v < .15 ? -.45 - Math.random() * .3 : v < .3 ? .12 + Math.random() * .25 : -.1 + (Math.random() - .5) * .25;
+    }
+    const ahead = t ? Math.atan2(dx, dz) : b.mvYaw;
+    wantYaw = b.idle > 0 ? b.aimYaw : b.alertT > 0 ? b.alertYaw : ahead + b.gazeYaw * (t ? .5 : 1);
+    wantPitch = b.idle > 0 ? -1 : b.alertT > 0 ? 0 : b.gazePitch;
+    b.alertT -= dt;
+  }
+  botLook(b, wantYaw, wantPitch, dt);
   // a two-handed stance turns the body right, the head looks back round along the gun
   b.g.rotation.y = b.aimYaw - b.holdTurn; b.headPiv.rotation.y = b.holdTurn; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
@@ -581,12 +667,13 @@ function updateBot(b, dt) {
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
   // in range for this gun: knife = arm's reach, flamethrower = its flame, rocket = not close enough to blow itself up
-  const inRange = W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : true;
+  const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : true;
   const ready = sees && b.seeT >= BOT.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
   b.aimT = ready && sniper ? b.aimT + dt : 0;
   if (ready && b.cd <= 0 && (!sniper || b.aimT >= SNIPE_T)) { if (W.melee) botStab(b, W, t, dist); else botFire(b, W, dist); }
 
-  // moving: keep the distance its gun likes, strafe side to side while fighting, go looking when it can't see anyone
+  // moving: keep the distance its gun likes, strafe side to side while fighting, go to where it last saw them when it loses them,
+  // wander when it has nobody
   let radial = 1, side = 0;
   if (sees) {
     radial = dist > keep[1] ? 1 : dist < keep[0] ? -1 : 0;
@@ -598,11 +685,12 @@ function updateBot(b, dt) {
   let gx = dx, gz = dz, gd = dist;
   // a target on another floor it can't see, or it's down in the pool: take the stairs (MAP.nav gives the next spot on the way)
   // one it can see but has to get closer to across the pool: round the edge of it
-  const way = pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : !sees || MAP.trapped?.(pos) ? MAP.nav?.(pos, tp) : radial > 0 ? MAP.around?.(pos, tp) : null;
-  const into = !pad && !!MAP.trapped?.(tp); // it only goes into the pool after a target that's in it
+  const way = pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : !sees || MAP.trapped?.(pos) ? MAP.nav?.(pos, go) : radial > 0 ? MAP.around?.(pos, tp) : null;
+  const into = !pad && !!t && !!MAP.trapped?.(go); // it only goes into the pool after a target that's in it
   if (way) { gx = way.x - pos.x; gz = way.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; side = 0; }
   else if (pad) { gx = pad.x - pos.x; gz = pad.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; }
-  else if (dist < 1.5 && !W.melee) radial = -1; // too close (a bot with its knife out wants to be this close)
+  else if (sees && dist < 1.5 && !W.melee) radial = -1; // too close (a bot with its knife out wants to be this close)
+  else if (t && !sees && dist < 1.2) radial = 0; // where it last saw them, and nobody there: it stands and looks about
   if (b.detour > 0) { b.detour -= dt; side = b.detourDir; radial *= .3; } // stuck on a crate: sidestep around it
   const ux = gx / gd, uz = gz / gd;
   let mx = ux * radial + uz * side, mz = uz * radial - ux * side;
@@ -615,6 +703,16 @@ function updateBot(b, dt) {
     const ox = pos.x - P.pos.x, oz = pos.z - P.pos.z, od = Math.hypot(ox, oz);
     if (od < .75) { if (od > .001) { mx += ox / od * 2; mz += oz / od * 2; } else mx += 2; }
   }
+  if (b.idle > 0) mx = mz = 0;
+  else if (!sees && !way && !pad && b.detour <= 0 && Math.hypot(mx, mz) > .05) {
+    // on its way somewhere with nobody to fight: not a ruler line. Its heading drifts to one side and the other, and it comes
+    // round to a new direction in a curve instead of snapping onto it
+    if ((b.wobT -= dt) <= 0) { b.wobT = 1 + Math.random() * 1.8; b.wobWant = (Math.random() * 2 - 1) * (gd > 5 ? .6 : .15); }
+    b.wob += (b.wobWant - b.wob) * Math.min(1, dt * 1.5);
+    const m0 = Math.hypot(mx, mz), turn = angDiff(Math.atan2(mx, mz) + b.wob, b.mvYaw);
+    b.mvYaw += Math.sign(turn) * Math.min(Math.abs(turn), TURN_WALK * dt);
+    mx = Math.sin(b.mvYaw) * m0; mz = Math.cos(b.mvYaw) * m0;
+  } else if (Math.hypot(mx, mz) > .05) b.mvYaw = Math.atan2(mx, mz);
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
     const s = BOT.speed * (mobMul(W) + b.rec.fx.spd) * dt / ml; mx *= s; mz *= s;
@@ -626,8 +724,9 @@ function updateBot(b, dt) {
       b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1;
       if (!b.vy && Math.random() < .4) b.jumpT = 0; // sometimes tries hopping over what it's stuck on
     }
-    // hops now and then like a player, more often mid-fight. Not while a sniper is lining up a shot
-    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? 1.5 + Math.random() * 3.5 : 4 + Math.random() * 8; b.vy = 9; b.dj = b.rec.fx.dj && Math.random() < .6 ? 1 : 0; }
+    // hops now and then like a player, fighting or just running somewhere (then every so often, sometimes a few in a row),
+    // more often mid-fight. Not while a sniper is lining up a shot
+    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? 1.5 + Math.random() * 3.5 : Math.random() < .3 ? .5 + Math.random() * .4 : 4 + Math.random() * 8; b.vy = 9; b.dj = b.rec.fx.dj && Math.random() < .6 ? 1 : 0; }
     // Raider Boots: most of its hops get a second jump near the top
     if (b.dj === 1 && b.vy && b.vy > -2 && b.vy < 2) { b.dj = 2; b.vy = DJ_V; sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     b.t += dt * BOT.speed * 2.2;
@@ -662,7 +761,7 @@ function dmDown(dt) {
   respawnT -= dt;
   if (net.on) respawnT = Math.max(respawnT, .01); // online you only come back when the server says so (spawn -> respawnYou)
   if (respawnT <= 0) { respawnYou(); return false; }
-  adsT = 0; if (camera.fov !== 75) { camera.fov = 75; camera.updateProjectionMatrix(); }
+  adsT = 0; if (camera.fov !== fovBase) { camera.fov = fovBase; camera.updateProjectionMatrix(); }
   $('scope').style.display = $('holo').style.display = 'none'; $('cross').style.display = 'none'; vm.visible = false;
   // you float up like the bots' angels do, looking down at where you were. Drowned: you sink instead (drownTick)
   const t = YOU_RESPAWN - respawnT, f = Math.min(1, t / 1.2);

@@ -58,15 +58,21 @@ function hatPieces(id, st) {
     if (st >= 2) { B(-7, 7, 0, 5, 8, 10, C); B(-7, 7, 4, 5, 8, 10, TRIM); } // the scarf, with an edge along its top
     if (st >= 3) B(-1, 1, 17, 18, -9, 9, TRIM); // painted into the top, front to back
   } else {
-    // a steel helmet: covers the top, sides and back, with a band round it, cheek guards and a nose guard down the middle.
-    // The band is red, gold at ★★★. ★★ adds a ridge over the top (gold at ★★★)
+    // a steel helmet: a dome down to the brow, open at the face below it, with thick plates standing proud of it for accents:
+    // the band across the brow, a cheek guard down each side of the face, a nose guard down the middle. A short guard covers the
+    // back of the neck. The band is red, gold at ★★★. ★★ adds a ridge over the top (gold at ★★★)
     const C = hex([150, 156, 166]), HI = hex([204, 210, 220]), DK = hex([90, 96, 108]);
     const TRIM = st >= 3 ? hex([226, 178, 40]) : hex([158, 34, 40]);
-    B(-9, 9, 4, 18, -9, 9, C); B(-9, 9, 1, 4, -9, -8, C); // the shell, and a guard down the back of the neck
-    B(-9, 9, 12, 15, -9, 9, TRIM); // the band, painted into the shell
+    B(-9, 9, 6, 18, -9, 9, C); B(-9, 9, 3, 6, -9, -7, C); // the dome, and a short guard down the back of the neck
+    B(-9, 9, 12, 15, -9, 9, TRIM); // the band, painted into the dome
     head();
-    B(-6, 6, 4, 12, 8, 9, 0); // the face opening, between the cheek guards
-    B(-2, 2, 5, 12, 8, 10, DK); // nose guard
+    B(-6, 6, 6, 11, 8, 9, 0); // the face opening, under the brow and between the cheek guards
+    B(-8, 8, 11, 15, 8, 10, TRIM); // the brow: the band stands proud across the front
+    for (const sx of [-1, 1]) { // cheek guards: a plate down the side of the face, round onto its front and in under the eye
+      const X = (a, c) => sx > 0 ? [a, c] : [-c, -a];
+      B(...X(8, 10), 3, 9, 0, 10, DK); B(...X(6, 10), 3, 9, 8, 10, DK); B(...X(4, 10), 3, 6, 8, 10, DK);
+    }
+    B(-2, 2, 3, 12, 8, 10, DK); // nose guard, down to the cheek guards' lower edge
     if (st >= 2) B(-2, 2, 18, 20, -8, 8, st >= 3 ? hex([240, 196, 64]) : HI); // the ridge
   }
   return out;

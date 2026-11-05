@@ -108,6 +108,7 @@ const VOX_FACES = [
   [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]], [[0, 1, 0], [0, 0, 1], [1, 0, 0]],
   [[0, -1, 0], [1, 0, 0], [0, 0, 1]], [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [0, 1, 0], [1, 0, 0]],
 ];
+const VOX_RING = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]; // the 8 pixels round one on a face
 // fills pieces ([w, h, d, palette index, x, y, z] boxes centered on x, y, z) into a grid of pixels
 function voxelGrid(pieces) {
   const boxes = pieces.map(([w, h, d, m, x, y, z]) => [Math.round(x - w / 2), Math.round(y - h / 2), Math.round(z - d / 2), Math.round(x + w / 2), Math.round(y + h / 2), Math.round(z + d / 2), m]);
@@ -130,12 +131,12 @@ function voxelGeos(pieces, px) {
     for (let f = 0; f < 6; f++) {
       const [n, a, b] = VOX_FACES[f];
       if (at(x + n[0], y + n[1], z + n[2])) continue;
-      // black where the face runs off an edge of the shape (not in the corners where one part sits against another)
+      // black where the face runs off an edge of the shape (not in the corners where one part sits against another). The pixels
+      // diagonally off an edge count too: without them the inside corners of a rim (round a hole, say) stay coloured and the line breaks
       let black = false;
-      for (let e = 0; e < 4 && !black && !P.glow; e++) {
-        const t = e < 2 ? a : b, s = e & 1 ? -1 : 1;
-        const ux = x + s * t[0], uy = y + s * t[1], uz = z + s * t[2];
-        if (!at(ux, uy, uz)) black = true;
+      for (let e = 0; e < 8 && !black && !P.glow; e++) {
+        const sa = VOX_RING[e][0], sb = VOX_RING[e][1];
+        if (!at(x + sa * a[0] + sb * b[0], y + sa * a[1] + sb * b[1], z + sa * a[2] + sb * b[2])) black = true;
       }
       let r = 0, g = 0, bl = 0;
       if (!black) {
