@@ -84,7 +84,7 @@ PATHS.forEach((pts, p) => {
 });
 lamps.forEach((l, i) => {
   const post = box(.22, 3.1, .22, postMat); post.position.set(l.x, 1.55, l.z); add(post);
-  building.cover.push(post); addSolid(l.x, l.z, .3, .3, 99);
+  building.cover.push(post); addSolid(l.x, l.z, .3, .3, 3.1); // as tall as the post, no higher: a rocket jump clears it
   const arm = box(.1, .1, .9, postMat); arm.position.set(l.x + l.ax * .4, 3, l.z + l.az * .4); arm.rotation.y = Math.atan2(l.ax, l.az); add(arm);
   const hx = l.x + l.ax * .8, hz = l.z + l.az * .8;
   const lan = box(.32, .42, .32, lanternMat); lan.position.set(hx, 2.55, hz); add(lan);
@@ -99,7 +99,7 @@ lamps.forEach((l, i) => {
 for (let k = 0; k < 4; k++) {
   const a = Math.PI / 8 + k * Math.PI / 2, x = Math.cos(a) * 6.8, z = Math.sin(a) * 6.8;
   if (M.crates.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.6)) continue;
-  const post = box(.22, 3.1, .22, postMat); post.position.set(x, 1.55, z); add(post); building.cover.push(post); addSolid(x, z, .3, .3, 99);
+  const post = box(.22, 3.1, .22, postMat); post.position.set(x, 1.55, z); add(post); building.cover.push(post); addSolid(x, z, .3, .3, 3.1);
   const lan = box(.32, .42, .32, lanternMat); lan.position.set(x, 3.3, z); add(lan);
   const cap = box(.42, .07, .42, ironMat); cap.position.set(x, 3.55, z); add(cap);
   const halo = new THREE.Sprite(haloMat); halo.scale.setScalar(1.8); halo.position.set(x, 3.3, z); add(halo);

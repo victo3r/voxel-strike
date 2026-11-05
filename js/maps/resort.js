@@ -235,12 +235,13 @@ const lawn = tex(drawGrass);
       for (const [a, b] of D4) {
         const nh = inGrid(i + a, j + b) ? H[at(i + a, j + b)] : 0;
         if (nh >= h) continue;
-        const v0 = 1 - (h - nh); // the top of the texture (the grass lip) at the top of the step
+        // a paved cell's step is paved down its face too (the tiles run from the foot up); a grass cell's shows earth with the grass lip at the top
+        const paved = !!PATH[c], v0 = paved ? 0 : 1 - (h - nh), v1 = paved ? h - nh : 1;
         const ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0;
         const lo = nh ? .78 : .72; // the bottom of a step is in shadow
-        const corners = a ? [[ex, nh, z0, 0, v0, lo], [ex, nh, z0 + 1, 1, v0, lo], [ex, h, z0 + 1, 1, 1], [ex, h, z0, 0, 1]]
-          : [[x0, nh, ez, 0, v0, lo], [x0 + 1, nh, ez, 1, v0, lo], [x0 + 1, h, ez, 1, 1], [x0, h, ez, 0, 1]];
-        quads.push([1, corners, [a, 0, b]]);
+        const corners = a ? [[ex, nh, z0, 0, v0, lo], [ex, nh, z0 + 1, 1, v0, lo], [ex, h, z0 + 1, 1, v1], [ex, h, z0, 0, v1]]
+          : [[x0, nh, ez, 0, v0, lo], [x0 + 1, nh, ez, 1, v0, lo], [x0 + 1, h, ez, 1, v1], [x0, h, ez, 0, v1]];
+        quads.push([paved ? 2 : 1, corners, [a, 0, b]]);
       }
     }
     if (quads.length) building.cover.push(cellMesh(quads, mats));
@@ -839,13 +840,25 @@ function inst(geo, mat, list) { // like instanced(), but things can tip as well:
 const trunksIn = [], trunksOut = [], fronds = [], nuts = [], palms = [];
 function palm(x, z, inside, y0 = 0) { // y0 = the height of the ground it grows from
   const h = 5.5 + rnd() * 3, a = rnd() * 6.28, lean = .8 + rnd() * 1.6, n = 9, out = inside ? trunksIn : trunksOut, top = y0 + h;
-  let tx = x, tz = z;
+  let tx = x, tz = z; const segs = [];
   for (let i = 0; i < n; i++) {
     const f = i / (n - 1), s = .6 - f * .2;
     tx = x + Math.cos(a) * lean * f * f; tz = z + Math.sin(a) * lean * f * f;
     out.push([tx, y0 + h * (i + .5) / n, tz, s, h / n + .03, s, 0, 0, 0xffffff]);
+    segs.push([tx, tz, y0 + h * i / n, y0 + h * (i + 1) / n, s]);
   }
-  if (inside) { addSolid(x, z, .7, .7, top - .25); standOn(tx, tz, 1.6, 1.6, top - .25, top + .1, top + .1, true, 'grass'); } // the trunk, and the crown you can stand on
+  if (inside) {
+    // the trunk's solids follow its lean: runs of segments within .3 of each other share one box (a few per palm), so you bump into
+    // the trunk where you see it and not into the air beside it. Then the crown you can stand on
+    for (let i = 0; i < n;) {
+      let j = i; const xs = [segs[i][0]], zs = [segs[i][1]];
+      while (j + 1 < n && Math.max(...xs, segs[j + 1][0]) - Math.min(...xs, segs[j + 1][0]) <= .3 && Math.max(...zs, segs[j + 1][1]) - Math.min(...zs, segs[j + 1][1]) <= .3) { j++; xs.push(segs[j][0]); zs.push(segs[j][1]); }
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs), w = segs[i][4] + .1;
+      const sol = addSolid((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0 + w, z1 - z0 + w, Math.min(segs[j][3], top - .25)); sol.bot = segs[i][2]; sol.palm = true;
+      i = j + 1;
+    }
+    standOn(tx, tz, 1.6, 1.6, top - .25, top + .1, top + .1, true, 'grass');
+  }
   const k = 8 + (rnd() * 3 | 0), spin = rnd() * 6.28, c = PALM_TINTS[rnd() * PALM_TINTS.length | 0];
   for (let i = 0; i < k; i++) {
     const ry = spin + i * 6.28 / k + (rnd() - .5) * .3, L1 = 1.4 + rnd() * .5, L2 = 1.5 + rnd() * .7, p1 = -.25 + rnd() * .3, p2 = .7 + rnd() * .4;
@@ -892,7 +905,8 @@ for (const [x, z, r] of [[92, -48, 7], [-78, 74, 6], [-96, -36, 8], [34, 104, 5]
   const n = 2 + (r > 6 ? 2 : 1);
   for (let i = 0; i < n; i++) { const a = rnd() * 6.28, d = rnd() * (r - 2); palm(x + Math.cos(a) * d, z + Math.sin(a) * d, false, .4); }
 }
-M.palms = palms;
+M.palms = palms; M.trunks = trunksIn; // the trunk segments drawn inside the map, for the map checks (test/maps.mjs)
+M.cell = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? { kind: kind[at(i, j)], h: H[at(i, j)], paved: !!PATH[at(i, j)] } : null; }; // what the island is at a point
 building.cover.push(inst(unit, trunkMat, trunksIn)); // bullets stop on the trunks inside the map, not on the leaves
 inst(unit, trunkMat, trunksOut); inst(frondGeo, frondMat, fronds); inst(unit, plain(0xffffff), nuts);
 
