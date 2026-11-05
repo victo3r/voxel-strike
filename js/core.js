@@ -57,6 +57,8 @@ const runShirtTex = tex(g => noise(g, [200, 75, 40], 30));
 const bruteShirtTex = tex(g => noise(g, [70, 45, 85], 25));
 const boomShirtTex = tex(g => noise(g, [185, 200, 55], 30));
 const bossShirtTex = tex(g => noise(g, [110, 20, 20], 25));
+const spitShirtTex = tex(g => noise(g, [120, 60, 150], 28)); // spitters: purple
+const hiveShirtTex = tex(g => noise(g, [60, 20, 90], 25)); // the hive boss: deep purple
 
 // the coin: 16x16 pixel art, a gold coin lit from the top-left with a voxel cube stamped in the middle.
 // COIN is the icon to drop into any HTML text; it draws from the --coin image set here

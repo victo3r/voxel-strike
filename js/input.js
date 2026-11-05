@@ -323,7 +323,7 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave();
 const ALL_MAPS = ['yard', 'forest', 'resort'];
 const V_MAPS = 3; // bump when the map pictures are retaken
 const MODES = [
-  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Survive the waves, earn coins, beat the boss every 5 waves', maps: ALL_MAPS },
+  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Your loadout against endless waves. Earn coins, beat a boss every 5 waves', maps: ALL_MAPS },
   { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ALL_MAPS },
   { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes, blue vs red. The team with the most kills wins', maps: ALL_MAPS },
   { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds. Rack up as many kills as you can', sub: [
@@ -539,7 +539,7 @@ function restart(spot) {
   useMap(mapId); setupPads();
   Object.assign(P, { drowned: false, burn: 0, vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, 0, 0); P.pos.lag = 0;
   if (spot) { P.pos.set(spot.x, spot.y ?? 0, spot.z); P.yaw = spot.yaw ?? 0; }
-  wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = '';
+  wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = ''; resetRun();
   WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); cancelReload(); soundsOff(); newBest = false;
   emptyPads();
   cur = gi('voxel'); aimOn = false; resetSlots(); buildGun(); renderHotbar();

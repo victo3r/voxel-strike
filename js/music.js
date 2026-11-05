@@ -326,7 +326,7 @@ function muHeat(S, left) {
     return I;
   }
   if (dead || shopOpen) return -1; // zombie waves: drums drop out on the shop and death screens
-  return zombies.some(z => z.type === 'boss' && !z.dead) ? .85 : Math.min(.35, wave * .03);
+  return zombies.some(z => z.boss && !z.dead) ? .85 : Math.min(.35, wave * .03);
 }
 
 // schedule one bar of a map song, starting at audio time t

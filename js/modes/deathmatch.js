@@ -723,7 +723,7 @@ function endMatch(results) {
 $('againBtn').addEventListener('click', () => { if (net.on) { net.again(); return; } restart(); lockMouse(); });
 $('postLobby').addEventListener('click', () => { net.leave(); restart(); showLobby(true); });
 
-// deathmatch: a gun from your account, at the stars you picked to use (gunUse, js/armory.js), with full ammo
+// a gun from your account, at the stars you picked to use (gunUse, js/armory.js), with full ammo
 function giveGun(g) {
   lvl[g] = Math.max(0, Math.min(2, gunUse(g) - 1)); applyLvl(g);
   owned[g] = true; ammo[g] = WEAPONS[g].mag; reserve[g] = resMax(g);
@@ -741,6 +741,10 @@ function setupMode() {
     matchT = MATCH_T; wearArmor();
     BASE.forEach((w, g) => { if (hasGun(g)) giveGun(g); });
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
+    cur = slotGun[0]; buildGun(); renderHotbar();
+  } else { // zombie waves: your loadout comes along, at its stars, with your armor; the shop between waves sells the rest (zombies.js SHOP)
+    wearArmor();
+    CATS.forEach(([c], s) => { const g = loadoutGun(c); giveGun(g); slotGun[s] = g; });
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
   musicMatch(mapId, pvp() ? 'dm' : mode); // every bot match uses the deathmatch music, timed to its own length

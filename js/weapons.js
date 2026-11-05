@@ -43,8 +43,8 @@ const magAt = (b, L) => b.mag === 1 ? 1 : Math.round(b.mag * (1 + .25 * L));
 // gun i's stats with L upgrades (0 = ★). Bots get their own copy at whatever stars they rolled
 const statsAt = (i, L) => { const b = BASE[i]; return { ...b, dmg: Math.round(b.dmg * (1 + .25 * L)), mag: magAt(b, L), reload: +(b.reload * (1 - .15 * L)).toFixed(2) }; };
 function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, mag: s.mag, reload: s.reload }); }
-// deathmatch: starters have no stars. Zombie waves: everything you buy in its shop can be starred
-const upgradable = i => mode === 'zombies' ? !BASE[i].free : !BASE[i].start;
+// starters never have stars; every other gun does (bought in the armory, or rented for a zombie-waves run and starred in its shop)
+const upgradable = i => !BASE[i].start;
 const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
 let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0;
 // camera recoil (combat.js recoilKick, main.js recoilTick): a shot kicks the view up `up` degrees and a little to one side (`side`),

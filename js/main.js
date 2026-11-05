@@ -1,6 +1,6 @@
 let stepT = 0, stepAlt = false; // footsteps: time until the next one, and which foot
 let jumpWas = false; // jump was held last frame (a double jump needs a fresh press)
-const runMul = w => mobMul(w) + youFx().spd; // your run speed: your gun's mobility plus your boots, added together
+const runMul = w => mobMul(w) + youFx().spd + perk.spd * .1; // your run speed: your gun's mobility plus your boots (and Adrenaline in zombie waves), added together
 
 // ---- looking through a sight: every sight is a square window filling most of the screen, and you only see out of the window
 // (the gun is hidden). kind = 'scope' (sniper: black all round, black cross lines) or 'holo' (holo sights: the dark sight housing
@@ -169,21 +169,26 @@ function update(dt) {
 
   if (pvp()) { updateDM(dt); if (matchOver) return; }
 
-  if (mode === 'zombies' && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = Math.max(.3, 1.5 - wave * .1); }
-  if (mode === 'zombies' && toSpawn === 0 && zombies.length === 0) {
+  if (mode === 'zombies' && !dead && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = Math.max(.3, 1.5 - wave * .1); }
+  if (mode === 'zombies' && !dead && toSpawn === 0 && zombies.length === 0) {
     if (wave > 0 && shopWave < wave) {
       shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
-      // account rewards: 1 real coin every wave, 15 XP every 5th wave
-      const xp = wave % 5 ? 0 : 15, r = grant(xp, 1);
-      waveReward = `Account: +1 ${COIN}${xp ? ` +${xp} XP` : ''}` + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ${COIN}` : '');
+      // account rewards: every wave pays a coin and a little XP, a boss wave a bounty on top, nothing past PAY_WAVES (a run, not a farm)
+      const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, xp = pay ? 3 + (bossW ? 15 : 0) : 0, gold = pay ? 1 + (bossW ? 5 : 0) : 0, r = grant(xp, gold);
+      runXp += xp; runCoins += gold + r.bonus;
+      waveReward = (pay ? `Account: +${gold} ${COIN} +${xp} XP` : `Account: past wave ${PAY_WAVES} the run pays no more`) + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ${COIN}` : '');
       openShop(); return;
     }
     if ((waveWait -= dt) <= 0) {
-      wave++; toSpawn = Math.round(5 + wave * 2.5); spawnT = 0; waveWait = 3;
-      const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!' };
-      banner(`WAVE ${wave}` + (news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
+      // hordes (waves 12, 22, 32...) are more zombies, each weaker, walkers and runners only. A boss every 5 waves: the charger, then the hive on every 10th
+      wave++; horde = wave >= 12 && wave % 10 === 2; toSpawn = Math.round((5 + wave * 2.5) * (horde ? 1.6 : 1)); spawnT = 0; waveWait = 3; countShown = 0;
+      const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };
+      banner(`WAVE ${wave}` + (horde ? '\nHORDE!' : news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
       sfx('waveStart');
-      if (wave % 5 === 0) { spawnZombie('boss'); sfx('bossRoar', { v: .7 }); }
+      if (wave % 5 === 0) { spawnZombie(wave % 10 === 0 ? 'hive' : 'boss'); sfx('bossRoar', { v: .7 }); }
+    } else if (wave > 0) { // between waves: a countdown, so you know when to be back from the pads
+      const n = Math.ceil(waveWait);
+      if (n !== countShown && n <= 3) { countShown = n; banner(`WAVE ${wave + 1} IN ${n}`); sfx('tick', { v: .5 }); }
     }
   }
 
@@ -267,7 +272,27 @@ function update(dt) {
         sfx('bossRoar', { at: z.g.position, far: 80 });
       }
     }
-    if (hold) { /* boss is winding up, charging or dazed */ }
+    // spitters keep their distance and lob acid at you when they can see you (strafe to dodge); the hive boss does the same with a fan
+    // of three, and calls two runners up out of the ground beside it now and then. Up close they swing like anyone
+    if (z.spit) {
+      if (z.windS > 0) { // winding up: a sickly glow, then the glob flies at where you are now
+        z.windS -= dt; hold = true; z.glow = Math.sin(z.windS * 40) > 0 ? 0x335500 : 0x112200;
+        if (z.windS <= 0) { spit(z); z.spitT = z.hive ? 2.4 : 2.8 + Math.random(); }
+      } else if (dist > 4 && dist < (z.hive ? 18 : 13) && Math.abs(dy) < 3 && !way && clearLine(spitFrom.set(z.g.position.x, z.g.position.y + 1.45 * z.scale, z.g.position.z), spitTo.set(P.pos.x, P.pos.y + 1, P.pos.z))) {
+        hold = true;
+        if ((z.spitT -= dt) <= 0) { z.windS = .5; sfx('fuse', { at: z.g.position, far: 40, rate: .5 }); }
+      }
+      if (z.hive && (z.sumT -= dt) <= 0) {
+        z.sumT = 7;
+        if (zombies.filter(o => !o.dead).length < 40) for (let k = 0; k < 2; k++) for (let tries = 0; tries < 6; tries++) {
+          const a = Math.random() * Math.PI * 2, sx = z.g.position.x + Math.cos(a) * 2.2, sz = z.g.position.z + Math.sin(a) * 2.2;
+          if (blocked(sx, sz, .3, 0) || overWater(sx, sz, 0) || poolAt(sx, sz)) continue;
+          const zz = makeZombie(sx, sz, 'runner'); burst(zz.g.position.clone().setY(.6), 0x9a60d0, 10); break;
+        }
+        sfx('bossRoar', { at: z.g.position, far: 80, rate: 1.3 });
+      }
+    }
+    if (hold) { /* boss is winding up, charging or dazed, a spitter is lining one up */ }
     else if (way || dist > z.reach) {
       let vx = wx / wd, vz = wz / wd;
       for (const o of zombies) { // keep them from stacking into one blob
@@ -327,7 +352,7 @@ function update(dt) {
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, 0x888888, 1); }
   }
 
-  updateFlares(dt); beamTick(dt); tracerTick(dt);
+  updateFlares(dt); beamTick(dt); tracerTick(dt); globTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;
@@ -336,7 +361,7 @@ function update(dt) {
     if (f.life <= 0) { scene.remove(f.m); flames.splice(i, 1); }
   }
 
-  const boss = zombies.find(z => z.type === 'boss' && !z.dead);
+  const boss = zombies.find(z => z.boss && !z.dead);
   $('bossbar').style.display = boss ? 'block' : 'none';
   if (boss) $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
 
@@ -349,7 +374,7 @@ function update(dt) {
   setHTML($('arm'), P.maxArmor ? ico('shield') + Math.ceil(P.armor) : '');
   const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
   setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : ammo[cur] + ' / ' + spare}`);
-  if (!pvp()) $('top').innerHTML = `WAVE ${wave}   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`; // deathmatch fills the top in updateDM
+  if (!pvp()) $('top').innerHTML = `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead).length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`; // deathmatch fills the top in updateDM
 }
 
 const clock = new THREE.Clock();
@@ -379,6 +404,7 @@ function fpsTick(raw) {
   // match would: with the mouse unlocked your keys are released, so you just stand there
   const live = !dead && !shopOpen && !matchOver && (pvp() || locked);
   if (live) update(dt);
+  else if (mode === 'zombies' && dead && !matchOver && (deadT += dt) >= DEAD_T) zombiesOver(); // zombie waves: you're dead, the world holds for a beat, then the results
   soundTick(dt, live);
   // bots and zombies are drawn a little low for a moment after stepping up a ledge, so they climb it smoothly
   const lagged = zombies.filter(z => z.g.position.lag), realY = lagged.map(z => z.g.position.y);

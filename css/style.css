@@ -191,6 +191,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .lb .you span{background:rgba(47,191,113,.22)}
 .lb.k{grid-template-columns:40px minmax(90px,1fr) 62px 70px}
 .lb .tm span{font-weight:bold;padding-top:8px;border-bottom:2px solid currentColor}
+.lb.z{grid-template-columns:minmax(150px,1fr) minmax(90px,auto)}.lb.z .r span:last-child{text-align:right} /* zombie waves results: label, value */
 #top .teams{font-size:22px;color:#fff;margin-top:2px}
 #top .teams b{padding:0 6px}
 #board{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:none;width:min(440px,94vw)}
