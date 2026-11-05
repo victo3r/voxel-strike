@@ -264,6 +264,17 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #pickList [data-mode=blitzTeam]{background:linear-gradient(135deg,rgba(235,160,30,.86) 0%,rgba(40,80,170,.88) 55%,rgba(170,45,40,.85) 100%)}
 #pickList .mi{flex:1;min-height:0;width:58%;align-self:center;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(4px 4px 0 rgba(0,0,0,.35))}
 #pickList [data-map]{background-color:#334;background-position:center;background-size:cover}
+/* mode cards: an icon and a one-line name, all the same. Picked: a bright edge, and its PLAY button slides out underneath (room is kept for it, so nothing jumps) */
+#pickList{align-items:flex-start}
+#pickList .mc{position:relative;padding-bottom:54px}
+#pickList button[data-mode]{align-items:center;text-align:center;white-space:nowrap;gap:10px;padding:14px 8px}
+#pickList .mc.sel button[data-mode]{border-color:var(--acc-lt);box-shadow:inset 0 -6px 0 rgba(0,0,0,.25),0 0 0 3px var(--acc),5px 5px 0 rgba(0,0,0,.45)}
+#pickList .go{position:absolute;left:0;right:0;bottom:4px;width:auto;aspect-ratio:auto;height:42px;padding:0;flex-direction:row;justify-content:center;align-items:center;font-size:18px;letter-spacing:2px;background:var(--sel);border-width:3px;opacity:0;transform:translateY(-26px) scaleY(.3);pointer-events:none;transition:opacity .16s,transform .18s}
+#pickList .mc.sel .go{opacity:1;transform:none;pointer-events:auto}
+#pickList .go:hover{background:var(--acc);filter:none}
+#pickDesc{margin:-8px 0 0;min-height:24px;max-width:90vw;font-size:18px;color:var(--silver);text-align:center;text-shadow:2px 2px 0 #000}
+#pickDesc.in{animation:descIn .22s ease-out}
+@keyframes descIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 #pickList small{font-size:clamp(11px,1.6vmin,14px);font-weight:normal;color:var(--silver)}
 
 /* xp + rewards */

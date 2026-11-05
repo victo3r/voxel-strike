@@ -372,7 +372,9 @@ function renderPick() {
   $('pickList').className = m ? 'maps' : join ? 'code' : 'modes';
   const pill = !!m && m.id !== 'zombies' && !pickPriv;
   $('pickPill').style.display = pill ? '' : 'none'; if (pill) renderPill();
-  const card = o => `<button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b><small>${o.desc}</small></button>`;
+  // a mode card: its icon and its name, every card the same. Its PLAY button waits under it until the card is picked (pickCard)
+  const card = o => `<div class="mc" data-id="${o.id}"><button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b></button><button class="go" data-go="${o.id}" tabindex="-1">${o.priv || o.id.startsWith('priv') ? 'OPEN' : 'PLAY'}</button></div>`;
+  pickSel = null; $('pickDesc').classList.remove('in'); $('pickDesc').textContent = m ? m.desc : ''; // on a map page: what the mode is
   if (join) {
     $('pickList').innerHTML = `<div class="codeBox"><p>Ask a friend for their room code</p><div><input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" autocapitalize="characters"><button id="codeGo">JOIN</button></div><p id="codeErr"></p></div>`;
     $('codeIn').focus(); return;
@@ -382,6 +384,16 @@ function renderPick() {
     ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
         return `<button data-map="${id}" style="background-image:linear-gradient(transparent 45%,rgba(0,0,0,.72)),url('img/maps/${id}.jpg?v=${V_MAPS}')"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
     : (priv ? PRIV_CARDS : group ? group.sub : create ? MODES.filter(x => x.id !== 'zombies' && !x.priv) : MODES).map(card).join('');
+}
+// the first click on a mode card picks it: its description comes in under the title and its PLAY button slides out under the card.
+// A second click on the card, or the button, goes on (the click handler below)
+let pickSel = null;
+const PICK_CARDS = [...MODES, ...MODES.flatMap(m => m.sub || []), ...PRIV_CARDS];
+function pickCard(id) {
+  pickSel = id;
+  document.querySelectorAll('#pickList .mc').forEach(c => c.classList.toggle('sel', c.dataset.id === id));
+  const d = $('pickDesc'); d.textContent = PICK_CARDS.find(c => c.id === id)?.desc || '';
+  d.classList.remove('in'); void d.offsetWidth; d.classList.add('in'); // (restarts the animation)
 }
 const pickOpen = () => $('pick').style.display === 'flex';
 function showPick(on) {
@@ -406,9 +418,10 @@ function joinWithCode() {
 }
 $('pickList').addEventListener('click', e => {
   if (e.target.closest('#codeGo')) return joinWithCode();
-  const b = e.target.closest('button'); if (!b || !(b.dataset.mode || b.dataset.map)) return;
-  if (b.dataset.mode) {
-    const id = b.dataset.mode;
+  const b = e.target.closest('button'); if (!b || !(b.dataset.mode || b.dataset.map || b.dataset.go)) return;
+  if (b.dataset.mode && pickSel !== b.dataset.mode) { pickCard(b.dataset.mode); sfx('ui'); return; }
+  if (b.dataset.mode || b.dataset.go) {
+    const id = b.dataset.mode || b.dataset.go;
     if (id === 'private') { pickMode = 'private'; pickPriv = false; renderPick(); sfx('ui'); return; }
     if (id === 'privCreate' || id === 'privJoin') { pickMode = id; pickPriv = id === 'privCreate'; renderPick(); sfx('ui'); return; }
     pickMode = id;
@@ -511,6 +524,16 @@ const KEY_ICON = [
   '..KKKK......', '.KyyyyK.....', 'KyyKKyyK....', 'KyyK.KyyK...', 'KyyKKyyKK...', '.KyyyyKyyK..',
   '..KKKKKyyyK.', '......KyyyK.', '......KyyKyK', '......KyyK.K', '......KyyKKK', '......KKK...',
 ];
+// a stopwatch: a round face 13 pixels across (drawn from a circle, so it's as tall as it's wide), hands at twelve and three, a stem on top
+const CLOCK_ICON = (() => {
+  const N = 13, c = 6, rows = ['.....KKK.....', '.....KwK.....'];
+  for (let y = 0; y < N; y++) {
+    let r = '';
+    for (let x = 0; x < N; x++) { const d = Math.hypot(x - c, y - c); r += d > 6.4 ? '.' : d > 5.4 || (x === c && y >= 2 && y <= c) || (y === c && x >= c && x <= c + 3) ? 'K' : 'w'; }
+    rows.push(r);
+  }
+  return rows;
+})();
 const iconFigure = c => ['KKKKKKK', 'KhhhhhK', 'KsssssK', 'KsKsKsK', 'KsssssK', 'KKKKKKK', `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, 'KKKKKKK'];
 const TEAM_ICON = iconFigure('b').map((r, k) => r + '..' + iconFigure('r')[k]);
 const MODE_ICONS = {
@@ -524,10 +547,7 @@ const MODE_ICONS = {
     '..KWKWKWKWKWGK..', '...KKKKKKKKKK...',
   ], { K: '#000', W: '#f0f0ea', G: '#b9bcc2', R: '#e0302a' }),
   team: artIcon(TEAM_ICON, { K: '#000', h: '#5a3a1e', s: '#e8b48a', b: '#3d7ce6', r: '#e0453a' }),
-  blitzMenu: artIcon([
-    '.....KKKK.....', '.....KwwK.....', '...KKKKKKKK...', '..KwwwwwwwwK..', '.KwwwwKwwwwwK.', 'KwwwwwKwwwwwwK',
-    'KwwwwwKwwwwwwK', 'KwwwwwKKKKwwwK', 'KwwwwwwwwwwwwK', 'KwwwwwwwwwwwwK', '.KwwwwwwwwwwK.', '..KwwwwwwwwK..', '...KKKKKKKK...',
-  ], { K: '#000', w: '#fff3c4' }),
+  blitzMenu: artIcon(CLOCK_ICON, { K: '#000', w: '#fff3c4' }),
   blitz: artIcon(BOLT_ICON, { K: '#000', y: '#ffd23a' }),
   blitzTeam: artIcon(BOLT_ICON, { K: '#000', y: (x, y) => x + y < 11 ? '#3d7ce6' : '#e0453a' }),
   private: artIcon(LOCK_ICON, { K: '#000', y: '#e0b84a', b: '#aab2bc' }),

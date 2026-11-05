@@ -3,7 +3,8 @@
 // You can wear any star you own (prof.armorUse), not just your best. It's worn in every match, zombie waves too (where the
 // shop's plates add to it). Each bot rolls its own armor: up to the star you own (worn or not), Wooden at most when you own none.
 // hp = the armor bar you spawn with: it takes damage before your health.
-// dr = share of every hit it takes off before anything else (so Ruby: a 50 hit does 46, and the armor bar soaks that first).
+// dr = share of every hit it takes off before anything else (so Emerald: a 50 hit does 46, and the armor bar soaks that first).
+// The bar grows 20 a star from 40 (Wooden) to 100 (Amethyst); from Ruby up each star cuts 4% more off every hit instead.
 // unlock = account level you need for that star, price = coins for that star (the first star is buying it)
 // shape = how the chestplate is built (see armorPieces): t = how far the plates stand off the chest, yb = where the plate ends at the bottom
 //   (the body runs y -12..12, so Wooden only covers the upper chest and each star reaches a bit lower),
@@ -11,21 +12,21 @@
 //   pecs = raised chest plates, gem = size of the chest gem, shards = crystals on each pad,
 //   tas = how far the plates over the hips hang below the plate, spine = a ridge down the back
 const ARMOR_TIERS = [
-  { id: 'wood', name: 'Wooden', hp: 50, dr: 0, unlock: 2, price: 10, c: [150, 104, 58], hi: [190, 144, 90], dk: [98, 64, 32],
+  { id: 'wood', name: 'Wooden', hp: 40, dr: 0, unlock: 2, price: 10, c: [150, 104, 58], hi: [190, 144, 90], dk: [98, 64, 32],
     shape: { t: 2, yb: 3, pad: [1, 3] } },
-  { id: 'steel', name: 'Steel', hp: 75, dr: 0, unlock: 5, price: 40, c: [158, 164, 174], hi: [212, 218, 226], dk: [96, 102, 112],
+  { id: 'steel', name: 'Steel', hp: 60, dr: 0, unlock: 5, price: 40, c: [158, 164, 174], hi: [212, 218, 226], dk: [96, 102, 112],
     shape: { t: 2, yb: 1, pad: [1, 4] } },
-  { id: 'gold', name: 'Gold', hp: 100, dr: 0, unlock: 9, price: 100, c: [226, 178, 40], hi: [255, 226, 110], dk: [158, 112, 16],
+  { id: 'gold', name: 'Gold', hp: 80, dr: 0, unlock: 9, price: 100, c: [226, 178, 40], hi: [255, 226, 110], dk: [158, 112, 16],
     shape: { t: 3, yb: -1, pad: [1, 5], pecs: true } },
-  { id: 'amethyst', name: 'Amethyst', hp: 100, dr: .04, unlock: 14, price: 200, c: [146, 88, 206], hi: [198, 152, 246], dk: [88, 46, 144], gem: [238, 218, 255],
+  { id: 'amethyst', name: 'Amethyst', hp: 100, dr: 0, unlock: 14, price: 200, c: [146, 88, 206], hi: [198, 152, 246], dk: [88, 46, 144], gem: [238, 218, 255],
     shape: { t: 3, yb: -3, pad: [2, 6], pecs: true, gem: 6, shards: 1 } },
-  { id: 'ruby', name: 'Ruby', hp: 100, dr: .08, unlock: 20, price: 320, c: [196, 38, 58], hi: [244, 104, 114], dk: [122, 16, 34], gem: [255, 198, 202],
+  { id: 'ruby', name: 'Ruby', hp: 100, dr: .04, unlock: 20, price: 320, c: [196, 38, 58], hi: [244, 104, 114], dk: [122, 16, 34], gem: [255, 198, 202],
     shape: { t: 3, yb: -4, pad: [2, 7], layer: true, pecs: true, gem: 6, shards: 1, tas: 3 } },
-  { id: 'emerald', name: 'Emerald', hp: 100, dr: .12, unlock: 27, price: 450, c: [36, 164, 86], hi: [110, 226, 150], dk: [16, 102, 50], gem: [206, 255, 224],
+  { id: 'emerald', name: 'Emerald', hp: 100, dr: .08, unlock: 27, price: 450, c: [36, 164, 86], hi: [110, 226, 150], dk: [16, 102, 50], gem: [206, 255, 224],
     shape: { t: 4, yb: -5, pad: [2, 8], layer: true, pecs: true, gem: 8, shards: 2, tas: 3 } },
-  { id: 'diamond', name: 'Diamond', hp: 100, dr: .16, unlock: 35, price: 600, c: [86, 206, 222], hi: [180, 246, 252], dk: [34, 142, 164], gem: [246, 255, 255],
+  { id: 'diamond', name: 'Diamond', hp: 100, dr: .12, unlock: 35, price: 600, c: [86, 206, 222], hi: [180, 246, 252], dk: [34, 142, 164], gem: [246, 255, 255],
     shape: { t: 4, yb: -6, pad: [2, 9], layer: true, pecs: true, gem: 8, shards: 2, tas: 4, spine: true } },
-  { id: 'champion', name: 'Champion', hp: 100, dr: .2, unlock: 50, price: 1000, c: [50, 50, 58], hi: [92, 92, 104], dk: [24, 24, 30], champ: true,
+  { id: 'champion', name: 'Champion', hp: 100, dr: .16, unlock: 50, price: 1000, c: [50, 50, 58], hi: [92, 92, 104], dk: [24, 24, 30], champ: true,
     shape: { t: 4, yb: -6, pad: [2, 9], layer: true, pecs: true, gem: 8, shards: 2, tas: 4, spine: true } },
 ];
 const ARMOR_MAX = ARMOR_TIERS.length;

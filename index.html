@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=101">
+<link id="css" rel="stylesheet" href="css/style.css?v=102">
 </head>
 <body class="boot">
 <div id="hud">
@@ -34,6 +34,7 @@
   <div id="pick">
     <button id="pickBack"></button>
     <h1 id="pickTitle"></h1>
+    <p id="pickDesc"></p>
     <div id="pickPill" class="seg" style="display:none"><button data-on="1">ONLINE</button><button data-on="0">VS BOTS</button><small id="pillNote"></small></div>
     <div id="pickList"></div>
   </div>
@@ -151,7 +152,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 108;
+const V = 109;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
 for (const src of FILES) {
