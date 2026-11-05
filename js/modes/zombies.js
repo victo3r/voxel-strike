@@ -270,23 +270,27 @@ const SHOP = [
   { gun: 'rocket', price: 450, desc: 'big splash damage, shoot the ground to rocket jump' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // perks stack this many times; a gun you own costs this share of its rent to fetch from the armory
-// the guns on offer: OFFERS a visit at most, picked afresh each wave (openShop) from the guns not in the run that would be a step up
-// in their category: a higher tier (the armory's unlock level, starters are tier 0) than the gun you hold there. So the default guns
-// drop out once you hold anything better, and a big collection never fills the shop. A category still on its starter is twice as
-// likely to get an offer. Yours come at a quarter price, the rest are rented; rentals already in the run always show their upgrades
+// the guns on offer: OFFERS a visit, one gun each from OFFERS different categories, picked afresh each wave (openShop).
+// A category's candidates are the guns not in the run, minus its starters once you hold a better gun there (so the default guns
+// stop showing, and a big collection never fills the shop). The categories are drawn with the ones where an offer would be a step up
+// (a higher tier than what you hold: the armory's unlock level, starters are tier 0) three times as likely, and within a category
+// higher tiers are more likely. Yours come at a quarter price, the rest are rented; rentals in the run always show their upgrades
 const OFFERS = 3, tierOf = g => BASE[g].start ? 0 : BASE[g].unlock || 1;
 let shopOffer = []; // SHOP indices of this visit's gun cards
 function pickOffers() {
-  const held = {};
+  const held = {}; // the best tier you hold in each category
   BASE.forEach((w, g) => { if (owned[g]) held[w.cat] = Math.max(held[w.cat] ?? -1, tierOf(g)); });
-  const pool = [];
+  const cats = {};
   SHOP.forEach((it, i) => {
     if (it.gun === undefined || owned[it.gun]) return;
-    const cat = BASE[it.gun].cat, have = held[cat] ?? -1;
-    if (tierOf(it.gun) > have) pool.push(i, ...(have <= 0 ? [i] : []));
+    const cat = BASE[it.gun].cat;
+    if (BASE[it.gun].start && (held[cat] ?? 0) > 0) return; // a default gun, once you hold something better there
+    (cats[cat] ??= []).push(i);
   });
+  const pool = Object.entries(cats).map(([cat, list]) => ({ list, w: list.some(i => tierOf(SHOP[i].gun) > (held[cat] ?? -1)) ? 3 : 1 }));
+  const draw = (items, w) => { let r = Math.random() * items.reduce((s, x) => s + w(x), 0), k = 0; while (k < items.length - 1 && (r -= w(items[k])) >= 0) k++; return k; };
   const out = [];
-  while (pool.length && out.length < OFFERS) { const i = pool[Math.random() * pool.length | 0]; out.push(i); for (let k = pool.length - 1; k >= 0; k--) if (pool[k] === i) pool.splice(k, 1); }
+  while (pool.length && out.length < OFFERS) { const [p] = pool.splice(draw(pool, x => x.w), 1); out.push(p.list[draw(p.list, i => 1 + tierOf(SHOP[i].gun) / 4)]); }
   return out.sort((a, b) => a - b);
 }
 const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i));
