@@ -27,14 +27,13 @@ function bootFx(b) {
 }
 // youFx (what you're wearing, boots and hat together) is in js/hats.js
 const DJ_V = 8.5; // the second jump's upward speed (the first is 9)
-// a bot's boots for the match: none (BOOT_BARE of the time) or any pair you own, at any stars up to the ones you wear on it.
-// Never better than yours
+// a bot's boots for the match: none (BOOT_BARE of the time) or any pair in the game: at ★ if you don't own it, else at any stars
+// up to the ones you own on it (worn or not). So you meet every pair, but never one better than yours
 const BOOT_BARE = .3;
 function botBoots() {
-  const mine = BOOTS.filter(B => bootStars(B.id));
-  if (!mine.length || Math.random() < BOOT_BARE) return null;
-  const B = mine[Math.random() * mine.length | 0];
-  return { id: B.id, st: 1 + (Math.random() * bootUse(B.id) | 0) };
+  if (Math.random() < BOOT_BARE) return null;
+  const B = BOOTS[Math.random() * BOOTS.length | 0];
+  return { id: B.id, st: 1 + (Math.random() * Math.max(1, bootStars(B.id)) | 0) };
 }
 
 // ---- the model: voxel pixel art like the armor (armor.js), in armor pixels (half a skin pixel each), measured from the hip,
@@ -77,6 +76,10 @@ function bootPieces(id, st, s = 1) {
     if (st >= 2) B(-3, 3, -18, -13, 5, 7, HI); // shin plate
     if (st >= 3) B(-1, 1, -17, -13, 7, 8, DK); // its ridge
   }
+  // the leg's room: hollow from the insole up to the top, a pixel of shell all round, a dark insole at the bottom. On a character the
+  // leg fills it; in the armory you see into it, so a boot looks like something you can put a foot in
+  const top = id === 'raider' ? -14 : -10, floor = id === 'raider' ? -22 : -21;
+  B(-4, 4, floor, top, -4, 4, 0); B(-4, 4, floor, floor + 1, -4, 4, hex([40, 40, 46]));
   if (s < 0) for (const p of out) p[4] = -p[4];
   return out;
 }

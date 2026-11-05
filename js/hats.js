@@ -31,27 +31,22 @@ function gearHit(fx, d, head) {
   if (fx.half && Math.random() < fx.half) d *= .5;
   return [d, head];
 }
-// a bot's hat for the match, the same way as its boots: none HAT_BARE of the time, or any hat you own at up to the stars you wear on it
+// a bot's hat for the match, the same way as its boots: none HAT_BARE of the time, or any hat in the game (botHat)
 const HAT_BARE = .3;
-function botHat() {
-  const mine = HATS.filter(H => hatStars(H.id));
-  if (!mine.length || Math.random() < HAT_BARE) return null;
-  const H = mine[Math.random() * mine.length | 0];
-  return { id: H.id, st: 1 + (Math.random() * hatUse(H.id) | 0) };
+function botHat() { // any hat in the game: ★ if you don't own it, else up to the stars you own on it (worn or not)
+  if (Math.random() < HAT_BARE) return null;
+  const H = HATS[Math.random() * HATS.length | 0];
+  return { id: H.id, st: 1 + (Math.random() * Math.max(1, hatStars(H.id)) | 0) };
 }
 
 // ---- the model: voxel pixel art like the armor, in armor pixels (half a skin pixel each), measured from the neck,
 // where the head pivots: the head is x -8..8, y 0..16, z -8..8 (+z is the face, +x the character's left).
 // The face (8x8 skin pixels) has its eyes in skin columns 1-2 and 5-6 and rows 3-4 from the top, so the middle two columns
 // (x -2..2) and the top two rows (y 12..16) can be covered without hiding them. Each hat stands one pixel off the head.
-// dummy = add a plain head inside, for the icon and the spinning preview
-function hatPieces(id, st, dummy = false) {
+// The icon and the spinning preview show the hat alone, hollow, the way it looks off a head
+function hatPieces(id, st) {
   const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a));
-  // after the shell: hollow it out (or put a plain head back in, with two dark eyes)
-  const head = () => {
-    B(-8, 8, 0, 16, -8, 8, dummy ? hex([196, 170, 146]) : 0);
-    if (dummy) { const E = hex([44, 44, 52]); B(-6, -2, 6, 8, 7, 8, E); B(2, 6, 6, 8, 7, 8, E); }
-  };
+  const head = () => B(-8, 8, 0, 16, -8, 8, 0); // after the shell: hollow it out where the head goes
   if (id === 'raider') {
     // a charcoal hood with a teal edge round the face, hanging down over the back of the neck.
     // ★★ adds a scarf pulled up over the mouth, ★★★ turns the edges gold and adds a stripe over the top
@@ -77,7 +72,7 @@ function hatPieces(id, st, dummy = false) {
   return out;
 }const HAT_PX = ARMOR_PX;
 const hatGeoCache = {};
-const hatGeo = (id, st, U, dummy = false) => hatGeoCache[id + ':' + st + ':' + U + ':' + dummy] ??= voxelGeos(hatPieces(id, st, dummy), U / HAT_PX).lit;
+const hatGeo = (id, st, U) => hatGeoCache[id + ':' + st + ':' + U] ??= voxelGeos(hatPieces(id, st), U / HAT_PX).lit;
 // puts hat h ({ id, st } or null) on a character from buildChar. It rides on the head, so it turns with it
 function dressHat(ch, h) {
   if (ch.hat) { ch.hat.mesh.parent.remove(ch.hat.mesh); ch.mats.splice(ch.mats.indexOf(ch.hat.mat), 1); ch.hat.mat.dispose(); ch.hat = null; }
@@ -85,14 +80,14 @@ function dressHat(ch, h) {
   const mat = armorMat(), mesh = new THREE.Mesh(hatGeo(h.id, h.st, ch.U), mat);
   ch.headPiv.add(mesh); ch.mats.push(mat); ch.hat = { mat, mesh };
 }
-// on a plain head, for the armory's spinning preview
-function hatModel(id, st, g) { g.add(new THREE.Mesh(hatGeo(id, st, 1 / 16, true), gunLit)); }
-// icon: seen from the front on a plain head, 4 screen pixels per armor pixel, black outline like the armor icons.
+// for the armory's spinning preview
+function hatModel(id, st, g) { g.add(new THREE.Mesh(hatGeo(id, st, 1 / 16), gunLit)); }
+// icon: seen from the front, 4 screen pixels per armor pixel, black outline like the armor icons.
 // Every star of a hat is drawn in the same frame
 const hatSpriteCache = {};
 function hatSprite(id, st) {
   const key = id + st; if (hatSpriteCache[key]) return hatSpriteCache[key];
-  const frame = voxelGrid(hatPieces(id, 3, true)), { lo, NX, NY, NZ, at } = voxelGrid(hatPieces(id, st, true));
+  const frame = voxelGrid(hatPieces(id, 3)), { lo, NX, NY, NZ, at } = voxelGrid(hatPieces(id, st));
   const W = frame.NX - 2, H = frame.NY - 2, K = 4, x0 = frame.lo[0] + 1, y1 = frame.lo[1] + frame.NY - 2;
   const dep = new Float32Array(W * H).fill(-99), col = new Array(W * H);
   for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
