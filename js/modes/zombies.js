@@ -270,6 +270,25 @@ const SHOP = [
   { gun: 'rocket', price: 450, desc: 'big splash damage, shoot the ground to rocket jump' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // perks stack this many times; a gun you own costs this share of its rent to fetch from the armory
+// the guns on offer: OFFERS a visit at most, picked afresh each wave (openShop) from the guns not in the run that would be a step up
+// in their category: a higher tier (the armory's unlock level, starters are tier 0) than the gun you hold there. So the default guns
+// drop out once you hold anything better, and a big collection never fills the shop. A category still on its starter is twice as
+// likely to get an offer. Yours come at a quarter price, the rest are rented; rentals already in the run always show their upgrades
+const OFFERS = 3, tierOf = g => BASE[g].start ? 0 : BASE[g].unlock || 1;
+let shopOffer = []; // SHOP indices of this visit's gun cards
+function pickOffers() {
+  const held = {};
+  BASE.forEach((w, g) => { if (owned[g]) held[w.cat] = Math.max(held[w.cat] ?? -1, tierOf(g)); });
+  const pool = [];
+  SHOP.forEach((it, i) => {
+    if (it.gun === undefined || owned[it.gun]) return;
+    const cat = BASE[it.gun].cat, have = held[cat] ?? -1;
+    if (tierOf(it.gun) > have) pool.push(i, ...(have <= 0 ? [i] : []));
+  });
+  const out = [];
+  while (pool.length && out.length < OFFERS) { const i = pool[Math.random() * pool.length | 0]; out.push(i); for (let k = pool.length - 1; k >= 0; k--) if (pool[k] === i) pool.splice(k, 1); }
+  return out.sort((a, b) => a - b);
+}
 const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i));
 let shopOpen = false, shopWave = 0, bonus = 0, armorBought = 0, waveReward = '';
 // each armor plate costs 25 more than the last; a rented gun's stars cost 75% of its rent for ★★ and 125% for ★★★; perks go up by half each time
@@ -279,8 +298,8 @@ const maxed = it => (isUpg(it) && lvl[it.gun] >= 2) || (it.armor && P.maxArmor >
 const priceOf = it => it.armor ? it.price + armorBought * 25 : it.perk ? Math.round(it.price * (1 + perk[it.perk] * .5)) : isUpg(it) ? Math.round(it.price * (lvl[it.gun] ? 1.25 : .75)) : it.gun !== undefined && hasGun(it.gun) ? Math.ceil(it.price * FETCH) : it.price;
 function renderShop() {
   $('shopInfo').innerHTML = `Wave ${wave} cleared! +${bonus} bonus   ·   <span class="pc">${COIN}${coins}</span>   ·   ${ico('heart')} ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ${ico('shield')} ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
-  // guns already in the run show only as upgrades (rentals), never as a second copy
-  const list = SHOP.map((it, i) => [it, i]).filter(([it]) => it.gun === undefined || !owned[it.gun] || isUpg(it));
+  // consumables and perks always, then this visit's gun offers, and the upgrades of the rentals in the run
+  const list = SHOP.map((it, i) => [it, i]).filter(([it, i]) => it.gun === undefined || isUpg(it) || shopOffer.includes(i) && !owned[it.gun]);
   $('items').innerHTML = list.map(([it, i]) => {
     const upg = isUpg(it), done = maxed(it);
     const off = done || (it.heal && P.hp >= P.max) || (it.refill && ammoFull()) || coins < priceOf(it);
@@ -320,7 +339,7 @@ function buy(i) {
   if (it.refill) WEAPONS.forEach((w, g) => { if (owned[g]) reserve[g] = resMax(g); });
   sfx('buy'); renderShop();
 }
-function openShop() { shopOpen = true; renderShop(); document.exitPointerLock(); }
+function openShop() { shopOpen = true; shopOffer = pickOffers(); renderShop(); document.exitPointerLock(); }
 $('items').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) buy(+b.dataset.i); });
 $('next').addEventListener('click', () => {
   shopOpen = false; $('shop').style.display = 'none'; waveWait = 3; // the next wave counts down from 3 (main.js)
@@ -368,5 +387,5 @@ function globTick(dt) {
   }
 }
 function clearGlobs() { for (const g of globs) scene.remove(g.m); globs.length = 0; }
-function resetRun() { perk.spd = perk.dmg = perk.hp = 0; runCoins = runXp = bossKills = 0; deadT = 0; horde = false; countShown = 0; clearGlobs(); }
+function resetRun() { perk.spd = perk.dmg = perk.hp = 0; runCoins = runXp = bossKills = 0; deadT = 0; horde = false; countShown = 0; shopOffer = []; clearGlobs(); }
 function banner(text, html = false) { const b = $('banner'); b[html ? 'innerHTML' : 'textContent'] = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }

@@ -181,7 +181,7 @@ function update(dt) {
     }
     if ((waveWait -= dt) <= 0) {
       // hordes (waves 12, 22, 32...) are more zombies, each weaker, walkers and runners only. A boss every 5 waves: the charger, then the hive on every 10th
-      wave++; horde = wave >= 12 && wave % 10 === 2; toSpawn = Math.round((5 + wave * 2.5) * (horde ? 1.6 : 1)); spawnT = 0; waveWait = 3; countShown = 0;
+      wave++; horde = wave >= 12 && wave % 10 === 2; toSpawn = Math.round((8 + wave * 2.5) * (horde ? 1.6 : 1)); // three more a wave than before: you start with a full kit now spawnT = 0; waveWait = 3; countShown = 0;
       const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };
       banner(`WAVE ${wave}` + (horde ? '\nHORDE!' : news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
       sfx('waveStart');
@@ -306,7 +306,7 @@ function update(dt) {
       walkDry(z.g.position, z.g.position.x, nz, z.r, !z.vy, into);
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
-    } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.type === 'boss' ? 3.5 : 2.2)) { // the boss can reach you on tall crates
+    } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.boss || z.type === 'brute' ? 3.5 : 2.2)) { // the bosses and brutes reach you on top of two crates
       z.atk = z.atkRate; sfx('zAttack', { at: z.g.position, far: 30, rate: z.type === 'brute' || z.type === 'boss' ? .7 : 1 }); hurtPlayer(z.dmg);
     }
     z.flash -= dt;
