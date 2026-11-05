@@ -19,8 +19,8 @@ const PAD_LOW = 60, PAD_NEAR = 8, PAD_FAR = 30;
 // floats away (s), join = the other bots have all joined by this time (s), kills = ranked on kills only (no points),
 // team = blue vs red, players = most players (you included) on a small / medium / large map
 const RULES = {
-  dm:        { name: 'DEATHMATCH', t: 240, you: 3, bot: 1.5, join: 60, kills: false, team: false, players: { small: 4, medium: 8, large: 8 } },
-  team:      { name: 'TEAM FIGHT', t: 240, you: 3, bot: 1.5, join: 60, kills: true,  team: true,  players: { small: 4, medium: 8, large: 8 } },
+  dm:        { name: 'DEATHMATCH', t: 240, you: 3, bot: 1.5, join: 60, kills: false, team: false, players: { small: 4, medium: 6, large: 8 } },
+  team:      { name: 'TEAM FIGHT', t: 240, you: 3, bot: 1.5, join: 60, kills: true,  team: true,  players: { small: 4, medium: 6, large: 8 } },
   blitz:     { name: 'BLITZ',      t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: false, players: { small: 4, medium: 6, large: 8 } },
   blitzTeam: { name: 'TEAM BLITZ', t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: true,  players: { small: 4, medium: 6, large: 6 } },
 };

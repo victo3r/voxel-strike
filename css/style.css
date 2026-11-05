@@ -76,7 +76,8 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 .sliders input{accent-color:var(--acc);width:100%;cursor:pointer}.sliders b{color:var(--acc-lt)}
 
 /* pause menu */
-#ctrlBtn,#lobbyBtn,#armBtn,#menuFriends{font:bold 18px monospace;padding:10px 18px;margin-top:14px}
+#menuPlay,#ctrlBtn,#lobbyBtn,#armBtn,#menuFriends{font:bold 18px monospace;padding:10px 18px;margin-top:14px}
+#menu #menuPlay{background:var(--sel)}#menu #menuPlay:hover{background:var(--acc)}
 /* small-window fixes: menus scroll instead of getting cut off */
 #menu,#shop{overflow-y:auto;justify-content:flex-start;padding:12px 8px;box-sizing:border-box}
 #menu>:first-child,#shop>h1{margin-top:auto!important}#menu>:last-child,#shop>:last-child{margin-bottom:auto!important}

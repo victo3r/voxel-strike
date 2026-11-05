@@ -213,6 +213,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys[e.code] = false);
 addEventListener('mousedown', e => {
+  gestureAt = performance.now(); // a click: the browser lets the page lock the mouse for a few seconds after one (lockMouse)
   const code = 'Mouse' + e.button;
   if (rebinding) { if (!e.target.closest('#bindReset,#bindX,#setTabs,.sliders,.seg,.tick')) { e.preventDefault(); assign(code); } return; }
   if (chatting) { e.preventDefault(); return; } // clicking while typing doesn't shoot or steal focus from the chat box
@@ -225,11 +226,19 @@ addEventListener('contextmenu', e => e.preventDefault());
 // Browsers that don't support it (e.g. some Chromebooks) fall back to a normal lock.
 function lockMouse() {
   const el = renderer.domElement;
+  clearTimeout(relockT); relockT = 0;
   let p;
   try { p = el.requestPointerLock({ unadjustedMovement: true }); } catch { p = null; }
   if (p?.catch) p.catch(() => el.requestPointerLock()?.catch?.(() => {}));
   else if (!p && document.pointerLockElement !== el) el.requestPointerLock()?.catch?.(() => {});
 }
+// Chrome won't lock the mouse again for about a second after Esc let it go (so a page can't trap you), and fails the click that
+// asks too soon. The click still counts as a gesture for a few seconds, so the lock is asked for again every RELOCK_EVERY ms until
+// the browser agrees (or RELOCK_FOR ms pass: then the menu says to click) instead of making you click twice. Esc itself can't be
+// that gesture: browsers never count it as one, so there is no "Esc again to resume"
+let gestureAt = -1e9, relockT = 0;
+const RELOCK_FOR = 3000, RELOCK_EVERY = 150;
+const canRelock = () => !locked && !shopOpen && !inLobby && !matchOver && !armOpen && $('binds').style.display !== 'flex' && $('away').style.display !== 'flex';
 let lastMove = 0;
 addEventListener('mousemove', e => {
   if (!locked) return;
@@ -286,13 +295,18 @@ document.addEventListener('pointerlockchange', () => {
     aimOn = false;
     // zombie waves death: the title says so, and clicking the background starts a new run
     $('menuTitle').textContent = dead ? 'YOU DIED' : pvp() ? 'MENU' : 'PAUSED';
+    $('menuPlay').textContent = dead ? 'TRY AGAIN' : pvp() ? 'BACK TO GAME' : 'RESUME';
     $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : pvp() ? '' : 'Click to resume';
     $('armBtn').style.display = $('menuFriends').style.display = pvp() ? '' : 'none'; // zombie waves has its own shop between waves
     renderHelp();
   }
 });
-// if the browser refuses to re-lock the mouse, show the menu so you can click back in
-document.addEventListener('pointerlockerror', () => { if (!shopOpen && !inLobby && !matchOver) { showAway(false); $('menuTitle').textContent = 'MENU'; $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex'; } });
+// the browser refused to lock the mouse: keep asking for a while after a click (see lockMouse), else show the menu so you can click back in
+document.addEventListener('pointerlockerror', () => {
+  if (shopOpen || inLobby || matchOver) return;
+  if (performance.now() - gestureAt < RELOCK_FOR) { if (!relockT) relockT = setTimeout(() => { relockT = 0; if (canRelock()) lockMouse(); }, RELOCK_EVERY); return; }
+  showAway(false); $('menuTitle').textContent = 'MENU'; $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex';
+});
 
 function showLobby(on) {
   inLobby = on;
