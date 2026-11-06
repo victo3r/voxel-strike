@@ -224,6 +224,9 @@ addEventListener('mousedown', e => {
   const code = 'Mouse' + e.button;
   if (rebinding) { if (!e.target.closest('#bindReset,#bindX,#setTabs,.sliders,.seg,.tick')) { e.preventDefault(); assign(code); } return; }
   if (chatting) { e.preventDefault(); return; } // clicking while typing doesn't shoot or steal focus from the chat box
+  // only a click with the mouse already locked counts: a click on a menu, the armory or the button that takes you back to the game
+  // never fires (nor keeps firing once that click locks the mouse)
+  if (!locked) return;
   keys[code] = true; press(code);
 });
 addEventListener('mouseup', e => keys['Mouse' + e.button] = false);
@@ -563,7 +566,7 @@ function restart(spot) {
   rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;
   flames.forEach(f => scene.remove(f.m)); flames.length = 0;
   flares.forEach(f => scene.remove(f.m)); flares.length = 0; clearBeams(); clearTracers(); recoilReset();
-  parts.forEach(p => scene.remove(p.m)); parts.length = 0;
+  parts.forEach(p => scene.remove(p.m)); parts.length = 0; clearDrops(scene);
   useMap(mapId); setupPads();
   Object.assign(P, { drowned: false, burn: 0, vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, 0, 0); P.pos.lag = 0;
   if (spot) { P.pos.set(spot.x, spot.y ?? 0, spot.z); P.yaw = spot.yaw ?? 0; }

@@ -313,9 +313,9 @@ function renderShop() {
       label = `<small class="cat">${CATS[slotOf(it.gun)][1]}${mine ? ' · YOURS' : ' · RENT'}</small><br>${label}` + (mine && gunUse(it.gun) ? ` <span class="cat">${starRow(gunUse(it.gun), gunUse(it.gun), 3)}</span>` : '');
     }
     if (upg) {
-      const g = it.gun, b = BASE[g], L = lvl[g] + 1;
+      const g = it.gun, nx = statsAt(g, lvl[g] + 1);
       label = `<small class="cat">${CATS[slotOf(g)][1]}</small><br>${it.name} <span class="cat">${stars(g)}</span>`;
-      desc = done ? 'fully upgraded' : `dmg ${WEAPONS[g].dmg} ${ico('right')} ${Math.round(b.dmg * (1 + .25 * L))} · mag ${WEAPONS[g].mag} ${ico('right')} ${magAt(b, L)} · faster reload`;
+      desc = done ? 'fully upgraded' : (nx.dmg !== WEAPONS[g].dmg ? `dmg ${WEAPONS[g].dmg} ${ico('right')} ${nx.dmg} · ` : '') + `mag ${WEAPONS[g].mag} ${ico('right')} ${nx.mag} · faster reload`;
       cost = done ? 'MAXED' : 'UPGRADE ' + COIN + priceOf(it);
     }
     if (it.perk) { label = `${it.name} <span class="cat">${ico('star').repeat(perk[it.perk])}</span>`; if (done) cost = 'MAXED'; }

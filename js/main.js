@@ -130,7 +130,7 @@ function update(dt) {
   tickCross(dt, BASE[cur]);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // eradicator barrels wind down after you stop firing
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
-  if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / w.reload < .45); // the flare in the muzzle: gone once fired, back in partway through the reload
+  if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / w.reload < .6); // the flare in the muzzle: gone once fired, back in your hand partway through the reload
   if (gunRound) { // the rocket: gone once fired, slides back into the tube near the end of the reload
     const k = reloading > 0 ? reloading / w.reload : 0;
     gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
@@ -172,6 +172,11 @@ function update(dt) {
   if (ra) { vm.position.x += ra.x; vm.position.y += ra.y; vm.position.z += ra.z; vm.rotation.x += ra.rx; vm.rotation.y += ra.ry; vm.rotation.z += ra.rz; }
   if (gunMag) { const r = gunMag.userData.rest; gunMag.position.set(r.x + (ra ? ra.mx : 0), r.y + (ra ? ra.my : 0), r.z + (ra ? ra.mz : 0)); }
   if (gunArmL) { const r = gunArmL.userData.rest; gunArmL.position.set(r.x, r.y + (ra ? ra.ay : 0), r.z + (ra ? ra.az : 0)); }
+  if (gunHand) { // one-handed guns: your left hand under the loose part, or down off the screen
+    const r = gunHand.userData.rest, hd = ra ? ra.hand : 0; gunHand.visible = hd > .01;
+    if (ra) gunHand.position.set(r.x + ra.mx, r.y + ra.my - (1 - hd) * .35, r.z + ra.mz);
+  }
+  reloadSwap(vmRl, w.id, ra ? 1 - reloading / w.reload : -1, gunMag, scene); // the spent mag falls away, a fresh one comes in
   if (ra && w.id === 'eradicator' && reloading / w.reload < .12) gunSpinV = Math.max(gunSpinV, 16); // a fresh belt: the barrels give a turn
   // switching guns: the one in your hands dips off the bottom of the screen and the next comes up (weapons.js equip, swapTick)
   const sw = swapTick(dt);
@@ -195,7 +200,7 @@ function update(dt) {
     }
     if ((waveWait -= dt) <= 0) {
       // hordes (waves 12, 22, 32...) are more zombies, each weaker, walkers and runners only. A boss every 5 waves: the charger, then the hive on every 10th
-      wave++; horde = wave >= 12 && wave % 10 === 2; toSpawn = Math.round((8 + wave * 2.5) * (horde ? 1.6 : 1)); // three more a wave than before: you start with a full kit now spawnT = 0; waveWait = 3; countShown = 0;
+      wave++; horde = wave >= 12 && wave % 10 === 2; toSpawn = Math.round((8 + wave * 2.5) * (horde ? 1.6 : 1)); spawnT = 0; waveWait = 3; countShown = 0; // 8 + 2.5 a wave: three more than before, as you start with a full kit now
       const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };
       banner(`WAVE ${wave}` + (horde ? '\nHORDE!' : news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
       sfx('waveStart');
@@ -412,6 +417,7 @@ function fpsTick(raw) {
   const raw = clock.getDelta(), dt = Math.min(raw, .05);
   fpsTick(raw);
   drownTick(dt); musicTick();
+  dropTick(dt); // spent mags lying about (weapons.js dropPart)
   if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pauses while the menu (or settings) is open. Bot matches keep running behind the menu, the way an online

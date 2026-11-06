@@ -9,17 +9,28 @@ const inMatch = () => !inLobby && pvp() && !matchOver; // online too: the change
 
 // the four main stats at the stars you're using: damage, fire rate, capacity (mag size) and mobility.
 // [label, value, unit]. One-shot guns fire once per reload, so that's their fire rate. A beam fires nonstop
-function mainStats(i) {
-  const w = BASE[i], L = Math.max(0, gunUse(i) - 1), dmg = Math.round(w.dmg * (1 + .25 * L)), rl = w.reload * (1 - .15 * L);
-  const per = s => s >= 20 ? Math.round(s) : +s.toFixed(1);
+function mainStats(i, L = Math.max(0, gunUse(i) - 1)) {
+  const w = BASE[i], s = statsAt(i, L);
+  const per = v => v >= 20 ? Math.round(v) : +v.toFixed(1);
   return [
-    ['DAMAGE', w.beam ? Math.round(dmg / w.rate) : dmg * w.pellets, w.beam ? '/ SEC' : ''], // a shotgun: every pellet hitting
-    ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(w.rate, rl) : w.rate)), w.beam ? '' : '/ SEC'],
-    ['CAPACITY', w.inf ? ico('inf') : magAt(w, L), ''],
+    ['DAMAGE', w.beam ? Math.round(s.dmg / w.rate) : s.dmg * w.pellets, w.beam ? '/ SEC' : ''], // a shotgun: every pellet hitting
+    ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(w.rate, s.reload) : w.rate)), w.beam ? '' : '/ SEC'],
+    ['CAPACITY', w.inf ? ico('inf') : s.mag, ''],
     ['MOBILITY', w.mob ?? 60, ''],
   ];
 }
-const gunStats = i => mainStats(i).map(([k, v]) => `${{ DAMAGE: 'DMG', 'FIRE RATE': 'RATE', CAPACITY: 'CAP', MOBILITY: 'MOB' }[k]} ${v}`).join(' · ');
+// what each star does to a gun, for its details: [label, value at ★, ★★, ★★★]. Damage per second is every shot hitting
+function starTable(i) {
+  const w = BASE[i], S = [0, 1, 2].map(L => statsAt(i, L)), rows = [];
+  rows.push(['DAMAGE', ...S.map(s => w.beam ? Math.round(s.dmg / w.rate) + '/s' : s.dmg * w.pellets)]);
+  if (!w.beam && w.mag > 1) rows.push(['DMG / SEC', ...S.map(s => Math.round(s.dmg * w.pellets / w.rate))]);
+  if (w.mag > 1) rows.push(['CAPACITY', ...S.map(s => s.mag)]);
+  rows.push(['RELOAD', ...S.map(s => s.reload.toFixed(2) + 's')]);
+  return rows;
+}
+// a row of stat boxes: [label, value, unit]
+const statBoxes = rows => `<div class="ms" style="grid-template-columns:repeat(${rows.length},1fr)">${rows.map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>`;
+const attrTags = list => list.length ? `<div class="at">${list.map(a => `<span>${a}</span>`).join('')}</div>` : '';
 // tags for how a gun works, listed under its description
 function gunAttrs(w) {
   const a = [];
@@ -54,8 +65,8 @@ const DESC = {
 };
 // the rest of the stats for the details view, at the stars you're using
 function gunSpecs(i) {
-  const w = BASE[i], L = Math.max(0, gunUse(i) - 1), out = [], rl = +(w.reload * (1 - .15 * L)).toFixed(1);
-  if (!w.melee) out.push(['RELOAD', rl + 's']);
+  const w = BASE[i], out = [], rl = +statsAt(i, Math.max(0, gunUse(i) - 1)).reload.toFixed(1);
+  if (!w.melee && w.start) out.push(['RELOAD', rl + 's']); // (guns with stars show it by star, above)
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
   if (w.rocket) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
   if (w.flare) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`], ['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
@@ -94,12 +105,16 @@ function renderArmory() {
     const w = BASE[i], tag = isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
     return `<div class="card${isLocked(i) ? ' locked' : ''}${i === armSel ? ' sel' : ''}${i === eq ? ' on' : ''}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img src="${SPRITES[i]}">` +
-      `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div><small>${gunStats(i)}</small></div>`;
+      `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
   }).join('');
   renderAct();
   if (inLobby) heroGun(armSel);
 }
-// the buttons for the picked gun, under your character (in a match, under where he'd stand)
+// ---- the card in the bottom right corner, next to your character: the item you picked, its stats, and its buttons at the bottom.
+// (Cards in the list only show the name: click one to see it here, click it again for its details: the model, what it is, star by star)
+const actCard = (name, stars, body, pick, btns) => `<div class="an"><span>${name} <span class="st">${stars}</span></span>` +
+  (armDetOk() ? `<button class="more" data-det="1">${armDet ? ico('left') + ' LIST' : 'DETAILS ' + ico('right')}</button>` : '') + `</div>${body}${pick}<div class="ab">${btns}</div>`;
+const armDetOk = () => armPage === 'weapons' || (wearCat !== 'skins' && (wearCat !== 'armor' || armorCard));
 function renderAct() {
   if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
@@ -111,32 +126,33 @@ function renderAct() {
     if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${upgPrice(i)}</button>`;
   }
   const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  $('armAct').innerHTML = `<div class="an">${w.name} <span class="st">${starTxt(i)}</span></div>${pick}<div class="ab">${btns}</div>`;
+  $('armAct').innerHTML = actCard(w.name, starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns);
   placeAct();
 }
+// the SHOOT and RELOAD buttons sit just left of your character, in the lobby, on the WEAPONS page (he puts the gun away for WEAR)
 function placeAct() {
-  const a = $('armAct'); if (!armOpen) return;
-  const W = innerWidth, edge = W > 700 ? $('armory').getBoundingClientRect().right - 40 : 0;
-  a.style.left = (inLobby ? heroScreen.x : (edge + W) / 2) + 'px';
-  a.style.bottom = inLobby ? '' : '24%'; // in a match, clear of the hotbar
+  if (!armOpen) return;
+  const h = $('heroAct'), on = inLobby && armPage === 'weapons' && innerWidth > 700;
+  h.style.display = on ? 'flex' : 'none';
+  if (on) { const edge = $('armory').getBoundingClientRect().right; h.style.left = Math.max(edge, heroScreen.x - innerHeight * .2 - 50) + 'px'; h.style.top = heroScreen.y + 'px'; }
 }
 function renderDetail() {
-  const i = armSel, w = BASE[i];
-  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"></div>` +
-    `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div>` +
-    `<div class="ms">${mainStats(i).map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>` +
-    `<p>${DESC[w.id] ?? ''}</p><div class="at">${gunAttrs(w).map(a => `<span>${a}</span>`).join('')}</div>` +
+  const i = armSel, w = BASE[i], u = gunUse(i), rows = w.start ? [] : starTable(i);
+  const table = rows.length ? `<div class="sk"><span></span>${[1, 2, 3].map(s => `<b class="h${s === u ? ' on' : ''}">${starRow(s)}</b>`).join('')}` +
+    rows.map(([k, ...v]) => `<span>${k}</span>${v.map((x, s) => `<b${s + 1 === u ? ' class="on"' : ''}>${x}</b>`).join('')}`).join('') + '</div>' : '';
+  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
+    `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div><p>${DESC[w.id] ?? ''}</p>` +
+    (table ? `<div class="sh">WHAT EACH STAR DOES</div>${table}` : '') +
     `<div class="ds">${gunSpecs(i).map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
-  pvShow(i + ':' + gunUse(i), g => makeGun(i, g, Math.max(0, gunUse(i) - 1), false), -Math.PI / 2); // starts side-on, muzzle to the right
+  pvShow(i + ':' + u, g => makeGun(i, g, Math.max(0, u - 1), false), -Math.PI / 2); // starts side-on, muzzle to the right
 }
 
 // ---- WEAR page. ARMOR has one card, Basic Armor. Click it to pick it, click it again for its details: the chestplate spins there,
 // and the arrows in the bottom corners step through its stars (your character wears whichever one you're looking at).
 // The button under him buys the next star
 const ARMOR_DESC = 'Worn in bot matches. Your armor bar fills every time you spawn and takes hits before your health. ' +
-  'Every star turns it into a bigger, tougher chestplate, and from Amethyst on, each one also cuts the damage you take by 4% more. ' +
+  'Every star turns it into a bigger, tougher chestplate, and from Ruby on, each one also cuts the damage you take by 4% more. ' +
   'You can wear any star you own. Bots roll their own armor, never better than what you wear.';
-const armorStat = T => `+${T.hp} ARMOR` + (T.dr ? ` · −${Math.round(T.dr * 100)}% DAMAGE` : '');
 function renderWear() {
   const n = myArmor(), w = wornArmor(), T = armorOf(w || 1);
   const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, w - 1)) : (G => { const on = G.worn(); return on ? G.sprite(on.id, on.st) : G.sprite(G.list[0].id, 1); })(GEAR[c]);
@@ -153,8 +169,7 @@ function renderWear() {
     const locked = !n && prof.lv < T.unlock, tag = n ? 'WEARING' : locked ? `${ico('lock')} LVL ${T.unlock}` : COIN + T.price;
     $('armList').innerHTML = `<p class="wd">${ARMOR_DESC}</p>` +
       `<div class="card${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${n ? ' on' : ''}" data-armor="1"><span class="tag">${tag}</span>` +
-      `<img class="ai" src="${armorSprite((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div>` +
-      `<small>${n ? T.name.toUpperCase() + ' · ' : ''}${armorStat(T)}</small></div>`;
+      `<img class="ai" src="${armorSprite((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div></div>`;
   }
   heroArmor(armDet ? armorPrev : w || 1);
   renderAct();
@@ -187,7 +202,10 @@ function renderArmorAct() {
   else if (prof.lv < next.unlock) btns += `<button disabled>${ico('lock')} ${n ? next.name.toUpperCase() + ' ' : ''}AT LVL ${next.unlock}</button>`;
   else btns += `<button data-arm="1" ${prof.coins < next.price ? 'disabled' : ''}>${n ? starRow(n + 1) + ' ' + next.name.toUpperCase() : 'BUY'} ${COIN}${next.price}</button>`;
   const pick = !armDet && n > 1 ? lvPick('wa', 'WEARING ' + armorOf(w).name.toUpperCase(), w <= 1, w >= n) : '';
-  $('armAct').innerHTML = `<div class="an">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div>${pick}<div class="ab">${btns}</div>`;
+  const T = armorOf(armDet ? armorPrev : w || 1); // the star you're looking at in the details, else the one you wear (or would buy)
+  const body = `<div class="tn">${T.name.toUpperCase()}${armDet ? '' : n ? ' · WEARING' : ' · NOT OWNED'}</div>` +
+    statBoxes([['ARMOR BAR', '+' + T.hp, ''], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE', '']]);
+  $('armAct').innerHTML = actCard(ARMOR_ITEM, n ? armorStarTxt() : '', body, pick, btns);
   placeAct();
 }
 // picks star s to wear (your best = no pick saved, so buying the next star puts it straight on)
@@ -237,7 +255,7 @@ function renderSkins() {
 }
 function renderSkinAct() {
   const p = lookChoices()[lookIndex()];
-  $('armAct').innerHTML = `<div class="an">${p?.name ?? 'CUSTOM'}</div>` + (inLobby ? '<div class="ab"><button data-cust="1">' + ico('pencil') + ' CUSTOMIZE</button></div>' : '');
+  $('armAct').innerHTML = actCard(p?.name ?? 'CUSTOM', '', '<div class="tn">WEARING</div>', '', inLobby ? '<button data-cust="1">' + ico('pencil') + ' CUSTOMIZE</button>' : '');
   placeAct();
 }
 // out of the armory and into the customizer (lobby.js), which comes back here when you're done
@@ -279,7 +297,6 @@ function gearLines(B, st) {
   return o;
 }
 const GEAR_SHORT = { 'DAMAGE CUT': 'DMG CUT', DAMAGE: 'DMG', 'HEADSHOT BLOCK': 'HS BLOCK', 'HALF DAMAGE': 'HALF DMG' };
-const gearSmall = (B, st) => gearLines(B, st).map(([k, v]) => k === 'JUMPS' ? 'DOUBLE JUMP' : k === 'STEALTH' ? 'HIDDEN PAST ' + v : `${v} ${GEAR_SHORT[k] ?? k}`).join(' · ');
 const gearList = G => G.list.map((B, i) => i).sort((a, b) => G.list[a].unlock - G.list[b].unlock);
 const gearLocked = (G, B) => !G.stars(B.id) && prof.lv < B.unlock;
 const gearUpg = (G, B) => Math.round(B.price * UPG[G.stars(B.id) - 1]);
@@ -305,20 +322,19 @@ function renderGear() {
     const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
     return `<div class="card${gearLocked(G, K) ? ' locked' : ''}${i === gearSel ? ' sel' : ''}${worn ? ' on' : ''}" data-gear="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${G.sprite(K.id, s)}">` +
-      `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div><small>${gearSmall(K, s)}</small></div>`;
+      `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div></div>`;
   }).join('');
   gearDress();
   renderAct();
   if (inLobby) heroGun(-1);
 }
 function renderGearDetail() {
-  const G = gearNow(), B = G.list[gearSel], st = gearShown(G, B), have = G.stars(B.id), lines = gearLines(B, st);
+  const G = gearNow(), B = G.list[gearSel], st = gearShown(G, B), have = G.stars(B.id);
   const specs = GEAR_STATS.filter(([f]) => B[f]).map(([f, k, fmt]) => [k + ' BY STAR', B[f].map(fmt).join(' / ')]);
   specs.push(['UNLOCKS AT', 'LVL ' + B.unlock], ['PRICE', COIN + B.price],
     ['STATUS', prof[G.on] === B.id && have ? 'WEARING' : have ? 'OWNED' : gearLocked(G, B) ? ico('lock') + ' LOCKED' : 'NOT OWNED']);
-  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"></div>` +
+  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
     `<div class="dn">${B.name} <span class="st">${gearStarTxt(G, B.id)}</span></div>` +
-    `<div class="ms" style="grid-template-columns:repeat(${lines.length},1fr)">${lines.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>` +
     `<p>${G.about[B.id] ?? ''}</p><div class="ds">${specs.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
   pvShow(wearCat + ':' + B.id + st, g => G.model(B.id, st, g), G.face); // turned a little, so you see the front and a side
 }
@@ -332,7 +348,8 @@ function renderGearAct() {
     if (st < 3) btns += `<button data-gup="1" ${prof.coins < gearUpg(G, B) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${gearUpg(G, B)}</button>`;
   }
   const u = G.using(B.id), pick = st > 1 ? lvPick('gu', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  $('armAct').innerHTML = `<div class="an">${B.name} <span class="st">${gearStarTxt(G, B.id)}</span></div>${pick}<div class="ab">${btns}</div>`;
+  const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
+  $('armAct').innerHTML = actCard(B.name, gearStarTxt(G, B.id), body, pick, btns);
   placeAct();
 }
 // the buttons for boots and hats. What they do is read live (js/hats.js youFx), so changes mid-match take effect straight away
@@ -372,7 +389,17 @@ function pvShow(key, build, face) {
     const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(28, 2, .01, 50), spin = new THREE.Group();
     sc.add(new THREE.HemisphereLight(0xffffff, 0x3a4a40, 1.5), spin);
     const key = new THREE.DirectionalLight(0xffffff, 1.8); key.position.set(2, 3, 4); sc.add(key);
-    pv = { cv, r, sc, cam, spin, key: '', on: false, t: 0 };
+    pv = { cv, r, sc, cam, spin, key: '', on: false, t: 0, drag: null, v: .7 };
+    // drag it to turn it (and tip it up or down a little); let go and it carries on turning, easing back to its slow spin
+    cv.addEventListener('pointerdown', e => { pv.drag = [e.clientX, e.clientY]; pv.v = 0; cv.setPointerCapture(e.pointerId); cv.classList.add('drag'); });
+    cv.addEventListener('pointermove', e => {
+      if (!pv.drag) return;
+      const dx = e.clientX - pv.drag[0], dy = e.clientY - pv.drag[1]; pv.drag = [e.clientX, e.clientY];
+      spin.rotation.y += dx * .012; spin.rotation.x = Math.max(-.7, Math.min(.7, spin.rotation.x + dy * .008));
+      pv.v = dx * .012 * 60;
+    });
+    const end = () => { pv.drag = null; cv.classList.remove('drag'); };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
   }
   $('detView').append(pv.cv);
   if (pv.key !== key) {
@@ -382,7 +409,7 @@ function pvShow(key, build, face) {
     const box = new THREE.Box3().setFromObject(g), sph = box.getBoundingSphere(new THREE.Sphere());
     g.position.sub(sph.center); pv.spin.add(g);
     pv.rad = sph.radius; pv.halfH = (box.max.y - box.min.y) / 2; pvFit();
-    pv.spin.rotation.y = face;
+    pv.spin.rotation.set(0, face, 0); pv.v = .7;
   }
   if (!pv.on) { pv.on = true; pv.t = performance.now(); requestAnimationFrame(pvTick); }
 }
@@ -399,7 +426,10 @@ function pvTick(now) {
   if (w && h && (pv.cv.width !== Math.round(w * pv.r.getPixelRatio()) || pv.cv.height !== Math.round(h * pv.r.getPixelRatio()))) {
     pv.r.setSize(w, h, false); pv.cam.aspect = w / h; pv.cam.updateProjectionMatrix(); pvFit();
   }
-  pv.spin.rotation.y += dt * .7;
+  if (!pv.drag) {
+    pv.v += (.7 - pv.v) * Math.min(1, dt * 1.5); pv.spin.rotation.y += pv.v * dt;
+    pv.spin.rotation.x *= Math.exp(-dt * 1.2); // tipped: it settles back level
+  }
   pv.r.render(pv.sc, pv.cam);
   requestAnimationFrame(pvTick);
 }
@@ -442,6 +472,7 @@ function armClick(e) {
     prof.coins -= T.price; prof.armor = n + 1; prof.armorUse = 0; if (armDet) armorPrev = n + 1; saveProf(); showProf();
     armorSync(); sfx(n ? 'upgrade' : 'buy');
   }
+  else if (b.dataset.det) { armDet = !armDet; if (armDet && armPage === 'wear' && wearCat === 'armor') armorPrev = wornArmor() || 1; sfx('ui'); }
   else if (b.dataset.c) { armCat = b.dataset.c; armDet = false; sfx('ui'); }
   else if (b.id === 'detBack') { armDet = false; sfx('ui'); }
   else if (b.dataset.buy) {
@@ -461,12 +492,14 @@ function armClick(e) {
 $('armory').addEventListener('click', armClick);
 $('armAct').addEventListener('click', armClick);
 $('armAct').addEventListener('pointerdown', e => e.stopPropagation()); // clicking a button shouldn't start spinning him
+$('heroAct').addEventListener('pointerdown', e => e.stopPropagation());
 const armIcon = () => $('armIcon').src = SPRITES[loadoutGun('primary')]; // the lobby's ARMORY button shows your primary gun
 armIcon();
 // in the lobby the home buttons hide and the camera slides over (lobby.js). In a match the menu hides so you see the game behind it
 function armShow(on) {
   $('armory').style.display = on ? 'flex' : 'none';
   $('armAct').style.display = on ? 'flex' : 'none';
+  if (!on) $('heroAct').style.display = 'none'; // (placeAct shows it)
   if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; }
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }

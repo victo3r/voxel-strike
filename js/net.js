@@ -550,7 +550,13 @@ net = (() => {
     // the gun in their hands
     if (cur.gun !== BASE[z.gun].id) { const i = gi(cur.gun); if (i !== undefined) { z.gun = i; z.ammo = 1; holdGun(z); sfx('equip', { at: pos, far: 15, v: .7 }); } }
     const W = BASE[z.gun];
-    if (r.q & 2) { if (!W.inf) sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); }
+    // their reload: the sound, and the reload animation on the gun in their hands for as long as their reload takes at their stars
+    // (deathmatch.js holdReload), cut short if they stop reloading (switched guns, died)
+    const rlT = z.rec.W?.[z.gun]?.reload ?? W.reload;
+    if (r.q & 2) { if (!W.inf) sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); z.rlLeft = W.inf || W.melee ? 0 : rlT; }
+    if (!r.reloadWas) z.rlLeft = 0;
+    if (z.rlLeft > 0) z.rlLeft = Math.max(0, z.rlLeft - dt);
+    holdReload(z, z.rlLeft, rlT);
     if (r.q & 64) { sfx('djump', { at: pos, far: 20, v: .7 }); burst(fv.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     r.q = 0;
     if (r.fired) {

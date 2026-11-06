@@ -1,0 +1,61 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+Voxel Strike is a browser FPS (three.js 0.160, plain JavaScript, no build step) served by GitHub Pages from `main` at
+https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, friends, online rooms) is a separate repo at
+`../voxel-strike-server` (Cloudflare Worker + Durable Objects + D1 at sync.gemforge.org); its README has the server commands.
+
+## Running and testing
+
+- Serve the folder and open it: `python -m http.server 8010 --bind 127.0.0.1`, then http://127.0.0.1:8010/?dev=1.
+  **Never use port 8000** (another service on this PC owns it) and never kill processes by port; stop stray
+  `http.server`/`wrangler`/`workerd` processes by command line.
+- `?dev=1` (or a localhost page) points online play at `ws://127.0.0.1:8787`; `?srv=http://host:port` points saves, friends and
+  play at another server (the tests use `?srv=http://127.0.0.1:9` to force offline).
+- All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
+  under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
+  `maps.mjs`, `gear.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`; `node test/measure-bots.mjs ladder` measures bot hit rates per
+  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`) also need the local dev server described in the server README; run
+  them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
+- `node ../voxel-strike-server/scripts/check-tables.mjs` must pass after changing any number the server also uses (weapon stats,
+  match rules, rewards, armor, gear, map sizes/pads): the server keeps its own copy in `tables.js`.
+
+## Shipping
+
+- Cache busting is manual: bump `const V = NNN` in `index.html` for any JS change (and the `style.css?v=` query for CSS). Commit
+  messages end with "Cache vNNN". Pushing `main` deploys the game.
+- Server changes need `npx -y wrangler@3.114.17 deploy` in the server repo (Node 20 here, so wrangler 3); the user runs production
+  deploys themselves.
+
+## Architecture
+
+- **One global scope.** `index.html` loads every file in `js/` as a classic script in a fixed order (the `FILES` list). Files share
+  top-level `const`/`let`/`function` declarations directly, so order matters and there are no imports. three.js is loaded as a
+  module and exposed as `window.THREE`.
+- **Everything that fights is in `zombies`** (`js/modes/zombies.js`): zombies, offline bots (`type: 'bot'`) and other online
+  players (`remote: true`, `pid`). Your bullets, knife, fire and rockets hit them through the same paths (`hurtZombie`,
+  `hurtPlayer`, `blast`, `applyBurn`).
+- **Modes.** `mode` is `'zombies'` or a bot/PvP mode; `pvp()` tells them apart. `js/modes/deathmatch.js` runs every non-zombie
+  match offline (rules in `RULES`, the bot AI in `updateBot`, bot skill levels in `SKILLS`, rewards) and `setupMode()` sets up
+  whichever mode was picked; `restart()` (input.js) resets the world. The frame loop is in `js/main.js`.
+- **Online** (`js/net.js`): the client owns its movement and detects hits locally, then claims them; the server validates and
+  owns health, scores, clock, respawns and pickup pads. One player's client (the host) runs the room's bots with the offline AI
+  and streams them. Protocol and server rules are in the server repo's `docs/` (spec-v2.md, spec-b.md, spec-c.md, spec-friends.md).
+- **Account** (`js/profile.js`, synced by `js/cloud.js`): level, coins, owned guns and stars, loadout, armor, boots and hats in
+  `prof`, saved to localStorage and to the server when signed in. Zombie-wave shop coins are separate from account coins.
+- **Maps** (`js/maps/*.js`) register with `startMap`, build meshes plus collision `solids` (`addBlock`/`addSlab`/`addSolid` in
+  `world.js`) and `cover` (what stops bullets). Decorative detail goes through `detail()` so the low graphics setting can hide it.
+- **Voxel models.** Guns (`GUN_MODELS` in weapons.js), armor, boots and hats are pixel boxes turned into geometry by `voxelGeos`,
+  which also draws the black outline. A model's moving parts are `sub()` groups (`spin`, `round`, `mag`). Hotbar and armory
+  sprites are rendered from the same models.
+- **Baked hold poses (gotcha).** How bots and the armory character hold each gun is solved once and baked into `HOLD_BAKED` in
+  `js/hold.js`, keyed by each `GUN_MODELS` entry's source length. Editing a gun model invalidates its pose and every player's
+  browser re-solves it (seconds of stutter). Re-bake by evaluating
+  `Object.fromEntries(BASE.map((w, i) => [w.id, holdFor(i)]))` in the page and pasting the result in; `test/anim.mjs` fails
+  while any pose is stale.
+
+## Conventions
+
+- Comments explain the game behaviour in plain words next to the code; keep them accurate when changing behaviour.
+- Browser-default UI (scroll bars and the like) should be styled to match the game's UI.

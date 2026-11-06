@@ -283,7 +283,7 @@ const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round } = makeGun(b.gun, gunM, b.rec.stars[b.gun]); // its upgrade bands, like yours
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag } = makeGun(b.gun, gunM, b.rec.stars[b.gun]); // its upgrade bands, like yours
   // held the way its hold says (js/hold.js): the gun and both arms come from the solved pose, which is in character pixels
   // from its feet. The aim group pivots at shoulder height. A one-handed weapon leaves the left arm hanging a little forward
   const h = holdFor(b.gun);
@@ -296,6 +296,39 @@ function holdGun(b) {
   b.flashM.position.set(0, my, mz - .04); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
   b.gunM = gunM; b.spin = spin; b.spinV = 0;
+  // what a reload moves from (holdReload): the gun's place, its loose part, both arms, and where each fist sits on the gun
+  // (in the gun's own space, so the hands stay on it as it turns)
+  b.mag = mag; b.rl = { rk: -1, on: false, p: gunM.position.clone(), q: gunM.quaternion.clone(), qR: b.armR.quaternion.clone(), qL: b.armL.quaternion.clone(), magAt: mag && mag.position.clone(), oneHand: !h.dL };
+  gunM.updateMatrix(); const inv = gunM.matrix.clone().invert(), fist = (a, d) => a.position.clone().addScaledVector(_hv.fromArray(d), ARM_LEN * u).applyMatrix4(inv);
+  b.rl.fR = fist(b.armR, h.dR); b.rl.fL = h.dL ? fist(b.armL, h.dL) : null;
+}
+// the reload on the gun in a bot's or another player's hands: the same moves as yours (weapons.js RELOAD_ANIM) on the gun they hold,
+// its loose part coming out and the spent one falling away, their hands staying on the gun and the left one going to the part.
+// left = seconds of reload to go (0 = not reloading), total = how long the whole reload takes
+const _rlE = new THREE.Euler(), _rlQ = new THREE.Quaternion(), _rlV = new THREE.Vector3(), _rlM = new THREE.Vector3(), _rlF = new THREE.Vector3();
+function holdReload(b, left, total) {
+  const R = b.rl, g = b.gunM; if (!R || !g) return;
+  const id = BASE[b.gun].id, k = left > 0 && total > 0 ? Math.max(0, 1 - left / total) : -1, ra = k >= 0 ? reloadPose(id, k) : null;
+  reloadSwap(R, id, k, b.mag, scene);
+  if (BASE[b.gun].flare && b.mag) b.mag.visible = b.ammo > 0 || k > .4; // the flare in the muzzle, like yours
+  if (!ra) {
+    if (R.on) { R.on = false; g.position.copy(R.p); g.quaternion.copy(R.q); b.armR.quaternion.copy(R.qR); b.armL.quaternion.copy(R.qL); if (b.mag) b.mag.position.copy(R.magAt); }
+    return;
+  }
+  R.on = true;
+  g.quaternion.copy(R.q).multiply(_rlQ.setFromEuler(_rlE.set(ra.rx, ra.ry, ra.rz)));
+  g.position.copy(R.p).add(_rlV.set(ra.x, ra.y, ra.z).applyQuaternion(R.q));
+  if (b.mag) b.mag.position.copy(R.magAt).add(_rlV.set(ra.mx, ra.my, ra.mz));
+  g.updateMatrix();
+  const aimAt = (arm, p) => arm.quaternion.setFromUnitVectors(ARM_DOWN, _rlV.copy(p).sub(arm.position).normalize());
+  aimAt(b.armR, _rlF.copy(R.fR).applyMatrix4(g.matrix));
+  // the left hand: on the fore grip, going to the loose part as it comes out (or, one-handed, coming up to it from hanging)
+  const toPart = R.oneHand ? ra.hand : Math.min(1, Math.max(0, -ra.ay / .3));
+  if (!b.mag || (!R.fL && toPart <= 0)) { if (R.fL) aimAt(b.armL, _rlF.copy(R.fL).applyMatrix4(g.matrix)); else b.armL.quaternion.copy(R.qL); return; }
+  _rlM.copy(partMid(b.mag)).add(b.mag.position).applyMatrix4(g.matrix);
+  if (R.fL) _rlF.copy(R.fL).applyMatrix4(g.matrix).lerp(_rlM, toPart); else _rlF.copy(_rlM);
+  if (R.fL || toPart > .01) aimAt(b.armL, _rlF);
+  if (!R.fL) b.armL.quaternion.slerp(R.qL, 1 - toPart);
 }
 // the best gun in its loadout for fighting at distance d. An empty gun counts for a lot less (it would have to reload),
 // and the one in its hands gets a small bonus so it doesn't flip back and forth (or between two empty guns)
@@ -707,6 +740,7 @@ function updateBot(b, dt) {
   if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels, like yours
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
+  holdReload(b, b.reload, W.reload);
   // in range for this gun: knife = arm's reach, flamethrower = its flame, rocket = not close enough to blow itself up
   const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : true;
   const ready = sees && b.seeT >= S.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
