@@ -334,7 +334,7 @@ const ALL_MAPS = ['yard', 'forest', 'resort'];
 const V_MAPS = 3; // bump when the map pictures are retaken
 const MODES = [
   // zombie waves is on the yard only for now: zombies get stuck on the busier maps, which weren't laid out for them. More open maps for it later
-  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Your loadout against endless waves, with a boss every 5', maps: ['yard'] },
+  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Test your loadout and strategy against endless zombie waves', maps: ['yard'] },
   { id: 'dm', name: 'DEATHMATCH', desc: 'A 4 minute free-for-all, top score wins', maps: ALL_MAPS },
   { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes of blue vs red, most kills wins', maps: ALL_MAPS },
   { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds to rack up all the kills you can', sub: [
@@ -379,7 +379,7 @@ function renderPick() {
   const card = o => `<div class="mc" data-id="${o.id}"><button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b></button><button class="go" data-go="${o.id}" tabindex="-1">${o.priv || o.id.startsWith('priv') ? 'OPEN' : 'PLAY'}</button></div>`;
   pickSel = null; $('pickDesc').classList.remove('in'); $('pickDesc').textContent = m ? m.desc : ''; // on a map page: what the mode is
   if (join) {
-    $('pickList').innerHTML = `<div class="codeBox"><p>Ask a friend for their room code</p><div><input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" autocapitalize="characters"><button id="codeGo">JOIN</button></div><p id="codeErr"></p></div>`;
+    $('pickList').innerHTML = `<div class="codeBox"><p>Ask a friend for their room code</p><input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" autocapitalize="characters"><button id="codeGo">JOIN</button><p id="codeErr"></p></div>`;
     $('codeIn').focus(); return;
   }
   // map cards show a picture of the map (img/maps/, taken from above in the game itself)
@@ -523,9 +523,10 @@ const LOCK_ICON = [
   '....KKKK....', '...KbbbbK...', '..KbbKKbbK..', '..KbK..KbK..', '..KbK..KbK..', '.KKKKKKKKKK.',
   '.KyyyyyyyyK.', '.KyyyKKyyyK.', '.KyyyKKyyyK.', '.KyyyyKyyyK.', '.KyyyyyyyyK.', '.KKKKKKKKKK.',
 ];
+// a key lying on its side: a round bow with a hole on the left, the shaft to the right and two teeth hanging under its end
 const KEY_ICON = [
-  '..KKKK......', '.KyyyyK.....', 'KyyKKyyK....', 'KyyK.KyyK...', 'KyyKKyyKK...', '.KyyyyKyyK..',
-  '..KKKKKyyyK.', '......KyyyK.', '......KyyKyK', '......KyyK.K', '......KyyKKK', '......KKK...',
+  '..KKKK..........', '.KyyyyK.........', 'KyyyyyyKKKKKKKKK', 'KyyKKyyyyyyyyyyK', 'KyyKKyyKKKKyKyKK',
+  'KyyyyyyK..KyKyK.', '.KyyyyK...KKKKK.', '..KKKK..........',
 ];
 // a stopwatch: a round face 13 pixels across (drawn from a circle, so it's as tall as it's wide), hands at twelve and three, a stem on top
 const CLOCK_ICON = (() => {

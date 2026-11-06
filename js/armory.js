@@ -7,7 +7,7 @@ const gunUse = i => { const st = gunStars(i), u = prof.use?.[BASE[i].id]; return
 const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
 const inMatch = () => !inLobby && pvp() && !matchOver; // online too: the change goes to the server as well (js/net.js gearChanged)
 
-// the four main stats at the stars you're using: damage, fire rate, capacity (mag size) and mobility.
+// the main stats at the stars you're using: damage, fire rate, capacity (mag size, left out for melee: it never runs out) and mobility.
 // [label, value, unit]. One-shot guns fire once per reload, so that's their fire rate. A beam fires nonstop
 function mainStats(i, L = Math.max(0, gunUse(i) - 1)) {
   const w = BASE[i], s = statsAt(i, L);
@@ -17,7 +17,7 @@ function mainStats(i, L = Math.max(0, gunUse(i) - 1)) {
     ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(s.rate, s.reload) : s.rate)), w.beam ? '' : '/ SEC'],
     ['CAPACITY', w.inf ? ico('inf') : s.mag, ''],
     ['MOBILITY', w.mob ?? 60, ''],
-  ];
+  ].filter(r => !(w.melee && r[0] === 'CAPACITY'));
 }
 // what each star does to a gun, for its details: [label, value at ★, ★★, ★★★]. Damage per second is every shot hitting
 function starTable(i) {
@@ -59,7 +59,7 @@ const DESC = {
   sniper: 'One big shot from across the map',
   semisniper: 'A sniper you can keep firing, a little less punch for a lot more shots',
   eradicator: 'A minigun that shreds everything in front of it',
-  knife: 'Always on you, never runs out, and you move fastest with it out',
+  knife: 'A trusty knife that never leaves your side.',
   flame: 'Sprays fire up close and leaves everything burning',
   rocket: 'One rocket, one big boom, and anyone near it feels it',
   flare: 'One burning flare that sets whoever it hits on fire',

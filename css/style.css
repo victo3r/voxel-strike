@@ -15,7 +15,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 /* each gun's crosshair is drawn in js (hud.js drawCross) */
 #cross{position:absolute;left:50%;top:50%;width:80px!important;height:80px!important;margin:-40px 0 0 -40px;pointer-events:none}
 /* the reload ring round the crosshair: a faint full circle, and a white one that fills clockwise from the top as the reload goes (main.js) */
-#rl{position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;pointer-events:none;transform:rotate(-90deg)}
+#rl{opacity:.7;position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;pointer-events:none;transform:rotate(-90deg)}
 #rl circle{fill:none;stroke-width:4}#rl .bg{stroke:rgba(0,0,0,.5)}
 #rlFg{stroke:#fff;stroke-dasharray:213.63;stroke-dashoffset:213.63;filter:drop-shadow(0 0 1px #000)}
 /* scroll bars, everywhere: square and in the game's colours instead of the browser's */
@@ -389,11 +389,10 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #pickPill small{width:100%;text-align:center;color:var(--silver);font-size:13px;text-shadow:2px 2px 0 #000}
 .codeBox{display:flex;flex-direction:column;align-items:center;gap:12px;color:#fff;text-shadow:2px 2px 0 #000;font-size:18px}
 .codeBox p{margin:0}
-.codeBox>div{display:flex;gap:8px}
-#codeIn{width:170px;font:bold 26px monospace;letter-spacing:6px;text-align:center;text-transform:uppercase;padding:8px 10px;background:var(--glass);color:#fff;border:3px solid var(--line-dim);outline:none}
+#codeIn{width:260px;box-sizing:border-box;font:bold 26px monospace;letter-spacing:6px;text-align:center;text-transform:uppercase;padding:8px 10px;background:var(--glass);color:#fff;border:3px solid var(--line-dim);outline:none}
 #codeIn:focus{border-color:var(--line)}
-#codeGo{font:bold 18px monospace;padding:8px 18px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
-#codeGo:hover{background:var(--hov)}
+#pickList #codeGo{width:auto;aspect-ratio:auto;display:block;text-align:center;gap:0;font:bold 22px monospace;padding:10px 34px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
+#pickList #codeGo:hover{background:var(--hov);filter:none}
 #codeErr{color:#ff6a6a;font-size:15px;min-height:18px}
 #pickList [data-mode=private],#pickList [data-mode=privCreate]{background:linear-gradient(160deg,rgba(90,100,120,.85),rgba(25,28,40,.9))}
 #pickList [data-mode=privJoin]{background:linear-gradient(160deg,rgba(60,120,140,.85),rgba(18,36,48,.9))}
