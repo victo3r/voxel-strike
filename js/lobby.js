@@ -497,7 +497,7 @@ function updateLobby(dt) {
       const q0i = _q0i.copy(q0).invert(), q1 = _q1.copy(q0).multiply(rq), move = v => v.sub(gp).applyQuaternion(q0i).applyQuaternion(rq).applyQuaternion(q0).add(gp).add(off);
       move(_l); move(_fr); gp.add(off); q0.copy(q1);
       if (chop) { // the arm swing: gun and both fists turn about his right shoulder (raised below 0, chopped down above)
-        _wq.setFromAxisAngle(X_AX, chop * 1.1); const sw = v => v.sub(SHR).applyQuaternion(_wq).add(SHR);
+        _wq.setFromAxisAngle(X_AX, chop * .9); const sw = v => v.sub(SHR).applyQuaternion(_wq).add(SHR);
         sw(gp); sw(_fr); sw(_l); q0.premultiply(_wq);
       }
       if (ra && hf.mag) { // where the loose part is now, in his space

@@ -122,8 +122,13 @@ function update(dt) {
   if ((mx || mz) && P.onGround) { if ((stepT -= dt) <= 0) { stepT = .33 / runMul(w); stepAlt = !stepAlt; sfx('step_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, P.pos.y)) + (stepAlt ? '' : '2'), { v: .75 }); } }
   else stepT = .08; // first step comes right after you start moving
 
+  // holding the trigger: a shot whenever the gun is ready, and a shot that was due partway through this step keeps the leftover
+  // time, so guns fire at their real rate whatever the frame rate (a gun faster than the step can fire twice in one)
   cd -= dt;
-  if (autoFire(w) && held('shoot')) shoot();
+  if (autoFire(w) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) {
+    const c0 = cd; shoot(); if (cd === c0) break;
+    if (c0 > -dt) cd += c0;
+  }
   aiming = opts.toggleAim ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); // the gun model settles; a sniper's slower (the knife: its swing)
@@ -420,7 +425,10 @@ function fpsTick(raw) {
 }
 (function loop() {
   requestAnimationFrame(loop);
-  const raw = clock.getDelta(), dt = Math.min(raw, .05);
+  // a slow frame (a busy Chromebook) is played as up to 3 steps of at most .05 s, so the game keeps real time down to about
+  // 7 frames a second: online you move, fire and reload as fast as everyone else. Slower than that it runs a little slow-motion
+  const raw = clock.getDelta(), dt = Math.min(raw, .05), steps = Math.min(3, Math.ceil(Math.min(raw, .15) / .05 - .001)) || 1;
+  const sdt = Math.min(raw, .15) / steps;
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // spent mags lying about (weapons.js dropPart)
@@ -428,8 +436,9 @@ function fpsTick(raw) {
   bootDone();
   // zombie waves pauses while the menu (or settings) is open. Bot matches keep running behind the menu, the way an online
   // match would: with the mouse unlocked your keys are released, so you just stand there
-  const live = !dead && !shopOpen && !matchOver && (pvp() || locked);
-  if (live) update(dt);
+  const isLive = () => !dead && !shopOpen && !matchOver && (pvp() || locked);
+  const live = isLive();
+  if (live) for (let k = 0; k < steps && (k === 0 || isLive()); k++) update(sdt);
   else if (mode === 'zombies' && dead && !matchOver && (deadT += dt) >= DEAD_T) zombiesOver(); // zombie waves: you're dead, the world holds for a beat, then the results
   soundTick(dt, live);
   // bots and zombies are drawn a little low for a moment after stepping up a ledge, so they climb it smoothly

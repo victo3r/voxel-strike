@@ -564,12 +564,12 @@ function fistOut(cells, c, dir, r, gap) {
   return t + gap;
 }
 const holdOf = w => w.hold;
-// a knife swing: t = 0 to 1 over the swing, back to where the arm is (0 = held, below 0 = raised, 1 = chopped all the way down).
-// The arm comes up first (to -.8 by .3), chops down through the target (1 by .55), then comes back to held
+// a knife swing: t = 0 to 1 over the swing, back to where the arm is (0 = held, below 0 = raised, above 0 = chopped down).
+// The arm comes up first (to -.55 by .3), chops down through the target (.75 by .55), then comes back to held
 // (bots', other players' and your character's in the armory; your own first-person swing is knifeChopFP in main.js)
 const KNIFE_SWING = .36; // seconds, the whole swing (the knife swings every .4 s)
 const swingAt = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
-  t = Math.min(1, Math.max(0, t)); return t < .3 ? -.8 * e(t / .3) : t < .55 ? -.8 + 1.8 * e((t - .3) / .25) : 1 - e((t - .55) / .45); };
+  t = Math.min(1, Math.max(0, t)); return t < .3 ? -.55 * e(t / .3) : t < .55 ? -.55 + 1.3 * e((t - .3) / .25) : .75 * (1 - e((t - .55) / .45)); };
 
 // your first-person arms: the arm from your own skin, its fist just outside the grip, running back off the bottom of the screen.
 // Two-handed weapons get your left arm too, on the fore

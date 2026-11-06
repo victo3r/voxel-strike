@@ -66,7 +66,7 @@ net = (() => {
   let hostPid = 0; // whose client runs the room's bots (the server picks; see the bots section below)
   let phase = 'wait', matchEnd = 0, rulesCap = 0;
   let alive = false, respawnAt = 0, readySent = false, readyT = 0;
-  let seq = 0, fired = 0, hits = [], evFlags = 0, pjSeq = 0, renderT = 0;
+  let seq = 0, fired = 0, hits = [], evFlags = 0, pjSeq = 0, renderT = 0, shotN = 0; // shotN counts every shot (yours and your bots')
   let last = null; // what you started last ({ mode, map, code, create }), for PLAY AGAIN
   let starting = null; // the match you're trying to join right now
   let rejoinInfo = null; // { room, pid, key } to get back into a match after the connection drops
@@ -526,15 +526,16 @@ net = (() => {
     let x, y, zz, yaw, pitch, cur = buf[buf.length - 1];
     let a = null, b = null;
     for (let i = buf.length - 1; i >= 0; i--) if (buf[i].ts <= t) { a = buf[i]; b = buf[i + 1] || null; break; }
+    // r.seenT = the server time of where it's drawn (your hits on it are checked against where it was then)
     if (a && b) {
-      const k = Math.min(1, (t - a.ts) / Math.max(1, b.ts - a.ts));
+      const k = Math.min(1, (t - a.ts) / Math.max(1, b.ts - a.ts)); r.seenT = a.ts + (b.ts - a.ts) * k;
       x = a.x + (b.x - a.x) * k; y = a.y + (b.y - a.y) * k; zz = a.z + (b.z - a.z) * k;
       yaw = a.yaw + wrapAng(b.yaw - a.yaw) * k; pitch = a.pitch + (b.pitch - a.pitch) * k; cur = a;
     } else if (a) { // past the newest position: carry on for a moment, then hold still
       const prev = buf[buf.length - 2], over = Math.min(50, t - a.ts) / 1000;
       const vx = prev && a.ts > prev.ts ? (a.x - prev.x) / ((a.ts - prev.ts) / 1000) : 0, vz = prev && a.ts > prev.ts ? (a.z - prev.z) / ((a.ts - prev.ts) / 1000) : 0;
-      x = a.x + vx * over; y = a.y; zz = a.z + vz * over; yaw = a.yaw; pitch = a.pitch; cur = a;
-    } else { x = cur.x; y = cur.y; zz = cur.z; yaw = cur.yaw; pitch = cur.pitch; }
+      x = a.x + vx * over; y = a.y; zz = a.z + vz * over; yaw = a.yaw; pitch = a.pitch; cur = a; r.seenT = a.ts + over * 1000;
+    } else { r.seenT = cur.ts; x = cur.x; y = cur.y; zz = cur.z; yaw = cur.yaw; pitch = cur.pitch; }
     const pos = z.g.position, sp = Math.hypot(x - r.lastX, zz - r.lastZ) / Math.max(dt, 1e-3);
     r.lastX = x; r.lastZ = zz;
     pos.set(x, y, zz); pos.lag = 0;
@@ -634,11 +635,15 @@ net = (() => {
     const list = h ? h.hits : hits;
     const pt = o.point || (victim === P ? centre.set(P.pos.x, P.pos.y + 1, P.pos.z) : victim.g.position), kind = o.kind | 0, gun = o.gun || BASE[cur].id;
     const eye = h ? botEye.set(h.body.g.position.x, h.body.g.position.y + 1.6, h.body.g.position.z) : camera.position;
-    if (kind === 0) { // one claim per shot and victim: pellets add up
-      const same = list.find(c => c[0] === vp && c[6] === 0 && c[7] === gun && c[2] === (o.head ? 1 : 0) && c[12] === (o.pj | 0));
+    if (kind === 0) { // one claim per shot and victim: a shotgun's pellets add up. Two shots before the next packet are two claims
+      const same = list.find(c => c.s === shotN && c[0] === vp && c[6] === 0 && c[7] === gun && c[2] === (o.head ? 1 : 0) && c[12] === (o.pj | 0));
       if (same) { same[1] += o.pellets ?? 1; return; }
     }
-    list.push([vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(renderT), o.pj | 0]);
+    // when the victim was where you saw it: another player is drawn a little in the past (the time applyRemote drew it at),
+    // a bot you run yourself is where it is now
+    const r = remotes.get(vp), seen = r && r.body === victim && r.seenT ? r.seenT : now();
+    const c = [vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(seen), o.pj | 0];
+    c.s = shotN; list.push(c);
   }
   const burn = (victim, gunId, by) => claim(victim, { kind: 7, gun: gunId, pellets: 1, by });
   function launchP(gunId, from, dir, by) {
@@ -711,7 +716,7 @@ net = (() => {
   setTimeout(probe, 300);
 
   Object.assign(api, {
-    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
+    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), probe, pick,
   });
   Object.defineProperties(api, { // read live (Object.assign would have copied them once)
