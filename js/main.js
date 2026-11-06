@@ -1,5 +1,6 @@
 let stepT = 0, stepAlt = false; // footsteps: time until the next one, and which foot
 let jumpWas = false; // jump was held last frame (a double jump needs a fresh press)
+const RL_C = 2 * Math.PI * 34; // the reload ring's length (its radius is 34, index.html #rl)
 const runMul = w => mobMul(w) + youFx().spd + perk.spd * .1; // your run speed: your gun's mobility plus your boots (and Adrenaline in zombie waves), added together
 
 // ---- looking through a sight: every sight is a square window filling most of the screen, and you only see out of the window
@@ -129,6 +130,7 @@ function update(dt) {
   tickCross(dt, BASE[cur]);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // eradicator barrels wind down after you stop firing
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
+  if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / w.reload < .45); // the flare in the muzzle: gone once fired, back in partway through the reload
   if (gunRound) { // the rocket: gone once fired, slides back into the tube near the end of the reload
     const k = reloading > 0 ? reloading / w.reload : 0;
     gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
@@ -154,17 +156,29 @@ function update(dt) {
     vm.position.set(.3 - kick * .08, -.22 + bob, -.5 - kick * .2);
     vm.rotation.set(.22 - kick * .9, kick * .5, 0);
   } else if (hold === 'heavy') { // low at your hip
-    vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob - (reloading > 0 ? .12 : 0), -.6 + kick * .06);
-    vm.rotation.set(.04 + kick * .1 + (reloading > 0 ? -.4 : 0), 0, 0);
+    vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob, -.6 + kick * .06);
+    vm.rotation.set(.04 + kick * .1, 0, 0);
   } else if (hold === 'shoulder') { // on your shoulder, pulled in close and pointing straight ahead; its back end runs past your head
-    vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob - (reloading > 0 ? .12 : 0), -.62 + kick * .1);
-    vm.rotation.set(kick * .2 + (reloading > 0 ? -.35 : 0), 0, 0);
+    vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob, -.62 + kick * .1);
+    vm.rotation.set(kick * .2, 0, 0);
   } else {
-    vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob - (reloading > 0 ? .15 : 0), -.55 + kick * .08);
-    vm.rotation.set(kick * .25 * (1 - adsT * .85) + (reloading > 0 ? -.6 : 0), 0, 0); // much less muzzle climb while aiming so the gun doesn't cover the crosshair
+    vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob, -.55 + kick * .08);
+    vm.rotation.set(kick * .25 * (1 - adsT * .85), 0, 0); // much less muzzle climb while aiming so the gun doesn't cover the crosshair
     if (hold === 'pistol') vm.position.y += .09 * (1 - adsT); // a pistol sits higher so your fist under its grip is on screen
     if (w.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // aiming raises the holo sight's window onto the middle of the screen
   }
+  // reloading: the gun's own animation (weapons.js RELOAD_ANIM), on top of where it's held; its loose part and your left arm move with it
+  const ra = reloading > 0 && gunShown === cur ? reloadPose(w.id, 1 - reloading / w.reload) : null;
+  if (ra) { vm.position.x += ra.x; vm.position.y += ra.y; vm.position.z += ra.z; vm.rotation.x += ra.rx; vm.rotation.y += ra.ry; vm.rotation.z += ra.rz; }
+  if (gunMag) { const r = gunMag.userData.rest; gunMag.position.set(r.x + (ra ? ra.mx : 0), r.y + (ra ? ra.my : 0), r.z + (ra ? ra.mz : 0)); }
+  if (gunArmL) { const r = gunArmL.userData.rest; gunArmL.position.set(r.x, r.y + (ra ? ra.ay : 0), r.z + (ra ? ra.az : 0)); }
+  if (ra && w.id === 'eradicator' && reloading / w.reload < .12) gunSpinV = Math.max(gunSpinV, 16); // a fresh belt: the barrels give a turn
+  // switching guns: the one in your hands dips off the bottom of the screen and the next comes up (weapons.js equip, swapTick)
+  const sw = swapTick(dt);
+  if (sw > 0) { const e = sw * sw * (3 - 2 * sw); vm.position.y -= e * .5; vm.rotation.x -= e * .9; }
+  // the reload ring round the crosshair: fills as the reload goes
+  const rl = $('rl');
+  if (reloading > 0) { rl.style.display = 'block'; $('rlFg').style.strokeDashoffset = RL_C * reloading / w.reload; } else if (rl.style.display !== 'none') rl.style.display = 'none';
   }
 
   if (pvp()) { updateDM(dt); if (matchOver) return; }

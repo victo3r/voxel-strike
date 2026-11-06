@@ -134,7 +134,6 @@ const GUN_FIT = {
   flare: d => d < 3 ? .1 : d < 20 ? .6 : .35,
 };
 const HUNT_D = 8; // while it can't see anyone it holds what it'd want if someone came round a corner this far away
-const SWAP_T = .35; // a bot can't fire for this long after switching guns
 const pickOf = list => list[Math.random() * list.length | 0];
 // taste: a little random per gun, plus one category it really likes (so you get snipers, rushers, rocket spammers...). load = gun indexes
 function tasteFor(load) {
@@ -314,12 +313,12 @@ function pickGun(b, d) {
 function botEquip(b, g) {
   if (g === b.gun) return;
   b.mags[b.gun] = b.ammo; b.reload = 0; // switching away mid-reload throws the reload away, like yours
-  b.gun = g; b.ammo = b.mags[g]; b.swap = SWAP_T; b.burst = 4 + (Math.random() * 6 | 0); b.aimT = 0;
+  b.gun = g; b.ammo = b.mags[g]; b.swap = drawT(BASE[g]); b.burst = 4 + (Math.random() * 6 | 0); b.aimT = 0;
   if (b.fireOn > 0) { b.fireOn = 0; sfx(b.fireEnd, { at: b.g.position, far: 50 }); }
   b.pickT = Math.max(b.pickT, 1.2 + Math.random() * .8); // sticks with it for a bit, unless it runs dry
   holdGun(b); sfx('equip', { at: b.g.position, far: 15, v: .7 });
   const W = b.rec.W[g];
-  if (!W.inf && b.ammo <= 0) { b.reload = SWAP_T + W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); } // picked up an empty one: reload it
+  if (!W.inf && b.ammo <= 0) { b.reload = drawT(W) + W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); } // picked up an empty one: reload it
 }
 // spot = where to put it ({x, z, yaw?}): online, where the server says. Otherwise it picks a spawn spot itself
 function makeBot(rec, spot) {

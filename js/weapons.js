@@ -88,6 +88,53 @@ const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
 let gunSpin = null, gunSpinV = 0; // the eradicator's barrel cluster, and how fast it's spinning
 let gunRound = null; // the rocket sitting in the launcher's tube, hidden while it's empty
 let gunHolo = null; // [y, z] of the holo sight's window on the gun in your hands (aiming brings it to the middle of the screen)
+let gunMag = null, gunArmL = null; // its loose part (see GUN_MODELS: mag) and your left arm: a reload moves them (RELOAD_ANIM)
+// ---- switching guns: the one in your hands goes down, the next comes up, and you can't fire until it's up. drawT = how long that
+// takes in all, .2 s for the lightest (the knife) to .4 s for the heaviest, by the gun's mobility. The first SWAP_DOWN of it is the
+// old gun going down. gunShown = the gun whose model is built (the new one is built at the bottom of the swap)
+const drawT = w => Math.min(.4, Math.max(.2, .2 + (80 - (w.mob ?? 60)) * .008)), SWAP_DOWN = .35;
+let gunShown = -1, swapOff = 0, swapDown = false, swapLen = .3; // swapOff: how far down the gun is (0 up, 1 off the bottom of the screen)
+// ---- reload animations: what the gun in your hands does while it reloads, as keyframes over the reload (0 = start, 1 = done), so a
+// starred gun's faster reload just plays faster. Each frame is [when, { ... }], everything 0 unless given, easing from one to the next:
+//   x, y, z: the gun moves (metres; +z is back toward you). rx, ry, rz: it turns (radians; rx > 0 tips the muzzle up, rz < 0 rolls
+//     its underside toward the middle of the screen, rz > 0 rolls its right side up)
+//   mx, my, mz: its loose part (gunMag) moves from where it sits, in the gun's own space (my < 0 = down out of the gun)
+//   ay, az: your left arm moves from the fore grip
+const POSE_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz', 'ay', 'az'];
+// a box magazine swapped from below: roll the gun, the mag drops away with your left hand, a fresh one comes up and is slapped home,
+// then a tug on the charging handle
+const magSwap = (roll, drop, lift = .2) => { const h = { rz: roll, rx: lift, y: -.03 }; return [[0, {}], [.14, h], [.32, { ...h, my: -drop, ay: -.3 }], [.52, { ...h, my: -drop, ay: -.3 }], [.7, { ...h, y: -.02 }], [.74, { ...h, y: .005 }], [.86, { rx: .05, z: .035 }], [.93, { z: -.01 }], [1, {}]]; };
+// shells pushed in one at a time (a dip of the gun and your hand for each), or a bolt gun's rounds: n dips between t0 and t1 on top of pose h
+const dips = (h, n, t0, t1, d = .025) => Array.from({ length: n }, (_, i) => { const t = t0 + (t1 - t0) * i / n, w = (t1 - t0) / n; return [[t + w * .45, { ...h, y: (h.y || 0) - d, ay: -.05 }], [t + w * .9, h]]; }).flat();
+const RELOAD_ANIM = (() => {
+  const pistol = roll => { const h = { rx: .45, rz: roll, y: .02 }; return [[0, {}], [.16, h], [.34, { ...h, my: -.26 }], [.52, { ...h, my: -.26 }], [.7, { ...h, y: .03 }], [.74, { ...h, y: .045 }], [.86, { rx: .08, z: .04 }], [.93, { z: -.012 }], [1, {}]]; };
+  const sg = { rz: -.5, rx: .28, y: -.04 }, bolt = { rz: .3, rx: .1, y: -.03, mz: .09, my: .02 }, box = { rz: -.4, ry: -.22, y: -.05 }, cell = { rx: .38, rz: -.25, y: .02 }, tank = { rz: -.5, rx: .18, y: -.02 };
+  return {
+    voxel: pistol(-.3), hitman: pistol(-.4), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), semisniper: magSwap(-.35, .38, .16),
+    // the shotgun: rolled over, four shells thumbed in, then the pump racked back and forward (your left hand goes with it)
+    shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
+    // the bolt gun: bolt up and back, rounds pressed in, bolt forward and down
+    sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
+    // the minigun: tipped so its ammo box comes up, the box off and a full one on, the belt slapped in
+    eradicator: [[0, {}], [.15, box], [.36, { ...box, my: -.36, ay: -.3 }], [.56, { ...box, my: -.36, ay: -.3 }], [.74, { ...box, y: -.04 }], [.78, { ...box, y: -.015 }], [.9, { y: -.02 }], [1, {}]],
+    // the heat ray: muzzle up, the spent heat cell pulled down out of the body, a fresh one pushed in until it seats
+    heatray: [[0, {}], [.14, cell], [.3, { ...cell, my: -.3, ay: -.3 }], [.5, { ...cell, my: -.3, ay: -.3 }], [.68, cell], [.72, { ...cell, y: .04 }], [.86, { rx: .05, z: .02 }], [.93, { z: -.01 }], [1, {}]],
+    // the flamethrower: rolled over, the empty tank dropped off its straps, a full one up and twisted tight
+    flame: [[0, {}], [.14, tank], [.34, { ...tank, my: -.38, ay: -.3 }], [.54, { ...tank, my: -.38, ay: -.3 }], [.74, tank], [.8, { ...tank, rz: -.58 }], [.9, { rx: .05 }], [1, {}]],
+    // the launcher: down off your shoulder while the next rocket goes in the front (main.js slides it in), then back up
+    rocket: [[0, {}], [.14, { rx: -.32, y: -.1, z: .05 }], [.85, { rx: -.32, y: -.1, z: .05 }], [.94, { rx: .04 }], [1, {}]],
+    // the flare gun: broken open (muzzle down), a new flare in, snapped shut
+    flare: [[0, {}], [.18, { rx: -.75, y: .03 }], [.7, { rx: -.75, y: .03 }], [.84, { rx: .12 }], [1, {}]],
+  };
+})();
+function reloadPose(id, k) {
+  const F = RELOAD_ANIM[id]; if (!F) return null;
+  let i = 1; while (i < F.length - 1 && k > F[i][0]) i++;
+  const [t0, a] = F[i - 1], [t1, b] = F[i], o = {};
+  let u = t1 > t0 ? Math.min(1, Math.max(0, (k - t0) / (t1 - t0))) : 1; u = u * u * (3 - 2 * u);
+  for (const c of POSE_KEYS) o[c] = (a[c] || 0) + ((b[c] || 0) - (a[c] || 0)) * u;
+  return o;
+}
 
 // gun models are voxel pixel art. Every size and spot in GUN_MODELS is in gun pixels, GPX world units each (times GUN_SCALE).
 // Guns point down -z with the grip near the origin. The pieces are filled into a grid of pixels (later pieces paint over
@@ -176,9 +223,10 @@ function voxelGeos(pieces, px) {
 //
 // each model returns, in gun pixels: muzzle [y, z], grip = [w, h, d, x, y, z] the box the right fist holds,
 // fore = the box the left fist holds (null on one-handed weapons), bands = z spots for the gold upgrade bands
-// and band = [width, height, y] for them, plus spin (the eradicator's barrels) and round (the loaded rocket) sub-parts
+// and band = [width, height, y] for them, plus sub-parts that move on their own: spin (the eradicator's barrels), round (the loaded
+// rocket) and mag (what a reload handles: a magazine, the sniper's bolt, the shotgun's pump, an ammo box, a heat cell, a fuel tank)
 const GUN_MODELS = {
-  voxel({ p, mat, dark, glow }) {
+  voxel({ p, mat, dark, glow, sub, at }) {
     const teal = glow(0x2ee6d6), grip = mat(0x3a3a3e);
     p(4, 4, 16, mat(0x6a6a6a), 0, 2, -8); p(4, 1, 16, mat(0x8e8e8e), 0, 3.5, -8); // slide and its lighter top
     p(4, 2, 13, dark, 0, -1, -6.5); // frame
@@ -186,33 +234,34 @@ const GUN_MODELS = {
     for (const z of [-4, -7, -10]) p(4, 2, 2, teal, 0, 2, z); // teal cubes set into the sides
     p(2, 1, 1, dark, 0, 4.5, -1); p(1, 1, 1, dark, 0, 4.5, -15); // sights
     p(1, 1, 4, dark, 0, -4.5, -7); p(1, 2, 1, dark, 0, -3, -9.5); p(1, 2, 1, mat(0x777777), 0, -3, -6.5); // trigger guard and trigger
-    p(4, 3, 4, grip, 0, -3.5, -3); p(4, 3, 4, grip, 0, -6.5, -2); p(4, 1, 4, dark, 0, -8.5, -2); // short grip under the back of the slide
-    return { muzzle: [2, -17], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -14], band: [6, 8, 1] };
+    p(4, 3, 4, grip, 0, -3.5, -3); p(4, 3, 4, grip, 0, -6.5, -2); // short grip under the back of the slide
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -8.5, -2); mg(2, 6, 2, teal, 0, -5, -2); // its power cell: the floor plate, and the glowing cell up inside the grip
+    return { muzzle: [2, -17], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -14], band: [6, 8, 1], mag };
   },
-  shotgun({ p, mat, dark }) {
+  shotgun({ p, mat, dark, sub, at }) {
     const wood = mat(0x7a5232), dwood = mat(0x4e3420), steel = mat(0x4a4a4e);
     p(4, 5, 9, wood, 0, -.5, 4.5); p(4, 6, 1, dwood, 0, -1, 9.5); // stock and butt pad
     p(6, 5, 11, steel, 0, .5, -5.5); // receiver
     p(4, 4, 26, mat(GUN_STEEL), 0, 2, -24); p(4, 3, 18, steel, 0, -1.5, -20); // barrel, mag tube under it
-    p(6, 4, 10, wood, 0, -1, -21); for (const z of [-17.5, -20.5, -23.5]) p(6, 4, 1, dwood, 0, -1, z); // pump and its grooves
+    const mag = sub(0, 0, 0), mg = at(mag); mg(6, 4, 10, wood, 0, -1, -21); for (const z of [-17.5, -20.5, -23.5]) mg(6, 4, 1, dwood, 0, -1, z); // pump and its grooves (racked at the end of a reload)
     p(1, 1, 1, mat(0xdddddd), 0, 4.5, -36.5); p(4, 4, 1, dark, 0, 2, -37.5); // bead sight, dark muzzle end
     p(4, 3, 3, wood, 0, -3.5, -1.5); p(4, 3, 3, wood, 0, -6.5, -.5); // pistol grip
     p(1, 1, 4, dark, 0, -4.5, -5); p(1, 2, 1, dark, 0, -3, -7.5); p(1, 2, 1, mat(0x777777), 0, -3, -4.5); // guard and trigger
-    return { muzzle: [2, -38], grip: [4, 6, 4, 0, -5, -1], fore: [6, 4, 10, 0, -1, -21], bands: [-3, -8], band: [8, 8, .5] };
+    return { muzzle: [2, -38], grip: [4, 6, 4, 0, -5, -1], fore: [6, 4, 10, 0, -1, -21], bands: [-3, -8], band: [8, 8, .5], mag };
   },
-  ar({ p, mat, dark }) {
+  ar({ p, mat, dark, sub, at }) {
     const body = mat(0x5a705a), dk = mat(0x465846);
     p(4, 6, 8, dk, 0, 0, 4); p(4, 8, 1, dark, 0, -1, 8.5); // stock, butt
     p(6, 6, 15, body, 0, 0, -7.5); // receiver
     p(4, 1, 13, dark, 0, 3.5, -7.5); p(2, 2, 2, dark, 0, 5, -2); // top rail, rear sight
     p(6, 6, 11, dk, 0, 0, -20.5); for (const z of [-18, -21, -24]) p(6, 2, 2, mat(0x2a2a2e), 0, 0, z); // handguard and its vents
     p(4, 4, 8, mat(GUN_STEEL), 0, 1, -30); p(4, 4, 3, dark, 0, 1, -35.5); p(2, 3, 1, dark, 0, 4.5, -25.5); // barrel, muzzle brake, front sight
-    p(4, 4, 4, dark, 0, -5, -10); p(4, 3, 4, dark, 0, -8.5, -11); // mag, curving forward
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 4, dark, 0, -5, -10); mg(4, 3, 4, dark, 0, -8.5, -11); // mag, curving forward
     p(4, 4, 4, dk, 0, -5, -2); p(4, 3, 4, dk, 0, -8.5, -1); // pistol grip
     p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
-    return { muzzle: [1, -37], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 11, 0, 0, -20.5], bands: [-5, -11], band: [8, 8, 0] };
+    return { muzzle: [1, -37], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 11, 0, 0, -20.5], bands: [-5, -11], band: [8, 8, 0], mag };
   },
-  sniper({ p, mat, dark, glow }) {
+  sniper({ p, mat, dark, glow, sub, at }) {
     const wood = mat(0x5a3d26), act = mat(0x44444c), silver = mat(0x9a9a9a);
     p(4, 6, 10, wood, 0, -1, 5); p(4, 8, 1, mat(0x2e1f14), 0, -1, 10.5); p(4, 2, 6, wood, 0, 3, 4); // stock, butt, cheek rest
     p(4, 4, 18, act, 0, 0, -9); p(4, 3, 10, wood, 0, -3.5, -16); // action, forend
@@ -220,23 +269,23 @@ const GUN_MODELS = {
     p(4, 4, 16, mat(0x2a2a2e), 0, 6, -10); p(6, 6, 2, dark, 0, 6, -1); p(6, 6, 2, dark, 0, 6, -19); // scope tube and bells
     p(4, 4, 1, glow(0x66ccff), 0, 6, -19.5); // lens
     p(2, 2, 2, dark, 0, 3, -5); p(2, 2, 2, dark, 0, 3, -15); // scope mounts
-    p(4, 2, 2, silver, 4, 1, -3); p(3, 3, 3, silver, 6.5, 1.5, -3.5); // bolt handle and knob
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 2, 2, silver, 4, 1, -3); mg(3, 3, 3, silver, 6.5, 1.5, -3.5); // bolt handle and knob (worked back and forward to reload)
     p(4, 5, 4, wood, 0, -4.5, -2); p(4, 3, 4, wood, 0, -8.5, -1); // pistol grip
     p(1, 1, 4, dark, 0, -5.5, -6); p(1, 3, 1, dark, 0, -3.5, -8.5); p(1, 2, 1, silver, 0, -3, -5.5); // guard and trigger
-    return { muzzle: [.5, -52], grip: [4, 8, 5, 0, -6, -1.5], fore: [4, 3, 10, 0, -3.5, -16], bands: [-6, -12], band: [6, 6, 0] };
+    return { muzzle: [.5, -52], grip: [4, 8, 5, 0, -6, -1.5], fore: [4, 3, 10, 0, -3.5, -16], bands: [-6, -12], band: [6, 6, 0], mag };
   },
   eradicator({ p, mat, dark, sub, at }) {
     const steel = mat(0x808084), dk = mat(0x48484e), bar = mat(0x66666b), gold = mat(0xc9a43a);
     p(10, 10, 14, steel, 0, 0, -5); p(12, 12, 2, dk, 0, 0, 3); // housing, back plate
     p(2, 2, 10, dk, 0, 8, -5); p(2, 2, 2, dk, 0, 6, -9); p(2, 2, 2, dk, 0, 6, -1); // carry handle
-    p(6, 6, 8, mat(0x5a5a2a), -8, -2, -5); p(4, 2, 4, gold, -5, 2, -5); // ammo box and the belt feeding in
+    const mag = sub(0, 0, 0), mg = at(mag); mg(6, 6, 8, mat(0x5a5a2a), -8, -2, -5); mg(4, 2, 4, gold, -5, 2, -5); // ammo box and the belt feeding in
     const spin = sub(0, 0, -23, [.5, .5, 0]), sp = at(spin);
     for (const [x, y] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) { sp(3, 3, 22, bar, x, y, 0); sp(1, 1, 1, mat(0x111111), x + .5, y + .5, -10.5); } // barrels with dark bores
     sp(2, 2, 18, dk, 0, 0, 1); for (const z of [-6, 6]) sp(9, 9, 2, dk, 0, 0, z); // spindle and barrel rings
     p(4, 2, 6, dk, 0, 3, 7); p(4, 2, 6, dk, 0, -5, 7); p(4, 10, 3, dk, 0, -1, 11.5); // D-shaped spade handle out the back
     p(1, 2, 1, mat(0x999999), 0, -1, 9.5); // trigger inside it
     p(4, 8, 4, dk, 0, -9, -8); // front handle
-    return { muzzle: [0, -35], grip: [4, 10, 3, 0, -1, 11.5], fore: [2, 4, 10, 0, 7, -5], bands: [-2, -5], band: [12, 12, 0], spin }; // left hand on the carry handle
+    return { muzzle: [0, -35], grip: [4, 10, 3, 0, -1, 11.5], fore: [2, 4, 10, 0, 7, -5], bands: [-2, -5], band: [12, 12, 0], spin, mag }; // left hand on the carry handle
   },
   // edge along the bottom, straight spine along the top, the edge curving up to meet it at the tip
   knife({ p, mat }) {
@@ -249,18 +298,18 @@ const GUN_MODELS = {
     p(2, 4, 2, blade, 0, 2, -21); p(2, 2, 2, blade, 0, 3, -23); // tip
     return { muzzle: [0, -24], grip: [6, 6, 10, 0, 1, 1], fore: null, bands: [-1.5, 1.5], band: [6, 6, 1] };
   },
-  flame({ p, mat, dark, glow }) {
+  flame({ p, mat, dark, glow, sub, at }) {
     const grey = mat(0x66666a), dk = mat(0x404044), red = mat(0xc43030);
     p(6, 6, 14, grey, 0, 0, -6); p(4, 4, 2, dk, 0, 0, 2); // body, rear cap
     p(8, 8, 7, dk, 0, 0, -16.5); for (const z of [-14.5, -16.5, -18.5]) p(8, 8, 1, mat(0x161616), 0, 0, z); // heat shroud and its ribs
     p(4, 4, 7, dark, 0, 0, -23.5); // nozzle
     p(2, 2, 6, dark, 0, -3, -23); p(2, 2, 2, glow(0xffaa33), 0, -3, -27); // pilot pipe and its flame
-    p(6, 6, 10, red, 0, -6, -8); for (const z of [-4.5, -10.5]) p(8, 8, 1, dk, 0, -6, z); // fuel tank and straps
-    p(4, 4, 1, mat(0xc9a43a), 0, -6, -13.5); // tank cap
+    const mag = sub(0, 0, 0), mg = at(mag); mg(6, 6, 10, red, 0, -6, -8); for (const z of [-4.5, -10.5]) mg(8, 8, 1, dk, 0, -6, z); // fuel tank and straps
+    mg(4, 4, 1, mat(0xc9a43a), 0, -6, -13.5); // tank cap
     p(4, 5, 4, dk, 0, -5.5, 1); p(4, 3, 4, dk, 0, -9.5, 2); // rear grip
     p(1, 1, 2, dark, 0, -6.5, -2); p(1, 2, 1, mat(0x999999), 0, -4, -1.5); // guard and trigger
     p(4, 7, 4, dk, 0, -7.5, -16); // front handle
-    return { muzzle: [0, -28], grip: [4, 8, 5, 0, -7, 1.5], fore: [8, 15, 7, 0, -3.5, -16.5], bands: [-7, -1], band: [8, 8, 0] }; // fore: the front handle and the shroud above it
+    return { muzzle: [0, -28], grip: [4, 8, 5, 0, -7, 1.5], fore: [8, 15, 7, 0, -3.5, -16.5], bands: [-7, -1], band: [8, 8, 0], mag }; // fore: the front handle and the shroud above it
   },
   // held by two grips near the front, with the long back end going over your shoulder
   rocket({ p, mat, dark, glow, sub, at }) {
@@ -278,18 +327,19 @@ const GUN_MODELS = {
     r(6, 6, 6, mat(0xaa3333), 0, 0, -25); r(4, 4, 3, mat(0xcc4433), 0, 0, -29.5); r(2, 2, 2, mat(0xe86a50), 0, 0, -32);
     return { muzzle: [0, -33], grip: [4, 8, 5, 0, -8, -5.5], fore: [4, 8, 4, 0, -8, -16], bands: [7, 10], band: [10, 10, 0], round };
   },
-  flare({ p, mat, dark, glow }) {
+  flare({ p, mat, dark, glow, sub, at }) {
     const red = mat(0xc8402a), grip = mat(0x3a3a3e);
     p(6, 6, 14, red, 0, 2, -9); p(6, 1, 14, mat(0xe8684a), 0, 4.5, -9); // fat barrel and its lighter top
-    p(6, 6, 2, dark, 0, 2, -17); p(4, 4, 1, glow(0xffaa33), 0, 2, -17.5); // dark muzzle with the flare inside
+    p(6, 6, 2, dark, 0, 2, -17); // dark muzzle
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 1, glow(0xffaa33), 0, 2, -17.5); // the flare inside it (gone once fired, back when it's reloaded)
     p(6, 8, 4, mat(0x3a3a3a), 0, 2, 0); p(2, 3, 2, dark, 0, 7.5, 2); // breech and hammer
     p(4, 4, 4, grip, 0, -4, 0); p(4, 3, 4, grip, 0, -7.5, 1); p(4, 2, 4, grip, 0, -10, 2); // grip, raked back in steps
     p(1, 1, 5, dark, 0, -4.5, -3.5); p(1, 3, 1, dark, 0, -2.5, -6.5); p(1, 2, 1, mat(0x888888), 0, -2, -3.5); // guard and trigger
-    return { muzzle: [2, -18], grip: [4, 9, 5, 0, -6.5, .5], fore: null, bands: [-6, -11], band: [8, 8, 2] };
+    return { muzzle: [2, -18], grip: [4, 9, 5, 0, -6.5, .5], fore: null, bands: [-6, -11], band: [8, 8, 2], mag };
   },
   // a black pistol with a long suppressor and a holo sight on the slide. holo = [y, z] of the middle of the sight's window,
   // which lines up with the middle of the screen when you aim
-  hitman({ p, mat, dark, glow }) {
+  hitman({ p, mat, dark, glow, sub, at }) {
     const slide = mat(0x3a3a40), grip = mat(0x2e2e33), can = mat(0x26262b), ring = mat(0x45454c);
     p(4, 4, 14, slide, 0, 2, -7); p(4, 1, 14, mat(0x55555d), 0, 3.5, -7); // slide and its lighter top
     for (const z of [-1.5, -3.5]) p(4, 2, 1, dark, 0, 2.5, z); // grip serrations at the back of the slide
@@ -301,11 +351,12 @@ const GUN_MODELS = {
     p(6, 1, 2, dark, 0, 9.5, -6);
     p(1, 1, 1, glow(0xff3333), .5, 5.5, -4.5); // the emitter that throws the reticle
     p(1, 1, 4, dark, 0, -4.5, -7); p(1, 2, 1, dark, 0, -3, -9.5); p(1, 2, 1, mat(0x777777), 0, -3, -6.5); // trigger guard and trigger
-    p(4, 3, 4, grip, 0, -3.5, -3); p(4, 3, 4, grip, 0, -6.5, -2); p(4, 1, 4, dark, 0, -8.5, -2); // grip
-    return { muzzle: [2, -34], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -13], band: [6, 8, 1], holo: [7, -6] };
+    p(4, 3, 4, grip, 0, -3.5, -3); p(4, 3, 4, grip, 0, -6.5, -2); // grip
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -8.5, -2); mg(2, 6, 2, mat(0x8a8a90), 0, -5, -2); // its magazine: the floor plate, and the steel body up inside the grip
+    return { muzzle: [2, -34], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -13], band: [6, 8, 1], holo: [7, -6], mag };
   },
   // a black rifle with orange stripes, a straight box mag, a toothed muzzle brake and a holo sight on the top rail
-  thrasher({ p, mat, dark, glow }) {
+  thrasher({ p, mat, dark, glow, sub, at }) {
     const body = mat(0x3c3c44), dk = mat(0x2b2b31), acc = mat(0xe0632a), vent = mat(0x141418);
     p(4, 6, 9, dk, 0, 0, 4.5); p(4, 8, 1, dark, 0, -1, 9.5); p(4, 1, 7, acc, 0, .5, 4.5); // stock, butt, stripe
     p(6, 6, 16, body, 0, 0, -8); p(6, 1, 12, acc, 0, -.5, -8); // receiver and its stripe
@@ -318,13 +369,13 @@ const GUN_MODELS = {
     p(4, 4, 6, mat(GUN_STEEL), 0, 1, -29); // barrel
     p(6, 6, 4, dk, 0, 1, -34); p(6, 2, 1, vent, 0, 1, -33.5); // muzzle brake and its port
     for (const y of [-1.5, 3.5]) p(4, 1, 2, dark, 0, y, -37); // its teeth
-    p(4, 8, 5, dark, 0, -7, -10.5); p(4, 1, 5, acc, 0, -8.5, -10.5); // straight box mag with an orange band
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 8, 5, dark, 0, -7, -10.5); mg(4, 1, 5, acc, 0, -8.5, -10.5); // straight box mag with an orange band
     p(4, 4, 4, dk, 0, -5, -2); p(4, 3, 4, dk, 0, -8.5, -1); // pistol grip
     p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
-    return { muzzle: [1, -38], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 10, 0, 0, -21], bands: [-3, -14], band: [8, 8, 0], holo: [7, -10] };
+    return { muzzle: [1, -38], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 10, 0, 0, -21], bands: [-3, -14], band: [8, 8, 0], holo: [7, -10], mag };
   },
   // a dark grey semi-auto sniper with tan furniture, a straight box mag, a scope with a green lens and a muzzle brake
-  semisniper({ p, mat, dark, glow }) {
+  semisniper({ p, mat, dark, glow, sub, at }) {
     const body = mat(0x3e3f44), tan = mat(0xb39a6b), dtan = mat(0x8a744c), vent = mat(0x1a1a1e);
     p(4, 6, 10, tan, 0, -1, 5); p(4, 8, 1, dark, 0, -1, 10.5); p(4, 2, 6, dtan, 0, 3, 4); // stock, butt pad, cheek riser
     p(6, 6, 16, body, 0, 0, -8); p(4, 1, 16, dark, 0, 3.5, -8); // receiver and top rail
@@ -335,14 +386,14 @@ const GUN_MODELS = {
     p(6, 6, 12, tan, 0, 0, -22); for (const z of [-19, -22, -25]) p(6, 2, 1, vent, 0, 0, z); // handguard and its vents
     p(4, 4, 14, mat(GUN_STEEL), 0, 1, -35); // barrel
     p(6, 6, 4, body, 0, 1, -44); p(6, 2, 1, vent, 0, 1, -43.5); // muzzle brake and its port
-    p(4, 8, 5, dark, 0, -7, -11); p(4, 1, 5, dtan, 0, -8.5, -11); // straight box mag with a tan band
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 8, 5, dark, 0, -7, -11); mg(4, 1, 5, dtan, 0, -8.5, -11); // straight box mag with a tan band
     p(4, 4, 4, dtan, 0, -5, -2); p(4, 3, 4, dtan, 0, -8.5, -1); // pistol grip
     p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
-    return { muzzle: [1, -46], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 12, 0, 0, -22], bands: [-6, -15], band: [8, 8, 0] };
+    return { muzzle: [1, -46], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 12, 0, 0, -22], bands: [-6, -15], band: [8, 8, 0], mag };
   },
   // a copper beam rifle. A big magnifying glass lies on top facing the sky to catch sunlight, and the barrel focuses that heat
   // into the beam: cooling fins down the barrel, a glowing tip, and a glowing heat cell under the body
-  heatray({ p, mat, dark, glow }) {
+  heatray({ p, mat, dark, glow, sub, at }) {
     const cop = mat(0xb5652b), dcop = mat(0x7e4220), brass = mat(0xc9a43a), steel = mat(0x6e6e74), wood = mat(0x5a3a22);
     p(4, 6, 8, wood, 0, -.5, 4); p(4, 8, 1, mat(0x3a2414), 0, -1, 8.5); // stock and butt
     p(6, 6, 16, cop, 0, 0, -8); p(6, 1, 16, mat(0xd98a4a), 0, 2.5, -8); // body and its lighter top
@@ -357,9 +408,9 @@ const GUN_MODELS = {
     p(4, 4, 2, dark, 0, .5, -31); p(2, 2, 1, glow(0xffb347), 0, .5, -32.5); // emitter and its glowing tip
     p(4, 4, 4, dcop, 0, -4.5, -1); p(4, 3, 4, dcop, 0, -7.5, 0); // pistol grip
     p(1, 1, 4, dark, 0, -5.5, -5); p(1, 2, 1, mat(0x888888), 0, -3.5, -4.5); // guard and trigger
-    p(4, 5, 4, mat(0x3a3a3a), 0, -5.5, -9); p(4, 2, 2, glow(0xffd23f), 0, -5.5, -9); // heat cell, with a window glowing out of both sides
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 5, 4, mat(0x3a3a3a), 0, -5.5, -9); mg(4, 2, 2, glow(0xffd23f), 0, -5.5, -9); // heat cell, with a window glowing out of both sides (spent ones are pulled and swapped)
     p(6, 4, 6, dark, 0, -5, -14); // front handle under the barrel's root
-    return { muzzle: [.5, -33], grip: [4, 7, 4, 0, -6, -.5], fore: [6, 4, 6, 0, -5, -14], bands: [-6, -10], band: [8, 7, -.5] };
+    return { muzzle: [.5, -33], grip: [4, 7, 4, 0, -6, -.5], fore: [6, 4, 6, 0, -5, -14], bands: [-6, -10], band: [8, 7, -.5], mag };
   },
 };
 // builds gun i's model into group g with `stars` gold upgrade bands: the same model in your hands, a bot's, and the armory.
@@ -420,7 +471,7 @@ function gunGeos(i, stars) {
     for (const g of [geos.lit, geos.glow]) if (g) { g.translate(-s.off[0] * px, -s.off[1] * px, -s.off[2] * px); g.computeBoundingSphere(); }
     return { at: s.at.map((v, k) => v + s.off[k]), geos };
   };
-  return { m, main: voxelGeos(main, px), spin: part(m.spin), round: part(m.round) };
+  return { m, main: voxelGeos(main, px), spin: part(m.spin), round: part(m.round), mag: part(m.mag) };
 }
 const SPRITES = BASE.map((w, i) => gunSprite(i));
 const gunBox = (b, px) => b && { c: [b[3] * px, b[4] * px, b[5] * px], h: [b[0] / 2 * px, b[1] / 2 * px, b[2] / 2 * px] };
@@ -431,7 +482,7 @@ function makeGun(i, g, stars) {
   };
   add(g, b.main);
   const sub = s => { if (!s) return null; const grp = new THREE.Group(); grp.position.set(...s.at.map(n => n * px)); add(grp, s.geos); g.add(grp); return grp; };
-  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin: sub(b.spin), round: sub(b.round), holo: b.m.holo && b.m.holo.map(n => n * px) };
+  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin: sub(b.spin), round: sub(b.round), mag: sub(b.mag), holo: b.m.holo && b.m.holo.map(n => n * px) };
 }
 // the solid pixels on the outside of gun i (with no upgrade bands), as x, y, z centers in world units, for keeping arms out of it
 const gunCellCache = {};
@@ -473,6 +524,7 @@ function vmArm(left, box, dir, low = 0) { // low: aim that far down the box (0 =
     const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; m.userData.shared = true; piv.add(m);
   }
   vm.add(piv);
+  return piv;
 }
 // which way each first-person arm runs from its fist, per hold: back toward you and down off the screen,
 // so the fist faces forward into the grip instead of pushing up under the gun
@@ -484,10 +536,11 @@ const VM_ARMS = {
 function buildGun() {
   vm.traverse(o => { if (o.geometry && o !== flashMesh && !o.userData.shared) o.geometry.dispose(); });
   vm.clear(); flashMesh.visible = false;
-  const { muzzle: [my, mz], grip, fore, spin, round, holo } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
-  gunSpin = spin; gunRound = round; gunHolo = holo; drawCross(BASE[cur]);
+  const { muzzle: [my, mz], grip, fore, spin, round, mag, holo } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
+  gunSpin = spin; gunRound = round; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
   vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
-  if (fore && arms[1]) vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]);
+  gunArmL = fore && arms[1] ? vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]) : null;
+  for (const o of [gunMag, gunArmL]) if (o) o.userData.rest = o.position.clone(); // where a reload's moves start from
   if (WEAPONS[cur].melee) return;
   flashMesh.position.set(0, my, mz - .04); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight);
 }
@@ -503,13 +556,21 @@ function selectSlot(s) {
 }
 function equip(i) {
   if (i === cur || !WEAPONS[i] || !owned[i]) return;
-  cur = i; slotGun[slotOf(i)] = i; cancelReload(); cd = .2; buildGun(); renderHotbar(); sfx('equip');
+  // the one in your hands goes down (from wherever it is, if you're already mid-swap), the new one comes up; no firing until then
+  cur = i; slotGun[slotOf(i)] = i; cancelReload(); swapLen = drawT(WEAPONS[i]); swapDown = true;
+  cd = Math.max(cd, swapLen * (SWAP_DOWN * (1 - swapOff) + 1 - SWAP_DOWN)); renderHotbar(); sfx('equip');
+}
+// the swap, every frame: down, the new model built at the bottom, up. Returns how far down the gun is (0 to 1)
+function swapTick(dt) {
+  if (swapDown) { swapOff += dt / (swapLen * SWAP_DOWN); if (swapOff >= 1) { swapOff = 1; swapDown = false; if (gunShown !== cur) buildGun(); } }
+  else if (swapOff > 0) swapOff = Math.max(0, swapOff - dt / (swapLen * (1 - SWAP_DOWN)));
+  return swapOff;
 }
 const dry = () => sfx('dry');
 // each gun has its own reload sound, timed to its base reload. Upgraded guns reload faster, so the sound plays faster to match
 let reloadSnd = null;
 function reload() {
-  const w = WEAPONS[cur]; if (w.melee || reloading > 0 || ammo[cur] === w.mag) return;
+  const w = WEAPONS[cur]; if (w.melee || reloading > 0 || ammo[cur] === w.mag || swapOff > 0) return; // (not while it's still coming up)
   if (!reserve[cur]) { dry(); return; }
   reloading = w.reload; reloadSnd = sfx('r_' + w.id, { rate: BASE[cur].reload / w.reload });
 }

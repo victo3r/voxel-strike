@@ -13,7 +13,18 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:monos
 canvas{width:100vw!important;height:100vh!important;display:block}
 #hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:2px 2px 0 #000;font-size:22px;font-weight:bold}
 /* each gun's crosshair is drawn in js (hud.js drawCross) */
-#cross{position:absolute;left:50%;top:50%;width:80px!important;height:80px!important;margin:-40px 0 0 -40px;pointer-events:none} /* !important beats the full-screen canvas rule */
+#cross{position:absolute;left:50%;top:50%;width:80px!important;height:80px!important;margin:-40px 0 0 -40px;pointer-events:none}
+/* the reload ring round the crosshair: a faint full circle, and a white one that fills clockwise from the top as the reload goes (main.js) */
+#rl{position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;pointer-events:none;transform:rotate(-90deg)}
+#rl circle{fill:none;stroke-width:4}#rl .bg{stroke:rgba(0,0,0,.5)}
+#rlFg{stroke:#fff;stroke-dasharray:213.63;stroke-dashoffset:213.63;filter:drop-shadow(0 0 1px #000)}
+/* scroll bars, everywhere: square and in the game's colours instead of the browser's */
+::-webkit-scrollbar{width:14px;height:14px}
+::-webkit-scrollbar-track{background:rgba(10,14,16,.55);border:2px solid var(--line-dim)}
+::-webkit-scrollbar-thumb{background:var(--acc);border:2px solid #000;box-shadow:inset -2px -2px 0 var(--acc-dk),inset 2px 2px 0 var(--acc-lt)}
+::-webkit-scrollbar-thumb:hover{background:var(--acc-lt)}
+::-webkit-scrollbar-corner{background:transparent}
+@supports not selector(::-webkit-scrollbar){*{scrollbar-width:auto;scrollbar-color:#2fbf71 rgba(10,14,16,.55)}} /* !important beats the full-screen canvas rule */
 /* hit markers: four lines turned to the diagonals, each pivoting on the middle of the screen (hud.js hitMarker moves them out) */
 #hm{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2}
 #hm i{position:absolute;left:-1px;top:0;width:2px;height:8px;opacity:0;transform-origin:50% 0;box-shadow:0 0 0 1px rgba(0,0,0,.55)}

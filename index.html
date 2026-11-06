@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=102">
+<link id="css" rel="stylesheet" href="css/style.css?v=103">
 </head>
 <body class="boot">
 <div id="hud">
-  <div id="hit"></div><canvas id="scope"></canvas><canvas id="holo"></canvas><canvas id="cross"></canvas><div id="hm"><i></i><i></i><i></i><i></i></div>
+  <div id="hit"></div><canvas id="scope"></canvas><canvas id="holo"></canvas><canvas id="cross"></canvas><svg id="rl" viewBox="0 0 80 80" style="display:none"><circle class="bg" cx="40" cy="40" r="34"/><circle id="rlFg" cx="40" cy="40" r="34"/></svg><div id="hm"><i></i><i></i><i></i><i></i></div>
   <div id="top"></div><div id="bossbar"><div id="bossfill"></div><span>BOSS</span></div><div id="banner"></div>
   <div id="board" class="lb"></div><div id="feed"></div>
   <div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="80" autocomplete="off" spellcheck="false"></div>
@@ -152,7 +152,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 109;
+const V = 110;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
 for (const src of FILES) {
