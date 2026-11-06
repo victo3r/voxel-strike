@@ -126,7 +126,7 @@ function update(dt) {
   if (autoFire(w) && held('shoot')) shoot();
   aiming = opts.toggleAim ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
-  kick = Math.max(0, kick - dt * (w.scope ? 4 : 8)); // the gun model settles; a sniper's slower
+  kick = Math.max(0, kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); // the gun model settles; a sniper's slower (the knife: its swing)
   tickCross(dt, BASE[cur]);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // eradicator barrels wind down after you stop firing
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
@@ -152,9 +152,12 @@ function update(dt) {
   $('cross').style.display = scoped ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
-  if (w.melee) { // blade tipped up a little out of your fist
-    vm.position.set(.3 - kick * .08, -.22 + bob, -.5 - kick * .2);
-    vm.rotation.set(.22 - kick * .9, kick * .5, 0);
+  if (w.melee) { // blade tipped up a little out of your fist. A swing (knifeChopFP): raised a little, chopped down and across the
+    // bottom middle of the screen, back up. It turns about a point back along your forearm (KNIFE_PIV), so your arm doesn't swing up into view
+    const c = kick > 0 ? knifeChopFP(1 - kick) : 0;
+    vm.rotation.set(.22 + c * .95, Math.abs(c) * .2, -c * .4);
+    knifeRest.set(.22, 0, 0); _kp.copy(KNIFE_PIV).applyEuler(knifeRest); _kq.copy(KNIFE_PIV).applyEuler(vm.rotation);
+    vm.position.set(.3 + Math.min(0, c) * .18, -.22 + bob + Math.max(0, c) * .1, -.5).add(_kp).sub(_kq);
   } else if (hold === 'heavy') { // low at your hip
     vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob, -.6 + kick * .06);
     vm.rotation.set(.04 + kick * .1, 0, 0);
@@ -396,6 +399,9 @@ function update(dt) {
   if (!pvp()) $('top').innerHTML = `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead).length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`; // deathmatch fills the top in updateDM
 }
 
+// your knife swing over t = 0 to 1: up to .6 (raised) by .22, down to -.55 (chopped through, still on screen) by .5, then back to 0 (held)
+const knifeChopFP = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); }; return t < .22 ? .6 * e(t / .22) : t < .5 ? .6 - 1.15 * e((t - .22) / .28) : -.55 * (1 - e((t - .5) / .5)); };
+const KNIFE_PIV = new THREE.Vector3(.04, -.06, .22), knifeRest = new THREE.Euler(), _kp = new THREE.Vector3(), _kq = new THREE.Vector3(); // (the knife swing's pivot, in the hand's space)
 const clock = new THREE.Clock();
 // the page starts with only the background showing (class "boot"); the buttons fade in once the lobby has drawn a couple of frames
 let bootFrames = 0;

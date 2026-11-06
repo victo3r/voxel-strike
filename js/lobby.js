@@ -207,7 +207,6 @@ const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), flar
   beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }) };
 const heroCan = () => armOpen && inLobby && armPage === 'weapons' && hf.i >= 0 && holdK > .9;
 function heroFireStop() {
-  if (hf.loop) { sfx(hf.loop, { v: .6 }); hf.loop = null; }
   hf.held = false; if (hf.beamM) hf.beamM.visible = false;
 }
 function heroTrigger(down) {
@@ -227,11 +226,11 @@ function heroShot() {
   if (hf.rl > 0 || hf.cd > 0) return;
   if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 }); hf.auto = .25; return; }
   hf.cd = w.rate; if (!w.inf) hf.ammo--;
-  hf.kick = 1;
+  hf.kick = w.beam || w.flame ? .06 : 1; // a beam or flame only trembles, so it stays on target
   if (w.melee) { sfx('swing', { v: .7 }); return; }
   hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq); // out of the muzzle, the way it points
   if (w.flame) { // a puff of fire
-    if (!hf.loop) { sfx('flameStart', { v: .6 }); hf.loop = 'flameEnd'; }
+    flameHeld = .12; // the fire sound, like yours (sound.js)
     for (let k = 0; k < 2; k++) {
       const m = new THREE.Mesh(flameGeo, flameMats[Math.random() * 3 | 0]); m.position.copy(_hm); m.scale.setScalar(.6); lobbyScene.add(m);
       heroFx.push({ m, v: _hd.clone().multiplyScalar(6).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5)), life: .4, grow: 2 });
@@ -239,7 +238,7 @@ function heroShot() {
     return;
   }
   if (w.beam) {
-    if (!hf.loop) { sfx('heatStart', { v: .6 }); hf.loop = 'heatEnd'; }
+    beamHeld = .12; // the hum, like yours (sound.js)
     hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); lobbyScene.add(hf.beamM);
     hf.beamOn = .08; return;
   }
@@ -262,11 +261,10 @@ function heroTick(dt) {
   if (hf.i < 0) return;
   const w = hf.st;
   if (!heroCan()) heroFireStop();
-  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.scope ? 4 : 8)); hf.flash -= dt;
+  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); hf.flash -= dt;
   if (hf.held && autoFire(w)) heroShot();
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
   if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload(); // ran dry: he reloads
-  if (hf.loop && (!hf.held || hf.ammo <= 0)) heroFireStop();
   hf.flashM.visible = hf.flash > 0;
   if (hf.spin) { hf.spin.rotation.z += hf.spinV * dt; hf.spinV = Math.max(0, hf.spinV - dt * 25); }
   if (hf.round) hf.round.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .4);
@@ -491,8 +489,9 @@ function updateLobby(dt) {
     reloadSwap(hf.rs, w ? w.id : '', ra ? 1 - hf.rl / w.reload : -1, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(ra ? ra.mx : 0, ra ? ra.my : 0, ra ? ra.mz : 0));
     if (ra || kk > 0) {
-      const melee = w.melee, rq = _rq2.setFromEuler(_re2.set((ra ? ra.rx : 0) + (melee ? 0 : kk * .25), ra ? ra.ry : 0, ra ? ra.rz : 0));
-      const off = _hv2.set(ra ? ra.x : 0, ra ? ra.y : 0, (ra ? ra.z : 0) + (melee ? -kk * .25 : kk * .04)).multiplyScalar(GUN_S).applyQuaternion(q0);
+      const melee = w.melee, chop = melee && kk > 0 ? swingAt(1 - kk) : 0; // the knife chops down (tip down about his fist) instead of kicking
+      const rq = _rq2.setFromEuler(_re2.set((ra ? ra.rx : 0) + (melee ? -chop * 1.3 : kk * .25), ra ? ra.ry : 0, ra ? ra.rz : 0));
+      const off = _hv2.set(ra ? ra.x : 0, ra ? ra.y : 0, (ra ? ra.z : 0) + (melee ? 0 : kk * .04)).multiplyScalar(GUN_S).applyQuaternion(q0);
       const q0i = _q0i.copy(q0).invert(), q1 = _q1.copy(q0).multiply(rq), move = v => v.sub(gp).applyQuaternion(q0i).applyQuaternion(rq).applyQuaternion(q0).add(gp).add(off);
       move(_l); move(_fr); gp.add(off); q0.copy(q1);
       if (ra && hf.mag) { // where the loose part is now, in his space

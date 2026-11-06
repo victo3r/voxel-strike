@@ -561,11 +561,11 @@ net = (() => {
     r.q = 0;
     if (r.fired) {
       const n = Math.min(r.fired, 3); r.fired = 0;
-      if (W.melee) { sfx('swing', { at: pos, far: 20 }); z.stab = .2; }
+      if (W.melee) { sfx('swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING; }
       else if (!W.flame && !W.beam) { z.muzzle = .05; for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); }
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0;
-    z.stab = Math.max(0, z.stab - dt); z.aim.position.z = z.stab * 1.3;
+    z.stab = Math.max(0, z.stab - dt); knifeChop(z);
     if (z.spin) { if (z.muzzle > 0) z.spinV = 30; z.spin.rotation.z += z.spinV * dt; z.spinV = Math.max(0, z.spinV - dt * 25); }
     if (z.round) z.round.visible = true;
     // flame and heat ray: on while they hold the trigger

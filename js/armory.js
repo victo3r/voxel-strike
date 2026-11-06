@@ -13,8 +13,8 @@ function mainStats(i, L = Math.max(0, gunUse(i) - 1)) {
   const w = BASE[i], s = statsAt(i, L);
   const per = v => v >= 20 ? Math.round(v) : +v.toFixed(1);
   return [
-    ['DAMAGE', w.beam ? Math.round(s.dmg / w.rate) : s.dmg * w.pellets, w.beam ? '/ SEC' : ''], // a shotgun: every pellet hitting
-    ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(w.rate, s.reload) : w.rate)), w.beam ? '' : '/ SEC'],
+    ['DAMAGE', w.beam ? Math.round(s.dmg / s.rate) : s.dmg * w.pellets, w.beam ? '/ SEC' : ''], // a shotgun: every pellet hitting
+    ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(s.rate, s.reload) : s.rate)), w.beam ? '' : '/ SEC'],
     ['CAPACITY', w.inf ? ico('inf') : s.mag, ''],
     ['MOBILITY', w.mob ?? 60, ''],
   ];
@@ -22,8 +22,9 @@ function mainStats(i, L = Math.max(0, gunUse(i) - 1)) {
 // what each star does to a gun, for its details: [label, value at ★, ★★, ★★★]. Damage per second is every shot hitting
 function starTable(i) {
   const w = BASE[i], S = [0, 1, 2].map(L => statsAt(i, L)), rows = [];
-  rows.push(['DAMAGE', ...S.map(s => w.beam ? Math.round(s.dmg / w.rate) + '/s' : s.dmg * w.pellets)]);
-  if (!w.beam && w.mag > 1) rows.push(['DMG / SEC', ...S.map(s => Math.round(s.dmg * w.pellets / w.rate))]);
+  rows.push(['DAMAGE', ...S.map(s => w.beam ? Math.round(s.dmg / s.rate) + '/s' : s.dmg * w.pellets)]);
+  if (!w.beam && S[2].rate !== S[0].rate) rows.push(['FIRE RATE', ...S.map(s => +(1 / s.rate).toFixed(1) + '/s')]);
+  if (!w.beam && w.mag > 1) rows.push(['DMG / SEC', ...S.map(s => Math.round(s.dmg * w.pellets / s.rate))]);
   if (w.mag > 1) rows.push(['CAPACITY', ...S.map(s => s.mag)]);
   rows.push(['RELOAD', ...S.map(s => s.reload.toFixed(2) + 's')]);
   return rows;

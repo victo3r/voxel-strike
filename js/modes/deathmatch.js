@@ -302,6 +302,8 @@ function holdGun(b) {
   gunM.updateMatrix(); const inv = gunM.matrix.clone().invert(), fist = (a, d) => a.position.clone().addScaledVector(_hv.fromArray(d), ARM_LEN * u).applyMatrix4(inv);
   b.rl.fR = fist(b.armR, h.dR); b.rl.fL = h.dL ? fist(b.armL, h.dL) : null;
 }
+// a bot's or another player's knife swing (b.stab = seconds of it left): the arms and knife chop down from the shoulders and come back
+function knifeChop(b) { const s = b.stab > 0 ? swingAt(1 - b.stab / KNIFE_SWING) : 0; b.aim.rotation.x += s * 1.1; b.aim.position.z = s * .12; }
 // the reload on the gun in a bot's or another player's hands: the same moves as yours (weapons.js RELOAD_ANIM) on the gun they hold,
 // its loose part coming out and the spent one falling away, their hands staying on the gun and the left one going to the part.
 // left = seconds of reload to go (0 = not reloading), total = how long the whole reload takes
@@ -563,7 +565,7 @@ function burnTick(dt) {
 }
 // knife: hits its target if it's close enough and in front of it
 function botStab(b, W, t, dist) {
-  b.cd = W.rate; b.stab = .2; sfx('swing', { at: b.g.position, far: 20 }); net.shot(W, b);
+  b.cd = W.rate; b.stab = KNIFE_SWING; sfx('swing', { at: b.g.position, far: 20 }); net.shot(W, b);
   const p = tPos(t), pos = b.g.position, want = Math.atan2(p.x - pos.x, p.z - pos.z);
   // right on top of its target the direction to it is meaningless, so it counts as in front
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
@@ -736,7 +738,7 @@ function updateBot(b, dt) {
 
   b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.flashM.visible = b.muzzle > 0;
   if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx(b.fireEnd, { at: pos, far: 50 });
-  b.stab = Math.max(0, b.stab - dt); b.aim.position.z = b.stab * 1.3; // knife jab: arms shoot forward and come back
+  b.stab = Math.max(0, b.stab - dt); knifeChop(b); // knife: a chop down
   if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels, like yours
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;

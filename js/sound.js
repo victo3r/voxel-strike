@@ -302,10 +302,11 @@ const SOUNDS = {
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
   djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // Raider Boots' second jump: a quick puff of air
   swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife whoosh
-  slash: [.2, .6, s => { // knife connecting: a metal "shing" and a thud
-    s.hiss({ ft: 'highpass', f: 3000, f2: 6000, d: .06, v: .8 });
-    s.tone({ f: 2600, f2: 2400, d: .14, v: .25 }); s.tone({ f: 3900, d: .08, v: .15 });
-    s.tone({ f: 160, f2: 70, d: .06, v: .6 });
+  slash: [.25, .6, s => { // knife connecting: the edge scraping through, a "shhing" rising in pitch, a faint ring of metal under it and a thud
+    s.hiss({ ft: 'bandpass', f: 2200, f2: 7500, q: 4, a: .008, d: .2, v: 1, sweep: .18 });
+    s.hiss({ ft: 'highpass', f: 5000, f2: 8000, a: .015, d: .15, v: .4 });
+    for (const [f, v] of [[3150, .06], [4420, .045], [5930, .035]]) s.tone({ t: .02, f, f2: f * .97, d: .22, v }); // out of tune with each other, so it rings, not tinks
+    s.thud({ d: .05, f: 150, v: .7 });
   }],
   // ---- aiming down a scope or holo sight (zin_ = in, zout_ = out). Same every time, no glassy ring ----
   zin_sniper: [.4, .42, s => { // stock pulled into the shoulder, then the zoom ring turns three notches
@@ -564,7 +565,7 @@ function flameBuffer() { // 2 seconds of roaring, crackling fire that loops with
 function soundTick(dt, live) {
   if (!ac || ac.state !== 'running') return;
   const t = ac.currentTime;
-  flameHeld = live ? flameHeld - dt : 0;
+  flameHeld = live || inLobby ? flameHeld - dt : 0; // (in the lobby: your character firing it in the armory)
   const fOn = flameHeld > 0;
   if (fOn && !flameLoop) {
     flameLoop = ac.createBufferSource(); flameLoop.buffer = flameBuffer(); flameLoop.loop = true;
@@ -583,7 +584,7 @@ function soundTick(dt, live) {
   }
   if (spinOsc) { spinOsc.frequency.setTargetAtTime(50 + spin * 130, t, .05); spinGain.gain.setTargetAtTime(spin * .07, t, .05); }
   // heat ray: a buzzing hum with a fast shimmer while the beam is on
-  beamHeld = live ? beamHeld - dt : 0;
+  beamHeld = live || inLobby ? beamHeld - dt : 0;
   const bOn = beamHeld > 0;
   if (bOn && !beamGain) {
     beamGain = ac.createGain(); beamGain.gain.value = 0;

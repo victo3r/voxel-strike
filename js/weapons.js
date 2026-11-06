@@ -36,16 +36,20 @@ const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
 const gi = id => W_ID[id]; // weapon id -> its index in BASE/WEAPONS
 // star upgrades: getting a gun gives ★, then two flat upgrades to ★★ and ★★★. Kept small on purpose, so stars never make a fight
 // much shorter and a gun from a higher armory level beats a low one maxed out. Every star adds +20% mag size and cuts reload time
-// by 10%; damage goes up less the faster the gun fires (STAR_DMG: +4% a star at over 6.6 shots a second, +6% at over 2, else +8%),
-// rounded to whole damage, so a fast gun's damage only moves at ★★★ (the Thrasher 12 -> 13) and its damage per second rises at
-// most 16%. One-shot guns (rocket launcher, flare gun) keep their single shot
+// by 10%, and every star raises its damage per second, by less the faster the gun fires (STAR_DPS: +4% a star at over 6.6 shots a
+// second, +6% at over 2, else +8%). Fast guns (and the beam) get it as fire rate, since a point of damage is a lot on them (the
+// Thrasher stays at 12 and goes 12.5 -> 13 -> 13.5 shots a second); the rest as damage, rounded but always at least +1 a star
+// (the Hitman 20 -> 21 -> 22). One-shot guns (rocket launcher, flare gun) keep their single shot
 const lvl = BASE.map(() => 0); // 0 = ★, 1 = ★★, 2 = ★★★
 const WEAPONS = BASE.map(w => ({ ...w }));
-const STAR_DMG = b => b.rate < .15 ? .04 : b.rate < .5 ? .06 : .08, STAR_MAG = .2, STAR_RELOAD = .1;
+const STAR_DPS = b => b.rate < .15 ? .04 : b.rate < .5 ? .06 : .08, STAR_MAG = .2, STAR_RELOAD = .1, STAR_FAST = .15;
 const magAt = (b, L) => b.mag === 1 ? 1 : Math.round(b.mag * (1 + STAR_MAG * L));
 // gun i's stats with L upgrades (0 = ★). Bots get their own copy at whatever stars they rolled
-const statsAt = (i, L) => { const b = BASE[i]; return { ...b, dmg: Math.round(b.dmg * (1 + STAR_DMG(b) * L)), mag: magAt(b, L), reload: +(b.reload * (1 - STAR_RELOAD * L)).toFixed(2) }; };
-function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, mag: s.mag, reload: s.reload }); }
+const statsAt = (i, L) => {
+  const b = BASE[i], k = 1 + STAR_DPS(b) * L, fast = b.rate < STAR_FAST;
+  return { ...b, dmg: fast ? b.dmg : Math.max(b.dmg + L, Math.round(b.dmg * k)), rate: fast ? +(b.rate / k).toFixed(4) : b.rate, mag: magAt(b, L), reload: +(b.reload * (1 - STAR_RELOAD * L)).toFixed(2) };
+};
+function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, rate: s.rate, mag: s.mag, reload: s.reload }); }
 // starters never have stars; every other gun does (bought in the armory, or rented for a zombie-waves run and starred in its shop)
 const upgradable = i => !BASE[i].start;
 const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
@@ -560,6 +564,10 @@ function fistOut(cells, c, dir, r, gap) {
   return t + gap;
 }
 const holdOf = w => w.hold;
+// a knife swing: t = 0 to 1 over the swing, back to how far down the blade is (0 = held, 1 = all the way down). Quick down, slower back up,
+// so it's a chop down through the target with the knife staying in the fist (yours, bots', other players', your character's in the armory)
+const KNIFE_SWING = .28; // seconds, the whole swing
+const swingAt = t => { t = Math.min(1, Math.max(0, t)); return Math.sin(Math.PI * (t < .3 ? t / .3 * .5 : .5 + (t - .3) / .7 * .5)); };
 
 // your first-person arms: the arm from your own skin, its fist just outside the grip, running back off the bottom of the screen.
 // Two-handed weapons get your left arm too, on the fore
