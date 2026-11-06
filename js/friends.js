@@ -29,7 +29,7 @@ async function frPoll(force = false) {
     for (const i of fr.invites) { // a new invite: say so wherever you are
       const k = i.id + ':' + i.room; if (frNoticed.has(k)) continue;
       frNoticed.add(k);
-      if (!frHidden.has(k)) { netToast(`${i.name} invited you to ${whereText(i)} — open FRIENDS to join`, 6000); sfx('join'); }
+      if (!frHidden.has(k)) { netToast(`${i.name} invited you to ${whereText(i)}, open FRIENDS to join`, 6000); sfx('join'); }
     }
   } catch { frErr = "Can't reach the server"; }
   finally { frBusy = false; renderFriends(); }

@@ -50,19 +50,19 @@ function gunAttrs(w) {
   return a;
 }
 const DESC = {
-  voxel: 'Your starting pistol, with a teal energy core. A dependable backup for when your primary runs dry.',
-  hitman: 'A suppressed pistol with a holo sight on the slide. Its quiet shots don\'t carry far, so people won\'t hear you coming.',
-  heatray: 'A big magnifying glass on top gathers sunlight, and the barrel focuses that heat into a beam. Hold the trigger to keep it on target.',
-  shotgun: 'A pump shotgun that fires a burst of pellets every shot. Devastating up close and weak at range, so get in close before you pull the trigger.',
-  ar: 'A reliable rifle that handles every range well. A solid pick for any fight.',
-  thrasher: 'A hard-hitting rifle that tears through fights, with a holo sight on the top rail for picking people off at range.',
-  sniper: 'A bolt-action rifle that hits hard from across the map. Aim to look through the scope.',
-  semisniper: 'A semi-auto sniper with a 10-round mag. Each shot hits a little softer than the bolt-action, but you can fire again almost right away.',
-  eradicator: 'A minigun that shreds anything in front of it. Reloading the belt takes a long time, so make it count.',
-  knife: 'Always with you and never runs out. It\'s the quickest way to get around the map.',
-  flame: 'Sprays a short cone of fire that hits everything in front of you and sets it burning. Its fuel tank refills when you reload.',
-  rocket: 'Fires a rocket that explodes on impact and hurts everyone in the blast. The blast also throws you, so you can rocket jump with it.',
-  flare: 'Fires a burning flare that sets whoever it hits on fire, with a small splash around the hit. It holds one flare, so make it count.',
+  voxel: 'Your trusty starter pistol, glowing teal core and all',
+  hitman: 'A suppressed pistol with a holo sight, so nobody hears you coming',
+  heatray: 'A giant magnifying glass turns sunlight into a beam that cooks whatever it touches',
+  shotgun: 'Pump action and a fistful of pellets, brutal up close',
+  ar: 'A solid rifle that does a bit of everything',
+  thrasher: 'A hard-hitting rifle with a holo sight for the longer fights',
+  sniper: 'One big shot from across the map',
+  semisniper: 'A sniper you can keep firing, a little less punch for a lot more shots',
+  eradicator: 'A minigun that shreds everything in front of it',
+  knife: 'Always on you, never runs out, and you move fastest with it out',
+  flame: 'Sprays fire up close and leaves everything burning',
+  rocket: 'One rocket, one big boom, and anyone near it feels it',
+  flare: 'One burning flare that sets whoever it hits on fire',
 };
 // the rest of the stats for the details view, at the stars you're using
 function gunSpecs(i) {
@@ -151,9 +151,7 @@ function renderDetail() {
 // ---- WEAR page. ARMOR has one card, Basic Armor. Click it to pick it, click it again for its details: the chestplate spins there,
 // and the arrows in the bottom corners step through its stars (your character wears whichever one you're looking at).
 // The button under him buys the next star
-const ARMOR_DESC = 'Worn in bot matches. Your armor bar fills every time you spawn and takes hits before your health. ' +
-  'Every star turns it into a bigger, tougher chestplate, and from Ruby on, each one also cuts the damage you take by 4% more. ' +
-  'You can wear any star you own. Bots roll their own armor, never better than what you wear.';
+const ARMOR_DESC = 'Soaks up hits before your health does and fills back up every spawn, and every star makes it tougher';
 function renderWear() {
   const n = myArmor(), w = wornArmor(), T = armorOf(w || 1);
   const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, w - 1)) : (G => { const on = G.worn(); return on ? G.sprite(on.id, on.st) : G.sprite(G.list[0].id, 1); })(GEAR[c]);
@@ -181,8 +179,7 @@ const armorStarTxt = () => starRow(wornArmor(), myArmor(), ARMOR_MAX);
 function renderArmorDetail() {
   const s = armorPrev, T = armorOf(s), n = myArmor();
   const state = s === wornArmor() ? 'WEARING' : s <= n ? 'OWNED' : prof.lv < T.unlock ? ico('lock') + ' LOCKED' : 'NOT OWNED';
-  const desc = `Star ${s} of ${ARMOR_ITEM}. You spawn with a ${T.hp} armor bar that takes hits before your health` +
-    (T.dr ? `, and every hit you take is cut by ${Math.round(T.dr * 100)}%.` : '.');
+  const desc = T.dr ? 'Soaks up hits before your health does and shrugs off part of every hit' : 'Soaks up hits before your health does';
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button>` +
     `<div id="detView"><button class="arw l" data-av="-1" ${s <= 1 ? 'disabled' : ''}>${ico('left')}</button><button class="arw r" data-av="1" ${s >= ARMOR_MAX ? 'disabled' : ''}>${ico('right')}</button></div>` +
     `<div class="dn">${T.name} <span class="st">${armorStars(s)}</span></div><p>${desc}</p><div class="ds">` +
@@ -216,7 +213,7 @@ function wearStar(s) {
 }
 // ---- WEAR page, SKINS: one card per look (the presets, plus your own once you've made one). Click one to put it on.
 // In the lobby, the last card (and the button under him) opens the customizer
-const SKINS_DESC = 'Pick how your character looks. In the lobby, CUSTOMIZE lets you make your own.';
+const SKINS_DESC = 'Pick a look, or make your own with CUSTOMIZE in the lobby';
 // a look seen from the front, Minecraft-style: head, neck, body with an arm each side, two legs, cut straight from its skin.
 // Skin pixels are scaled up K times with a black outline round the outside, like the other sprites
 const lookSpriteCache = new Map();
@@ -268,20 +265,17 @@ function openCust() { closeArmory(); showCust(true); }
 const GEAR = {
   boots: { list: BOOTS, I: BOOT_I, own: 'boots', use: 'bootUse', on: 'bootOn', stars: bootStars, using: bootUse, worn: wornBoots,
     sprite: bootSprite, model: bootsModel, face: .6, put: b => heroBoots(b),
-    desc: 'Wear one pair at a time, in every mode. What they do adds on top of your armor, your hat and your gun\'s mobility. ' +
-      'Bots can roll boots too, never better than yours.',
+    desc: 'One pair at a time, in every mode',
     about: {
-      warrior: 'Steel greaves for fighters. Every weapon you use does more damage, and every hit you take is cut a little more, on top of your armor.',
-      raider: 'High-top runners with a wing on each ankle. You run faster, and you can jump a second time in the air: press jump again.',
+      warrior: 'Steel greaves for brawlers, so you hit harder and take a little less',
+      raider: 'Winged runners that make you faster and let you jump again in midair',
     } },
   hats: { list: HATS, I: HAT_I, own: 'hats', use: 'hatUse', on: 'hatOn', stars: hatStars, using: hatUse, worn: wornHat,
     sprite: hatSprite, model: hatModel, face: .5, put: h => heroHat(h),
-    desc: 'Wear one hat at a time, in every mode. What it does adds on top of your armor and boots. ' +
-      'Bots can roll hats too, never better than yours.',
+    desc: 'One hat at a time, in every mode',
     about: {
-      warrior: 'A steel helmet with a nose guard. Every hit you take is cut a little more, and some headshots glance off it and only do body-shot damage.',
-      raider: 'A dark hood for staying out of sight. Some hits only do half damage, and enemies further away than its stealth range can\'t see your red outline. ' +
-        'Higher stars hide you from closer in.',
+      warrior: 'A steel helmet that takes the edge off hits and sometimes turns a headshot into a body shot',
+      raider: 'A dark hood that sometimes halves a hit and hides your red outline from anyone outside its stealth range',
     } },
 };
 // he wears your boots and hat (not the ones you're looking at)

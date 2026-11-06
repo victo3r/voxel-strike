@@ -40,10 +40,10 @@ const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true };
 let opts = { ...DEFAULT_OPTS };
 try { const o = JSON.parse(localStorage.getItem('voxelstrike-opts')); if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k]; } catch {}
 const saveOpts = () => { try { localStorage.setItem('voxelstrike-opts', JSON.stringify(opts)); } catch {} };
-const AA_DESC = ['Off.', 'Near an enemy your aim slows down, gets pulled toward them while you move onto them, and turns with them a bit while you track.', 'Like low, but stronger.'];
+const AA_DESC = ['Off', 'Slows your aim near enemies and nudges it onto them, but fast flicks get no help', 'Like low but stronger'];
 function renderOpts() {
   document.querySelectorAll('#aaQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.aa));
-  $('aaDesc').textContent = AA_DESC[opts.aa] + (opts.aa ? ' Fast flicks get no help, so it does very little for a mouse.' : '');
+  $('aaDesc').textContent = AA_DESC[opts.aa];
   $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel;
 }
 $('aaQ').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || +b.dataset.v === opts.aa) return; opts.aa = +b.dataset.v; saveOpts(); renderOpts(); sfx('ui'); });
@@ -126,9 +126,9 @@ $('vol').addEventListener('change', () => sfx('ui'));
 renderSens();
 // graphics (per device, see core.js)
 const GFX_DESC = {
-  high: 'Full resolution with smooth edges. Best for a gaming PC.',
-  medium: 'No edge smoothing, and high-resolution screens draw at standard resolution. A good fit for Chromebooks and laptops.',
-  low: 'Like medium, plus no grass, fireflies or light shafts, blurrier textures far away and a shorter view distance.',
+  high: 'Full resolution and smooth edges, best on a gaming PC',
+  medium: 'No edge smoothing and standard resolution, good for laptops and Chromebooks',
+  low: 'Medium without the grass, fireflies and light shafts, and a shorter view',
 };
 const saveGfx = () => { try { localStorage.setItem('voxelstrike-gfx', JSON.stringify(gfx)); } catch {} };
 function renderGfx() {
@@ -149,7 +149,7 @@ renderGfx();
 const held = a =>binds[a].some(c => c && keys[c]);
 const isBind = (a, code) => binds[a].includes(code);
 function nice(code) {
-  if (!code) return '—';
+  if (!code) return '-';
   const named = { Mouse0: 'Left Click', Mouse1: 'Middle Click', Mouse2: 'Right Click', Mouse3: 'Mouse 4', Mouse4: 'Mouse 5',
     WheelUp: 'Scroll Up', WheelDown: 'Scroll Down', ArrowUp: ico('up'), ArrowDown: ico('down'), ArrowLeft: ico('left'), ArrowRight: ico('right'),
     ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl', AltLeft: 'L Alt', AltRight: 'R Alt' };
@@ -334,14 +334,14 @@ const ALL_MAPS = ['yard', 'forest', 'resort'];
 const V_MAPS = 3; // bump when the map pictures are retaken
 const MODES = [
   // zombie waves is on the yard only for now: zombies get stuck on the busier maps, which weren't laid out for them. More open maps for it later
-  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Your loadout against endless waves. Earn coins, beat a boss every 5 waves', maps: ['yard'] },
-  { id: 'dm', name: 'DEATHMATCH', desc: '4 minute free-for-all. Highest score wins', maps: ALL_MAPS },
-  { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes, blue vs red. The team with the most kills wins', maps: ALL_MAPS },
-  { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds. Rack up as many kills as you can', sub: [
-    { id: 'blitz', name: 'FREE FOR ALL', title: 'BLITZ · FREE FOR ALL', desc: 'Everyone for themselves. Most kills wins', maps: ALL_MAPS },
-    { id: 'blitzTeam', name: 'TEAM', title: 'BLITZ · TEAM', desc: 'Blue vs red. The team with the most kills wins', maps: ALL_MAPS },
+  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Your loadout against endless waves, with a boss every 5', maps: ['yard'] },
+  { id: 'dm', name: 'DEATHMATCH', desc: 'A 4 minute free-for-all, top score wins', maps: ALL_MAPS },
+  { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes of blue vs red, most kills wins', maps: ALL_MAPS },
+  { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds to rack up all the kills you can', sub: [
+    { id: 'blitz', name: 'FREE FOR ALL', title: 'BLITZ · FREE FOR ALL', desc: 'Everyone for themselves, most kills wins', maps: ALL_MAPS },
+    { id: 'blitzTeam', name: 'TEAM', title: 'BLITZ · TEAM', desc: 'Blue vs red, most kills wins', maps: ALL_MAPS },
   ] },
-  { id: 'private', name: 'PRIVATE MATCH', desc: 'Make a room for your friends, or join one with a code', priv: true },
+  { id: 'private', name: 'PRIVATE MATCH', desc: 'Make a room for friends or join one with a code', priv: true },
 ];
 const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : m.priv ? [] : [m]); // the ones you can actually start
 if (!MAPS[mapId]) mapId = 'yard';
@@ -363,8 +363,8 @@ $('pickPill').addEventListener('click', e => {
   localStorage.setItem('voxelstrike-online', b.dataset.on); renderPill(); sfx('ui');
 });
 const PRIV_CARDS = [
-  { id: 'privCreate', name: 'CREATE ROOM', desc: 'Pick a mode and a map, then share the code with your friends' },
-  { id: 'privJoin', name: 'JOIN WITH CODE', desc: 'Type the 6-letter code a friend gave you' },
+  { id: 'privCreate', name: 'CREATE ROOM', desc: 'Pick a mode and map, then share the code' },
+  { id: 'privJoin', name: 'JOIN WITH CODE', desc: 'Type in the 6-letter code from a friend' },
 ];
 function renderPick() {
   const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);

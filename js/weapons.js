@@ -84,7 +84,7 @@ function loadoutGun(cat) { // the gun in your loadout for this category. Falls b
 function renderHotbar() {
   $('hotbar').innerHTML = CATS.map(([, label], s) => {
     const i = slotGun[s], key = nice(binds['slot' + (s + 1)][0] || binds['slot' + (s + 1)][1]);
-    return `<div class="slot ${i === cur ? 'on' : ''} ${i < 0 ? 'empty' : ''}"><span class="k">${key === '—' ? '' : key}</span>` +
+    return `<div class="slot ${i === cur ? 'on' : ''} ${i < 0 ? 'empty' : ''}"><span class="k">${key === '-' ? '' : key}</span>` +
       `<span class="s">${i >= 0 ? stars(i) : ''}</span><img src="${i >= 0 ? SPRITES[i] : SPRITES[0]}"><span class="c">${label}</span></div>`;
   }).join('');
 }
@@ -564,10 +564,12 @@ function fistOut(cells, c, dir, r, gap) {
   return t + gap;
 }
 const holdOf = w => w.hold;
-// a knife swing: t = 0 to 1 over the swing, back to how far down the blade is (0 = held, 1 = all the way down). Quick down, slower back up,
-// so it's a chop down through the target with the knife staying in the fist (yours, bots', other players', your character's in the armory)
-const KNIFE_SWING = .28; // seconds, the whole swing
-const swingAt = t => { t = Math.min(1, Math.max(0, t)); return Math.sin(Math.PI * (t < .3 ? t / .3 * .5 : .5 + (t - .3) / .7 * .5)); };
+// a knife swing: t = 0 to 1 over the swing, back to where the arm is (0 = held, below 0 = raised, 1 = chopped all the way down).
+// The arm comes up first (to -.8 by .3), chops down through the target (1 by .55), then comes back to held
+// (bots', other players' and your character's in the armory; your own first-person swing is knifeChopFP in main.js)
+const KNIFE_SWING = .36; // seconds, the whole swing (the knife swings every .4 s)
+const swingAt = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  t = Math.min(1, Math.max(0, t)); return t < .3 ? -.8 * e(t / .3) : t < .55 ? -.8 + 1.8 * e((t - .3) / .25) : 1 - e((t - .55) / .45); };
 
 // your first-person arms: the arm from your own skin, its fist just outside the grip, running back off the bottom of the screen.
 // Two-handed weapons get your left arm too, on the fore

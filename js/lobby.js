@@ -489,11 +489,17 @@ function updateLobby(dt) {
     reloadSwap(hf.rs, w ? w.id : '', ra ? 1 - hf.rl / w.reload : -1, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(ra ? ra.mx : 0, ra ? ra.my : 0, ra ? ra.mz : 0));
     if (ra || kk > 0) {
-      const melee = w.melee, chop = melee && kk > 0 ? swingAt(1 - kk) : 0; // the knife chops down (tip down about his fist) instead of kicking
-      const rq = _rq2.setFromEuler(_re2.set((ra ? ra.rx : 0) + (melee ? -chop * 1.3 : kk * .25), ra ? ra.ry : 0, ra ? ra.rz : 0));
+      // the knife swings instead of kicking: his whole arm comes up about his shoulder and chops down (below), and the blade
+      // tips back on the way up and down through the chop about his fist
+      const melee = w.melee, chop = melee && kk > 0 ? swingAt(1 - kk) : 0;
+      const rq = _rq2.setFromEuler(_re2.set((ra ? ra.rx : 0) + (melee ? -chop * .8 : kk * .25), ra ? ra.ry : 0, ra ? ra.rz : 0));
       const off = _hv2.set(ra ? ra.x : 0, ra ? ra.y : 0, (ra ? ra.z : 0) + (melee ? 0 : kk * .04)).multiplyScalar(GUN_S).applyQuaternion(q0);
       const q0i = _q0i.copy(q0).invert(), q1 = _q1.copy(q0).multiply(rq), move = v => v.sub(gp).applyQuaternion(q0i).applyQuaternion(rq).applyQuaternion(q0).add(gp).add(off);
       move(_l); move(_fr); gp.add(off); q0.copy(q1);
+      if (chop) { // the arm swing: gun and both fists turn about his right shoulder (raised below 0, chopped down above)
+        _wq.setFromAxisAngle(X_AX, chop * 1.1); const sw = v => v.sub(SHR).applyQuaternion(_wq).add(SHR);
+        sw(gp); sw(_fr); sw(_l); q0.premultiply(_wq);
+      }
       if (ra && hf.mag) { // where the loose part is now, in his space
         const toPart = pose.fL ? Math.min(1, Math.max(0, -ra.ay / .3)) : ra.hand;
         _hv2.copy(partMid(hf.mag)).add(hf.mag.position).multiplyScalar(GUN_S).applyQuaternion(q0).add(gp);

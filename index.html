@@ -84,7 +84,7 @@
           <label class="tick"><input id="optToggleAim" type="checkbox"> Toggle aim (press once to aim, again to stop)</label>
           <label class="tick"><input id="optWheel" type="checkbox"> Scroll wheel switches guns</label>
           <h2>KEYS</h2>
-          <small>Click a box, then press a key, mouse button or scroll. Backspace clears it, Esc cancels.</small>
+          <small>Click a box, then press a key, mouse button or scroll (Backspace clears it, Esc cancels)</small>
           <div id="bindList"></div>
           <button id="bindReset">RESET CONTROLS</button>
         </section>
@@ -103,7 +103,7 @@
           <div class="sliders">
             <span>Render resolution</span><input id="gfxRes" type="range" min="0.5" max="1" step="0.05"><b id="gfxResV"></b>
           </div>
-          <small>Lower draws fewer pixels, so it runs faster but looks softer.</small>
+          <small>Lower runs faster but looks softer</small>
           <h2>DISPLAY</h2>
           <label class="tick"><input id="gfxFps" type="checkbox"> Show FPS</label>
           <small id="gfxNote"></small>
@@ -118,12 +118,12 @@
           <h2>CLOUD SAVE</h2>
           <div id="acct"></div>
           <div id="acctForm">
-            <p>Sign in to keep your level, coins, guns and look on every device. Controls and volume stay separate on each device.</p>
+            <p>Sign in to keep your level, coins, guns and look on every device</p>
             <input id="acctUser" maxlength="16" placeholder="Username" autocomplete="username" spellcheck="false">
             <input id="acctPass" type="password" maxlength="128" placeholder="Password" autocomplete="current-password">
             <div><button id="acctIn">SIGN IN</button> <button id="acctNew">CREATE ACCOUNT</button></div>
             <p id="acctErr"></p>
-            <small>There's no email, so a lost password can't be reset. Write it down somewhere.</small>
+            <small>There's no email, so write your password down somewhere safe</small>
           </div>
         </section>
       </div>
@@ -152,7 +152,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 112;
+const V = 113;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
 for (const src of FILES) {

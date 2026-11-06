@@ -163,7 +163,7 @@ net = (() => {
       const err = $('codeErr'); if (err) err.textContent = why; else netToast(why);
       return;
     }
-    netToast(`${why} — playing against bots`, 4000);
+    netToast(`${why}, playing against bots`, 4000);
     mode = o.mode; mapId = o.map;
     showPick(false); restart(); showLobby(false); lockMouse();
   }
@@ -180,10 +180,10 @@ net = (() => {
     const wasOn = api.on;
     if (job && !job.dead && !welcomed) { // never got in
       if (codeNum === 4001 && job.tries++ < 3 && !job.o.code) { // full: look for another room of that mode and map
-        if (job.o.room) { job.o.room = null; netToast('That room is full — finding another', 3000); } else job.not.push(room);
+        if (job.o.room) { job.o.room = null; netToast('That room is full, finding another', 3000); } else job.not.push(room);
         findRoom(job).catch(e => fail(job, e?.message || 'No room found')); return;
       }
-      const why = { 4000: 'The game was updated. Reload the page to play online', 4001: 'That room is full', 4002: 'The server did not like that request', 4003: 'You were removed from that room', 4005: 'You joined from another tab' }[codeNum];
+      const why = { 4000: 'The game was updated, reload the page to play online', 4001: 'That room is full', 4002: 'The server did not like that request', 4003: 'You were removed from that room', 4005: 'You joined from another tab' }[codeNum];
       fail(job, why || 'Could not connect');
       return;
     }
@@ -193,7 +193,7 @@ net = (() => {
     if (codeNum === 1012 || codeNum === 1006 || codeNum === 1001 || codeNum === 1011) { // dropped: try once to get straight back in
       if (rejoinInfo && !matchOver && !rejoinInfo.tried) { rejoinInfo.tried = true; netToast('Reconnecting…', 2500); setTimeout(() => { if (!api.on || !rejoinInfo) return; connect(rejoinInfo.room, null, { pid: rejoinInfo.pid, key: rejoinInfo.key }); }, 2000); return; }
     }
-    const why = { 4000: 'The game was updated — reload the page', 4003: 'You were removed from the match', 4004: 'Disconnected for being away', 4005: 'You joined from another tab' }[codeNum] || 'Connection lost';
+    const why = { 4000: 'The game was updated, reload the page', 4003: 'You were removed from the match', 4004: 'Disconnected for being away', 4005: 'You joined from another tab' }[codeNum] || 'Connection lost';
     netToast(why, 4000);
     endOnline();
     restart(); showLobby(true);
@@ -224,7 +224,7 @@ net = (() => {
       case 'dmg': return damage(m);
       case 'die': return died(m);
       case 'score': return score(m.rows);
-      case 'phase': phase = m.phase; if (m.matchEnd) matchEnd = m.matchEnd; lastTop = ''; if (m.solo) netToast('Everyone else left — the match ends in 30 seconds unless someone joins', 5000); return;
+      case 'phase': phase = m.phase; if (m.matchEnd) matchEnd = m.matchEnd; lastTop = ''; if (m.solo) netToast('Everyone else left, so the match ends in 30 seconds unless someone joins', 5000); return;
       case 'fire': return remoteFire(m);
       case 'boom': return remoteBoom(m);
       case 'gear': return gearMsg(m);

@@ -267,7 +267,7 @@ const SHOP = [
   { gun: 'flame', price: 200, desc: 'burns everything in front of you' },
   { gun: 'flare', price: 120, desc: 'one fiery shot that sets them on fire' },
   { gun: 'eradicator', price: 280, desc: '120 round bullet hose' },
-  { gun: 'rocket', price: 450, desc: 'big splash damage, shoot the ground to rocket jump' },
+  { gun: 'rocket', price: 450, desc: 'big splash damage' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // perks stack this many times; a gun you own costs this share of its rent to fetch from the armory
 // the guns on offer: OFFERS a visit, one gun each from OFFERS different categories, picked afresh each wave (openShop).

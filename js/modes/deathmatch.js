@@ -302,8 +302,9 @@ function holdGun(b) {
   gunM.updateMatrix(); const inv = gunM.matrix.clone().invert(), fist = (a, d) => a.position.clone().addScaledVector(_hv.fromArray(d), ARM_LEN * u).applyMatrix4(inv);
   b.rl.fR = fist(b.armR, h.dR); b.rl.fL = h.dL ? fist(b.armL, h.dL) : null;
 }
-// a bot's or another player's knife swing (b.stab = seconds of it left): the arms and knife chop down from the shoulders and come back
-function knifeChop(b) { const s = b.stab > 0 ? swingAt(1 - b.stab / KNIFE_SWING) : 0; b.aim.rotation.x += s * 1.1; b.aim.position.z = s * .12; }
+// a bot's or another player's knife swing (b.stab = seconds of it left): the arms and knife come up from the shoulders,
+// chop down and come back
+function knifeChop(b) { const s = b.stab > 0 ? swingAt(1 - b.stab / KNIFE_SWING) : 0; b.aim.rotation.x += s * 1.1; b.aim.position.z = Math.max(0, s) * .12; }
 // the reload on the gun in a bot's or another player's hands: the same moves as yours (weapons.js RELOAD_ANIM) on the gun they hold,
 // its loose part coming out and the spent one falling away, their hands staying on the gun and the left one going to the part.
 // left = seconds of reload to go (0 = not reloading), total = how long the whole reload takes
