@@ -65,6 +65,17 @@ function cgPlay(on) {
   if (!cg.on || on === cg.playing || performance.now() - cgSentT < 1100) return;
   cg.playing = on; cgSentT = performance.now(); cgCall(s => on ? s.game.gameplayStart() : s.game.gameplayStop());
 }
+// a rewarded ad (js/boost.js: WATCH AD for a booster). reward() only once it has been watched to the end; fail(code) otherwise
+// ('adsDisabled' and 'adblock' mean no ads this session, so the button goes away)
+function cgRewarded(reward, fail = () => {}) {
+  if (!cg.on || cg.ad) return fail('other');
+  const end = () => { cg.ad = false; document.body.classList.remove('cgAd'); cgHush(); };
+  cgCall(s => s.ad.requestAd('rewarded', {
+    adStarted: () => { cg.ad = true; document.body.classList.add('cgAd'); cgHush(); },
+    adFinished: () => { end(); reward(); },
+    adError: e => { end(); fail(e?.code || 'other'); },
+  }));
+}
 // a midgame ad at a natural break (the results screen of a match or run). The game doesn't wait on it: the ad plays over the page,
 // and while it plays the sound is off and clicks are blocked (body.cgAd). CrazyGames skips it quietly when it's too soon
 function cgMidgame() {

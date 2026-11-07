@@ -32,5 +32,6 @@ const xpText = () => prof.lv >= LV_MAX ? 'MAX LEVEL' : `${prof.xp} / ${xpNeed(pr
 function showProf() { // lobby: compact level badge with a thin XP bar top left; coins top right next to settings
   $('prof').innerHTML = `<div class="lv"><b>LVL ${prof.lv}</b>${xpBar()}<small>${xpText()}</small></div>`;
   $('lobbyCoins').innerHTML = COIN + prof.coins;
+  if (typeof renderBoost === 'function') renderBoost(); // js/boost.js: the booster count under the coins
 }
 showProf();

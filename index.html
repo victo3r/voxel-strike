@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=108">
+<link id="css" rel="stylesheet" href="css/style.css?v=109">
 </head>
 <body class="boot">
 <div id="hud">
@@ -26,6 +26,7 @@
     </div>
     <div id="lobbyCoins" class="pc"></div>
     <button id="lobbySet" class="sq small" title="Settings"><img id="setIcon"></button>
+    <button id="boostBtn" title="2× Booster"></button>
     <button id="lobbyArm" class="sq"><img id="armIcon"><b>ARMORY</b></button>
     <button id="playBtn" class="sq"><img id="playIcon"><b>PLAY</b></button>
     <button id="joinBtn" class="sq" style="display:none"><b>JOIN ROOM</b><small id="joinCode"></small></button>
@@ -44,6 +45,7 @@
   <div id="roomRow" style="display:none"><span id="roomCode"></span><button id="inviteBtn">INVITE</button></div>
   <div id="menuBtns"><button id="menuPlay">BACK TO GAME</button><button id="armBtn">ARMORY</button><button id="menuFriends">FRIENDS</button><button id="menuPlayers">PLAYERS</button><button id="ctrlBtn">SETTINGS</button><button id="lobbyBtn">EXIT GAME</button></div>
 </div>
+<div id="boost"><div id="boostBox"></div></div>
 <div id="away"><div id="awayBar"><span>CLICK TO PLAY</span><button id="awayMenu">MENU</button></div></div>
 <div id="armory">
   <div id="armHead"><h1>ARMORY</h1><div id="armInfo"></div><button id="armX">CLOSE</button></div>
@@ -92,8 +94,8 @@
         <section data-t="sound">
           <h2>VOLUME</h2>
           <div class="sliders">
-            <span>Sound effects</span><input id="vol" type="range" min="0" max="1" step="0.05"><b id="volV"></b>
-            <span>Music</span><input id="mvol" type="range" min="0" max="1" step="0.05"><b id="mvolV"></b>
+            <span>Sound effects</span><input id="vol" type="range" min="0" max="1" step="0.05"><b id="volV"></b><button class="mute" data-m="sfx" title="Mute sound effects"></button>
+            <span>Music</span><input id="mvol" type="range" min="0" max="1" step="0.05"><b id="mvolV"></b><button class="mute" data-m="music" title="Mute music"></button>
           </div>
         </section>
         <section data-t="graphics">
@@ -155,13 +157,13 @@
 <script type="module">
 // Three.js only ships as a module, so load it here, make it global,
 // then load the game files in order as plain scripts (works from file://).
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import * as THREE from './lib/three.module.js'; // three.js r160 (MIT), kept here so the game never depends on another site to start
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 117;
+const V = 118;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
+  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/boost.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
 // js/crazy.js first: on CrazyGames it loads their SDK and puts your saved progress in place, and the rest waits for that (cgReady)
 await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });
 await (window.cgReady || Promise.resolve());

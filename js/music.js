@@ -9,7 +9,7 @@ let musicVol = .6;
 try { const v = parseFloat(localStorage.getItem('voxelstrike-music')); if (v >= 0 && v <= 1) musicVol = v; } catch {}
 function setMusicVolume(v) {
   musicVol = v;
-  if (MU) MU.master.gain.setTargetAtTime(v, ac.currentTime, .05);
+  if (MU) MU.master.gain.setTargetAtTime(mutes.music ? 0 : v, ac.currentTime, .05); // mutes: sound.js
   try { localStorage.setItem('voxelstrike-music', v); } catch {}
 }
 const mtof = m => 440 * 2 ** ((m - 69) / 12);
@@ -142,7 +142,7 @@ function muKit(name) {
 // ---- shared output, made once sound is allowed ----
 let MU = null;
 function muInit() {
-  const master = ac.createGain(); master.gain.value = musicVol;
+  const master = ac.createGain(); master.gain.value = mutes.music ? 0 : musicVol;
   const comp = ac.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 3; comp.attack.value = .01; comp.release.value = .25;
   master.connect(comp).connect(hush); // sound.js: muted with everything else on CrazyGames
   // a long, dark hall for the pads: noise that gets duller as it dies away

@@ -359,7 +359,7 @@ function zombiesOver() {
   $('postBoard').className = 'lb z';
   const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
   $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`);
-  $('rewards').innerHTML = `<div class="rw"><span class="rx">+${runXp} XP</span><span class="pc">+${runCoins} ${COIN}</span></div><div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
+  $('rewards').innerHTML = `<div class="rw"><span class="rx">+${runXp} XP</span><span class="pc">+${runCoins} ${COIN}</span>${boostTag()}</div><div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '');
   $('post').style.display = 'flex';
   sfx(newBest ? 'win' : 'lose');

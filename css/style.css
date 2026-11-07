@@ -84,6 +84,10 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #fps{position:fixed;left:50%;transform:translateX(-50%);top:2px;z-index:50;font:bold 12px monospace;color:#ffd23f;text-shadow:1px 1px 0 #000;pointer-events:none}
 @media (max-width:620px){#setMain{flex-direction:column}#setTabs{flex-direction:row;width:auto;border-right:0;border-bottom:3px solid var(--line-dim);padding:8px}#setTabs button{flex:1;text-align:center;padding:6px 2px;font-size:12px}#setBody{padding:4px 10px 12px}}
 .sliders{display:grid;grid-template-columns:minmax(100px,190px) minmax(120px,240px) 60px;gap:8px 10px;align-items:center;font-size:16px}
+.sliders:has(.mute){grid-template-columns:minmax(100px,190px) minmax(120px,240px) 60px 40px}
+#binds .sliders .mute{width:36px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;font-size:18px}
+#binds .sliders .mute.on{border-color:#f96;color:#f96}
+.sliders .off{opacity:.4}
 .sliders input{accent-color:var(--acc);width:100%;cursor:pointer}.sliders b{color:var(--acc-lt)}
 
 /* pause menu */
@@ -280,6 +284,18 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #playBtn img{width:56%;image-rendering:auto}
 #playBtn b{font-size:clamp(19px,3.6vmin,40px)}
 #lobbySet{right:20px;top:18px;width:clamp(48px,7vmin,64px)}
+/* the 2x booster (js/boost.js): a button under your coins, and its card */
+#boostBtn{position:absolute;top:calc(28px + clamp(48px,7vmin,64px));right:calc(32px + clamp(48px,7vmin,64px));height:clamp(40px,5.5vmin,52px);display:flex;align-items:center;gap:8px;padding:0 14px;font:bold clamp(16px,2.4vmin,21px) monospace;color:#ffd75e;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);text-shadow:2px 2px 0 #000}
+#boostBtn b{color:#fff}#boostBtn:hover{background:var(--hov)}
+#boostBtn.on{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.6),4px 4px 0 rgba(0,0,0,.4)}
+#boost{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
+#boostBox{display:flex;flex-direction:column;gap:10px;width:min(360px,90vw);padding:20px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
+#boostBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}#boostBox p{margin:0;color:var(--muted);font-size:15px}
+#boostBox .bn{font-size:17px}#boostBox .bn b{color:#ffd75e;font-size:22px}
+#boostBox button{font:bold 16px monospace;padding:10px;color:#fff;background:var(--glass);border:3px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
+#boostBox button:hover:not(:disabled){background:var(--hov)}#boostBox button:disabled{opacity:.45;cursor:default}
+#boostBox #boostUse{background:rgba(36,170,98,.8)}#boostBox #boostUse.on{background:rgba(160,120,20,.85);border-color:#ffd75e}
+#post .bx{color:#ffd75e;display:inline-flex;align-items:center;gap:6px;margin-left:14px}
 #lobbySet img{width:62%}
 
 /* mode / map picker */

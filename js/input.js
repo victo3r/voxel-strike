@@ -33,7 +33,12 @@ function renderSens() {
   $('fovIn').value = fovBase; $('fovV').textContent = fovBase + '°';
   $('vol').value = volume; $('volV').textContent = Math.round(volume * 100) + '%';
   $('mvol').value = musicVol; $('mvolV').textContent = Math.round(musicVol * 100) + '%';
+  // the mute buttons: a crossed-out speaker while muted, and the slider dims
+  document.querySelectorAll('.sliders .mute').forEach(b => { const m = mutes[b.dataset.m]; b.innerHTML = ico(m ? 'sndOff' : 'snd'); b.classList.toggle('on', m); });
+  $('vol').classList.toggle('off', mutes.sfx); $('volV').classList.toggle('off', mutes.sfx);
+  $('mvol').classList.toggle('off', mutes.music); $('mvolV').classList.toggle('off', mutes.music);
 }
+document.querySelectorAll('.sliders .mute').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const k = b.dataset.m; setMute(k, !mutes[k]); renderSens(); if (!mutes.sfx) sfx('ui'); }));
 // other control options, per device like sensitivity. aa = aim assist (0 off, 1 low, 2 medium), toggleAim = press aim once
 // to aim and again to stop (instead of holding it), wheel = the scroll wheel switches guns
 const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true, chat: true }; // chat: show chat (off hides it and the chat key does nothing)
@@ -565,6 +570,7 @@ showLobby(true);
 
 // spot = where to stand ({ x, y, z, yaw }) when the server has already picked your place, instead of the middle of the map
 function restart(spot) {
+  boostStart(); // js/boost.js: is this game boosted
   zombies.forEach(z => scene.remove(z.g)); zombies.length = 0;
   booms.forEach(b => scene.remove(b.m)); booms.length = 0;
   rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;

@@ -7,10 +7,18 @@ const BUF = {}; // name -> { buf, v }
 let ac = null, bus, outGain, verbIn;
 let volume = 0.8;
 try { const v = parseFloat(localStorage.getItem('voxelstrike-vol')); if (v >= 0 && v <= 1) volume = v; } catch {}
+// the mute buttons beside the volume sliders (settings, SOUND): the slider keeps its level for when you unmute
+let mutes = { sfx: false, music: false };
+try { const m = JSON.parse(localStorage.getItem('voxelstrike-mute')); if (m) mutes = { sfx: !!m.sfx, music: !!m.music }; } catch {}
+const sfxGain = () => mutes.sfx ? 0 : volume;
+function setMute(k, on) {
+  mutes[k] = on; try { localStorage.setItem('voxelstrike-mute', JSON.stringify(mutes)); } catch {}
+  if (k === 'sfx') { if (outGain) outGain.gain.value = sfxGain(); } else setMusicVolume(musicVol);
+}
 // hush: silent while CrazyGames says mute (their setting beats the volume sliders) or an ad plays (js/crazy.js)
 let hush = null;
 function cgHush() { if (hush) hush.gain.value = cgQuiet() ? 0 : 1; }
-function setVolume(v) { volume = v; if (outGain) outGain.gain.value = v; try { localStorage.setItem('voxelstrike-vol', v); } catch {} }
+function setVolume(v) { volume = v; if (outGain) outGain.gain.value = sfxGain(); try { localStorage.setItem('voxelstrike-vol', v); } catch {} }
 
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function audio() {
@@ -18,7 +26,7 @@ function audio() {
     ac = new AudioContext();
     const comp = ac.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2;
-    bus = ac.createGain(); outGain = ac.createGain(); outGain.gain.value = volume;
+    bus = ac.createGain(); outGain = ac.createGain(); outGain.gain.value = sfxGain();
     hush = ac.createGain(); hush.connect(ac.destination); cgHush(); // everything (sounds and music) goes out through hush
     bus.connect(comp).connect(outGain).connect(hush);
     // a short shared echo so sounds have some space around them instead of sounding flat
