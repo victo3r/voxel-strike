@@ -375,7 +375,6 @@ const GUN_MODELS = {
     p(8, 8, 3, dk, 0, 0, -20.5); p(10, 10, 3, dk, 0, 0, 26.5); p(10, 10, 2, dark, 0, 0, 30); // front ring, rear ring, exhaust
     p(6, 6, 1, hole, 0, 0, -21.5); p(6, 6, 1, hole, 0, 0, 30.5); // dark tube mouths
     for (const x of [-3.5, 3.5]) p(1, 4, 36, mat(0xc9a43a), x, 0, 4); // yellow warning stripes
-    p(4, 4, 6, dark, -3, 6, -12); p(2, 2, 1, glow(0xff5544), -3, 6, -15.5); // sight with a red lens
     p(6, 2, 12, mat(0x2a2a2a), 0, -5, 18); // shoulder pad under the back
     p(4, 5, 4, dk, 0, -6.5, -6); p(4, 3, 4, dk, 0, -10.5, -5); // trigger grip
     p(1, 1, 4, dark, 0, -7.5, -10); p(1, 2, 1, mat(0x888888), 0, -5, -9.5); // guard and trigger

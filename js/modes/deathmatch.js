@@ -496,8 +496,12 @@ function botHear(x, z, who, quiet) {
   heard.push({ x, z, who, quiet: !!quiet, at: now }); if (heard.length > 8) heard.shift();
 }
 // pick who to fight. Once it has seen its target it stays on it until the target dies or has been out of sight for LOSE_T,
-// unless someone else is hurting it badly (SWITCH_DMG). Otherwise: whoever is shooting it (if it can see them once it turns),
-// else the closest one it notices. Nobody noticed: nobody (it wanders, see roamGoal)
+// unless someone else is hurting it badly (SWITCH_DMG), or it notices someone much closer (NEAR_SWITCH: in front of it or close
+// enough to bump into, in plain sight, within that many meters and under half as far as its target), so a bot in a group doesn't
+// keep shooting past the enemy right ahead of it at someone across the map. It never turns round for someone it hasn't noticed.
+// Otherwise: whoever is shooting it (if it can see them once it turns), else the closest one it notices. Nobody noticed: nobody
+// (it wanders, see roamGoal)
+const NEAR_SWITCH = 14;
 function pickTarget(b) {
   const pos = b.g.position, enemies = enemiesOf(b);
   if (!enemies.length) return null;
@@ -505,7 +509,8 @@ function pickTarget(b) {
   const shooter = b.hitBy && b.hitByT > 0 && b.hitBy !== b.tgt && tAlive(b.hitBy) && canSee(b.hitBy) ? b.hitBy : null;
   if (b.tgt && tAlive(b.tgt) && b.engaged && b.lostT < LOSE_T) {
     if (shooter && (b.hitDmg >= SWITCH_DMG || b.lostT > 0)) return shooter; // getting shot hard, or can't see its own target right now
-    return b.tgt;
+    const dt0 = d(b.tgt), near = enemies.filter(t => t !== b.tgt && d(t) < NEAR_SWITCH && d(t) < dt0 * .5 && inView(b, t) && canSee(t)).sort((a, c) => d(a) - d(c))[0];
+    return near ?? b.tgt;
   }
   if (shooter) return shooter;
   return enemies.filter(t => inView(b, t) && canSee(t)).sort((a, c) => d(a) - d(c))[0] ?? null;
