@@ -3,6 +3,9 @@
 const XP_BASE = 50, XP_STEP = 25, LV_MAX = 50;
 const xpNeed = lv => XP_BASE + XP_STEP * (lv - 1);
 const lvBonus = lv => 5 * (lv - 1); // coins for reaching level lv: 5 at level 2, 10 at level 3 ... 245 at level 50
+// 2x boosters (js/boost.js) for reaching level lv: 1 up to level 9, then one more every 10 levels (2 from 10, 3 from 20 ... 6 at 50),
+// since levels take longer to reach while games pay the same
+const lvBoosts = lv => 1 + Math.floor(lv / 10);
 // guns: weapon id -> stars (1-3) for unlockable guns you own. Starters aren't listed, everyone has them.
 // loadout: category -> weapon id, the one gun per category you take into a match (missing = that category's starter)
 // use: weapon id -> the stars you take into a match when that's fewer than you own (missing = all of them)
@@ -17,15 +20,16 @@ const saveProf = () => { try { localStorage.setItem('voxelstrike-profile', JSON.
 // adds XP and coins, levels up as many times as it fills (each level-up pays its coin bonus).
 // Returns { ups: levels gained, bonus: level-up coins paid }
 function grant(xp, coins) {
-  let ups = 0, bonus = 0;
+  let ups = 0, bonus = 0, boostUp = 0;
   prof.coins += coins;
   if (prof.lv < LV_MAX) prof.xp += xp;
-  while (prof.lv < LV_MAX && prof.xp >= xpNeed(prof.lv)) { prof.xp -= xpNeed(prof.lv); prof.lv++; ups++; bonus += lvBonus(prof.lv); }
+  while (prof.lv < LV_MAX && prof.xp >= xpNeed(prof.lv)) { prof.xp -= xpNeed(prof.lv); prof.lv++; ups++; bonus += lvBonus(prof.lv); boostUp += lvBoosts(prof.lv); }
   if (prof.lv >= LV_MAX) prof.xp = 0;
   prof.coins += bonus;
+  prof.boosts = (prof.boosts | 0) + boostUp;
   prof.earned = (prof.earned ?? 0) + coins + bonus; // lifetime coins, never goes down (used to compare saves)
   saveProf(); showProf();
-  return { ups, bonus };
+  return { ups, bonus, boostUp };
 }
 const xpBar = () => `<div class="xpbar"><div style="width:${prof.lv >= LV_MAX ? 100 : Math.min(100, prof.xp / xpNeed(prof.lv) * 100)}%"></div></div>`;
 const xpText = () => prof.lv >= LV_MAX ? 'MAX LEVEL' : `${prof.xp} / ${xpNeed(prof.lv)} XP`;

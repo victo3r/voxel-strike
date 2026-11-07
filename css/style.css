@@ -291,7 +291,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #boost{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
 #boostBox{display:flex;flex-direction:column;gap:10px;width:min(360px,90vw);padding:20px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #boostBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}#boostBox p{margin:0;color:var(--muted);font-size:15px}
-#boostBox .bn{font-size:17px}#boostBox .bn b{color:#ffd75e;font-size:22px}
+#boostBox .bn{font-size:17px}#boostBox p.be{text-align:center;color:#ffd75e;font-size:14px}#boostBox .bn b{color:#ffd75e;font-size:22px}
 #boostBox button{font:bold 16px monospace;padding:10px;color:#fff;background:var(--glass);border:3px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
 #boostBox button:hover:not(:disabled){background:var(--hov)}#boostBox button:disabled{opacity:.45;cursor:default}
 #boostBox .bs{display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px}

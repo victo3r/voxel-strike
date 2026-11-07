@@ -1,10 +1,10 @@
 // 2x BOOSTERS: one doubles the XP and coins of your next game (a match, or a whole Zombie Waves run).
 // prof.boosts = how many you have, prof.boostSet = how many of your next games to boost (one booster each). The ⚡ button under
 // your coins in the lobby opens the booster card: ◀ ▶ picks how many games (0 = off, up to how many you have), WATCH AD gets one
-// more (CrazyGames only, every AD_GAP seconds at most), BUY gets one with coins (the way without ads). Daily rewards and other
-// events can hand them out later.
+// more (CrazyGames only, every AD_GAP seconds at most). Without ads you earn them by leveling up (profile.js lvBoosts); daily
+// rewards and other events can hand them out later.
 // A booster is used up at a game's first pay (the end of a match, the first wave of a run), so leaving before then keeps it.
-const BOOST_PRICE = 15, AD_GAP = 180; // coins for one; seconds between rewarded ads
+const AD_GAP = 180; // seconds between rewarded ads
 let gameBoost = false, boostSpent = false; // this game is boosted (set when it starts, input.js restart); its booster is used up
 let adNext = 0; // when the next ad may be offered (performance.now), noAds: CrazyGames has no ads for us this session
 let noAds = false;
@@ -29,7 +29,7 @@ function renderBoost() {
     `<div class="bs"><span>BOOST MY NEXT</span><button id="boostLess" ${k > 0 ? '' : 'disabled'}>${ico('left')}</button><b class="${k ? 'on' : ''}">${k}</b>` +
     `<button id="boostMore" ${k < n ? '' : 'disabled'}>${ico('right')}</button><span>${k === 1 ? 'GAME' : 'GAMES'}</span></div>` +
     (ads ? `<button id="boostAd" ${wait > 0 ? 'disabled' : ''}>${ico('video')} ${wait > 0 ? `NEXT AD IN ${Math.floor(wait / 60)}:${String(wait % 60).padStart(2, '0')}` : 'WATCH AD · +1'}</button>` : '') +
-    `<button id="boostBuy" ${prof.coins >= BOOST_PRICE ? '' : 'disabled'}>BUY 1 · ${COIN}${BOOST_PRICE}</button>` +
+    `<p class="be">Level up to earn more</p>` +
     `<button id="boostX">CLOSE</button>`;
 }
 function openBoost() { $('boost').style.display = 'flex'; renderBoost(); sfx('ui'); }
@@ -42,7 +42,6 @@ $('boost').addEventListener('click', e => {
   if (!id && e.target.id === 'boost') return closeBoost(); // a click outside the card
   if (id === 'boostX') return closeBoost();
   if (id === 'boostLess' || id === 'boostMore') { prof.boostSet = Math.max(0, Math.min(boosts(), boostSet() + (id === 'boostMore' ? 1 : -1))); saveProf(); sfx('ui'); }
-  else if (id === 'boostBuy' && prof.coins >= BOOST_PRICE) { prof.coins -= BOOST_PRICE; prof.boosts = boosts() + 1; saveProf(); showProf(); sfx('buy'); }
   else if (id === 'boostAd') {
     adNext = performance.now() + AD_GAP * 1000; // no second ad for a while, watched or not
     cgRewarded(() => { prof.boosts = boosts() + 1; saveProf(); renderBoost(); sfx('buy'); netToast('+1 2× BOOSTER'); },

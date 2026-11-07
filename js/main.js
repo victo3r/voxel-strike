@@ -203,7 +203,7 @@ function update(dt) {
       // account rewards: every wave pays a coin and a little XP, a boss wave a bounty on top, nothing past PAY_WAVES (a run, not a farm)
       const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 1 + (bossW ? 5 : 0) : 0), r = grant(xp, gold); // doubled with a booster (js/boost.js)
       runXp += xp; runCoins += gold + r.bonus;
-      waveReward = (pay ? `Account: +${gold} ${COIN} +${xp} XP` : `Account: past wave ${PAY_WAVES} the run pays no more`) + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ${COIN}` : '');
+      waveReward = (pay ? `Account: +${gold} ${COIN} +${xp} XP` : `Account: past wave ${PAY_WAVES} the run pays no more`) + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ${COIN} +${r.boostUp} ${ico('bolt')}` : '');
       openShop(); return;
     }
     if ((waveWait -= dt) <= 0) {
