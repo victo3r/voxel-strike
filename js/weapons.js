@@ -16,7 +16,7 @@ const CAT_I = Object.fromEntries(CATS.map(([k], i) => [k, i]));
 const BASE = [
   { id: 'voxel', hold: 'pistol', name: 'Voxel Gun', cat: 'backup', start: true, free: true, mob: 70, dmg: 20, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3 },
   { id: 'hitman', hold: 'pistol', name: 'Hitman', cat: 'backup', unlock: 3, price: 60, mob: 70, zoom: 2, quiet: true, dmg: 20, rate: .2, mag: 18, reload: 1.1, pellets: 1, spread: 0, auto: false, color: 0x2c2c30, len: .4 },
-  { id: 'heatray', hold: 'rifle', name: 'Heat Ray Rifle', cat: 'special', unlock: 4, price: 100, mob: 60, beam: true, dmg: 4, rate: .05, range: 30, mag: 100, reload: 2.0, pellets: 1, spread: 0, auto: true, color: 0xb5652b, len: .7 },
+  { id: 'heatray', hold: 'rifle', name: 'Heat Ray Rifle', cat: 'special', unlock: 4, price: 100, mob: 60, beam: true, dmg: 6, rate: .05, range: 30, mag: 100, reload: 2.0, pellets: 1, spread: 0, auto: true, color: 0xb5652b, len: .7 },
   { id: 'shotgun', hold: 'rifle', name: 'Shotgun', cat: 'primary', start: true, mob: 60, action: 'PUMP ACTION', dmg: 10, rate: .75, mag: 6, reload: 1.6, pellets: 9, spread: .07, auto: false, color: 0x6b4a2b, len: .6 },
   { id: 'ar', hold: 'rifle', name: 'Assault Rifle', cat: 'primary', start: true, mob: 60, dmg: 12, rate: .09, mag: 30, reload: 1.4, pellets: 1, spread: .006, auto: true, color: 0x2f3b2f, len: .55 },
   { id: 'sniper', hold: 'rifle', name: 'Sniper Rifle', cat: 'sniper', start: true, mob: 55, action: 'BOLT ACTION', zoom: 5, dmg: 80, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, scope: true },
