@@ -289,7 +289,7 @@ document.addEventListener('pointerlockchange', () => {
   const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS);
   showAway(away);
   $('menu').style.display = locked || away || shopOpen || inLobby || matchOver ? 'none' : 'flex';
-  $('menuTip').textContent = binds.menu[0] ? `Tip: press ${nice(binds.menu[0])} for this menu to stay in fullscreen` : '';
+  $('menuTip').textContent = cg.on && binds.menu[0] ? `Tip: press ${nice(binds.menu[0])} for this menu to stay in fullscreen` : '';
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
   if (locked) closeArmory();
   if (!locked) {

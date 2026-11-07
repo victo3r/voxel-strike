@@ -514,6 +514,6 @@ body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:
 .logo{font-family:monospace;font-weight:bold;background:linear-gradient(135deg,#1e8cff 0%,#3fa6ff 28%,#fff 46%,#fff 54%,#3fd45e 72%,#1fae3f 100%) 0 0/calc(1ch + var(--ls)) 100% repeat-x;--ls:3px;letter-spacing:var(--ls);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;
   filter:drop-shadow(2px 0 0 #000) drop-shadow(-2px 0 0 #000) drop-shadow(0 2px 0 #000) drop-shadow(0 -2px 0 #000) drop-shadow(3px 4px 0 rgba(0,0,0,.45))}
 #lobbyLogo{position:absolute;left:50%;top:clamp(48px,7.5vh,64px);transform:translateX(-50%);font-size:clamp(30px,4.6vw,56px);white-space:nowrap;pointer-events:none!important}
-/* pause key tip, CrazyGames only (Esc leaves their fullscreen) */
-#menuTip{display:none;margin:14px 0 0;font-size:14px;color:var(--muted)}
-body.cg #menuTip{display:block}
+/* pause key tip, CrazyGames only (Esc leaves their fullscreen). Always laid out, empty elsewhere: it's the menu's last child, which centres it */
+#menu #menuTip{margin:14px 0 0;font-size:14px;color:var(--muted)}
+#menu #menuTip:empty{margin:0}
