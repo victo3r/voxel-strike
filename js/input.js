@@ -4,7 +4,7 @@ const ACTIONS = [
   ['shoot', 'Shoot'], ['aim', 'Aim / scope'], ['reload', 'Reload'], ['next', 'Next gun'], ['prev', 'Previous gun'],
   ['lookL', 'Look left'], ['lookR', 'Look right'], ['lookU', 'Look up'], ['lookD', 'Look down'],
   ['slot1', 'Primary slot'], ['slot2', 'Backup slot'], ['slot3', 'Melee slot'], ['slot4', 'Special slot'], ['slot5', 'Sniper slot'], ['slot6', 'Premium slot'],
-  ['board', 'Leaderboard (hold)'], ['chat', 'Chat'],
+  ['board', 'Leaderboard (hold)'], ['chat', 'Chat'], ['menu', 'Menu'],
 ];
 const DEFAULT_BINDS = {
   fwd: ['KeyW', ''], back: ['KeyS', ''], left: ['KeyA', ''], right: ['KeyD', ''], jump: ['Space', ''],
@@ -12,11 +12,12 @@ const DEFAULT_BINDS = {
   next: ['WheelDown', 'KeyE'], prev: ['WheelUp', 'KeyQ'],
   lookL: ['ArrowLeft', ''], lookR: ['ArrowRight', ''], lookU: ['ArrowUp', ''], lookD: ['ArrowDown', ''],
   slot1: ['Digit1', ''], slot2: ['Digit2', ''], slot3: ['Digit3', ''], slot4: ['Digit4', ''], slot5: ['Digit5', ''], slot6: ['Digit6', ''],
-  board: ['Tab', ''], chat: ['KeyT', 'Enter'],
+  board: ['Tab', ''], chat: ['KeyT', 'Enter'], menu: ['KeyP', ''],
 };
 const copyBinds = b => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, [...v]]));
 let binds = copyBinds(DEFAULT_BINDS);
 try { const saved = JSON.parse(localStorage.getItem('voxelstrike-binds')); if (saved) for (const k in binds) if (Array.isArray(saved[k])) binds[k] = [saved[k][0] ?? '', saved[k][1] ?? '']; } catch {}
+if (Object.keys(binds).some(k => k !== 'menu' && binds[k].includes('KeyP'))) binds.menu = ['', '']; // P already used for something else
 const saveBinds = () => { try { localStorage.setItem('voxelstrike-binds', JSON.stringify(binds)); } catch {} };
 // look sensitivity
 const DEFAULT_SENS = { mouse: 1, keys: 1 };
@@ -193,6 +194,7 @@ addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && $('b
 
 function press(code) {
   if (!locked || chatting) return;
+  if (isBind('menu', code)) { document.exitPointerLock(); return; } // like Esc, but stays fullscreen
   if (isBind('chat', code)) { openChat(); if (chatting) return; }
   if (isBind('shoot', code)) shoot();
   if (isBind('reload', code)) reload();
@@ -287,6 +289,7 @@ document.addEventListener('pointerlockchange', () => {
   const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS);
   showAway(away);
   $('menu').style.display = locked || away || shopOpen || inLobby || matchOver ? 'none' : 'flex';
+  $('menuTip').textContent = binds.menu[0] ? `Tip: press ${nice(binds.menu[0])} for this menu to stay in fullscreen` : '';
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
   if (locked) closeArmory();
   if (!locked) {
