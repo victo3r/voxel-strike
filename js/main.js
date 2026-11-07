@@ -412,7 +412,7 @@ const clock = new THREE.Clock();
 let bootFrames = 0;
 function bootDone() {
   if (bootFrames < 0 || ++bootFrames < 3) return;
-  bootFrames = -1;
+  bootFrames = -1; cgLoaded(); // js/crazy.js
   document.body.classList.replace('boot', 'booting');
   setTimeout(() => document.body.classList.remove('booting'), 600);
 }
@@ -432,12 +432,13 @@ function fpsTick(raw) {
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // spent mags lying about (weapons.js dropPart)
-  if (inLobby) { soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
+  if (inLobby) { cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pauses while the menu (or settings) is open. Bot matches keep running behind the menu, the way an online
   // match would: with the mouse unlocked your keys are released, so you just stand there
   const isLive = () => !dead && !shopOpen && !matchOver && (pvp() || locked);
   const live = isLive();
+  cgPlay(live && locked && !inLobby); // CrazyGames: you're playing (js/crazy.js)
   if (live) for (let k = 0; k < steps && (k === 0 || isLive()); k++) update(sdt);
   else if (mode === 'zombies' && dead && !matchOver && (deadT += dt) >= DEAD_T) zombiesOver(); // zombie waves: you're dead, the world holds for a beat, then the results
   soundTick(dt, live);

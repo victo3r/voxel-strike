@@ -71,7 +71,7 @@ function botsHear(text) {
 }
 
 function openChat() {
-  if (chatting || !pvp() || matchOver && !net.on || !opts.chat) return; // chat turned off in settings: no typing either
+  if (chatting || !pvp() || matchOver && !net.on || !chatOn()) return; // chat turned off: no typing either
   chatting = true; for (const k in keys) keys[k] = false;
   $('chat').classList.add('open'); $('chatIn').value = ''; $('chatIn').focus();
 }
@@ -96,7 +96,8 @@ function resetChat() { closeChat(); chatQ = []; chatGap = 0; $('chatLog').innerH
 // with MUTE (their chat stops showing for you, until you close the page) and REPORT (pick why; the server saves it with their
 // last chat lines for the owner to read, room.js onReport). Swearing and links are already starred by the server's filter
 const muted = new Set(), reported = new Set(); // muted: names (lowercase); reported: player ids this match
-const chatHidden = name => !opts.chat || muted.has(String(name).toLowerCase());
+const chatOn = () => opts.chat && !cgNoChat(); // CrazyGames' own chat setting overrides yours (js/crazy.js)
+const chatHidden = name => !chatOn() || muted.has(String(name).toLowerCase());
 let reportAsk = 0; // the player whose REPORT is asking why
 const REPORT_WHY = [['chat', 'CHAT'], ['name', 'NAME'], ['cheat', 'CHEATING']];
 function renderPlayers() {

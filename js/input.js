@@ -44,7 +44,8 @@ const AA_DESC = ['Off', 'Slows your aim near enemies and nudges it onto them, bu
 function renderOpts() {
   document.querySelectorAll('#aaQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.aa));
   $('aaDesc').textContent = AA_DESC[opts.aa];
-  $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel; $('optChat').checked = opts.chat;
+  $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel;
+  $('optChat').checked = opts.chat && !cgNoChat(); $('optChat').disabled = cgNoChat(); // CrazyGames' chat setting is off: so is ours
 }
 $('aaQ').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || +b.dataset.v === opts.aa) return; opts.aa = +b.dataset.v; saveOpts(); renderOpts(); sfx('ui'); });
 $('optToggleAim').addEventListener('change', e => { opts.toggleAim = e.target.checked; aimOn = false; saveOpts(); });

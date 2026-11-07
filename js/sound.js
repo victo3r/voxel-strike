@@ -7,6 +7,9 @@ const BUF = {}; // name -> { buf, v }
 let ac = null, bus, outGain, verbIn;
 let volume = 0.8;
 try { const v = parseFloat(localStorage.getItem('voxelstrike-vol')); if (v >= 0 && v <= 1) volume = v; } catch {}
+// hush: silent while CrazyGames says mute (their setting beats the volume sliders) or an ad plays (js/crazy.js)
+let hush = null;
+function cgHush() { if (hush) hush.gain.value = cgQuiet() ? 0 : 1; }
 function setVolume(v) { volume = v; if (outGain) outGain.gain.value = v; try { localStorage.setItem('voxelstrike-vol', v); } catch {} }
 
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -16,7 +19,8 @@ function audio() {
     const comp = ac.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2;
     bus = ac.createGain(); outGain = ac.createGain(); outGain.gain.value = volume;
-    bus.connect(comp).connect(outGain).connect(ac.destination);
+    hush = ac.createGain(); hush.connect(ac.destination); cgHush(); // everything (sounds and music) goes out through hush
+    bus.connect(comp).connect(outGain).connect(hush);
     // a short shared echo so sounds have some space around them instead of sounding flat
     const ir = ac.createBuffer(2, ac.sampleRate * 1.2, ac.sampleRate), r = rng(7); // must match the sound card's rate
     for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (r() * 2 - 1) * (1 - i / d.length) ** 3.5 * (i < 400 ? i / 400 : 1); }

@@ -144,7 +144,7 @@ let MU = null;
 function muInit() {
   const master = ac.createGain(); master.gain.value = musicVol;
   const comp = ac.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 3; comp.attack.value = .01; comp.release.value = .25;
-  master.connect(comp).connect(ac.destination);
+  master.connect(comp).connect(hush); // sound.js: muted with everything else on CrazyGames
   // a long, dark hall for the pads: noise that gets duller as it dies away
   const n = ac.sampleRate * 3, ir = ac.createBuffer(2, n, ac.sampleRate), r = rng(31);
   for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let l = 0; for (let i = 0; i < n; i++) { l += (r() * 2 - 1 - l) * (.6 - .5 * i / n); d[i] = l * (1 - i / n) ** 2.2 * Math.min(1, i / 600); } }

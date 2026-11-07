@@ -363,6 +363,7 @@ function zombiesOver() {
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '');
   $('post').style.display = 'flex';
   sfx(newBest ? 'win' : 'lose');
+  setTimeout(cgMidgame, 1500); // CrazyGames: a midgame ad once you've seen how you did (js/crazy.js)
   document.exitPointerLock();
 }
 // ---- spit: spitters and the hive lob globs of acid at you. They fly straight with a little drop, and burst on you, the ground or a crate

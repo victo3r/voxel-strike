@@ -896,6 +896,7 @@ function endMatch(results) {
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ${COIN}</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
   sfx(won ? 'win' : 'lose'); musicEnd();
+  setTimeout(cgMidgame, 1500); // CrazyGames: a midgame ad once you've seen how you did (js/crazy.js)
   if (ups) setTimeout(() => sfx('levelUp'), 700);
   document.exitPointerLock();
 }
