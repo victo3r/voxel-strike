@@ -121,9 +121,15 @@ function openFriends() { showSetTab('friends'); openSettings(); frPoll(true); sf
 $('friendsBtn').addEventListener('click', openFriends);
 $('menuFriends').addEventListener('click', e => { e.stopPropagation(); openFriends(); });
 $('setTabs').addEventListener('click', e => { if (e.target.closest('button')?.dataset.t === 'friends') { frSure = 0; frPoll(true); } });
-// the results screen: a + ADD next to each signed-in player you aren't friends with yet (js/net.js calls this after endMatch)
+// the results screen: a + ADD next to each signed-in player you aren't friends with yet (js/net.js calls this after endMatch).
+// Bots and guests (data-nofid) get one too that just shows SENT and never answers, like in the PLAYERS list
 function frPostButtons() {
   if (!auth || !fr.me) return;
+  for (const s of $('postBoard').querySelectorAll('[data-nofid]')) {
+    if (s.querySelector('button')) continue;
+    const r = recs.find(r => r.pid === +s.dataset.nofid), sent = !!r && frAskedNoAcct.has(r.name);
+    if (r) s.insertAdjacentHTML('beforeend', ` <button class="fb" data-act="none" data-pid="${r.pid}"${sent ? ' disabled' : ''}>${sent ? 'SENT' : '+ ADD'}</button>`);
+  }
   for (const s of $('postBoard').querySelectorAll('[data-fid]')) {
     const id = +s.dataset.fid; if (!id || id === fr.me.id || s.querySelector('button')) continue;
     const done = frIds.has(id) || frOut.has(id);
@@ -133,6 +139,7 @@ function frPostButtons() {
 $('postBoard').addEventListener('click', async e => {
   const b = e.target.closest('button.fb'); if (!b || b.disabled) return;
   b.disabled = true;
+  if (b.dataset.act === 'none') { const r = recs.find(r => r.pid === +b.dataset.pid); if (r) frAskedNoAcct.add(r.name); b.textContent = 'SENT'; sfx('ui'); return; }
   if (b.dataset.act === 'acc') { if (await frCall('accept', { id: +b.dataset.id })) { b.textContent = 'FRIENDS'; sfx('buy'); frPoll(true); } else b.disabled = false; return; }
   const r = await frAdd('#' + b.dataset.id);
   if (r) b.textContent = r.result === 'friends' ? 'FRIENDS' : 'SENT'; else b.disabled = false;
