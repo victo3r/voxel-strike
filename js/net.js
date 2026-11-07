@@ -106,7 +106,7 @@ net = (() => {
     let r;
     if (o.code) {
       r = await fetchJson('/play/code/' + o.code);
-      if (r.status === 404) throw new Error('No room with that code');
+      if (r.status === 404 || r.status === 422) throw new Error('No room with that code');
       if (!r.room) throw new Error('Could not look up that code');
       o.mode = r.mode; o.map = r.map;
     } else if (o.create) {
