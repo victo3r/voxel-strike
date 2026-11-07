@@ -16,7 +16,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
   under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
   `maps.mjs`, `gear.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/measure-bots.mjs ladder` measures bot hit rates per
-  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows) also need the local dev server described in the server README; run
+  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
 - `node ../voxel-strike-server/scripts/check-tables.mjs` must pass after changing any number the server also uses (weapon stats,
   match rules, rewards, armor, gear, map sizes/pads): the server keeps its own copy in `tables.js`.
@@ -43,7 +43,8 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   owns health, scores, clock, respawns and pickup pads. One player's client (the host) runs the room's bots with the offline AI
   and streams them. Protocol and server rules are in the server repo's `docs/` (spec-v2.md, spec-b.md, spec-c.md, spec-friends.md).
 - **Stats** are counted by the server only (room.js `saveStats`): signed-in players in public online rooms, into D1 `stats`,
-  `stats_week` and `stats_guns`; `GET /stats/<id>` reads them. The daily reward (`js/daily.js`) is client-side, in `prof.daily`.
+  `stats_week` and `stats_guns`; `GET /stats/<id>` (a player card) and `GET /boards`
+  (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`) is client-side, in `prof.daily`.
 - **Account** (`js/profile.js`, synced by `js/cloud.js`): level, coins, owned guns and stars, loadout, armor, boots and hats in
   `prof`, saved to localStorage and to the server when signed in. Zombie-wave shop coins are separate from account coins.
 - **Maps** (`js/maps/*.js`) register with `startMap`, build meshes plus collision `solids` (`addBlock`/`addSlab`/`addSolid` in

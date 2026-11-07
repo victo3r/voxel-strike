@@ -27,7 +27,7 @@ function renderDaily() {
   $('dailyBtn').classList.toggle('ready', !s.claimed);
   if ($('daily').style.display !== 'flex') return;
   const left = Math.max(0, Math.ceil((new Date().setHours(24, 0, 0, 0) - Date.now()) / 1000)), hms = `${left / 3600 | 0}:${String((left / 60 | 0) % 60).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
-  $('dailyBox').innerHTML = `<h1>${ico('gift')} DAILY REWARD</h1><p>${s.lost ? 'Missed a day, so the streak starts again' : 'Come back every day for bigger rewards'}</p>` +
+  $('dailyBox').innerHTML = `<h1>${ico('gift')} DAILY REWARD</h1><p>${s.lost ? 'You lost your streak.' : 'Come back every day for bigger rewards'}</p>` +
     `<div class="days">${DAILY.map((r, i) => { const n = i + 1, cls = n < s.day || (s.claimed && n === s.day) ? 'done' : n === s.day ? 'now' : '';
       return `<div class="day ${cls}${n === DAILY.length ? ' big' : ''}"><b>DAY ${n}</b><div class="gift">${dailyGift(r)}</div>${cls === 'done' ? ico('check', 'ck') : ''}</div>`; }).join('')}</div>` +
     (s.claimed ? `<button id="dailyGo" disabled>NEXT IN ${hms}</button>` : `<button id="dailyGo" class="go">CLAIM</button>`) +

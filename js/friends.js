@@ -86,7 +86,7 @@ function renderFriends() {
   const me = fr.me;
   $('frMe').innerHTML = me ? `You: <b>${esc(myName)}</b>${me.user.toLowerCase() !== myName.toLowerCase() ? ` <small>@${esc(me.user)}</small>` : ''} · ID <b>#${me.id}</b><small>Friends add you by your username or your ID</small>` : '';
   const btn = (act, id, label, cls = '') => `<button data-act="${act}" data-id="${id}"${cls ? ` class="${cls}"` : ''}>${label}</button>`;
-  const who = f => `<b>${esc(f.name)}</b>${f.user.toLowerCase() !== f.name.toLowerCase() ? `<small>@${esc(f.user)}</small>` : ''}`;
+  const who = f => `<b data-card="${f.id}" class="pn">${esc(f.name)}</b>${f.user.toLowerCase() !== f.name.toLowerCase() ? `<small>@${esc(f.user)}</small>` : ''}`;
   const inv = fr.invites.filter(i => !frHidden.has(i.id + ':' + i.room)).map(i =>
     `<div class="frRow on">${who(i)}<span class="st">invited you · ${esc(whereText(i))}</span>${i.humans < i.cap ? btn('jinv', i.id, 'JOIN') : '<span class="full">FULL</span>'}${btn('hide', i.id + ':' + i.room, '✕', 'x')}</div>`).join('');
   const reqs = fr.in.map(f => `<div class="frRow">${who(f)}<span class="st">wants to be friends</span>${btn('acc', f.id, 'ACCEPT')}${btn('dec', f.id, '✕', 'x')}</div>`).join('');
