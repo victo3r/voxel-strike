@@ -1,13 +1,10 @@
-// Every sound in the game is made here in code (no audio files).
-// Each one is built once when the page loads (rendered into a buffer), so a gun sounds exactly the same every shot,
-// and playing it is cheap even when several miniguns are going at once.
-// sfx(name) plays one for you; sfx(name, { at: position }) plays it out in the world, panned left/right and quieter with distance.
+// sound effects, all made in code and rendered once at load
 const SR = 44100;
-const BUF = {}; // name -> { buf, v }
+const BUF = {};
 let ac = null, bus, outGain, verbIn;
 let volume = 0.8;
 try { const v = parseFloat(localStorage.getItem('voxelstrike-vol')); if (v >= 0 && v <= 1) volume = v; } catch {}
-// the mute buttons beside the volume sliders (settings, SOUND): the slider keeps its level for when you unmute
+// mute buttons
 let mutes = { sfx: false, music: false };
 try { const m = JSON.parse(localStorage.getItem('voxelstrike-mute')); if (m) mutes = { sfx: !!m.sfx, music: !!m.music }; } catch {}
 const sfxGain = () => mutes.sfx ? 0 : volume;
@@ -15,7 +12,7 @@ function setMute(k, on) {
   mutes[k] = on; try { localStorage.setItem('voxelstrike-mute', JSON.stringify(mutes)); } catch {}
   if (k === 'sfx') { if (outGain) outGain.gain.value = sfxGain(); } else setMusicVolume(musicVol);
 }
-// hush: silent while CrazyGames says mute (their setting beats the volume sliders) or an ad plays (js/crazy.js)
+// silent while CrazyGames mutes us or an ad plays
 let hush = null;
 function cgHush() { if (hush) hush.gain.value = cgQuiet() ? 0 : 1; }
 function setVolume(v) { volume = v; if (outGain) outGain.gain.value = sfxGain(); try { localStorage.setItem('voxelstrike-vol', v); } catch {} }
@@ -27,10 +24,10 @@ function audio() {
     const comp = ac.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2;
     bus = ac.createGain(); outGain = ac.createGain(); outGain.gain.value = sfxGain();
-    hush = ac.createGain(); hush.connect(ac.destination); cgHush(); // everything (sounds and music) goes out through hush
+    hush = ac.createGain(); hush.connect(ac.destination); cgHush();
     bus.connect(comp).connect(outGain).connect(hush);
-    // a short shared echo so sounds have some space around them instead of sounding flat
-    const ir = ac.createBuffer(2, ac.sampleRate * 1.2, ac.sampleRate), r = rng(7); // must match the sound card's rate
+    // shared echo
+    const ir = ac.createBuffer(2, ac.sampleRate * 1.2, ac.sampleRate), r = rng(7);
     for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (r() * 2 - 1) * (1 - i / d.length) ** 3.5 * (i < 400 ? i / 400 : 1); }
     const verb = ac.createConvolver(); verb.buffer = ir;
     verbIn = ac.createGain(); const wet = ac.createGain(); wet.gain.value = .35;
@@ -39,10 +36,10 @@ function audio() {
   if (ac.state === 'suspended') ac.resume();
   return ac;
 }
-// browsers only allow sound after you click or press something
+// browsers only allow sound after a click or key press
 addEventListener('pointerdown', audio); addEventListener('keydown', audio);
 
-// ---- building blocks used by the sound recipes below. t = start time, a = attack, d = fade time, v = loudness ----
+// building blocks for the sounds below
 function kit(c, seed) {
   const r = rng(seed), out = c.destination;
   const nb = c.createBuffer(1, SR * 2, SR), nd = nb.getChannelData(0);
@@ -58,7 +55,6 @@ function kit(c, seed) {
   }
   const s = {
     r,
-    // an oscillator sliding from f to f2. lp/bp = optional lowpass/bandpass to soften or shape it
     tone({ type = 'sine', f, f2 = f, t = 0, a = .002, d = .1, v = .5, glide = a + d, lp = 0, bp = 0, q = 1 }) {
       const o = c.createOscillator(); o.type = type;
       o.frequency.setValueAtTime(f, t); if (f2 !== f) o.frequency.exponentialRampToValueAtTime(f2, t + glide);
@@ -67,18 +63,17 @@ function kit(c, seed) {
       if (bp) n = n.connect(filt('bandpass', bp, bp, q, t, 0));
       env(n, t, a, d, v); o.start(t); o.stop(t + a + d + .02);
     },
-    // filtered noise. ft = filter type, swept from f to f2
     hiss({ t = 0, a = .001, d = .1, v = .5, ft = 'lowpass', f = 2000, f2 = f, q = 1, sweep = a + d }) {
       const n = c.createBufferSource(); n.buffer = nb;
       env(n.connect(filt(ft, f, f2, q, t, sweep)), t, a, d, v);
       n.start(t, r() * 1.5); n.stop(t + a + d + .02);
     },
-    // metal: a few out-of-tune partials ringing together
+    // metal ring
     ring({ f, t = 0, d = .3, v = .5, ratios = [1, 2.76, 5.4, 8.93] }) {
       ratios.forEach((k, i) => s.tone({ f: f * k, t, d: d / (1 + i * .5), v: v / (1 + i * .8) }));
     },
     click({ t = 0, f = 2500, v = .6 }) { s.hiss({ t, ft: 'bandpass', f, q: 5, d: .018, v }); s.tone({ type: 'triangle', f: f * .35, f2: f * .25, t, d: .025, v: v * .4 }); },
-    // a sound drawn sample by sample. fill(array) writes it, then it's scaled so its loudest point is v
+    // a sound drawn sample by sample
     draw(t, dur, fill, v = 1) {
       const b = c.createBuffer(1, Math.ceil(dur * SR), SR), o = b.getChannelData(0);
       fill(o);
@@ -86,9 +81,7 @@ function kit(c, seed) {
       if (pk) for (let i = 0; i < o.length; i++) o[i] *= v / pk;
       const src = c.createBufferSource(); src.buffer = b; src.connect(out); src.start(t);
     },
-    // two parts of a gun hitting: a sharp noise tick colored by a few heavily damped resonances around f.
-    // They die out within a few ms so it reads as a click/clack, not a ringing glass or bell. d = how long the tick rattles.
-    // body = the weight behind it (a dull noisy thud, not a tone)
+    // gun parts clacking together
     clack({ t = 0, f = 2400, d = .02, v = .8, body = 0 }) {
       const tau = Math.min(d * .12, .0025);
       const res = [[1, 1], [.55, .8], [1.8, .4]].map(([k, A]) => {
@@ -106,7 +99,7 @@ function kit(c, seed) {
         }
       }, v);
     },
-    // weight landing: low rumbly noise (no pure tone) that dies away over d. f = how deep
+    // low thud
     thud({ t = 0, d = .05, f = 140, v = .8 }) {
       const k = 1 - Math.exp(-6.2832 * f / SR);
       s.draw(t, d * 4 + .01, o => {
@@ -114,7 +107,7 @@ function kit(c, seed) {
         for (let i = 0; i < o.length; i++) { const x = i / SR; a += (r() * 2 - 1 - a) * k; b += (a - b) * k; o[i] = b * Math.min(1, x / .002) * Math.exp(-x / d); }
       }, v);
     },
-    // lots of tiny random clicks: grass blades, sand grains, gravel. dens = how many per sample, lo-hi = the band they ring in
+    // crunchy grass, sand or gravel
     crunch({ t = 0, a = .003, d = .08, dens = .05, lo = 900, hi = 5000, v = .6 }) {
       const kh = 1 - Math.exp(-6.2832 * hi / SR), kl = 1 - Math.exp(-6.2832 * lo / SR);
       s.draw(t, a + d * 3, o => {
@@ -127,7 +120,7 @@ function kit(c, seed) {
         }
       }, v);
     },
-    // a hollow knock: noise hitting a few low resonances that die out over tau (wood, a metal deck). Low and short, so it doesn't ring
+    // hollow knock on wood or metal
     knock({ t = 0, f = 300, tau = .02, v = .8, parts = [[1, 1], [1.58, .55], [2.37, .3]], grit = .15 }) {
       const res = parts.map(([k, A]) => {
         const R = Math.exp(-1 / (tau * SR * (1 - .25 * Math.log2(k)))), w = 6.2832 * f * k * (.96 + r() * .08) / SR;
@@ -136,15 +129,13 @@ function kit(c, seed) {
       s.draw(t, tau * 6 + .02, o => {
         for (let i = 0; i < o.length; i++) {
           const x = i / SR, ex = (r() * 2 - 1) * Math.exp(-x / .0012);
-          let y = ex * grit; // grit = how much of the raw hit you hear on top of the knock
+          let y = ex * grit;
           for (const q of res) { const yy = ex + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = yy; y += yy * q.A * 4; }
           o[i] = y;
         }
       }, v);
     },
-    // a board creaking under weight: the wood sticks and slips, an uneven tick each time (some slips skipped, some bigger),
-    // at f to f2 ticks a second. Each tick rings the board's narrow, uneven resonances (res = [freq, width]).
-    // The ticks are too fast and too ragged, and the ringing too high and narrow, to sound like a voice. Swells in and out over d
+    // creaky floorboard
     creak({ t = 0, d = .12, f = 420, f2 = f * 1.25, v = .3, res = [[1380, 45], [2270, 60], [3610, 90]] }) {
       const rs = res.map(([F, bw], k) => { const R = Math.exp(-Math.PI * bw / SR); return { A: (1 - R) / (1 + k * .5), c1: 2 * R * Math.cos(6.2832 * F / SR), c2: -R * R, y1: 0, y2: 0 }; });
       s.draw(t, d + .06, o => {
@@ -160,7 +151,7 @@ function kit(c, seed) {
         }
       }, v);
     },
-    // metal sliding on metal: gritty band-limited noise around f
+    // metal sliding on metal
     scrape({ t = 0, d = .08, f = 1500, v = .35 }) {
       const k1 = 1 - Math.exp(-6.2832 * f * 1.6 / SR), k2 = 1 - Math.exp(-6.2832 * f * .6 / SR);
       s.draw(t, d + .01, o => {
@@ -172,10 +163,7 @@ function kit(c, seed) {
         }
       }, v);
     },
-    // a human grunt or groan. A buzzing voice goes through the mouth's vowel resonances (fm = [freq, width, level]),
-    // which slide toward fm2 as the mouth closes. h = the breathy "h" before the voice starts. Pitch rises from f0 to fpk
-    // (the effort), then falls to f1. rough = growl/strain (every other vocal-cord cycle is weaker), rough2 = how rough it ends.
-    // tail = the breath let out after
+    // grunts and groans
     voice({ t = 0, d = .18, f0 = 150, fpk = 190, pk = .15, f1 = 115, v = 1, h = .015, rough = .25, rough2 = rough, breath = .3, tail = .08,
       fm = [[640, 90, 1], [1190, 100, .5], [2390, 140, .22], [3300, 220, .1], [3750, 260, .06]], fm2 = fm }) {
       s.draw(t, h + d + tail + .06, o => {
@@ -194,8 +182,8 @@ function kit(c, seed) {
           const dg = g - prev; prev = g;
           const venv = x < 0 ? 0 : Math.min(1, x / .006) * (x < d * .45 ? 1 : Math.exp(-(x - d * .45) / (d * .22)));
           const w = r() * 2 - 1;
-          const asp = x < 0 ? Math.min(1, (x + h) / .004) * .8 : 0; // the "h" before it
-          const out = x > d * .5 ? .45 * Math.exp(-(x - d * .5) / tail) * Math.min(1, (x - d * .5) / .03) : 0; // breathing out after
+          const asp = x < 0 ? Math.min(1, (x + h) / .004) * .8 : 0;
+          const out = x > d * .5 ? .45 * Math.exp(-(x - d * .5) / tail) * Math.min(1, (x - d * .5) / .03) : 0;
           const src = dg * 22 * venv + w * (breath * venv * (.3 + g) + (asp + out) * breath);
           let y = 0;
           fm.forEach(([F, B, A], k) => {
@@ -204,14 +192,14 @@ function kit(c, seed) {
             const R = Math.exp(-Math.PI * Bx / SR), yy = src + 2 * R * Math.cos(6.2832 * Fx / SR) * q.y1 - R * R * q.y2;
             q.y2 = q.y1; q.y1 = yy; y += yy * Ax;
           });
-          lo += (y - lo) * .55; // take the harsh top off, so it sounds like a chest and not a speaker
+          lo += (y - lo) * .55;
           o[i] = lo;
         }
       }, v);
     },
-    // a bullet hitting a body: a soft thud and a slap
+    // bullet hitting a body
     impact(t) { s.hiss({ t, f: 350, d: .05, v: .9 }); s.hiss({ t, ft: 'bandpass', f: 1500, q: 1, d: .012, v: .6 }); },
-    // pieces of reloads (and the ammo pickup)
+    // reload pieces
     magOut(t) { s.clack({ t, f: 3600, d: .008, v: .35 }); s.scrape({ t: t + .02, d: .1, f: 1800, v: .3 }); },
     magIn(t) { s.scrape({ t, d: .06, f: 1400, v: .3 }); s.clack({ t: t + .06, f: 1600, d: .022, v: 1, body: .9 }); s.clack({ t: t + .085, f: 3400, d: .01, v: .4 }); },
     rack(t) { s.scrape({ t, d: .07, f: 2000, v: .35 }); s.clack({ t: t + .07, f: 1900, d: .018, v: .7, body: .3 }); s.clack({ t: t + .16, f: 2300, d: .025, v: 1, body: .7 }); },
@@ -222,117 +210,116 @@ function kit(c, seed) {
     latch(t) { s.clack({ t, f: 1500, d: .015, v: .8, body: .3 }); },
     thunk(t) { s.clack({ t, f: 750, d: .03, v: 1, body: 1.4 }); },
     rattle(t) { for (let k = 0; k < 6; k++) s.clack({ t: t + k * .035, f: 2400 + r() * 1200, d: .006, v: .3 }); },
-    // pickup jingle: quick rising notes
     arp(t, notes, { type = 'triangle', gap = .055, d = .3, v = .4 } = {}) { notes.forEach((f, i) => s.tone({ type, f, t: t + i * gap, d, v })); },
   };
   return s;
 }
 
-// recipes: name -> [length in seconds, volume, build]
+// name: [length, volume, build]
 const SOUNDS = {
-  // ---- your guns firing (bots use these too) ----
-  voxel: [.3, .5, s => { // teal energy pistol: a bright "pew"
+  // guns
+  voxel: [.3, .5, s => {
     s.tone({ type: 'square', f: 1500, f2: 320, d: .11, v: .3, lp: 3500 });
     s.tone({ f: 950, f2: 220, d: .14, v: .55 });
     s.hiss({ ft: 'bandpass', f: 3500, q: 1.5, d: .025, v: .5 });
     s.tone({ f: 120, f2: 50, d: .08, v: .6 });
   }],
-  shotgun: [.75, .9, s => { // big boom, then the pump racks
+  shotgun: [.75, .9, s => {
     s.hiss({ f: 3200, f2: 220, d: .35, v: 1 });
     s.tone({ f: 140, f2: 40, d: .25, v: 1 });
     s.hiss({ ft: 'highpass', f: 4000, d: .02, v: .5 });
     s.pump(.38);
   }],
-  ar: [.2, .42, s => { // short punchy "pap" (fires 11 times a second, so it stays tight)
+  ar: [.2, .42, s => {
     s.hiss({ ft: 'bandpass', f: 2000, f2: 900, q: .8, d: .07, v: .9 });
     s.tone({ f: 170, f2: 60, d: .06, v: .9 });
     s.click({ f: 4000, v: .35 });
   }],
-  thrasher: [.2, .42, s => { // like the AR's "pap" but grittier: a raspy square-wave crunch and a brighter, rougher crack
+  thrasher: [.2, .42, s => {
     s.hiss({ ft: 'bandpass', f: 2600, f2: 1100, q: .7, d: .065, v: .9 });
     s.tone({ f: 190, f2: 65, d: .055, v: .85 });
     s.tone({ type: 'square', f: 230, f2: 90, d: .05, v: .32, lp: 2200 });
     s.tone({ type: 'sawtooth', f: 115, f2: 70, d: .04, v: .2, lp: 1400 });
     s.click({ f: 4800, v: .4 });
   }],
-  sniper: [1.05, 1, s => { // sharp crack, rolling boom, then the bolt cycles
+  sniper: [1.05, 1, s => {
     s.hiss({ ft: 'highpass', f: 3000, d: .03, v: 1 });
     s.hiss({ f: 4000, f2: 150, d: .6, v: .9 });
     s.tone({ f: 100, f2: 30, d: .45, v: 1 });
     s.tone({ type: 'square', f: 300, f2: 60, d: .15, v: .3, lp: 800 });
     s.boltUp(.55); s.boltDown(.72);
   }],
-  semisniper: [.55, .9, s => { // a tighter, punchier crack than the bolt-action and a shorter boom, then the action snaps back on its own
+  semisniper: [.55, .9, s => {
     s.hiss({ ft: 'highpass', f: 3400, d: .025, v: 1 });
     s.hiss({ f: 3600, f2: 220, d: .32, v: .75 });
     s.tone({ f: 130, f2: 40, d: .26, v: .9 });
     s.tone({ type: 'square', f: 360, f2: 90, d: .09, v: .28, lp: 1100 });
     s.clack({ t: .07, f: 2300, d: .012, v: .5, body: .3 }); s.clack({ t: .1, f: 3000, d: .01, v: .35 });
   }],
-  eradicator: [.12, .32, s => { // tiny "tk" with a thump; the motor whir is a separate live sound
+  eradicator: [.12, .32, s => { // the motor whir is in soundTick
     s.hiss({ ft: 'bandpass', f: 1500, f2: 700, d: .045, v: .9 });
     s.tone({ f: 150, f2: 70, d: .05, v: .8 });
     s.click({ f: 3500, v: .25 });
   }],
-  flameStart: [.45, .5, s => { // "fwoomp" when the flamethrower lights up
+  flameStart: [.45, .5, s => {
     s.hiss({ f: 250, f2: 1600, a: .05, d: .3, v: 1, sweep: .12 });
     s.tone({ f: 70, f2: 120, a: .04, d: .3, v: .6 });
   }],
   flameEnd: [.3, .35, s => { s.hiss({ f: 900, f2: 200, d: .25, v: 1 }); }],
-  rocket: [.8, .85, s => { // thump out of the tube and a whoosh
+  rocket: [.8, .85, s => {
     s.tone({ f: 90, f2: 40, d: .2, v: 1 });
     s.hiss({ ft: 'bandpass', f: 300, f2: 2500, q: 2, a: .05, d: .55, v: .8 });
     s.click({ f: 900, v: .5 });
   }],
-  boom: [1.6, 1, s => { // rockets and exploders
+  boom: [1.6, 1, s => {
     s.hiss({ f: 1800, f2: 80, a: .004, d: 1.3, v: 1 });
     s.tone({ f: 70, f2: 25, d: .7, v: 1 });
     s.hiss({ ft: 'highpass', f: 2500, d: .05, v: .6 });
     s.tone({ type: 'square', f: 120, f2: 40, d: .4, v: .35, lp: 400 });
     s.hiss({ f: 220, t: .05, a: .05, d: 1.1, v: .6 });
   }],
-  flare: [.5, .55, s => { // "ploomp" and a fizzing hiss
+  flare: [.5, .55, s => {
     s.tone({ f: 260, f2: 110, d: .1, v: 1 });
     s.hiss({ ft: 'highpass', f: 2500, f2: 6000, a: .02, d: .35, v: .45 });
     s.click({ f: 1200, v: .3 });
   }],
-  flareHit: [.6, .6, s => { // burst of sparks
+  flareHit: [.6, .6, s => {
     s.hiss({ ft: 'bandpass', f: 1500, f2: 400, d: .35, v: .9 });
     s.tone({ f: 180, f2: 60, d: .15, v: .7 });
     for (let k = 0; k < 7; k++) s.click({ t: .04 + s.r() * .4, f: 2500 + s.r() * 3000, v: .3 });
   }],
-  hitman: [.25, .32, s => { // suppressed: a soft "thwp" and the slide clacking back, no bang
+  hitman: [.25, .32, s => {
     s.hiss({ ft: 'bandpass', f: 1300, f2: 500, q: 1.2, d: .045, v: 1 });
     s.thud({ d: .025, f: 220, v: .7 });
     s.clack({ t: .012, f: 3200, d: .01, v: .55 }); s.clack({ t: .05, f: 2600, d: .012, v: .4 });
   }],
-  heatStart: [.3, .45, s => { // the beam catching: a quick rising zap
+  heatStart: [.3, .45, s => {
     s.tone({ f: 300, f2: 1800, d: .14, v: .5, glide: .1 });
     s.tone({ type: 'square', f: 150, f2: 420, d: .14, v: .2, lp: 2000, glide: .1 });
     s.hiss({ ft: 'highpass', f: 4000, d: .08, v: .35 });
   }],
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
-  djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // Raider Boots' second jump: a quick puff of air
-  swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife whoosh
-  slash: [.25, .6, s => { // knife connecting: the edge scraping through, a "shhing" rising in pitch, a faint ring of metal under it and a thud
+  djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // double jump
+  swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife
+  slash: [.25, .6, s => {
     s.hiss({ ft: 'bandpass', f: 2200, f2: 7500, q: 4, a: .008, d: .2, v: 1, sweep: .18 });
     s.hiss({ ft: 'highpass', f: 5000, f2: 8000, a: .015, d: .15, v: .4 });
-    for (const [f, v] of [[3150, .06], [4420, .045], [5930, .035]]) s.tone({ t: .02, f, f2: f * .97, d: .22, v }); // out of tune with each other, so it rings, not tinks
+    for (const [f, v] of [[3150, .06], [4420, .045], [5930, .035]]) s.tone({ t: .02, f, f2: f * .97, d: .22, v });
     s.thud({ d: .05, f: 150, v: .7 });
   }],
-  // ---- aiming down a scope or holo sight (zin_ = in, zout_ = out). Same every time, no glassy ring ----
-  zin_sniper: [.4, .42, s => { // stock pulled into the shoulder, then the zoom ring turns three notches
+  // aiming in and out
+  zin_sniper: [.4, .42, s => {
     s.hiss({ ft: 'bandpass', f: 500, f2: 1400, q: 1.5, a: .03, d: .07, v: .6, sweep: .09 });
     s.thud({ t: .07, d: .03, f: 130, v: .9 });
     s.clack({ t: .08, f: 1500, d: .014, v: .5, body: .5 });
     for (let k = 0; k < 3; k++) s.clack({ t: .16 + k * .045, f: 3000 + k * 250, d: .005, v: .3 });
   }],
-  zout_sniper: [.3, .36, s => { // ring clicks back, the stock leaves your shoulder
+  zout_sniper: [.3, .36, s => {
     for (let k = 0; k < 2; k++) s.clack({ t: k * .04, f: 3200 - k * 250, d: .005, v: .28 });
     s.hiss({ ft: 'bandpass', f: 1300, f2: 450, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
     s.clack({ t: .11, f: 1300, d: .012, v: .3, body: .3 });
   }],
-  zin_semisniper: [.32, .4, s => { // stock into the shoulder, then two quick notches on the zoom ring
+  zin_semisniper: [.32, .4, s => {
     s.hiss({ ft: 'bandpass', f: 550, f2: 1500, q: 1.5, a: .025, d: .06, v: .55, sweep: .08 });
     s.thud({ t: .06, d: .025, f: 150, v: .8 });
     s.clack({ t: .07, f: 1700, d: .012, v: .45, body: .4 });
@@ -343,16 +330,16 @@ const SOUNDS = {
     s.hiss({ ft: 'bandpass', f: 1400, f2: 500, q: 1.5, a: .02, d: .07, v: .45, sweep: .09 });
     s.clack({ t: .09, f: 1400, d: .012, v: .28, body: .3 });
   }],
-  zin_thrasher: [.3, .4, s => { // rifle snaps up and the holo sight blinks on with a short rising chirp
+  zin_thrasher: [.3, .4, s => {
     s.hiss({ ft: 'bandpass', f: 600, f2: 1800, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 });
     s.clack({ t: .05, f: 1800, d: .012, v: .55, body: .4 });
     s.tone({ type: 'square', f: 1100, f2: 1700, t: .07, a: .004, d: .05, v: .16, lp: 2600, glide: .04 });
   }],
-  zout_thrasher: [.25, .34, s => { // the chirp drops as it shuts off and the rifle comes down
+  zout_thrasher: [.25, .34, s => {
     s.tone({ type: 'square', f: 1500, f2: 900, a: .004, d: .045, v: .14, lp: 2400, glide: .04 });
     s.hiss({ ft: 'bandpass', f: 1600, f2: 550, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
   }],
-  zin_hitman: [.22, .32, s => { // a light pistol: quick lift, small tick and a tiny high blip
+  zin_hitman: [.22, .32, s => {
     s.hiss({ ft: 'bandpass', f: 900, f2: 2200, q: 1.6, a: .015, d: .045, v: .45, sweep: .05 });
     s.clack({ t: .035, f: 2800, d: .007, v: .4 });
     s.tone({ type: 'square', f: 1900, f2: 2400, t: .05, a: .003, d: .035, v: .12, lp: 3200, glide: .025 });
@@ -364,8 +351,8 @@ const SOUNDS = {
   dry: [.1, .5, s => { s.clack({ f: 2800, d: .01, v: .8 }); }],
   equip: [.25, .4, s => { s.scrape({ d: .07, f: 1500, v: .4 }); s.clack({ t: .07, f: 2200, d: .015, v: .8, body: .3 }); }],
 
-  // ---- reloads: one per gun, timed to the gun's base reload. Upgrades make reloads faster, so these just play faster too ----
-  r_voxel: [1, .45, s => { // mag out, mag in, then the teal charge-up
+  // reloads, timed to each gun's base reload
+  r_voxel: [1, .45, s => {
     s.magOut(.08); s.magIn(.32);
     s.tone({ type: 'square', f: 300, f2: 1600, t: .55, a: .2, d: .08, v: .2, lp: 2500, glide: .25 });
     s.tone({ f: 600, f2: 2400, t: .55, a: .2, d: .08, v: .3, glide: .25 });
@@ -381,26 +368,24 @@ const SOUNDS = {
   r_rocket: [2.6, .45, s => { s.latch(.3); s.hiss({ ft: 'bandpass', f: 600, f2: 300, q: 2, t: 1.0, a: .1, d: .25, v: .5 }); s.thunk(1.35); s.latch(2.1); }],
   r_flare: [1.3, .45, s => { s.latch(.1); s.shell(.6); s.latch(1.0); }],
   r_hitman: [1.1, .45, s => { s.magOut(.08); s.magIn(.5); s.rack(.82); }],
-  r_heatray: [2, .45, s => { // vent the heat, swap the cell, then it charges back up
+  r_heatray: [2, .45, s => {
     s.latch(.12); s.hiss({ ft: 'highpass', f: 3500, f2: 1500, t: .18, a: .03, d: .45, v: .5 });
     s.magOut(.8); s.magIn(1.2);
     s.tone({ f: 400, f2: 2000, t: 1.5, a: .25, d: .1, v: .28, glide: .3 }); s.tone({ f: 2000, t: 1.85, d: .12, v: .25 });
   }],
 
-  // ---- getting hit. These play from whoever got hit, so a far-away hit is barely audible ----
-  // a short, strained "hgh!" pushed out of the chest, the mouth closing toward "uhm"
+  // getting hit
   hurt: [.25, .5, s => {
     s.impact(0);
     s.voice({ t: .005, h: .015, d: .1, f0: 135, fpk: 185, pk: .2, f1: 110, rough: .3, rough2: .55, breath: .35, tail: .03,
       fm2: [[480, 100, 1], [1050, 110, .45], [2300, 150, .18], [3300, 240, .08], [3750, 280, .05]] });
   }],
-  hurtHead: [.3, .55, s => { // same grunt, sharper, with a hard crack on top
+  hurtHead: [.3, .55, s => {
     s.impact(0); s.clack({ f: 1300, d: .012, v: .7, body: .7 }); s.hiss({ ft: 'bandpass', f: 3200, q: 1.2, d: .02, v: .5 });
     s.voice({ t: .01, h: .01, d: .1, f0: 150, fpk: 205, pk: .15, f1: 115, rough: .35, rough2: .6, breath: .4, tail: .03, v: .9,
       fm2: [[480, 100, 1], [1050, 110, .45], [2300, 150, .18], [3300, 240, .08], [3750, 280, .05]] });
   }],
-  armorHit: [.3, .55, s => { s.clack({ f: 1100, d: .02, v: 1, body: .8 }); s.hiss({ ft: 'bandpass', f: 2800, q: 1.3, d: .03, v: .45 }); }], // bullet into a plate
-  // a groan that strains up, breaks into a rough fry, and fades out on a last breath ("aAAghh...hhh")
+  armorHit: [.3, .55, s => { s.clack({ f: 1100, d: .02, v: 1, body: .8 }); s.hiss({ ft: 'bandpass', f: 2800, q: 1.3, d: .03, v: .45 }); }],
   die: [.65, .55, s => {
     s.impact(0);
     s.voice({ t: .005, h: .02, d: .35, f0: 140, fpk: 200, pk: .12, f1: 75, rough: .2, rough2: .85, breath: .45, tail: .12,
@@ -408,30 +393,27 @@ const SOUNDS = {
       fm2: [[520, 120, 1], [1000, 130, .4], [2350, 170, .15], [3300, 260, .06], [3750, 300, .04]] });
   }],
 
-  // ---- kills (only for yours) ----
+  // kills
   kill: [.45, .55, s => { s.tone({ f: 120, f2: 60, d: .1, v: .8 }); s.tone({ type: 'triangle', f: 1046, t: .02, d: .3, v: .6 }); s.tone({ f: 2093, t: .02, d: .15, v: .2 }); }],
-  killSpecial: [.85, .65, s => { // headshots and streaks
+  killSpecial: [.85, .65, s => {
     s.tone({ f: 100, f2: 50, d: .12, v: .8 });
     s.arp(0, [784, 1046, 1318, 1568], { gap: .06, d: .35, v: .5 });
     s.hiss({ ft: 'highpass', f: 7000, t: .1, a: .05, d: .4, v: .25 });
   }],
 
-  // ---- moving ----
-  // footsteps and landings (step_<surface>, step_<surface>2 for the other foot, land_<surface>) are made from FOOT below
-
-  // ---- pickups ----
-  pickHealth: [.75, .5, s => { // sparkly "bling"
+  // pickups
+  pickHealth: [.75, .5, s => {
     s.arp(0, [1318, 1661, 1976, 2637], { gap: .05, d: .3, v: .45 });
     s.tone({ f: 3951, t: .15, d: .4, v: .15 });
     s.hiss({ ft: 'highpass', f: 8000, a: .05, d: .35, v: .15 });
   }],
   pickAmmo: [.45, .6, s => { s.magOut(0); s.magIn(.14); }],
-  pickArmor: [.5, .65, s => { // a strap pulled tight, then the plates settling on
+  pickArmor: [.5, .65, s => {
     s.scrape({ d: .1, f: 900, v: .4 });
     s.clack({ t: .1, f: 900, d: .025, v: 1, body: 1 }); s.clack({ t: .19, f: 1300, d: .015, v: .55, body: .5 });
   }],
 
-  // ---- zombies ----
+  // zombies
   zAttack: [.35, .6, s => { s.hiss({ ft: 'bandpass', f: 600, f2: 1800, q: 2, a: .03, d: .1, v: .7 }); s.tone({ type: 'sawtooth', f: 140, f2: 90, d: .2, v: .6, bp: 600, q: 2 }); s.tone({ f: 100, f2: 50, t: .08, d: .08, v: .6 }); }],
   zDie: [.6, .55, s => { s.tone({ type: 'sawtooth', f: 180, f2: 60, a: .02, d: .45, v: .8, bp: 600, q: 2 }); }],
   fuse: [.08, .4, s => { s.tone({ type: 'square', f: 1500, d: .05, v: .5, lp: 4000 }); }],
@@ -444,7 +426,7 @@ const SOUNDS = {
   bonk: [.4, .6, s => { s.tone({ f: 420, f2: 200, d: .2, v: .7 }); s.clack({ f: 800, d: .02, v: .8, body: 1 }); }],
   smash: [.5, .8, s => { s.tone({ f: 120, f2: 40, d: .3, v: 1 }); s.hiss({ f: 1000, f2: 100, d: .3, v: .8 }); }],
 
-  // ---- menus and match events ----
+  // menus and match events
   ui: [.06, .3, s => { s.tone({ f: 900, f2: 700, d: .04, v: .6 }); s.click({ f: 3000, v: .3 }); }],
   buy: [.4, .45, s => { s.tone({ type: 'square', f: 988, d: .06, v: .35, lp: 3000 }); s.tone({ type: 'square', f: 1318, t: .07, d: .25, v: .35, lp: 3000 }); }],
   upgrade: [.6, .45, s => { s.arp(0, [523, 659, 784, 1046, 1318], { gap: .05, d: .25, v: .4 }); }],
@@ -456,46 +438,46 @@ const SOUNDS = {
   levelUp: [.9, .5, s => { s.arp(0, [523, 784, 1046, 1568, 2093], { gap: .045, d: .4, v: .4 }); s.hiss({ ft: 'highpass', f: 7000, t: .15, a: .05, d: .5, v: .2 }); }],
 };
 
-// one foot coming down on each surface at time t. k = pitch (the two feet differ a little), w = how hard
+// footsteps for each surface
 const FOOT = {
   grass(s, t, k, w) {
     s.thud({ t, d: .04, f: 120 * k, v: .8 * w });
-    s.crunch({ t, d: .075, dens: .04, lo: 800 * k, hi: 4500 * k, v: .9 * w }); // the blades crushing
+    s.crunch({ t, d: .075, dens: .04, lo: 800 * k, hi: 4500 * k, v: .9 * w });
     s.hiss({ t, f: 1500 * k, f2: 500, a: .003, d: .07, v: .3 * w });
   },
   sand(s, t, k, w) {
     s.thud({ t, d: .05, f: 110 * k, v: .7 * w });
-    s.crunch({ t, a: .012, d: .12, dens: .3, lo: 1500 * k, hi: 7000, v: .75 * w }); // fine grains shifting
+    s.crunch({ t, a: .012, d: .12, dens: .3, lo: 1500 * k, hi: 7000, v: .75 * w });
     s.hiss({ t, ft: 'bandpass', f: 2600 * k, f2: 1100, q: .7, a: .01, d: .11, v: .4 * w });
   },
-  wood(s, t, k, w) { // a hollow plank knock with a little scuff
+  wood(s, t, k, w) {
     s.thud({ t, d: .035, f: 160 * k, v: .8 * w });
     s.knock({ t, f: 240 * k, tau: .022, v: w, parts: [[1, 1], [1.47, .6], [2.3, .35], [3.1, .15]] });
     s.crunch({ t, d: .02, dens: .03, lo: 2000, hi: 6000, v: .2 * w });
   },
-  stone(s, t, k, w) { // a hard heel tap and a gritty scuff
+  stone(s, t, k, w) {
     s.thud({ t, d: .03, f: 150 * k, v: .6 * w });
     s.clack({ t, f: 2200 * k, d: .01, v: .65 * w, body: .6 });
     s.scrape({ t: t + .004, d: .045, f: 2800 * k, v: .3 * w });
   },
-  metal(s, t, k, w) { // a dull clunk on an iron deck
+  metal(s, t, k, w) {
     s.thud({ t, d: .035, f: 150 * k, v: .7 * w });
     s.knock({ t, f: 520 * k, tau: .03, v: .8 * w, grit: .04, parts: [[1, 1], [2.03, .45], [2.9, .4], [4.2, .2]] });
     s.clack({ t, f: 1500 * k, d: .006, v: .12 * w });
   },
 };
-// creaks under the boards: [step, other foot, landing]. Each sounds a little different, but the same every time
+// wood creaks: step, other foot, landing
 const CREAK = [{ t: .045, d: .11, f: 380, f2: 470, v: .16 },
   { t: .05, d: .09, f: 460, f2: 400, v: .13, res: [[1520, 50], [2490, 65], [3880, 95]] },
   { t: .035, d: .16, f: 340, f2: 430, v: .2, res: [[1290, 45], [2120, 60], [3420, 90]] }];
 const AFTER = { wood: (s, n) => s.creak(CREAK[n]) };
 for (const [surf, foot] of Object.entries(FOOT)) {
-  const toe = .05, after = AFTER[surf] || (() => {}); // heel, then the rest of the foot rolling down
+  const toe = .05, after = AFTER[surf] || (() => {});
   SOUNDS['step_' + surf] = [.32, .38, s => { foot(s, 0, 1, 1); foot(s, toe, 1.08, .45); after(s, 0); }];
   SOUNDS['step_' + surf + '2'] = [.32, .38, s => { foot(s, 0, .93, 1); foot(s, toe + .006, 1, .45); after(s, 1); }];
-  SOUNDS['land_' + surf] = [.38, .5, s => { s.thud({ d: .04, f: 170, v: .55 }); foot(s, 0, .95, 1.1); foot(s, .022, 1, .85); after(s, 2); }]; // both feet, nearly together
+  SOUNDS['land_' + surf] = [.38, .5, s => { s.thud({ d: .04, f: 170, v: .55 }); foot(s, 0, .95, 1.1); foot(s, .022, 1, .85); after(s, 2); }];
 }
-// falling into deep water: the slap, the spray coming back down, and bubbles rising after
+// splash
 SOUNDS.splash = [1.1, .8, s => {
   s.thud({ d: .07, f: 130, v: .7 });
   s.hiss({ ft: 'lowpass', f: 5500, f2: 1500, a: .002, d: .07, v: .9 });
@@ -505,9 +487,9 @@ SOUNDS.splash = [1.1, .8, s => {
 }];
 const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
-// small close-up sounds (gun handling, voices, steps) get much less of the shared echo, so clicks don't smear into a ringing room
+// close-up sounds get less echo
 const CLOSE = /^(r_|zin_|zout_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$)/;
-// render every recipe into a buffer, scaled so its loudest point is the same for all of them
+// render every sound at load
 const soundsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [len, v, build]], i) => {
   const c = new OfflineAudioContext(1, Math.ceil(SR * len), SR);
   build(kit(c, 1000 + i));
@@ -518,8 +500,7 @@ const soundsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [len, v
 }));
 soundsReady.catch(e => console.warn('sound setup failed', e));
 
-// play a sound. at = where it happens in the world (leave it out for your own sounds).
-// v = volume, rate = speed (also raises/lowers the pitch), far = distance where it fades out completely.
+// play a sound, optionally out in the world at a position
 function sfx(name, { at = null, v = 1, rate = 1, far = 60 } = {}) {
   if (!ac || ac.state !== 'running' || !BUF[name]) return null;
   let gain = BUF[name].v * v, pan = 0, cut = 20000, send = .1;
@@ -528,12 +509,12 @@ function sfx(name, { at = null, v = 1, rate = 1, far = 60 } = {}) {
     const d = Math.hypot(dx, dy, dz);
     if (d >= far) return null;
     gain *= (1 - d / far) ** 1.5 / (1 + d / 6);
-    // which side it's on, relative to where you're looking (you look down -z when yaw is 0)
+    // pan left or right
     const yaw = camera.rotation.y, dh = Math.hypot(dx, dz);
     if (dh > .01) {
       const right = (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / dh, ahead = (-dx * Math.sin(yaw) - dz * Math.cos(yaw)) / dh;
       pan = right * .85 * Math.min(1, dh / 1.5);
-      cut = 20000 / (1 + d / 10) * (ahead < -.3 ? .55 : 1); // further away and behind you = more muffled
+      cut = 20000 / (1 + d / 10) * (ahead < -.3 ? .55 : 1); // muffle far and behind
     }
     send = .12 + .45 * d / far;
   }
@@ -550,7 +531,7 @@ function sfx(name, { at = null, v = 1, rate = 1, far = 60 } = {}) {
 }
 function stopSfx(src) { try { src?.stop(); } catch {} }
 
-// hit sounds come from whoever got hit, at most one every 0.07s each (so a shotgun blast is one "uhf", not nine)
+// one hurt sound per hit, not one per shotgun pellet
 function hurtSfx(who, name, at, opts = {}) {
   if (!ac) return;
   if (who._sndT > ac.currentTime - .07) return;
@@ -558,10 +539,10 @@ function hurtSfx(who, name, at, opts = {}) {
   sfx(name, { at, far: 30, ...opts });
 }
 
-// ---- sounds that keep going while something is held: the flamethrower, the eradicator's motor and the heat ray ----
+// looping sounds: flamethrower, eradicator motor, heat ray
 let flameHeld = 0, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null;
 let beamHeld = 0, beamOn = false, beamGain = null;
-function flameBuffer() { // 2 seconds of roaring, crackling fire that loops without a seam
+function flameBuffer() { // fire loop
   const n = SR * 2, x = SR / 10, r = rng(99), raw = new Float32Array(n + x);
   let lo = 0, lo2 = 0;
   for (let i = 0; i < raw.length; i++) {
@@ -570,14 +551,14 @@ function flameBuffer() { // 2 seconds of roaring, crackling fire that loops with
   }
   const buf = ac.createBuffer(1, n, SR), d = buf.getChannelData(0);
   for (let i = 0; i < n; i++) d[i] = raw[i] * .5;
-  for (let i = 0; i < x; i++) d[i] = (raw[i] * (i / x) + raw[n + i] * (1 - i / x)) * .5; // blend the end into the start
+  for (let i = 0; i < x; i++) d[i] = (raw[i] * (i / x) + raw[n + i] * (1 - i / x)) * .5;
   return buf;
 }
-// called every frame. live = false while the game isn't running (lobby, shop, death screen), so held sounds stop
+// every frame: start and stop the looping sounds
 function soundTick(dt, live) {
   if (!ac || ac.state !== 'running') return;
   const t = ac.currentTime;
-  flameHeld = live || inLobby ? flameHeld - dt : 0; // (in the lobby: your character firing it in the armory)
+  flameHeld = live || inLobby ? flameHeld - dt : 0; // also plays in the armory
   const fOn = flameHeld > 0;
   if (fOn && !flameLoop) {
     flameLoop = ac.createBufferSource(); flameLoop.buffer = flameBuffer(); flameLoop.loop = true;
@@ -586,7 +567,7 @@ function soundTick(dt, live) {
     flameLoop.connect(lp).connect(flameGain).connect(bus); flameLoop.start();
   }
   if (fOn !== flameOn) { flameOn = fOn; sfx(fOn ? 'flameStart' : 'flameEnd'); flameGain?.gain.setTargetAtTime(fOn ? .45 : 0, t, fOn ? .04 : .08); }
-  // eradicator motor: whirs up while the barrels spin and winds down after
+  // eradicator motor
   const spin = live && gunSpin ? gunSpinV / 30 : 0;
   if (spin > 0 && !spinOsc) {
     spinOsc = ac.createOscillator(); spinOsc.type = 'sawtooth';
@@ -595,7 +576,7 @@ function soundTick(dt, live) {
     spinOsc.connect(lp).connect(spinGain).connect(bus); spinOsc.start();
   }
   if (spinOsc) { spinOsc.frequency.setTargetAtTime(50 + spin * 130, t, .05); spinGain.gain.setTargetAtTime(spin * .07, t, .05); }
-  // heat ray: a buzzing hum with a fast shimmer while the beam is on
+  // heat ray hum
   beamHeld = live || inLobby ? beamHeld - dt : 0;
   const bOn = beamHeld > 0;
   if (bOn && !beamGain) {

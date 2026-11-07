@@ -66,5 +66,8 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 
 ## Conventions
 
-- Comments explain the game behaviour in plain words next to the code; keep them accurate when changing behaviour.
+- Comments are short and human: a one-line label like "weapon stats" or a brief why, never multi-line explanations or
+  field legends (the code is public and CrazyGames reviewers may read it). Skip comments that restate the code. Details that
+  are easy to break go in `../voxel-strike-server/docs/game-notes.md` (private); read it before changing a system and keep it
+  up to date.
 - Browser-default UI (scroll bars and the like) should be styled to match the game's UI.

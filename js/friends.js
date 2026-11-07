@@ -1,12 +1,8 @@
-// Friends. Needs an account (js/cloud.js): add people by their username or player ID (#123), or straight from the results screen
-// after a match. They accept, and from then on you see whether they're online and where they're playing, can JOIN their match, and
-// can INVITE them to yours. Everything goes through the save server (POST /friends/*, voxel-strike-server/worker.js).
-// The list is polled: every 30 s, 15 s while the FRIENDS page is open, never while the tab is hidden. When you're not in an online
-// room the poll is also the heartbeat that tells your friends you're online; in a room, the room reports where you are (room.js).
+// friends: add by username or #id, see who's online, join and invite
 const FR_POLL = 30000, FR_POLL_OPEN = 15000;
 let fr = { me: null, friends: [], in: [], out: [], invites: [] }, frAt = -1e9, frBusy = false, frErr = '', frMsg = '', frBad = false, frSure = 0;
-const frIds = new Set(), frOut = new Set(), frIn = new Set(); // ids: friends, requests I sent, requests to me (the results-screen buttons read these)
-const frNoticed = new Set(), frHidden = new Set(); // invites already announced / dismissed, as from:room
+const frIds = new Set(), frOut = new Set(), frIn = new Set(); // friends, requests sent, requests received
+const frNoticed = new Set(), frHidden = new Set(); // invites already shown or dismissed
 const frOpen = () => $('binds').style.display === 'flex' && setTab === 'friends';
 const frOnline = () => fr.friends.filter(f => f.on).length;
 const modeTitle = id => { const m = PLAY_MODES.find(m => m.id === id); return m ? m.title || m.name : String(id || '').toUpperCase(); };
@@ -18,7 +14,7 @@ async function frPoll(force = false) {
   if (frBusy || !force && performance.now() - frAt < (frOpen() ? FR_POLL_OPEN : FR_POLL)) return;
   frBusy = true;
   try {
-    const r = await api('POST', '/friends/list', { name: myName, lobby: !net.on }); // lobby: not in an online room, so this is the heartbeat
+    const r = await api('POST', '/friends/list', { name: myName, lobby: !net.on }); // outside a room this doubles as the online heartbeat
     if (r.status === 401) { signedOut(); frReset(); return; }
     if (r.status !== 200) throw 0;
     fr = { me: r.me, friends: r.friends || [], in: r.in || [], out: r.out || [], invites: r.invites || [] }; frErr = ''; frAt = performance.now();
@@ -26,7 +22,7 @@ async function frPoll(force = false) {
     for (const f of fr.friends) frIds.add(f.id);
     for (const f of fr.out) frOut.add(f.id);
     for (const f of fr.in) frIn.add(f.id);
-    for (const i of fr.invites) { // a new invite: say so wherever you are
+    for (const i of fr.invites) { // show new invites
       const k = i.id + ':' + i.room; if (frNoticed.has(k)) continue;
       frNoticed.add(k);
       if (!frHidden.has(k)) { netToast(`${i.name} invited you to ${whereText(i)}, open FRIENDS to join`, 6000); sfx('join'); }
@@ -34,7 +30,7 @@ async function frPoll(force = false) {
   } catch { frErr = "Can't reach the server"; }
   finally { frBusy = false; renderFriends(); }
 }
-// one call to the server; a failure shows under the add box. Returns the reply, or null
+// one friends call; errors show under the add box
 async function frCall(path, body) {
   try {
     const r = await api('POST', '/friends/' + path, body);
@@ -55,7 +51,7 @@ async function frAdd(who) {
   await frPoll(true);
   return r;
 }
-// into a friend's match: a private room goes through its code, a public one straight to the room (js/net.js start)
+// join a friend's match
 function frJoin(f) {
   if (!f?.room) return;
   closeBinds(); sfx('ui');
@@ -69,14 +65,14 @@ async function frAct(act, id, b) {
   else if (act === 'acc') { if (await frCall('accept', { id: num })) { sfx('buy'); await frPoll(true); } }
   else if (act === 'dec') { if (await frCall('decline', { id: num })) { sfx('ui'); await frPoll(true); } }
   else if (act === 'inv') { if (await frCall('invite', { id: num })) { const f = fr.friends.find(f => f.id === num); frSay(`Invite sent to ${f ? f.name : 'your friend'}`); sfx('ui'); if (b) { b.textContent = 'INVITED'; b.disabled = true; } } }
-  else if (act === 'rm') { // a tiny ✕ shouldn't drop a friend by accident: the first click asks
+  else if (act === 'rm') { // first click on the x asks to confirm
     if (frSure !== num) { frSure = num; renderFriends(); return; }
     frSure = 0;
     if (await frCall('remove', { id: num })) { sfx('ui'); await frPoll(true); }
   }
 }
 
-// ---- the FRIENDS page (settings), the FRIENDS button in the lobby, the + ADD buttons on the results board
+// friends page and lobby button
 function renderFriends() {
   renderFrBtn();
   const list = $('friends'); if (!list) return;
@@ -104,7 +100,7 @@ function renderFriends() {
     + `<h2>FRIENDS · ${frOnline()} ONLINE</h2>` + (rows || (fr.me ? '<p class="frNote">No friends yet. Add someone by their username or ID, or from the results screen after a match.</p>' : ''))
     + (sent ? `<h2>SENT</h2>${sent}` : '') + (frErr ? `<p class="frErr">${esc(frErr)}</p>` : '');
 }
-function renderFrBtn() { // FRIENDS in the lobby: a yellow count when someone's waiting on you, green for friends online
+function renderFrBtn() { // yellow = requests waiting, green = friends online
   const b = $('frBadge'), waiting = auth ? fr.in.length + fr.invites.filter(i => !frHidden.has(i.id + ':' + i.room)).length : 0, on = auth ? frOnline() : 0;
   b.textContent = waiting ? String(waiting) : on ? String(on) : '';
   b.className = waiting ? 'new' : 'on';
@@ -121,8 +117,7 @@ function openFriends() { showSetTab('friends'); openSettings(); frPoll(true); sf
 $('friendsBtn').addEventListener('click', openFriends);
 $('menuFriends').addEventListener('click', e => { e.stopPropagation(); openFriends(); });
 $('setTabs').addEventListener('click', e => { if (e.target.closest('button')?.dataset.t === 'friends') { frSure = 0; frPoll(true); } });
-// the results screen: a + ADD next to each signed-in player you aren't friends with yet (js/net.js calls this after endMatch).
-// Bots and guests (data-nofid) get one too that just shows SENT and never answers, like in the PLAYERS list
+// + ADD on the results screen (bots and guests just show SENT)
 function frPostButtons() {
   if (!auth || !fr.me) return;
   for (const s of $('postBoard').querySelectorAll('[data-nofid]')) {
@@ -144,10 +139,8 @@ $('postBoard').addEventListener('click', async e => {
   const r = await frAdd('#' + b.dataset.id);
   if (r) b.textContent = r.result === 'friends' ? 'FRIENDS' : 'SENT'; else b.disabled = false;
 });
-// the PLAYERS list in the pause menu (chat.js renderPlayers): + ADD next to everyone in your match, when you're signed in.
-// A signed-in player gets a real request. A bot, or a guest (no account, nothing to send it to), just shows SENT and never
-// answers, so a bot looks like any other player
-const frAskedNoAcct = new Set(); // names, for this session
+// + ADD in the players list (bots and guests just show SENT)
+const frAskedNoAcct = new Set();
 function frPlayerBtn(r) {
   if (!auth || !fr.me) return '';
   const id = r.fid | 0;
@@ -165,7 +158,7 @@ $('plist').addEventListener('click', async e => {
   if (b.dataset.fr === 'acc') sfx('buy');
   await frPoll(true); renderPlayers();
 });
-// polling: a tick every 5 s decides whether it's time (see the top); signing in or out refreshes at once
+// poll every 30 s, 15 s with the page open, never while hidden
 setInterval(() => { if (auth && !document.hidden) frPoll(); }, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && auth) frPoll(); });
 let frUser = auth?.user ?? null;

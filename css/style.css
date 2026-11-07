@@ -1,4 +1,4 @@
-/* menu theme: see-through silver glass over a blurred game, emerald accents, white button outlines */
+/* menu theme */
 :root{
   --acc:#2fbf71;--acc-dk:#145c38;--acc-lt:#8ff0b6;
   --silver:#d6dce0;--muted:#a9b4ba;
@@ -7,28 +7,28 @@
   --line:#fff;--line-dim:rgba(255,255,255,.4);
   --ov:.18;--blur:blur(10px);
 }
-/* low graphics: skip the blur (it costs every frame on weak GPUs) and darken the glass a bit instead */
+/* low graphics: no blur */
 body.lowfx{--ov:.62;--blur:none}
 html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:monospace;user-select:none}
 canvas{width:100vw!important;height:100vh!important;display:block}
 #hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:2px 2px 0 #000;font-size:22px;font-weight:bold}
-/* each gun's crosshair is drawn in js (hud.js drawCross) */
+
 #cross{position:absolute;left:50%;top:50%;width:80px!important;height:80px!important;margin:-40px 0 0 -40px;pointer-events:none}
-/* the reload ring round the crosshair: a faint full circle, and a white one that fills clockwise from the top as the reload goes (main.js) */
+/* reload ring */
 #rl{opacity:.7;position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;pointer-events:none;transform:rotate(-90deg)}
 #rl circle{fill:none;stroke-width:4}#rl .bg{stroke:rgba(0,0,0,.5)}
 #rlFg{stroke:#fff;stroke-dasharray:213.63;stroke-dashoffset:213.63;filter:drop-shadow(0 0 1px #000)}
-/* scroll bars, everywhere: square and in the game's colours instead of the browser's */
+/* scroll bars */
 ::-webkit-scrollbar{width:14px;height:14px}
 ::-webkit-scrollbar-track{background:rgba(10,14,16,.55);border:2px solid var(--line-dim)}
 ::-webkit-scrollbar-thumb{background:var(--acc);border:2px solid #000;box-shadow:inset -2px -2px 0 var(--acc-dk),inset 2px 2px 0 var(--acc-lt)}
 ::-webkit-scrollbar-thumb:hover{background:var(--acc-lt)}
 ::-webkit-scrollbar-corner{background:transparent}
-@supports not selector(::-webkit-scrollbar){*{scrollbar-width:auto;scrollbar-color:#2fbf71 rgba(10,14,16,.55)}} /* !important beats the full-screen canvas rule */
-/* hit markers: four lines turned to the diagonals, each pivoting on the middle of the screen (hud.js hitMarker moves them out) */
+@supports not selector(::-webkit-scrollbar){*{scrollbar-width:auto;scrollbar-color:#2fbf71 rgba(10,14,16,.55)}}
+/* hit markers */
 #hm{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2}
 #hm i{position:absolute;left:-1px;top:0;width:2px;height:8px;opacity:0;transform-origin:50% 0;box-shadow:0 0 0 1px rgba(0,0,0,.55)}
-/* the sniper scope and the holo reticle: drawn small in js (main.js drawScope / drawHolo) and blown up with hard pixel edges */
+/* scope and holo reticle */
 #scope,#holo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;image-rendering:pixelated;pointer-events:none}
 #holo{filter:drop-shadow(0 0 3px rgba(255,40,40,.75))}
 #hp{position:absolute;left:20px;bottom:20px;color:#ff5a5a}
@@ -93,21 +93,21 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 /* pause menu */
 #menuPlay,#ctrlBtn,#lobbyBtn,#armBtn,#menuFriends,#menuPlayers{font:bold 18px monospace;padding:10px 18px;margin-top:14px}
 #menu #menuPlay{background:var(--sel)}#menu #menuPlay:hover{background:var(--acc)}
-/* small-window fixes: menus scroll instead of getting cut off */
+/* small windows: menus scroll */
 #menu,#shop{overflow-y:auto;justify-content:flex-start;padding:12px 8px;box-sizing:border-box}
 #menu>:first-child,#shop>h1{margin-top:auto!important}#menu>:last-child,#shop>:last-child{margin-bottom:auto!important}
 #items{grid-template-columns:repeat(3,minmax(0,210px))}
 #menu #msg:empty{display:none}
 #menuTitle{font-size:56px;margin:0 0 6px}
 #menuBtns{display:flex;flex-direction:column;gap:10px;margin-top:12px;width:220px}
-/* the window lost focus mid-match (Alt+Tab): a running match stays in view behind this slim bar instead of the menu (input.js). Sits above the hotbar */
+/* paused bar (window lost focus) */
 #away{position:fixed;inset:0;display:none;align-items:flex-end;justify-content:center;padding-bottom:92px;box-sizing:border-box;cursor:pointer}
 #awayBar{display:flex;align-items:center;gap:14px;padding:8px 10px 8px 18px;background:rgba(20,26,30,.88);border:3px solid var(--line-dim);color:#fff;font:bold 18px monospace;letter-spacing:2px;text-shadow:2px 2px 0 #000}
 #awayBar button{font:bold 14px monospace;padding:5px 12px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
 #awayBar button:hover{background:var(--hov)}
 #menuBtns button{margin:0;width:100%}
 
-/* hotbar (in-game HUD, not a menu) */
+/* hotbar */
 #hotbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px}
 .slot{position:relative;width:84px;height:58px;box-sizing:border-box;background:rgba(0,0,0,.45);border:3px solid #555;display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .15s}
 .slot.on{border-color:#ffd23f;background:rgba(70,50,10,.65);transform:translateY(-6px)}
@@ -118,14 +118,14 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 .slot .c{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:9px;color:#ccc}
 @media (max-width:900px){.slot{width:56px;height:42px}.slot img{width:48px;height:24px}.slot .c{display:none}.slot .k{font-size:10px}}
 
-/* armory: a blurred glass panel down the left side; the lobby camera slides over so your character stands on the right (lobby.js frameLobby) */
+/* armory */
 #armory{position:fixed;left:0;top:0;bottom:0;width:min(720px,60vw);display:none;flex-direction:column;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);color:#fff;text-shadow:2px 2px 0 #000;z-index:9;overflow-y:auto;padding:16px 56px 18px 22px;box-sizing:border-box;animation:armIn .3s ease-out}
 @keyframes armIn{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
 #armory>*{flex-shrink:0}
 #armHead{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 #armory h1{font-size:40px;margin:0}
 #armInfo{display:flex;gap:18px;font-size:18px;font-weight:bold}#armInfo .pc{margin-left:0}
-/* pages down the left (WEAPONS, WEAR), each page's sections along the top */
+/* armory pages and sections */
 #armBody{display:flex;gap:12px;align-items:flex-start;margin-top:14px}
 #armPages{display:flex;flex-direction:column;gap:6px;width:76px;flex-shrink:0;position:sticky;top:0}
 #armory #armPages button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 6px;color:var(--silver);font:bold 11px monospace;text-shadow:1px 1px 0 #000}
@@ -145,7 +145,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armList .card.locked{opacity:.5}#armList .card.locked.sel{opacity:.75}
 #armList .tag{position:absolute;top:4px;right:6px;font:bold 11px monospace;color:var(--silver)}
 #armList .card.on .tag{color:var(--acc-lt)}
-/* the corner card (armory.js renderAct): the item you picked, its stats, then its buttons, bottom right beside your character */
+/* armory item card */
 #armAct{position:fixed;right:20px;bottom:20px;width:clamp(270px,27vw,340px);box-sizing:border-box;display:none;flex-direction:column;align-items:stretch;gap:9px;padding:12px 14px 14px;z-index:9;color:#fff;text-shadow:2px 2px 0 #000;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:3px solid var(--line);box-shadow:4px 4px 0 rgba(0,0,0,.4);animation:armIn .25s ease-out}
 #armAct .an{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;font:bold 19px monospace}
 #armAct .an>span{min-width:0}
@@ -155,15 +155,15 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armAct .ab{display:flex;flex-wrap:wrap;gap:8px}
 #armAct .ab button{flex:1 1 auto}
 #armAct .an button.more{flex-shrink:0;font:bold 12px monospace;padding:5px 8px;border-width:2px}
-/* which star you use: ◀ USING ★★ ▶ */
+/* star picker */
 #armAct .lvp{display:flex;align-items:center;justify-content:center;gap:10px;font:bold 15px monospace;color:var(--acc-lt)}
 #armAct .lvp button{font:bold 14px monospace;padding:5px 11px}
-/* the armory's SHOOT and RELOAD buttons, just left of your character (armory.js placeAct, lobby.js heroTrigger) */
+/* armory shoot and reload buttons */
 #heroAct{position:fixed;display:none;flex-direction:column;gap:10px;transform:translateY(-50%);z-index:9}
 #heroAct button{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;background:var(--glass);border:3px solid var(--line);cursor:pointer;box-shadow:3px 3px 0 rgba(0,0,0,.45);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);touch-action:none;user-select:none}
 #heroAct button:hover{background:var(--hov)}
 #heroAct button:active{border-color:var(--acc);background:rgba(47,191,113,.3)}
-/* pixel icons (icons.js): a mask in the text's color, with a hard shadow like the text's */
+/* pixel icons */
 .ic{display:inline-block;height:.9em;width:calc(.9em * var(--ar,1));vertical-align:-.08em;filter:drop-shadow(.11em .11em 0 rgba(0,0,0,.75));font-style:normal}
 .ic>i{display:block;width:100%;height:100%;background:currentColor;-webkit-mask:var(--m) center/100% 100% no-repeat;mask:var(--m) center/100% 100% no-repeat;image-rendering:pixelated}
 .st .ic+.ic{margin-left:.08em}
@@ -182,7 +182,7 @@ button .ic{pointer-events:none}
 #detView{position:relative}
 #detCv{cursor:grab;touch-action:none}#detCv.drag{cursor:grabbing}
 #detView .hint{position:absolute;left:8px;top:6px;font:bold 11px monospace;color:var(--muted);pointer-events:none}
-/* details: what each star does, ★ ★★ ★★★ across, the one you use lit */
+/* star details */
 #armDet .sh{font:bold 13px monospace;color:var(--silver);margin-top:4px}
 #armDet .sk{display:grid;grid-template-columns:auto repeat(3,1fr);gap:4px 10px;font-size:14px;align-items:center}
 #armDet .sk span{color:var(--muted)}
@@ -197,14 +197,14 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #armDet p{margin:0;font-size:14px;line-height:1.45;color:var(--silver)}
 #armDet .ds{display:grid;grid-template-columns:auto 1fr;gap:5px 18px;margin-top:6px;font-size:14px}
 #armDet .ds span{color:var(--muted)}
-/* the four main stats, big, in a row */
+/* main stats */
 #armDet .ms,#armAct .ms{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 #armDet .ms div,#armAct .ms div{display:flex;flex-direction:column;align-items:center;padding:6px 2px;background:rgba(0,0,0,.22);border:2px solid var(--line)}
 #armDet .ms span,#armAct .ms span{font-size:10px;color:var(--muted);white-space:nowrap}
 #armDet .ms b,#armAct .ms b{font:bold 20px monospace;color:#fff}
 #armDet .ms small,#armAct .ms small{font-size:10px;color:var(--silver)}
 #armAct .ms small{display:block;text-align:center}#armAct .ms b{font-size:18px}
-/* attributes: how the gun works */
+/* attributes */
 #armDet .at,#armAct .at{display:flex;flex-wrap:wrap;gap:6px}
 #armDet .at span,#armAct .at span{font:bold 11px monospace;padding:3px 8px;border:2px solid var(--acc);color:var(--acc-lt);background:rgba(47,191,113,.15)}
 #armList .card img{width:96px;height:48px;image-rendering:pixelated}
@@ -216,7 +216,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 @media (max-height:620px),(max-width:620px){#armory h1{font-size:26px;text-shadow:3px 3px 0 var(--acc-dk)}#armTabs img,#armPages img{width:44px;height:22px}#armory #armTabs button,#armory #armPages button{font-size:9px}#armPages{width:60px}#armList{grid-template-columns:repeat(auto-fill,minmax(124px,1fr))}#armList .cn{font-size:14px}}
 @media (max-width:700px){#armBody{flex-direction:column}#armPages{flex-direction:row;width:auto;align-self:stretch;position:static}#armory #armPages button{flex:1}#armMain{width:100%}#armory{width:100%;-webkit-mask-image:none;mask-image:none;padding:12px 14px 100px}#armAct{right:12px;bottom:12px;width:calc(100vw - 24px)}#armory{padding-bottom:300px}}
 
-/* match HUD + leaderboards */
+/* match HUD and leaderboards */
 #top .clock{font-size:30px;color:#fff}
 #top .clock.low{color:#ff5a5a}
 #top .place{font-size:16px;margin-top:2px}
@@ -227,7 +227,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .lb .you span{background:rgba(47,191,113,.22)}
 .lb.k{grid-template-columns:40px minmax(90px,1fr) 62px 70px}
 .lb .tm span{font-weight:bold;padding-top:8px;border-bottom:2px solid currentColor}
-.lb.z{grid-template-columns:minmax(150px,1fr) minmax(90px,auto)}.lb.z .r span:last-child{text-align:right} /* zombie waves results: label, value */
+.lb.z{grid-template-columns:minmax(150px,1fr) minmax(90px,auto)}.lb.z .r span:last-child{text-align:right}
 #top .teams{font-size:22px;color:#fff;margin-top:2px}
 #top .teams b{padding:0 6px}
 #board{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:none;width:min(440px,94vw)}
@@ -256,7 +256,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #lobbyUI{position:absolute;inset:0;pointer-events:none}
 #lobbyUI>*{pointer-events:auto}
 #lobbyTop{position:absolute;left:20px;top:18px;display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;max-width:calc(100% - 300px)}
-#lobbyBtns{flex-basis:100%;display:flex;gap:8px} /* the cloud save and FRIENDS, on their own row under your name */
+#lobbyBtns{flex-basis:100%;display:flex;gap:8px}
 #nameRow{display:flex;gap:6px;width:250px}
 #nameIn{flex:1;min-width:0;font:bold 16px monospace;padding:6px 9px;background:var(--glass);color:#fff;border:3px solid var(--line-dim);outline:none;text-shadow:2px 2px 0 #000}
 #nameIn:focus{border-color:var(--line)}
@@ -267,7 +267,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .lv b{grid-row:span 2;font-size:20px}
 .lv .xpbar{height:6px;margin:0;border-width:2px}
 .lv small{font-size:11px;color:var(--silver);margin-top:2px}
-/* coins: top right, next to settings */
+/* coins */
 #coinRow{position:absolute;top:18px;right:calc(32px + clamp(48px,7vmin,64px));display:flex;gap:12px}
 #lobbyCoins{height:clamp(48px,7vmin,64px);box-sizing:border-box;display:flex;align-items:center;padding:0 14px;margin:0;font:bold clamp(17px,2.6vmin,22px) monospace;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
 .pc{color:#ffcf3a;margin-left:auto;white-space:nowrap}
@@ -285,10 +285,10 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #playBtn img{width:56%;image-rendering:auto}
 #playBtn b{font-size:clamp(19px,3.6vmin,40px)}
 #lobbySet{right:20px;top:18px;width:clamp(48px,7vmin,64px)}
-/* the 2x booster (js/boost.js): a button under your coins, and its card */
+/* booster */
 #boostBtn{position:absolute;right:20px;bottom:calc(32px + clamp(100px,17vmin,230px));width:clamp(100px,17vmin,230px);box-sizing:border-box;justify-content:center;height:clamp(40px,5.5vmin,52px);display:flex;align-items:center;gap:8px;padding:0 14px;font:bold clamp(16px,2.4vmin,21px) monospace;color:#ffd75e;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);text-shadow:2px 2px 0 #000}
 #boostBtn b{color:#fff}#boostBtn:hover{background:var(--hov)}
-/* the daily reward (js/daily.js): a gift button under the booster button (a dot when there's one to claim), and its card */
+/* daily reward */
 #dailyBtn{position:relative;width:clamp(48px,7vmin,64px);height:clamp(48px,7vmin,64px);box-sizing:border-box;padding:0;font-size:clamp(24px,3.6vmin,32px);background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
 #dailyBtn:hover{background:var(--hov)}
 #dailyBtn.ready{border-color:#ffd75e;animation:dailyPulse 1.6s ease-in-out infinite}
@@ -320,7 +320,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #post .bx{color:#ffd75e;display:inline-flex;align-items:center;gap:6px;margin-left:14px}
 #lobbySet img{width:62%}
 
-/* mode / map picker */
+/* mode and map picker */
 #pick{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:16px;box-sizing:border-box;overflow-y:auto}
 #pick>*{flex-shrink:0}
 #pickTitle{margin:0;font-size:44px}
@@ -336,7 +336,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #pickList [data-mode=blitzTeam]{background:linear-gradient(135deg,rgba(235,160,30,.86) 0%,rgba(40,80,170,.88) 55%,rgba(170,45,40,.85) 100%)}
 #pickList .mi{flex:1;min-height:0;width:58%;align-self:center;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(4px 4px 0 rgba(0,0,0,.35))}
 #pickList [data-map]{background-color:#334;background-position:center;background-size:cover}
-/* mode cards: an icon and a one-line name, all the same. Picked: a bright edge, and its PLAY button slides out underneath (room is kept for it, so nothing jumps) */
+/* mode cards */
 #pickList{align-items:flex-start}
 #pickList .mc{position:relative;padding-bottom:54px}
 #pickList button[data-mode]{align-items:center;text-align:center;white-space:nowrap;gap:10px;padding:14px 8px}
@@ -349,7 +349,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 @keyframes descIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 #pickList small{font-size:clamp(11px,1.6vmin,14px);font-weight:normal;color:var(--silver)}
 
-/* xp + rewards */
+/* xp and rewards */
 .xpbar{height:10px;margin-top:6px;background:rgba(0,0,0,.45);border:2px solid var(--line-dim)}
 .xpbar>div{height:100%;background:var(--acc);box-shadow:inset 0 -3px 0 var(--acc-dk)}
 .rw{display:flex;justify-content:center;gap:28px;font-size:26px;font-weight:bold}
@@ -358,10 +358,10 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .rl{text-align:center;font-size:14px;color:var(--silver);margin-top:6px}
 @keyframes lvpop{from{transform:scale(1.6);opacity:0}to{transform:none;opacity:1}}
 
-/* character stage + customizer */
+/* character stage and customizer */
 #stage{flex:1;position:relative;cursor:grab;touch-action:none}
 #stage:active{cursor:grabbing}
-/* WEAR > SKINS cards: a tall front-view sprite of each look (armory.js lookSprite) */
+/* skin cards */
 #armList .card img.sk{width:38px;height:78px}
 #armList .card .plus{display:flex;align-items:center;justify-content:center;width:78px;height:78px;font-size:44px;color:var(--silver)}
 #armTabs img.hd{width:30px}
@@ -405,7 +405,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #acctForm input:focus{border-color:var(--line)}
 #acctErr{color:#f96;min-height:1.2em}
 #acctForm small{color:var(--muted)!important;font-size:12px}
-/* until the first frame of the lobby is drawn, show only the background, then fade everything else in */
+/* fade in once the lobby has drawn */
 .boot>*:not(canvas):not(#noTouch){opacity:0!important;pointer-events:none!important}
 .booting>*:not(canvas){transition:opacity .45s ease-out}
 #cloudBtn{font:bold 15px monospace;width:40px;height:32px;padding:0;line-height:0;display:flex;align-items:center;justify-content:center}
@@ -419,7 +419,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #cloudBtn.offline{color:#ff7a6a}
 @keyframes cloudpulse{50%{opacity:.4}}
 
-/* online play (js/net.js): the ONLINE / VS BOTS pill, private room cards and code box, the finding overlay, the room code in the menu */
+/* online play */
 #pickPill{align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;max-width:96vw}
 #pickPill button{font:bold 15px monospace;padding:7px 16px;background:var(--glass);color:var(--silver);border:3px solid var(--line-dim);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7)}
 #pickPill button.sel{background:var(--sel);color:#fff;border-color:var(--line)}
@@ -447,7 +447,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #netToast.show{opacity:1}
 @media (max-height:620px){#findingMsg{font-size:24px}#joinBtn{bottom:10vmin}}
 
-/* friends (js/friends.js): the FRIENDS button next to the cloud, the FRIENDS page in settings, the + ADD buttons on the results board */
+/* friends */
 #friendsBtn{height:32px;padding:0 10px;display:flex;align-items:center;gap:8px;font:bold 14px monospace;letter-spacing:1px}
 #frBadge{font:bold 12px monospace;min-width:8px;padding:1px 6px;text-shadow:none;line-height:16px}
 #frBadge:empty{display:none}
@@ -464,16 +464,16 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .frRow b{color:#fff}.frRow small{color:var(--muted);font-size:12px}.frRow .st{color:var(--muted);font-size:13px;margin-right:auto}
 .frRow.on .st{color:var(--acc-lt)}
 .plNone{color:var(--muted);font-size:14px;margin:4px 0}
-/* CrazyGames (js/crazy.js): nothing clickable while an ad plays; no sign-in or friends of our own (their accounts only) */
+/* CrazyGames */
 body.cgAd::after{content:'';position:fixed;inset:0;z-index:2147483647}
-/* on CrazyGames (js/crazy.js, cloud.js): no account page (you're signed in by CrazyGames), friends only when signed in, the name box locked to your CrazyGames username */
+
 body.cg #setTabs [data-t=account],body.cgNoAcct #cloudBtn,body.cg:not(.cgIn) #friendsBtn,body.cg:not(.cgIn) #menuFriends,body.cg:not(.cgIn) #setTabs [data-t=friends],body.cg:not(.cgIn) #post .fb,body.cgIn #nameDice{display:none!important}
 body.cgIn #nameIn{cursor:default;color:var(--muted)}
 .frRow .full{color:#f96;font-size:12px;letter-spacing:1px}
 #binds .frRow button{font:bold 12px monospace;padding:4px 10px}#binds .frRow button.x{color:var(--silver);border-color:var(--line-dim);padding:4px 8px}#binds .frRow button.sure{color:#fff;border-color:#f96}
 .frNote{margin:0;font-size:14px;color:var(--silver);max-width:460px}.frErr{margin:0;color:#f96;font-size:13px}
 #post .lb .fb{font:bold 11px monospace;padding:2px 7px;margin:0 0 0 10px;vertical-align:1px}#post .lb .fb:disabled{opacity:.6;cursor:default}
-/* leaderboards and player cards (js/boards.js) */
+/* leaderboards and player cards */
 #topBtn{height:32px;padding:0 10px;display:flex;align-items:center;gap:6px;font:bold 14px monospace;letter-spacing:1px}#topBtn .ic{color:#ffd75e}
 #card{z-index:21;background:rgba(0,0,0,.6)}#card #cardBox{background:rgba(24,34,30,.95)}#lbBox>*,#cardBox>*{flex-shrink:0}#lbBox>.lbList{flex-shrink:1}
 #lbBox,#cardBox{display:flex;flex-direction:column;gap:10px;width:min(560px,94vw);max-height:92vh;box-sizing:border-box;padding:18px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
@@ -504,15 +504,13 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 .cs b{font-size:22px;color:#ffd75e}.cs span{font-size:11px;color:var(--muted)}
 .cFav{display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}.cFav span{font-size:11px;color:var(--muted)}.cFav img{height:30px;image-rendering:pixelated}
 #postBoard [data-fid],#friends .pn{cursor:pointer}#postBoard [data-fid]:hover,#friends .pn:hover{text-decoration:underline}
-/* touch-only devices (index.html): a full-screen note instead of the game */
+/* phones and tablets without a mouse */
 #noTouch{display:none}
 body.touchOnly #noTouch{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2f5a3a,#14241a);font-family:monospace;color:#fff;text-align:center;text-shadow:3px 3px 0 #000}
 body.touchOnly #noTouch>div{padding:24px 20px;border:4px solid #fff;background:rgba(0,0,0,.35);box-shadow:6px 6px 0 rgba(0,0,0,.45);max-width:420px}
 body.touchOnly #noTouch h1{margin:0 0 14px;font-size:clamp(30px,9vw,46px);--ls:2px}
 body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:1.4}
-/* the game's name: every letter has its own diagonal gradient, blue at the top left, white across the middle, green at the
-   bottom right (one gradient tile per monospace letter, 1ch plus the letter spacing --ls), with a black outline and drop shadow
-   (drop-shadow filters, since text-shadow would paint over gradient-filled text). On the lobby and the touch-only screen */
+/* game title */
 .logo{font-family:monospace;font-weight:bold;background:linear-gradient(135deg,#1e8cff 0%,#3fa6ff 28%,#fff 46%,#fff 54%,#3fd45e 72%,#1fae3f 100%) 0 0/calc(1ch + var(--ls)) 100% repeat-x;--ls:3px;letter-spacing:var(--ls);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;
   filter:drop-shadow(2px 0 0 #000) drop-shadow(-2px 0 0 #000) drop-shadow(0 2px 0 #000) drop-shadow(0 -2px 0 #000) drop-shadow(3px 4px 0 rgba(0,0,0,.45))}
 #lobbyLogo{position:absolute;left:50%;top:clamp(48px,7.5vh,64px);transform:translateX(-50%);font-size:clamp(30px,4.6vw,56px);white-space:nowrap;pointer-events:none!important}

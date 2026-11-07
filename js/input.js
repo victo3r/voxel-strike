@@ -1,4 +1,4 @@
-// every action has two slots; codes are keyboard e.code values, 'Mouse0'-'Mouse4', or 'WheelUp'/'WheelDown'
+// key bindings, two keys per action
 const ACTIONS = [
   ['fwd', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'], ['jump', 'Jump'],
   ['shoot', 'Shoot'], ['aim', 'Aim / scope'], ['reload', 'Reload'], ['next', 'Next gun'], ['prev', 'Previous gun'],
@@ -18,13 +18,12 @@ const copyBinds = b => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, 
 let binds = copyBinds(DEFAULT_BINDS);
 try { const saved = JSON.parse(localStorage.getItem('voxelstrike-binds')); if (saved) for (const k in binds) if (Array.isArray(saved[k])) binds[k] = [saved[k][0] ?? '', saved[k][1] ?? '']; } catch {}
 const saveBinds = () => { try { localStorage.setItem('voxelstrike-binds', JSON.stringify(binds)); } catch {} };
-// sensitivity multipliers: mouse/trackpad look and arrow-key look, 1 = default speed
+// look sensitivity
 const DEFAULT_SENS = { mouse: 1, keys: 1 };
 let sens = { ...DEFAULT_SENS };
 try { const s = JSON.parse(localStorage.getItem('voxelstrike-sens')); if (s) for (const k in sens) if (s[k] > 0) sens[k] = s[k]; } catch {}
 const saveSens = () => { try { localStorage.setItem('voxelstrike-sens', JSON.stringify(sens)); } catch {} };
-// your field of view, in degrees up and down the screen (FOV_MIN to FOV_MAX). Sights and scopes zoom in from it, and looking
-// round slows down by the same amount when zoomed (camera.fov / fovBase), whatever it's set to
+// field of view
 const FOV_DEF = 75, FOV_MIN = 60, FOV_MAX = 90;
 let fovBase = FOV_DEF;
 try { const f = +localStorage.getItem('voxelstrike-fov'); if (f >= FOV_MIN && f <= FOV_MAX) fovBase = f; } catch {}
@@ -33,15 +32,14 @@ function renderSens() {
   $('fovIn').value = fovBase; $('fovV').textContent = fovBase + '°';
   $('vol').value = volume; $('volV').textContent = Math.round(volume * 100) + '%';
   $('mvol').value = musicVol; $('mvolV').textContent = Math.round(musicVol * 100) + '%';
-  // the mute buttons: a crossed-out speaker while muted, and the slider dims
+  // mute buttons
   document.querySelectorAll('.sliders .mute').forEach(b => { const m = mutes[b.dataset.m]; b.innerHTML = ico(m ? 'sndOff' : 'snd'); b.classList.toggle('on', m); });
   $('vol').classList.toggle('off', mutes.sfx); $('volV').classList.toggle('off', mutes.sfx);
   $('mvol').classList.toggle('off', mutes.music); $('mvolV').classList.toggle('off', mutes.music);
 }
 document.querySelectorAll('.sliders .mute').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const k = b.dataset.m; setMute(k, !mutes[k]); renderSens(); if (!mutes.sfx) sfx('ui'); }));
-// other control options, per device like sensitivity. aa = aim assist (0 off, 1 low, 2 medium), toggleAim = press aim once
-// to aim and again to stop (instead of holding it), wheel = the scroll wheel switches guns
-const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true, chat: true }; // chat: show chat (off hides it and the chat key does nothing)
+// other control options
+const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true, chat: true };
 let opts = { ...DEFAULT_OPTS };
 try { const o = JSON.parse(localStorage.getItem('voxelstrike-opts')); if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k]; } catch {}
 const saveOpts = () => { try { localStorage.setItem('voxelstrike-opts', JSON.stringify(opts)); } catch {} };
@@ -50,43 +48,37 @@ function renderOpts() {
   document.querySelectorAll('#aaQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.aa));
   $('aaDesc').textContent = AA_DESC[opts.aa];
   $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel;
-  $('optChat').checked = opts.chat && !cgNoChat(); $('optChat').disabled = cgNoChat(); // CrazyGames' chat setting is off: so is ours
+  $('optChat').checked = opts.chat && !cgNoChat(); $('optChat').disabled = cgNoChat(); // follow CrazyGames' chat setting
 }
 $('aaQ').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || +b.dataset.v === opts.aa) return; opts.aa = +b.dataset.v; saveOpts(); renderOpts(); sfx('ui'); });
 $('optToggleAim').addEventListener('change', e => { opts.toggleAim = e.target.checked; aimOn = false; saveOpts(); });
 $('optWheel').addEventListener('change', e => { opts.wheel = e.target.checked; saveOpts(); });
 $('optChat').addEventListener('change', e => { opts.chat = e.target.checked; saveOpts(); if (!opts.chat) $('chatLog').innerHTML = ''; });
-let aimOn = false; // toggle aim: whether you're aimed in right now
+let aimOn = false;
 renderOpts();
 
-// ---- aim assist. Mostly "sticky": inside a small zone round an enemy your aim slows down, and while you're already moving
-// toward them it adds a small pull, never more than a share of your own movement, so it never moves your aim on its own.
-// Both fade out as you turn faster, so a flick gets nothing. The zone is measured on screen, so it shrinks when you zoom in.
-// It helps on every enemy that has a red outline (not teammates, not enemies hidden by a Raider Hood) and only if you can see them.
-// zone = degrees from the edge of their body, slow = how much slower your aim gets right on them, pull = the most pull as a
-// share of how far you moved, follow = how much of the enemy's own sideways movement your aim keeps up with while you're
-// moving your aim (only then). Full help under SLOW_V radians a second of turning, none past FAST_V
+// aim assist: slows your aim near enemies, never moves it on its own
 const AA = [null, { zone: 4.5, slow: .35, pull: .45, follow: .35 }, { zone: 5.5, slow: .42, pull: .6, follow: .45 }];
 const AA_SLOW_V = 2, AA_FAST_V = 5.5, AA_RANGE = 80, AA_ACTIVE_MS = 150;
 let aaT = null, aaLastT = 0, aaMoveAt = -1e9, aaFade = 0, aaPrev = null;
 const aaV = new THREE.Vector3(), aaRay = new THREE.Raycaster();
 const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
-// how far your crosshair is from the enemy's body, as [yaw, pitch] you'd have to turn. 0, 0 = it's on them
+// how far the crosshair is from an enemy
 function aaErr(t) {
   let ey = wrapA(t.yaw - P.yaw); ey = Math.sign(ey) * Math.max(0, Math.abs(ey) - t.w);
   const ep = P.pitch < t.bot ? t.bot - P.pitch : P.pitch > t.top ? t.top - P.pitch : 0;
   return [ey, ep];
 }
-// once a frame: the closest enemy inside the zone that you can see
+// pick the closest visible enemy near the crosshair
 function aaTarget() {
   aaPick();
-  // follow: if it's the same enemy as last frame and you've been moving your aim just now, turn with them a bit
+  // follow a moving enemy a little while you're aiming
   const L = AA[opts.aa], t = aaT;
   if (!t) { aaPrev = null; return; }
   const mid = (t.bot + t.top) / 2;
   if (aaPrev && aaPrev.z === t.z && performance.now() - aaMoveAt < AA_ACTIVE_MS && aaFade > 0) {
     const dy = wrapA(t.yaw - aaPrev.yaw), dp = mid - aaPrev.mid;
-    if (Math.abs(dy) < .15 && Math.abs(dp) < .15) { // a bigger jump is a respawn or teleport, not movement
+    if (Math.abs(dy) < .15 && Math.abs(dp) < .15) { // skip respawns
       const close = 1 - Math.hypot(...aaErr(t)) / t.zone, k = L.follow * aaFade * Math.max(0, close);
       P.yaw += dy * k; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + dp * k));
     }
@@ -111,7 +103,7 @@ function aaPick() {
     if (!aaRay.intersectObjects(crateMeshes, false).length) { aaT = t; return; }
   }
 }
-// your look movement this event (yaw, pitch, in radians) over dt seconds, with aim assist added
+// add aim assist to a mouse movement
 function aaLook(dy, dp, dt) {
   const L = AA[opts.aa], a = Math.hypot(dy, dp);
   if (!L || !aaT || !a) return [dy, dp];
@@ -131,7 +123,7 @@ $('vol').addEventListener('input', e => { setVolume(+e.target.value); renderSens
 $('mvol').addEventListener('input', e => { setMusicVolume(+e.target.value); renderSens(); });
 $('vol').addEventListener('change', () => sfx('ui'));
 renderSens();
-// graphics (per device, see core.js)
+// graphics settings
 const GFX_DESC = {
   high: 'Full resolution and smooth edges, best on a gaming PC',
   medium: 'No edge smoothing and standard resolution, good for laptops and Chromebooks',
@@ -141,7 +133,7 @@ const saveGfx = () => { try { localStorage.setItem('voxelstrike-gfx', JSON.strin
 function renderGfx() {
   document.querySelectorAll('#gfxQ button').forEach(b => b.classList.toggle('sel', b.dataset.q === gfx.q));
   $('gfxDesc').textContent = GFX_DESC[gfx.q];
-  document.body.classList.toggle('lowfx', gfx.q === 'low'); // menus skip the background blur on low
+  document.body.classList.toggle('lowfx', gfx.q === 'low');
   $('gfxRes').value = gfx.res; $('gfxResV').textContent = Math.round(gfx.res * 100) + '%';
   $('gfxFps').checked = gfx.fps; $('fps').style.display = gfx.fps ? '' : 'none';
   $('gfxNote').textContent = gfxQ().aa !== gfxAA ? 'Edge smoothing turns ' + (gfxQ().aa ? 'on' : 'off') + ' the next time you reload the page.' : '';
@@ -162,8 +154,8 @@ function nice(code) {
     ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl', AltLeft: 'L Alt', AltRight: 'R Alt' };
   return named[code] ?? code.replace(/^Key|^Digit/, '');
 }
-const renderHelp = () => renderHotbar(); // the hotbar shows each slot's key, so it redraws when binds change
-let rebinding = null; // { a: action, s: slot }
+const renderHelp = () => renderHotbar();
+let rebinding = null;
 function renderBinds() {
   $('bindList').innerHTML = ACTIONS.map(([a, label]) => `<span>${label}</span>` + [0, 1].map(s =>
     `<button data-a="${a}" data-s="${s}" class="${rebinding && rebinding.a === a && rebinding.s === s ? 'wait' : ''}">${rebinding && rebinding.a === a && rebinding.s === s ? 'press…' : nice(binds[a][s])}</button>`).join('')).join('');
@@ -171,18 +163,18 @@ function renderBinds() {
 function assign(code) {
   const { a, s } = rebinding; rebinding = null;
   if (code !== null) {
-    if (code) for (const k in binds) binds[k] = binds[k].map(c => c === code ? '' : c); // a key can only do one thing
+    if (code) for (const k in binds) binds[k] = binds[k].map(c => c === code ? '' : c);
     binds[a][s] = code; saveBinds(); renderHelp(); sfx('ui');
   }
   renderBinds();
 }
-// start listening on mousedown and stop it there, so the same click can't get bound as Left Click
+// rebinding a key (on mousedown so the click itself isn't bound)
 $('bindList').addEventListener('mousedown', e => {
-  const b = e.target.closest('button'); if (!b || rebinding) return; // while waiting, let the click through to be bound
+  const b = e.target.closest('button'); if (!b || rebinding) return;
   e.stopPropagation(); e.preventDefault();
   rebinding = { a: b.dataset.a, s: +b.dataset.s }; renderBinds();
 });
-// settings page: CONTROLS / SOUND / GRAPHICS / ACCOUNT tabs. It opens on whichever tab you used last
+// settings tabs
 let setTab = 'controls';
 function showSetTab(t) {
   setTab = t; rebinding = null; renderBinds(); if (t === 'players') renderPlayers();
@@ -199,18 +191,18 @@ const closeBinds = () => { rebinding = null; $('binds').style.display = 'none'; 
 $('bindX').addEventListener('click', closeBinds);
 addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && $('binds').style.display === 'flex') closeBinds(); });
 
-function press(code) { // one-shot actions fire on the press, held actions are read every frame in update()
+function press(code) {
   if (!locked || chatting) return;
   if (isBind('chat', code)) { openChat(); if (chatting) return; }
   if (isBind('shoot', code)) shoot();
   if (isBind('reload', code)) reload();
   if (isBind('aim', code) && opts.toggleAim) aimOn = !aimOn;
-  const sw = opts.wheel || !code.startsWith('Wheel'); // scroll can be turned off for switching guns
+  const sw = opts.wheel || !code.startsWith('Wheel');
   const before = cur;
   if (sw && isBind('next', code)) cycle(1);
   if (sw && isBind('prev', code)) cycle(-1);
   for (let s = 0; s < CATS.length; s++) if (sw && isBind('slot' + (s + 1), code)) selectSlot(s);
-  if (cur !== before) aimOn = false; // a new gun comes out un-aimed
+  if (cur !== before) aimOn = false;
 }
 addEventListener('keydown', e => {
   if (rebinding) {
@@ -219,28 +211,25 @@ addEventListener('keydown', e => {
     return;
   }
   if (chatting) return;
-  if (locked && (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab' || isBind('chat', e.code))) e.preventDefault(); // so the T doesn't get typed into chat
-  if (e.target.tagName === 'INPUT') return; // typing your name in the lobby
+  if (locked && (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab' || isBind('chat', e.code))) e.preventDefault();
+  if (e.target.tagName === 'INPUT') return;
   if (e.repeat) return;
   keys[e.code] = true;
   press(e.code);
 });
 addEventListener('keyup', e => keys[e.code] = false);
 addEventListener('mousedown', e => {
-  gestureAt = performance.now(); // a click: the browser lets the page lock the mouse for a few seconds after one (lockMouse)
+  gestureAt = performance.now();
   const code = 'Mouse' + e.button;
   if (rebinding) { if (!e.target.closest('#bindReset,#bindX,#setTabs,.sliders,.seg,.tick')) { e.preventDefault(); assign(code); } return; }
-  if (chatting) { e.preventDefault(); return; } // clicking while typing doesn't shoot or steal focus from the chat box
-  // only a click with the mouse already locked counts: a click on a menu, the armory or the button that takes you back to the game
-  // never fires (nor keeps firing once that click locks the mouse)
+  if (chatting) { e.preventDefault(); return; }
+  // clicks on menus don't shoot
   if (!locked) return;
   keys[code] = true; press(code);
 });
 addEventListener('mouseup', e => keys['Mouse' + e.button] = false);
 addEventListener('contextmenu', e => e.preventDefault());
-// unadjustedMovement asks for raw mouse input, which avoids Chrome on Windows
-// sometimes reporting one huge fake movement (the camera "snap").
-// Browsers that don't support it (e.g. some Chromebooks) fall back to a normal lock.
+// lock the mouse, asking for raw input to avoid camera snaps
 function lockMouse() {
   const el = renderer.domElement;
   clearTimeout(relockT); relockT = 0;
@@ -249,10 +238,7 @@ function lockMouse() {
   if (p?.catch) p.catch(() => el.requestPointerLock()?.catch?.(() => {}));
   else if (!p && document.pointerLockElement !== el) el.requestPointerLock()?.catch?.(() => {});
 }
-// Chrome won't lock the mouse again for about a second after Esc let it go (so a page can't trap you), and fails the click that
-// asks too soon. The click still counts as a gesture for a few seconds, so the lock is asked for again every RELOCK_EVERY ms until
-// the browser agrees (or RELOCK_FOR ms pass: then the menu says to click) instead of making you click twice. Esc itself can't be
-// that gesture: browsers never count it as one, so there is no "Esc again to resume"
+// Chrome refuses to relock right after Esc, so keep retrying for a bit
 let gestureAt = -1e9, relockT = 0;
 const RELOCK_FOR = 3000, RELOCK_EVERY = 150;
 const canRelock = () => !locked && !shopOpen && !inLobby && !matchOver && !armOpen && $('binds').style.display !== 'flex' && $('away').style.display !== 'flex';
@@ -260,11 +246,11 @@ let lastMove = 0;
 addEventListener('mousemove', e => {
   if (!locked) return;
   const dx = e.movementX, dy = e.movementY, m = Math.hypot(dx, dy);
-  // drop a lone spike far bigger than the movement just before it (browser glitch, not a real flick)
-  if (m > 250 && m > lastMove * 8 + 60) { lastMove = m; return; } // only ever skips one event in a row
+  // ignore one-off huge mouse jumps (a browser glitch)
+  if (m > 250 && m > lastMove * 8 + 60) { lastMove = m; return; }
   lastMove = m;
-  const s = .0022 * sens.mouse * camera.fov / fovBase; // slower aim when zoomed
-  const gap = e.timeStamp - aaLastT; aaLastT = e.timeStamp; // time since the last movement, for how fast you're turning
+  const s = .0022 * sens.mouse * camera.fov / fovBase;
+  const gap = e.timeStamp - aaLastT; aaLastT = e.timeStamp;
   const [ay, ap] = aaLook(-dx * s, -dy * s, gap > 0 && gap < 100 ? gap / 1000 : 1 / 60);
   P.yaw += ay;
   P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ap));
@@ -274,24 +260,21 @@ addEventListener('wheel', e => {
   if (!e.deltaY) return;
   const code = e.deltaY > 0 ? 'WheelDown' : 'WheelUp';
   if (rebinding) { assign(code); return; }
-  const now = performance.now(); if (now - wheelT < 120) return; // trackpads send tons of scroll events
+  const now = performance.now(); if (now - wheelT < 120) return;
   wheelT = now; press(code);
 }, { passive: true });
 $('menu').addEventListener('click', () => {
   if (dead) restart();
   lockMouse();
 });
-// Switching windows (Alt+Tab, a click on another window, another tab) unlocks the mouse just like Esc does. A match that keeps
-// running without you (online, bots) then stays in view behind a slim CLICK TO PLAY bar instead of the menu covering it, so you
-// can keep an eye on it from the other window. The bar's MENU button, or Esc, opens the menu; Esc in the game opens it straight
-// away as before. The browser's blur can land just before or just after the unlock, so each handler looks for the other within AWAY_MS.
+// switching windows mid-match shows a small CLICK TO PLAY bar instead of the menu
 let blurAt = -1e9, unlockAt = -1e9;
 const AWAY_MS = 300;
-const runsBehindMenu = () => pvp() && !dead && !shopOpen && !inLobby && !matchOver; // zombie waves pauses instead, so it keeps its menu
+const runsBehindMenu = () => pvp() && !dead && !shopOpen && !inLobby && !matchOver;
 function showAway(on) { $('away').style.display = on ? 'flex' : 'none'; if (on) $('menu').style.display = 'none'; }
 addEventListener('blur', () => {
   blurAt = performance.now();
-  if (!locked && blurAt - unlockAt < AWAY_MS && runsBehindMenu() && $('menu').style.display !== 'none') showAway(true); // the unlock landed first
+  if (!locked && blurAt - unlockAt < AWAY_MS && runsBehindMenu() && $('menu').style.display !== 'none') showAway(true);
 });
 $('away').addEventListener('click', () => lockMouse());
 const awayMenu = () => { showAway(false); $('menu').style.display = 'flex'; };
@@ -299,27 +282,25 @@ $('awayMenu').addEventListener('click', e => { e.stopPropagation(); awayMenu(); 
 addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && !locked && $('away').style.display === 'flex') awayMenu(); });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
-  net.onLock?.(locked); // online: locking the mouse is also when you ask to spawn (js/net.js)
+  net.onLock?.(locked);
   if (!locked) unlockAt = performance.now();
-  const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS); // the window went too, or just did
+  const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS);
   showAway(away);
   $('menu').style.display = locked || away || shopOpen || inLobby || matchOver ? 'none' : 'flex';
   $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
   if (locked) closeArmory();
   if (!locked) {
-    // zombie waves pauses behind the menu; bot matches keep running (see the loop in main.js)
     for (const k in keys) keys[k] = false;
     aimOn = false;
-    // zombie waves death: the title says so, and clicking the background starts a new run
     $('menuTitle').textContent = dead ? 'YOU DIED' : pvp() ? 'MENU' : 'PAUSED';
     $('menuPlay').textContent = dead ? 'TRY AGAIN' : pvp() ? 'BACK TO GAME' : 'RESUME';
     $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : pvp() ? '' : 'Click to resume';
-    $('armBtn').style.display = $('menuFriends').style.display = pvp() ? '' : 'none'; // zombie waves has its own shop between waves
-    $('menuPlayers').style.display = net.on ? '' : 'none'; // mute and report: online matches
+    $('armBtn').style.display = $('menuFriends').style.display = pvp() ? '' : 'none';
+    $('menuPlayers').style.display = net.on ? '' : 'none';
     renderHelp();
   }
 });
-// the browser refused to lock the mouse: keep asking for a while after a click (see lockMouse), else show the menu so you can click back in
+// mouse lock refused: retry for a bit, then show the menu
 document.addEventListener('pointerlockerror', () => {
   if (shopOpen || inLobby || matchOver) return;
   if (performance.now() - gestureAt < RELOCK_FOR) { if (!relockT) relockT = setTimeout(() => { relockT = 0; if (canRelock()) lockMouse(); }, RELOCK_EVERY); return; }
@@ -335,13 +316,11 @@ function showLobby(on) {
 }
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); restart(); showLobby(true); });
 
-// PLAY: pick a mode, then one of the maps that mode can be played on. Picking the map starts the match.
-// A mode with `sub` opens a second page to pick between its versions (Blitz: free for all or team) before the maps.
-// Player counts on the map cards come from RULES in modes/deathmatch.js
+// the play button brings up mode select, then map select
 const ALL_MAPS = ['yard', 'forest', 'resort'];
-const V_MAPS = 3; // bump when the map pictures are retaken
+const V_MAPS = 3; // bump when the map pictures change
 const MODES = [
-  // zombie waves is on the yard only for now: zombies get stuck on the busier maps, which weren't laid out for them. More open maps for it later
+  // zombies only on the yard for now
   { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Test your loadout and strategy against endless zombie waves', maps: ['yard'] },
   { id: 'dm', name: 'DEATHMATCH', desc: 'A 4 minute free-for-all, top score wins', maps: ALL_MAPS },
   { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes of blue vs red, most kills wins', maps: ALL_MAPS },
@@ -351,15 +330,13 @@ const MODES = [
   ] },
   { id: 'private', name: 'PRIVATE MATCH', desc: 'Make a room for friends or join one with a code', priv: true },
 ];
-const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : m.priv ? [] : [m]); // the ones you can actually start
+const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : m.priv ? [] : [m]);
 if (!MAPS[mapId]) mapId = 'yard';
 const savedMode = localStorage.getItem('voxelstrike-mode');
 if (PLAY_MODES.some(m => m.id === savedMode)) mode = savedMode;
-// pickMode: null = choosing a mode, a mode with sub = choosing its version, a playable mode = choosing its map,
-// 'private' = CREATE / JOIN, 'privCreate' = choosing the mode for a private room, 'privJoin' = typing a friend's code.
-// pickPriv = the match being set up is a private room (always online, so the ONLINE / VS BOTS pill is hidden)
+// which page of the picker you're on
 let pickMode = null, pickPriv = false;
-// ONLINE / VS BOTS on the map page. Remembered per device; online unless this network can't open a socket (net.wsOk, js/net.js)
+// ONLINE / VS BOTS switch
 const onlinePref = () => { if (net.wsOk === false) return false; const s = localStorage.getItem('voxelstrike-online'); return s === null ? true : s === '1'; };
 function renderPill() {
   const on = onlinePref(), blocked = net.wsOk === false;
@@ -383,28 +360,26 @@ function renderPick() {
   $('pickList').className = m ? 'maps' : join ? 'code' : 'modes';
   const pill = !!m && m.id !== 'zombies' && !pickPriv;
   $('pickPill').style.display = pill ? '' : 'none'; if (pill) renderPill();
-  // a mode card: its icon and its name, every card the same. Its PLAY button waits under it until the card is picked (pickCard)
   const card = o => `<div class="mc" data-id="${o.id}"><button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b></button><button class="go" data-go="${o.id}" tabindex="-1">${o.priv || o.id.startsWith('priv') ? 'OPEN' : 'PLAY'}</button></div>`;
-  pickSel = null; $('pickDesc').classList.remove('in'); $('pickDesc').textContent = m ? m.desc : ''; // on a map page: what the mode is
+  pickSel = null; $('pickDesc').classList.remove('in'); $('pickDesc').textContent = m ? m.desc : '';
   if (join) {
     $('pickList').innerHTML = `<div class="codeBox"><p>Ask a friend for their room code</p><input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" autocapitalize="characters"><button id="codeGo">JOIN</button><p id="codeErr"></p></div>`;
     $('codeIn').focus(); return;
   }
-  // map cards show a picture of the map (img/maps/, taken from above in the game itself)
+  // map cards
   $('pickList').innerHTML = m
     ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
         return `<button data-map="${id}" style="background-image:linear-gradient(transparent 45%,rgba(0,0,0,.72)),url('img/maps/${id}.jpg?v=${V_MAPS}')"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : ''}</small></button>`; }).join('')
     : (priv ? PRIV_CARDS : group ? group.sub : create ? MODES.filter(x => x.id !== 'zombies' && !x.priv) : MODES).map(card).join('');
 }
-// the first click on a mode card picks it: its description comes in under the title and its PLAY button slides out under the card.
-// A second click on the card, or the button, goes on (the click handler below)
+// first click selects a mode card, second click opens it
 let pickSel = null;
 const PICK_CARDS = [...MODES, ...MODES.flatMap(m => m.sub || []), ...PRIV_CARDS];
 function pickCard(id) {
   pickSel = id;
   document.querySelectorAll('#pickList .mc').forEach(c => c.classList.toggle('sel', c.dataset.id === id));
   const d = $('pickDesc'); d.textContent = PICK_CARDS.find(c => c.id === id)?.desc || '';
-  d.classList.remove('in'); void d.offsetWidth; d.classList.add('in'); // (restarts the animation)
+  d.classList.remove('in'); void d.offsetWidth; d.classList.add('in');
 }
 const pickOpen = () => $('pick').style.display === 'flex';
 function showPick(on) {
@@ -437,20 +412,20 @@ $('pickList').addEventListener('click', e => {
     if (id === 'privCreate' || id === 'privJoin') { pickMode = id; pickPriv = id === 'privCreate'; renderPick(); sfx('ui'); return; }
     pickMode = id;
     const m = PLAY_MODES.find(m => m.id === pickMode);
-    if (m) { // a mode you can play (not the Blitz page): remember it, then show its maps
+    if (m) {
       mode = pickMode; localStorage.setItem('voxelstrike-mode', mode);
       if (!m.maps.includes(mapId)) mapId = m.maps[0];
     }
     renderPick(); sfx('ui'); return;
   }
   mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId);
-  // online: net.js finds a room and starts the match itself (and drops back to a bot match if it can't)
+  // online: net.js finds a room
   if (mode !== 'zombies' && (pickPriv || onlinePref())) { net.start({ mode, map: mapId, create: pickPriv }); return; }
   showPick(false); restart(); showLobby(false); lockMouse();
 });
 $('pickList').addEventListener('keydown', e => { if (e.target.id === 'codeIn' && (e.code === 'Enter' || e.code === 'NumpadEnter')) { e.preventDefault(); joinWithCode(); } });
 addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && pickOpen()) $('pickBack').click(); });
-// your name: saves when you click away or press Enter. Blank goes back to the old one. The dice rolls a random one.
+// your name
 $('nameIn').value = myName;
 const saveName = () => { $('nameIn').value = setMyName($('nameIn').value); };
 $('nameIn').addEventListener('change', saveName);
@@ -460,7 +435,7 @@ $('nameDice').addEventListener('click', () => { $('nameIn').value = setMyName(ne
 document.addEventListener('pointerlockchange', () => { if (document.activeElement === $('nameIn')) $('nameIn').blur(); });
 $('lobbySet').addEventListener('click', () => { openSettings(); sfx('ui'); });
 
-// pixel icons for the lobby buttons, drawn from a grid with a dark outline added round the edge
+// pixel icons for the lobby buttons
 function pixIcon(rows, col, scale = 4) {
   const h = rows.length, w = rows[0].length, c = document.createElement('canvas');
   c.width = (w + 2) * scale; c.height = (h + 2) * scale;
@@ -468,7 +443,7 @@ function pixIcon(rows, col, scale = 4) {
   for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
     const fill = on(x, y), edge = !fill && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => on(x + a, y + b));
     if (!fill && !edge) continue;
-    g.fillStyle = fill ? (y < h / 2 ? col[0] : col[1]) : '#000'; // lighter top half, darker bottom half
+    g.fillStyle = fill ? (y < h / 2 ? col[0] : col[1]) : '#000';
     g.fillRect((x + 1) * scale, (y + 1) * scale, scale, scale);
   }
   return c.toDataURL();
@@ -489,13 +464,10 @@ $('setIcon').src = pixIcon([
   '..XX.XXXX.XX..',
   '.....XXXX.....',
 ], ['#d8dde4', '#9aa3ae']);
-// PLAY: a pixel-art triangle on a 22-pixel grid with sharp corners. Instead of a hard black staircase, each pixel along the edge
-// gets an in-between color by how much of it the triangle and its dark green outline cover, so the edge looks smooth up close
-// but you can still see the pixels
+// play button triangle
 $('playIcon').src = (() => {
   const N = 22, S = 10, SS = 6, c = document.createElement('canvas'); c.width = c.height = N * S;
-  const g = c.getContext('2d'), P = [[4.5, 2], [20.5, 11], [4.5, 20]], W = 1.35; // corners, outline width (grid pixels)
-  // signed distance past each edge (negative = inside), the triangle is where all three are under 0. Growing by W keeps the corners sharp
+  const g = c.getContext('2d'), P = [[4.5, 2], [20.5, 11], [4.5, 20]], W = 1.35;
   const edges = P.map((a, k) => { const b = P[(k + 1) % 3], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dy / l, -dx / l, a]; });
   const out = (x, y) => Math.max(...edges.map(([nx, ny, a]) => (x - a[0]) * nx + (y - a[1]) * ny)) * (edges[0][0] * (P[2][0] - P[0][0]) + edges[0][1] * (P[2][1] - P[0][1]) > 0 ? -1 : 1);
   const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k), LINE = [13, 74, 40];
@@ -508,8 +480,7 @@ $('playIcon').src = (() => {
   }
   return c.toDataURL();
 })();
-// mode icons: pixel art with its black outline drawn in. pal maps each letter to a color, or to a function of (x, y) for split colors.
-// The bottom half is shaded a little darker
+// mode icons
 function artIcon(rows, pal, scale = 8) {
   const h = rows.length, w = Math.max(...rows.map(r => r.length)), c = document.createElement('canvas');
   c.width = w * scale; c.height = h * scale;
@@ -526,17 +497,15 @@ const BOLT_ICON = [
   '....KKKKKK.', '...KyyyyyK.', '...KyyyyK..', '..KyyyyK...', '..KyyyKKKKK', '.KyyyyyyyyK',
   '.KKKKKyyyK.', '.....KyyK..', '....KyyK...', '....KyK....', '...KyK.....', '...KK......',
 ];
-// a padlock (private matches) and a key (join with a code)
 const LOCK_ICON = [
   '....KKKK....', '...KbbbbK...', '..KbbKKbbK..', '..KbK..KbK..', '..KbK..KbK..', '.KKKKKKKKKK.',
   '.KyyyyyyyyK.', '.KyyyKKyyyK.', '.KyyyKKyyyK.', '.KyyyyKyyyK.', '.KyyyyyyyyK.', '.KKKKKKKKKK.',
 ];
-// a key lying on its side: a round bow with a hole on the left, the shaft to the right and two teeth hanging under its end
 const KEY_ICON = [
   '..KKKK..........', '.KyyyyK.........', 'KyyyyyyKKKKKKKKK', 'KyyKKyyyyyyyyyyK', 'KyyKKyyKKKKyKyKK',
   'KyyyyyyK..KyKyK.', '.KyyyyK...KKKKK.', '..KKKK..........',
 ];
-// a stopwatch: a round face 13 pixels across (drawn from a circle, so it's as tall as it's wide), hands at twelve and three, a stem on top
+// stopwatch
 const CLOCK_ICON = (() => {
   const N = 13, c = 6, rows = ['.....KKK.....', '.....KwK.....'];
   for (let y = 0; y < N; y++) {
@@ -549,7 +518,7 @@ const CLOCK_ICON = (() => {
 const iconFigure = c => ['KKKKKKK', 'KhhhhhK', 'KsssssK', 'KsKsKsK', 'KsssssK', 'KKKKKKK', `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, `K${c.repeat(5)}K`, 'KKKKKKK'];
 const TEAM_ICON = iconFigure('b').map((r, k) => r + '..' + iconFigure('r')[k]);
 const MODE_ICONS = {
-  zombies: artIcon([ // a plain blocky zombie head: dark hair, two eyes, a flat mouth
+  zombies: artIcon([
     'KKKKKKKKKKKK', 'KddddddddddK', 'KdgggddgggdK', 'KggggggggggK', 'KgKKggggKKgK', 'KgKKggggKKgK',
     'KggggggggggK', 'KggggggggggK', 'KggKKKKKKggK', 'KggggggggggK', 'KggggggggggK', 'KKKKKKKKKKKK',
   ], { K: '#000', g: '#5aa844', d: '#3d7d2e' }, 11),
@@ -568,9 +537,9 @@ const MODE_ICONS = {
 };
 showLobby(true);
 
-// spot = where to stand ({ x, y, z, yaw }) when the server has already picked your place, instead of the middle of the map
+// reset the world for a new game (spot = where the server put you)
 function restart(spot) {
-  boostStart(); // js/boost.js: is this game boosted
+  boostStart();
   zombies.forEach(z => scene.remove(z.g)); zombies.length = 0;
   booms.forEach(b => scene.remove(b.m)); booms.length = 0;
   rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;

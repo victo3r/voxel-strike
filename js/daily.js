@@ -1,13 +1,8 @@
-// DAILY REWARD: one claim a day, on a 7-day streak that pays more each day (DAILY below, coins and 2x boosters). Claim every day
-// and the streak goes on; miss a day and it starts again from day 1; after day 7 a new week starts at day 1.
-// Days follow the player's own clock (local midnight). prof.daily = { last: the day you last claimed ('YYYY-MM-DD'), streak: which
-// day of the streak that was (1-7) }, saved and synced with the rest of the profile.
-// The gift button under the booster button opens the card (with a dot when there's one to claim); the card also opens by itself
-// the first time you're in the lobby on a day you haven't claimed (not under automated tests, so their clicks aren't blocked).
+// daily reward: a 7 day streak, miss a day and it starts over
 const DAILY = [{ c: 10 }, { b: 1 }, { c: 20 }, { b: 2 }, { c: 30 }, { b: 2 }, { c: 50, b: 3 }];
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dayBefore = () => { const d = new Date(); d.setDate(d.getDate() - 1); return dayKey(d); };
-// where today stands: claimed already (day = the day claimed), or which day today's claim would be, and whether a streak was lost
+// today's streak day, and whether the streak was lost
 function dailyNow() {
   const d = prof.daily || {}, today = dayKey();
   if (d.last === today) return { claimed: true, day: d.streak | 0 || 1 };
@@ -44,7 +39,7 @@ $('daily').addEventListener('click', e => {
   if (id === 'dailyGo') claimDaily();
   renderDaily();
 });
-// once a second: the countdown, the button's dot (a new day can start while the game is open), and the first lobby visit of the day
+// update the countdown and pop the card up on the first lobby visit of the day
 let dailyShown = '';
 setInterval(() => {
   renderDaily();

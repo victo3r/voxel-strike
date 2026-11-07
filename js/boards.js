@@ -1,17 +1,13 @@
-// LEADERBOARDS and PLAYER CARDS. Everything here comes from the server's stats (voxel-strike-server room.js saveStats): online
-// matches in public rooms by signed-in players, so nothing on them can be farmed against bots offline or in a private room.
-// TOP (next to FRIENDS in the lobby) opens the boards: THIS WEEK (Monday to Monday, UTC) or ALL TIME, ranked by XP, wins or kills,
-// the top 50 and where you stand. Clicking a player there, a name on the results screen or in your friends list opens their card:
-// look, level, gear, and their numbers this week or all time (wins, kills, K/D, accuracy, headshots, favourite gun).
+// leaderboards and player cards (stats only count online public matches)
 const BOARD_BY = [['xp', 'XP'], ['wins', 'WINS'], ['kills', 'KILLS']];
 let lbB = 'week', lbBy = 'xp', lbData = null, lbErr = '', lbAt = 0, lbKey = '';
 let cardData = null, cardWeek = false, cardErr = '';
 const myId = () => auth?.id || (typeof fr === 'object' && fr.me?.id) || 0;
 const safeSprite = (look, head) => { try { return skinSprite(look && typeof look === 'object' ? look : PRESETS[0].look, head); } catch { return skinSprite(PRESETS[0].look, head); } };
-// a player's in-game name, and their username under it when it's different (friends.js shows them the same way)
+// in-game name, with @username under it when different
 const whoIs = (nick, user) => `<b>${esc(nick || user)}</b>${user && (nick || user).toLowerCase() !== user.toLowerCase() ? `<small>@${esc(user)}</small>` : ''}`;
 const lbNum = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? (n / 1e3).toFixed(1) + 'K' : String(n);
-function weekLeft() { // till Monday 00:00 UTC
+function weekLeft() { // time until Monday 00:00 UTC
   const d = new Date(), next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + (8 - d.getUTCDay()) % 7 || 7), s = (next - d) / 1000;
   return s > 86400 ? `${Math.floor(s / 86400)}D ${Math.floor(s / 3600) % 24}H` : `${Math.floor(s / 3600)}H ${Math.floor(s / 60) % 60}M`;
 }
@@ -56,7 +52,7 @@ $('lb').addEventListener('click', e => {
   if (b?.dataset.by && b.dataset.by !== lbBy) { lbBy = b.dataset.by; sfx('ui'); loadBoard(); }
 });
 
-// ---- a player's card
+// player card
 async function openCard(id) {
   if (!id) return;
   $('card').style.display = 'flex'; cardData = null; cardErr = ''; cardWeek = false; renderCard(); sfx('ui');
@@ -94,6 +90,6 @@ $('card').addEventListener('click', e => {
   if (!b && e.target.id === 'card' || b?.id === 'cardX') { $('card').style.display = 'none'; return; }
   if (b?.dataset.cw) { cardWeek = b.dataset.cw === '1'; sfx('ui'); renderCard(); }
 });
-// names on the results screen (signed-in players) and in the friends list open their card
+// clicking a name on the results screen or friends list opens their card
 $('postBoard').addEventListener('click', e => { const n = e.target.closest('[data-fid]'); if (n && !e.target.closest('button')) { e.stopPropagation(); openCard(+n.dataset.fid); } });
 $('friends').addEventListener('click', e => { const n = e.target.closest('[data-card]'); if (n) { e.stopPropagation(); openCard(+n.dataset.card); } });

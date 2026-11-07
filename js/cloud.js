@@ -1,16 +1,13 @@
-// Cloud saves: signing in keeps your level, XP, coins, guns, loadout, look, name and zombie best the same on every device.
-// Controls, sensitivity, volume and the last map you picked stay per device.
-// The server keeps a revision number that goes up on every save. A device only overwrites the cloud copy if nobody
-// else saved since it last synced; if someone did, whichever copy has more total progress wins.
-const CLOUD = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || 'https://sync.gemforge.org'; // ?srv= points saves, friends and play at another server (testing)
+// cloud saves: newest save wins, or the one with more progress if both changed
+const CLOUD = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || 'https://sync.gemforge.org'; // ?srv= points at another server
 let auth = null, sync = { user: null, rev: 0, dirty: false };
 try { auth = JSON.parse(localStorage.getItem('voxelstrike-auth')); } catch {}
 try { sync = { ...sync, ...JSON.parse(localStorage.getItem('voxelstrike-sync')) }; } catch {}
 const saveSync = () => { try { localStorage.setItem('voxelstrike-sync', JSON.stringify(sync)); } catch {} };
 let changes = 0, busy = false, pushTimer = 0, cloudState = '', applying = false;
-let onAuth = () => {}; // js/friends.js sets this: the friend list refreshes when you sign in or out
+let onAuth = () => {}; // set by friends.js
 
-// lifetime coins earned, for comparing progress. Older saves didn't track it, so estimate it from coins + what the guns cost.
+// lifetime coins, estimated for old saves
 if (prof.earned == null) {
   let spent = 0;
   for (const w of BASE) {
@@ -38,13 +35,13 @@ function applySave(s) {
   prof.guns = { ...prof.guns }; prof.loadout = { ...prof.loadout }; prof.use = { ...prof.use }; prof.boots = { ...prof.boots }; prof.bootUse = { ...prof.bootUse }; prof.hats = { ...prof.hats }; prof.hatUse = { ...prof.hatUse };
   if (!prof.look) prof.look = { ...PRESETS[0].look };
   try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {}
-  const n = cleanName(auth?.cg ? auth.user : s.name); // on CrazyGames you're always called your CrazyGames username
+  const n = cleanName(auth?.cg ? auth.user : s.name); // on CrazyGames your name is your CrazyGames username
   if (n) { myName = n; $('nameIn').value = n; try { localStorage.setItem('voxelstrike-name', n); } catch {} }
   if (!keepBest && s.best) { best = { wave: s.best.wave | 0, kills: s.best.kills | 0 }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
   showProf(); dressHero(); armIcon();
   if (armOpen) renderArmory();
   applying = false;
-  if (keepBest) markDirty(); // this device has a better zombie run than the cloud copy
+  if (keepBest) markDirty(); // this device has a better zombie run
 }
 
 async function api(method, path, body, keepalive = false) {
@@ -57,7 +54,7 @@ async function api(method, path, body, keepalive = false) {
 
 function setState(s) { cloudState = s; renderAcct(); }
 function signedOut() {
-  auth = null; sync = { user: sync.user, rev: 0, dirty: false }; // remembers whose progress is on this device
+  auth = null; sync = { user: sync.user, rev: 0, dirty: false }; // remember whose progress is on this device
   try { localStorage.removeItem('voxelstrike-auth'); } catch {}
   saveSync(); setState('');
 }
@@ -71,7 +68,7 @@ function markDirty() {
 }
 onSave = markDirty;
 
-// the cloud copy changed under us: keep whichever side has more progress
+// the cloud copy changed: keep whichever has more progress
 async function resolve(r) {
   if (progress(r.save?.prof) >= progress(prof)) {
     applySave(r.save); sync.rev = r.rev; sync.dirty = false; saveSync(); setState('saved');
@@ -113,10 +110,10 @@ async function pull() {
   finally { busy = false; }
 }
 
-// ---- account section of the settings page ----
+// account section of settings
 function renderAcct() {
   onAuth();
-  // the ☁ next to your level: grey and dashed for a guest, green when saved, pulsing yellow while saving, red when offline
+  // grey = guest, green = saved, yellow = saving, red = offline
   const cb = $('cloudBtn'), cs = !auth ? 'guest' : cloudState || 'saving';
   cb.className = cs;
   cb.title = { guest: cg.on ? 'Log in to CrazyGames to save your progress and add friends' : 'Not signed in, click to save your progress', saved: `Saved to ${auth?.user}`, saving: 'Syncing…', offline: "Offline, it'll save when you're back online" }[cs];
@@ -153,9 +150,9 @@ async function acctGo(how) {
   $('acctPass').value = ''; $('acctErr').textContent = ''; sfx('buy');
   await signedIn(r, how === 'signup');
 }
-// whose progress this is: the username, or a CrazyGames player's account ID (their username can change)
+// save owner key (CrazyGames ids, since their names can change)
 const acctKey = a => a.cg ? '#' + a.id : a.user.toLowerCase();
-// a sign-in reply ({user, id, token, rev, save}): start syncing. fresh = a new account made from this device's progress
+// after signing in: start syncing
 async function signedIn(r, fresh) {
   auth = { user: r.user, token: r.token, id: r.id, ...(r.cg ? { cg: true, cgId: r.cgId } : {}) };
   try { localStorage.setItem('voxelstrike-auth', JSON.stringify(auth)); } catch {}
@@ -163,7 +160,7 @@ async function signedIn(r, fresh) {
   sync = { user: acctKey(auth), rev: 0, dirty: false };
   if (auth.cg) cgLook();
   if (fresh || !r.save) { sync.rev = r.rev; saveSync(); if (!r.save) await push(); else setState('saved'); return; }
-  // signing in on a device that already has progress: the bigger save wins, unless this device was synced to a different account
+  // the bigger save wins, unless this device belonged to another account
   if (otherAccount || progress(r.save.prof) >= progress(prof)) { applySave(r.save); sync.rev = r.rev; saveSync(); setState('saved'); }
   else { sync.rev = r.rev; saveSync(); await push(); }
 }
@@ -171,23 +168,21 @@ async function signedIn(r, fresh) {
 renderAcct();
 if (auth && !cg.on) { if (sync.user !== acctKey(auth)) { sync.user = acctKey(auth); saveSync(); } pull(); }
 
-// ---- CrazyGames: no username or password here, you're signed in with your CrazyGames account (POST /auth/cg with their signed
-// token, the server checks it). Guests play as guests; the ☁ button asks CrazyGames to log in. Signed in, your name is your
-// CrazyGames username (the name box is locked) and FRIENDS shows up (body.cgIn). Logging out of CrazyGames signs you out here too
-async function cgToken() { return cg.sdk.user.getUserToken(); } // their token (a function of its own, so the tests can hand over one)
+// CrazyGames sign-in: uses their account, no password of ours
+async function cgToken() { return cg.sdk.user.getUserToken(); }
 let cgBusy = false;
 async function cgSignIn() {
   if (!cg.on || cgBusy) return;
   cgBusy = true;
   try {
     let who = null; try { who = await cg.sdk.user.getUser(); } catch {}
-    if (!who) { if (auth?.cg) signedOut(); return; } // a guest, or just logged out
+    if (!who) { if (auth?.cg) signedOut(); return; } // guest, or just logged out
     if (auth?.cg && auth.cgId === who.__dangerousUserId) { pull(); return; } // still signed in from last time
     let tok = null; try { tok = await cgToken(); } catch {}
     if (!tok) return;
     const r = await api('POST', '/auth/cg', { token: tok, save: snapshot() });
     if (!r.token) { setState('offline'); return; }
-    if (auth) api('POST', '/logout').catch(() => {}); // someone else was signed in on this device
+    if (auth) api('POST', '/logout').catch(() => {}); // someone else was signed in here
     await signedIn({ ...r, cgId: who.__dangerousUserId }, r.fresh);
   } catch { setState('offline'); }
   finally { cgBusy = false; cgLook(); }
@@ -201,12 +196,12 @@ function cgLook() {
 }
 if (cg.on) {
   if (cg.sdk.user.isUserAccountAvailable) { cgCall(s => s.user.addAuthListener(() => cgSignIn())); cgSignIn(); }
-  else document.body.classList.add('cgNoAcct'); // accounts are off where the game is shown: no ☁ button
+  else document.body.classList.add('cgNoAcct'); // no accounts here, hide the cloud button
   cgLook();
 }
-// pick up progress from your other devices when you come back to this tab or sit in the lobby
+// pull progress from other devices when you come back
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { if (inLobby) pull(); } // not mid-match: a pulled save would swap your gear under you
-  else if (sync.dirty) push(true); // closing or switching away: send anything unsaved
+  if (document.visibilityState === 'visible') { if (inLobby) pull(); } // not mid-match, it would swap your gear
+  else if (sync.dirty) push(true); // leaving the tab: send anything unsaved
 });
 setInterval(() => { if (inLobby && !document.hidden) { if (sync.dirty) push(); else pull(); } }, 30000);

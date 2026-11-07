@@ -1,7 +1,4 @@
-// The bot that's there when the match starts gets a NATO-alphabet name ("Foxtrot"). The ones that join later
-// get names that look like real people made them, so a lobby full of bots doesn't feel like one.
-// Most are English. The rest are spread across other big languages, and each name remembers its language
-// so that bot can chat in it (js/chat.js).
+// bot names that look like real players made them
 const NAME_MAX = 16;
 const pickN = a => a[Math.random() * a.length | 0];
 
@@ -28,7 +25,7 @@ const N_NUMS = ['1', '2', '7', '9', '11', '13', '21', '23', '42', '64', '77', '8
   '2008', '2009', '2010', '2011', '2012', '2013', '1337'];
 const num = () => Math.random() < .55 ? pickN(N_NUMS) : String(10 + (Math.random() * 90 | 0));
 
-// [weight out of 100, full names in that language]. English takes whatever weight is left (about 60%).
+// other languages: [weight out of 100, names]; English gets the rest
 const N_LANGS = {
   es: [9, ['LeonValiente', 'LoboNegro', 'ElTigre', 'Fuego', 'Sombra', 'ElCrack', 'Rayo', 'DragonRojo', 'Pollito', 'ElProXD', 'Toro',
     'Guerrero', 'Calavera', 'Halcon', 'Tiburon', 'ElLoco', 'ElMasPro', 'Gatito', 'Fantasma', 'Relampago', 'Mateo', 'Santi', 'Diego',
@@ -49,7 +46,7 @@ const N_LANGS = {
     'Neko', 'Sushi', 'Tanuki', 'Kage', 'Akuma', 'ねこ']],
   ko: [2, ['호랑이', '민준', '지수', 'Minjun', 'Jisoo', 'Hyun', 'Taeyang', 'Seojun', 'Kimchi', 'Doyun', '불꽃', '용']],
 };
-const N_LATIN = s => /^[\x00-\x7f]*$/.test(s); // only add number tags and the like to names in plain letters
+const N_LATIN = s => /^[\x00-\x7f]*$/.test(s); // only add numbers and tags to names in plain letters
 
 function enName() {
   const r = Math.random();
@@ -94,7 +91,7 @@ function langName(list) {
   if (s < .9) return b + '_' + num();
   return b.toLowerCase();
 }
-// a random name that looks like a real player made it. Returns { name, lang }.
+// random player-style name, returns { name, lang }
 function randomName() {
   let roll = Math.random() * 100;
   for (const lang in N_LANGS) {
@@ -114,7 +111,7 @@ function nameMaker(taken) {
     return { name: 'Player' + (1000 + Math.random() * 9000 | 0), lang: 'en' };
   };
 }
-// NATO-alphabet names are kept only for bots (no generated name can match one exactly)
+// NATO names are only for the starting bot
 const BOT_DEFAULTS = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliett', 'Kilo', 'Lima',
   'Mike', 'November', 'Oscar', 'Papa', 'Quebec', 'Romeo', 'Sierra', 'Tango', 'Uniform', 'Victor', 'Whiskey', 'Xray', 'Yankee', 'Zulu'];
 const NATO_SET = new Set(BOT_DEFAULTS.map(s => s.toLowerCase()));
@@ -124,7 +121,7 @@ const defaultBotName = (not = '') => {
 };
 
 function cleanName(s) { return String(s ?? '').replace(/[<>&"']/g, '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX); }
-// the default name a new player gets, and what the dice rolls: always adjective + noun (BraveLion, BraveLion42)
+// default name for new players: adjective + noun
 function newMyName(not = '') {
   for (let i = 0; i < 20; i++) {
     let n = pickN(N_ADJ) + pickN(N_NOUN);

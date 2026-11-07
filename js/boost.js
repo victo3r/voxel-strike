@@ -1,18 +1,13 @@
-// 2x BOOSTERS: one doubles the XP and coins of your next game (a match, or a whole Zombie Waves run).
-// prof.boosts = how many you have, prof.boostSet = how many of your next games to boost (one booster each). The ⚡ button under
-// your coins in the lobby opens the booster card: ◀ ▶ picks how many games (0 = off, up to how many you have), WATCH AD gets one
-// more (CrazyGames only, every AD_GAP seconds at most). Without ads you earn them by leveling up (profile.js lvBoosts); daily
-// rewards and other events can hand them out later.
-// A booster is used up at a game's first pay (the end of a match, the first wave of a run), so leaving before then keeps it.
+// 2x boosters: double the XP and coins of your next games
 const AD_GAP = 180; // seconds between rewarded ads
-let gameBoost = false, boostSpent = false; // this game is boosted (set when it starts, input.js restart); its booster is used up
-let adNext = 0; // when the next ad may be offered (performance.now), noAds: CrazyGames has no ads for us this session
+let gameBoost = false, boostSpent = false;
+let adNext = 0;
 let noAds = false;
 const boosts = () => prof.boosts | 0;
-if (prof.boostOn) { prof.boostSet = Math.max(prof.boostSet | 0, 1); delete prof.boostOn; } // an older save's single "on"
-const boostSet = () => Math.min(prof.boostSet | 0, boosts()); // never more games than boosters
+if (prof.boostOn) { prof.boostSet = Math.max(prof.boostSet | 0, 1); delete prof.boostOn; } // old saves had a single on/off
+const boostSet = () => Math.min(prof.boostSet | 0, boosts());
 function boostStart() { gameBoost = boostSet() > 0; boostSpent = false; }
-// every pay from a game goes through this: doubled when boosted, and the first boosted pay uses the booster up (grant saves it)
+// doubles a game's pay; the first boosted pay uses the booster up
 function boostPay(xp, coins) {
   if (!gameBoost) return [xp, coins];
   if (!boostSpent) { boostSpent = true; prof.boostSet = Math.max(0, boostSet() - 1); prof.boosts = Math.max(0, boosts() - 1); }
@@ -34,12 +29,12 @@ function renderBoost() {
 }
 function openBoost() { $('boost').style.display = 'flex'; renderBoost(); sfx('ui'); }
 function closeBoost() { $('boost').style.display = 'none'; }
-setInterval(() => { if ($('boost').style.display === 'flex' && adNext > performance.now() - 1500) renderBoost(); }, 1000); // the ad timer
+setInterval(() => { if ($('boost').style.display === 'flex' && adNext > performance.now() - 1500) renderBoost(); }, 1000); // keep the ad countdown ticking
 $('boostBtn').addEventListener('click', e => { e.stopPropagation(); openBoost(); });
 $('boost').addEventListener('click', e => {
   e.stopPropagation();
   const id = e.target.closest('button')?.id;
-  if (!id && e.target.id === 'boost') return closeBoost(); // a click outside the card
+  if (!id && e.target.id === 'boost') return closeBoost(); // clicked outside the card
   if (id === 'boostX') return closeBoost();
   if (id === 'boostLess' || id === 'boostMore') { prof.boostSet = Math.max(0, Math.min(boosts(), boostSet() + (id === 'boostMore' ? 1 : -1))); saveProf(); sfx('ui'); }
   else if (id === 'boostAd') {

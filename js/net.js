@@ -1,29 +1,12 @@
-// Online play. A match is a room on the save server (Cloudflare, see the voxel-strike-server folder): everyone in it sends
-// where they are 20 times a second, the server passes that round and decides every hit, death, score and the clock.
-// You own your own movement (so it never feels laggy); other players are drawn a little in the past, smoothed between
-// the positions the server sent. The rest of the game only talks to this file through `net` (player.js declares the
-// offline stub `net = { on: false }` so nothing breaks when this file isn't loaded):
-//   net.on                   an online match is running
-//   net.claim(victim, opts)  "I hit this one": the server works out the damage (victim = an entity in zombies, or P for yourself)
-//   net.burn(victim, gun)    "I set this one on fire"
-//   net.shot(w)              you fired once (fire rate and ammo are checked on the server)
-//   net.launch(gun, o, d)    you fired a rocket or flare, returns its id;  net.boom(id, p)  where it went off
-//   net.ev('jump'|'djump')   so others hear it
-//   net.matchTick(dt)        runs the online match HUD (clock, scoreboard) instead of updateDM's bot match
-//   net.banner               text dmDown shows instead of YOU DIED while you wait to spawn
-//   net.applyRemote(z, dt)   moves another player's body each frame
-//   net.roster()             setupMode: the players in the room become recs
-//   net.start(o) / again() / leave() / onLock(locked) / chat(text)
-//   net.room                 the room you're in (js/friends.js: JOIN / INVITE know who's already with you)
-//   net.host                 I run the room's bots (docs/spec-c.md): their AI is the offline one, the server owns their health and scores
+// online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server (testing)
+const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
-const NET_BUILD = +(document.currentScript?.src.match(/[?&]v=(\d+)/)?.[1] ?? 0); // the V from index.html, so the server can tell old cached clients
-const NET_RATE = 50; // ms between the packets you send (20 a second)
-const NET_HIST = 600; // ms of other players' positions kept for smoothing
-// a guest id that stays the same on this device, so you're the same guest from match to match (friends later)
+const NET_BUILD = +(document.currentScript?.src.match(/[?&]v=(\d+)/)?.[1] ?? 0); // lets the server spot old cached clients
+const NET_RATE = 50; // ms between packets (20 a second)
+const NET_HIST = 600; // ms of position history for smoothing
+// guest id that stays the same on this device
 let guestId = localStorage.getItem('voxelstrike-guest');
 if (!/^[0-9a-f]{16}$/.test(guestId || '')) {
   guestId = [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -31,22 +14,18 @@ if (!/^[0-9a-f]{16}$/.test(guestId || '')) {
 }
 const netToastEl = $('netToast');
 let netToastT = 0;
-function netToast(text, ms = 3200) { // a message that shows over anything (lobby, pick screen, match)
+function netToast(text, ms = 3200) { // message that shows over anything
   netToastEl.textContent = text; netToastEl.classList.add('show');
   clearTimeout(netToastT); netToastT = setTimeout(() => netToastEl.classList.remove('show'), ms);
 }
 const safeCss = c => /^#[0-9a-fA-F]{3,8}$/.test(c || '') ? c : '#e8e8e8';
 const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000;
 const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
-// your camera looks along -sin/-cos of your yaw (main.js) but a character body faces +sin/+cos (deathmatch.js aimDir),
-// so another player's body is turned half a circle from the yaw they sent
+// bodies face the opposite way from the camera yaw
 const bodyYaw = y => y + Math.PI;
 
 net = (() => {
-  // ---- the clock: our best guess of the server's time, from pings (the one with the shortest round trip in the last 10 s
-  // is the most honest). Everything time-related on the wire is in server ms
-  // off = the offset in use, target = the latest estimate: off slides toward it a few ms per packet, so the times you send
-  // never jump (the server reads your speed from the gaps between them)
+  // server clock estimate from pings (slides, never jumps)
   const clock = { off: 0, target: 0, rtt: 0, jitter: 0, samples: [] };
   const localNow = () => performance.now();
   const now = () => localNow() + clock.off;
@@ -61,23 +40,23 @@ net = (() => {
   }
   const interpDelay = () => Math.max(100, Math.min(300, 100 + 2 * clock.jitter)); // how far in the past other players are drawn
 
-  // ---- state
+  // state
   let ws = null, welcomed = false, pid = 0, key = '', room = '', code = null, myTeamRaw = 0;
-  let hostPid = 0; // whose client runs the room's bots (the server picks; see the bots section below)
+  let hostPid = 0; // whose client runs the room's bots
   let phase = 'wait', matchEnd = 0, rulesCap = 0;
   let alive = false, respawnAt = 0, readySent = false, readyT = 0;
-  let seq = 0, fired = 0, hits = [], evFlags = 0, pjSeq = 0, renderT = 0, shotN = 0; // shotN counts every shot (yours and your bots')
-  let last = null; // what you started last ({ mode, map, code, create }), for PLAY AGAIN
-  let starting = null; // the match you're trying to join right now
-  let rejoinInfo = null; // { room, pid, key } to get back into a match after the connection drops
-  const remotes = new Map(); // pid -> { rec, body, buf: [positions], fired, burn, reloadWas, q: queued events }
+  let seq = 0, fired = 0, hits = [], evFlags = 0, pjSeq = 0, renderT = 0, shotN = 0; // shotN counts every shot, yours and your bots'
+  let last = null; // for PLAY AGAIN
+  let starting = null;
+  let rejoinInfo = null; // to get back in after a dropped connection
+  const remotes = new Map();
   let roster = { recs: [], youRec: null };
   let lastTop = '', lastBoard = '', lastSec = 0;
-  const api = { on: false, banner: '', wsOk: null, code: null, serverPads: false }; // serverPads: the server stocks the pads (false on a server from before increment B)
+  const api = { on: false, banner: '', wsOk: null, code: null, serverPads: false }; // serverPads: the server stocks the pads
 
   function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
 
-  // ---- the lobby's network check: can this network open a socket to the game server at all? School filters often can't
+  // can this network reach the game server? (school filters often can't)
   function probe() {
     if (api.wsOk !== null) return;
     const saved = sessionStorage.getItem('voxelstrike-ws');
@@ -91,8 +70,8 @@ net = (() => {
     setTimeout(() => finish(false), 3000);
   }
 
-  // ---- what you take into the match: your name, look and gear, as ids the server knows
-  function myGear() { // stars for every gun you own, not just the loadout: you can switch guns in the armory mid-match
+  // your name, look and gear for the server
+  function myGear() { // every gun you own, since you can swap mid-match
     const load = CATS.map(([c]) => BASE[loadoutGun(c)].id), stars = {};
     BASE.forEach((w, i) => { if (hasGun(i)) stars[w.id] = Math.max(0, Math.min(2, gunUse(i) - 1)); });
     return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load };
@@ -104,8 +83,7 @@ net = (() => {
     send(m);
   }
 
-  // ---- starting a match: find a room (or make/join a private one), connect, say hello, and take the first welcome.
-  // Anything going wrong inside a few seconds drops you into a bot match instead, with a note saying so
+  // starting a match; if it fails we fall back to a bot match
   const findingEl = $('finding'), findingMsg = $('findingMsg');
   function showFinding(text) { findingMsg.textContent = text; findingEl.style.display = 'flex'; }
   function hideFinding() { findingEl.style.display = 'none'; }
@@ -116,10 +94,10 @@ net = (() => {
   }
   function start(o) {
     if (starting) return;
-    if (api.on) leave(); // (PLAY AGAIN after a dropped match, or a new match from the lobby)
-    last = o; // kept for PLAY AGAIN (a private room's code lands on it once the room is made, a public room's name once you're in)
+    if (api.on) leave();
+    last = o; // kept for PLAY AGAIN
     const job = starting = { o, not: [], tries: 0, dead: false, timer: 0 };
-    showFinding(o.friend ? `JOINING ${o.friend.toUpperCase()}…` : o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…'); // friend: from the friends list
+    showFinding(o.friend ? `JOINING ${o.friend.toUpperCase()}…` : o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…');
     job.timer = setTimeout(() => fail(job, 'Took too long to reach the servers'), 8000);
     findRoom(job).catch(e => fail(job, e?.message || 'Could not reach the servers'));
   }
@@ -135,7 +113,7 @@ net = (() => {
       r = await fetchJson('/play/private', { method: 'POST', body: JSON.stringify({ mode: o.mode, map: o.map }) });
       if (!r.room) throw new Error(r.error || 'Could not make a room');
       o.code = r.code;
-    } else if (o.room) { // a public room by name: a friend's, or the one you just played in (PLAY AGAIN keeps everyone together)
+    } else if (o.room) { // a public room by name (a friend's, or PLAY AGAIN)
       r = { room: o.room };
     } else {
       r = await fetchJson(`/play/find?mode=${encodeURIComponent(o.mode)}&map=${encodeURIComponent(o.map)}&not=${job.not.join(',')}`);
@@ -159,7 +137,7 @@ net = (() => {
     if (ws && !welcomed) { try { ws.close(1000); } catch {} ws = null; }
     hideFinding();
     const o = job.o;
-    if (o.code && !o.mode) { // a bad code: stay on the code page
+    if (o.code && !o.mode) { // bad code: stay on the code page
       const err = $('codeErr'); if (err) err.textContent = why; else netToast(why);
       return;
     }
@@ -175,11 +153,11 @@ net = (() => {
   }
   $('findingX').addEventListener('click', () => { cancelStart(); sfx('ui'); });
 
-  // ---- connection lost / ended
+  // connection lost or ended
   function onClose(codeNum, reason, job) {
     const wasOn = api.on;
     if (job && !job.dead && !welcomed) { // never got in
-      if (codeNum === 4001 && job.tries++ < 3 && !job.o.code) { // full: look for another room of that mode and map
+      if (codeNum === 4001 && job.tries++ < 3 && !job.o.code) { // room full: try another
         if (job.o.room) { job.o.room = null; netToast('That room is full, finding another', 3000); } else job.not.push(room);
         findRoom(job).catch(e => fail(job, e?.message || 'No room found')); return;
       }
@@ -189,8 +167,8 @@ net = (() => {
     }
     ws = null;
     if (!wasOn) return;
-    if (codeNum === 4010) return; // the match ended normally: the results screen is up, and PLAY AGAIN / EXIT go through again() / leave()
-    if (codeNum === 1012 || codeNum === 1006 || codeNum === 1001 || codeNum === 1011) { // dropped: try once to get straight back in
+    if (codeNum === 4010) return; // match ended normally
+    if (codeNum === 1012 || codeNum === 1006 || codeNum === 1001 || codeNum === 1011) { // dropped: try once to get back in
       if (rejoinInfo && !matchOver && !rejoinInfo.tried) { rejoinInfo.tried = true; netToast('Reconnecting…', 2500); setTimeout(() => { if (!api.on || !rejoinInfo) return; connect(rejoinInfo.room, null, { pid: rejoinInfo.pid, key: rejoinInfo.key }); }, 2000); return; }
     }
     const why = { 4000: 'The game was updated, reload the page', 4003: 'You were removed from the match', 4004: 'Disconnected for being away', 4005: 'You joined from another tab' }[codeNum] || 'Connection lost';
@@ -212,7 +190,7 @@ net = (() => {
   }
   function again() { if (!last) return; endOnline(); start(last.code ? { code: last.code } : { mode: last.mode, map: last.map, room: last.room }); }
 
-  // ---- messages from the server
+  // messages from the server
   function onMsg(m, job) {
     const t = Array.isArray(m) ? m[0] : m.t;
     switch (t) {
@@ -234,7 +212,7 @@ net = (() => {
       case 'warp': return warped(m);
       case 'host': return setHost(m.pid);
       case 'fill': return fill(m.n | 0);
-      case 'chat': if (chatHidden(cleanName(m.name))) return; return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80)); // chat off or muted (chat.js)
+      case 'chat': if (chatHidden(cleanName(m.name))) return; return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80));
       case 'over': return over(m);
       case 'kick': return;
       case 'probe': return;
@@ -249,8 +227,8 @@ net = (() => {
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     mode = w.mode; mapId = w.map;
     api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads);
-    if (last && !code && !rejoining) last.room = room; // PLAY AGAIN goes back to this room, so a group stays together
-    // the roster: you, then everyone else, as bot-shaped records the rest of the game already understands
+    if (last && !code && !rejoining) last.room = room; // PLAY AGAIN keeps a group together
+    // the roster, as bot-shaped records
     for (const r of remotes.values()) dropBody(r);
     remotes.clear();
     roster.youRec = { name: myName, you: true, team: 0, css: '#8ff0b6', score: 0, kills: 0, deaths: 0, assists: 0, streak: 0, pid };
@@ -262,7 +240,7 @@ net = (() => {
     }
     if (!rejoining) {
       hideFinding(); showPick(false);
-      restart(); // -> setupMode -> net.roster()
+      restart();
       showLobby(false);
     } else restart();
     if (api.serverPads) w.pads.forEach((type, i) => { const p = pads[i]; if (p) { clearPad(p); if (type) spawnPickup(p, type); } }); // what the pads hold right now
@@ -275,8 +253,7 @@ net = (() => {
     send({ t: 'ping', c: localNow() });
     cgRoom();
   }
-  // CrazyGames: tell their site which room you're in, so friends there can join you with one click and invite links lead here
-  // (a private room by its code, a public one by its name). Leaving says so too
+  // CrazyGames: report our room so friends can join and invite links work
   let cgInRoom = false;
   const roomParams = () => code ? { join: code } : { room, mode, map: mapId };
   function cgRoom() {
@@ -284,15 +261,15 @@ net = (() => {
     if (api.on) { cgInRoom = true; cgCall(s => s.game.updateRoom({ roomId: room, isJoinable: true, inviteParams: roomParams() })); }
     else if (cgInRoom) { cgInRoom = false; cgCall(s => s.game.leftRoom()); }
   }
-  // an invite's params ({join: code} or {room, mode, map}) as a start()
+  // an invite's params as a start()
   function fromInvite(p) {
     const c = String(p?.join || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
     if (c.length === 6) return { code: c };
     if (/^pub-[\w-]{1,60}$/.test(p?.room || '') && PLAY_MODES.some(m => m.id === p.mode) && MAPS[p.map]) return { room: p.room, mode: p.mode, map: p.map };
     return null;
   }
-  // another player's record, shaped like a bot's (deathmatch.js joinBot/makeBot) so hits, outlines, tags and angels all work
-  // a player's gear as the rec fields the bot code reads: stars and stats by gun index, the loadout, boots, hat, armor tier and their effects
+  // another player's record, shaped like a bot's
+  // their gear as the fields the bot code reads
   function gearFields(gear) {
     gear = gear || {};
     const stars = {}, W = {};
@@ -303,9 +280,9 @@ net = (() => {
     const armor = Math.max(0, Math.min(ARMOR_MAX, gear.armor | 0));
     return { stars, load, W, boots, hat, armor, fx: gearFx(boots, hat) };
   }
-  function gearMsg(m) { // someone changed gear in the armory mid-match
-    if (m.pid === undefined) { P.maxArmor = m.maxArmor; P.armor = m.armor; return; } // the server's answer to your own change: the armor bar is its call
-    const r = remotes.get(m.pid); if (r) Object.assign(r.rec, gearFields(m.gear)); // their next body, and the next gun they pull out, use it
+  function gearMsg(m) { // someone changed gear mid-match
+    if (m.pid === undefined) { P.maxArmor = m.maxArmor; P.armor = m.armor; return; } // the server's answer to your own change
+    const r = remotes.get(m.pid); if (r) Object.assign(r.rec, gearFields(m.gear));
   }
   function makeRemoteRec(p) {
     const name = cleanName(p.name) || 'Player';
@@ -313,16 +290,16 @@ net = (() => {
     const css = team !== undefined ? TEAMS[team].css : safeCss(p.css);
     let look = p.look && typeof p.look === 'object' ? { ...p.look } : null;
     if (!look || typeof look.hair !== 'string' || typeof look.top !== 'string') look = randomLook(name, 0x6a6a72);
-    if (team !== undefined) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team colours on the shirt
+    if (team !== undefined) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team shirt colour
     const tag = tagMat(name, css);
     if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; } // teammates' tags show through walls
-    return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, bot: !!p.bot, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {}, // fid: their player ID when signed in (js/friends.js); bot: one of the room's bots
+    return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, bot: !!p.bot, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {},
       score: p.score | 0, kills: p.kills | 0, deaths: p.deaths | 0, assists: p.assists | 0, streak: p.streak | 0, alive: !!p.alive, b: null, wait: Infinity, remote: true };
   }
   function addRemote(p, announce) {
     if (remotes.has(p.pid)) left(p.pid, 'replaced');
     const rec = makeRemoteRec(p), r = { rec, body: null, buf: [], fired: 0, burn: 0, reloadWas: false, q: 0, pos: p.pos || null, hits: [], respawnAt: 0, readyAt: 0 };
-    if (rec.bot && hostPid === pid) hostRec(rec); // a bot of mine to run
+    if (rec.bot && hostPid === pid) hostRec(rec); // a bot I host
     remotes.set(p.pid, r); roster.recs.push(rec);
     if (recs !== roster.recs) recs.push(rec);
     if (announce) { feed(`${nameTag(rec)} joined`); sfx('join'); }
@@ -342,12 +319,12 @@ net = (() => {
     if (reason !== 'replaced') feed(`${nameTag(r.rec)} left`);
     if (r.rec.tag?.map) { r.rec.tag.map.dispose(); r.rec.tag.dispose(); }
   }
-  // bodies: built with makeBot like a bot's, then driven from the network instead of the AI (main.js checks z.remote)
+  // bodies: built like a bot's, driven by the network
   function spawnBody(r, x, y, z, yaw = 0) {
     yaw = bodyYaw(yaw);
     dropBody(r);
     const b = makeBot(r.rec, { x, y, z, yaw });
-    b.remote = !r.rec.hostBot; b.pid = r.rec.pid; b.aimYaw = yaw; b.aimPitch = 0; // a bot I host runs the offline AI instead of snapshots
+    b.remote = !r.rec.hostBot; b.pid = r.rec.pid; b.aimYaw = yaw; b.aimPitch = 0; // bots I host run the offline AI
     b.g.position.set(x, y, z); b.g.position.lag = 0; b.g.rotation.y = yaw - b.holdTurn;
     r.rec.b = b; r.body = b; r.rec.alive = true;
     r.buf = [{ ts: now(), x, y, z, yaw, pitch: 0, gun: BASE[b.gun].id, flags: 8 }];
@@ -356,7 +333,7 @@ net = (() => {
   }
   function dropBody(r) {
     const b = r.body; r.body = null; r.rec.b = null; r.rec.alive = false;
-    if (!b || b.dead) return; // a dead one is an angel: main.js takes it away when it's faded
+    if (!b || b.dead) return; // dead ones fade out as angels
     scene.remove(b.g); const i = zombies.indexOf(b); if (i >= 0) zombies.splice(i, 1);
   }
   function spawn(m) {
@@ -379,18 +356,18 @@ net = (() => {
       P.hp = m.hp; P.armor = m.armor;
       if (!alive) return;
       youHitFx(!!m.head, armorOnly);
-      if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false); // a blast that wasn't yours throws you
+      if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false); // someone else's blast throws you
       return;
     }
     const r = remotes.get(m.v); if (!r) return;
     r.rec.alive = true;
     const b = r.body; if (!b) return;
     b.hp = Math.max(m.hp, b.dead ? 0 : .01); b.armor = m.armor;
-    if (r.rec.hostBot && m.by && m.by !== m.v) { // my bot: it remembers who's hurting it, like offline (hurtZombie), so it fights back
+    if (r.rec.hostBot && m.by && m.by !== m.v) { // my bot remembers who's hurting it
       const who = m.by === pid ? YOU_T : bodyOf(m.by);
       if (who) { if (b.hitBy !== who || b.hitByT <= 0) b.hitDmg = 0; b.hitBy = who; b.hitByT = 2; b.hitDmg += m.d; }
     }
-    if (m.by === pid) return; // your own hits already showed their marker and flash when you fired
+    if (m.by === pid) return; // your own hits already showed
     hitFx(b, pt ? pt.clone() : b.g.position.clone().setY(b.g.position.y + 1.1), !!m.head, m.kind === 'burn');
   }
   function died(m) {
@@ -410,7 +387,7 @@ net = (() => {
       return;
     }
     const r = remotes.get(m.v); if (!r) return;
-    r.respawnAt = m.respawnAt || now() + 3000; r.readyAt = 0; // (a bot I host: hostTick asks for its spawn when this comes)
+    r.respawnAt = m.respawnAt || now() + 3000; r.readyAt = 0;
     const b = r.body; if (!b) { r.rec.alive = false; return; }
     b.hp = 0; b.dead = .0001; b.drowned = !!m.drowned;
     botDownFx(b, !!m.drowned);
@@ -427,9 +404,9 @@ net = (() => {
     const won = MR.team ? lead > 0 : place === 1, [xp, gold] = m.rewards?.[pid] || [0, 0];
     phase = 'over'; alive = false; api.banner = '';
     endMatch({ place, won, xp, gold, lead, priv: !!m.priv });
-    if (typeof frPostButtons === 'function') frPostButtons(); // + ADD next to the players you could befriend (js/friends.js)
+    if (typeof frPostButtons === 'function') frPostButtons(); // + ADD buttons
   }
-  // ---- pickup pads: the server stocks them and says who got what (js/combat.js pads, js/main.js asks with pick when you stand on one)
+  // pickup pads: the server stocks them and says who got what
   const padPos = new THREE.Vector3();
   function padMsg(m) {
     const p = pads[m.i]; if (!p) return;
@@ -437,53 +414,49 @@ net = (() => {
     if (m.type) spawnPickup(p, m.type);
     else if (m.by !== pid) sfx(m.was === 'health' ? 'pickHealth' : m.was === 'armor' ? 'pickArmor' : 'pickAmmo', { at: padPos.set(p.x, .6, p.z), far: 18, v: .6 }); // someone else grabbed it
   }
-  // by = one of my bots standing on it (its AI checked the pickup would do something); otherwise it's me
+  // by = one of my bots, otherwise me
   function pick(p, by) {
     if (!api.on || !p.item) return;
     let byPid = 0;
     if (by) { if (!hostedOf(by)) return; byPid = by.pid; }
     else if (!alive || !canPickup(p.type)) return;
-    const t = localNow(); if (p.claimAt && t - p.claimAt < 1200) return; // asked already, the answer is on its way
+    const t = localNow(); if (p.claimAt && t - p.claimAt < 1200) return; // already asked
     p.claimAt = t;
     const m = { t: 'pick', i: pads.indexOf(p) }; if (byPid) m.by = byPid;
     send(m);
   }
-  function botPicked(m) { // the server handed a pickup to one of my bots
+  function botPicked(m) { // the server gave a pickup to one of my bots
     const b = remotes.get(m.by)?.body; if (!b || b.dead) return;
     b.hp = m.hp; b.armor = m.armor;
     sfx(m.type === 'health' ? 'pickHealth' : m.type === 'armor' ? 'pickArmor' : 'pickAmmo', { at: b.g.position, far: 25, v: .7 });
   }
-  // the server didn't accept where you went (too fast, off the map, or packets from before a spawn reached it): back to where it last had you.
-  // by: one of my bots instead
+  // the server rejected our position: snap back
   function warped(m) {
     if (m.by) { const b = remotes.get(m.by)?.body; if (b && !b.dead) { b.g.position.set(m.x, m.y, m.z); b.g.position.lag = 0; b.vy = 0; b.lx = b.lz = 0; } return; }
     if (!alive) return;
     P.pos.set(m.x, m.y, m.z); P.pos.lag = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0;
   }
-  // ---- bots (docs/spec-c.md): a public room fills its empty slots with bots. One human is the host: its client runs their AI (the
-  // same bots as offline, deathmatch.js updateBot), streams them in its own packets and claims their hits; the server owns their
-  // health, scores and respawns like anyone's. Everyone else gets them as remote players. Hosting moves to another human when the
-  // host leaves or parks, so the bots carry on
+  // room bots: one player hosts their AI, the server owns their health
   const hostedOf = by => { const r = by && by.pid ? remotes.get(by.pid) : null; return r && r.rec.hostBot && r.body ? r : null; };
-  // (its level for as long as I run it: from a roll for a full room of bots, js/modes/deathmatch.js rollSkills)
+  // bot levels rolled once per room
   let skillPool = null;
   function hostRec(rec) { rec.hostBot = true; rec.remote = false; rec.taste = tasteFor(rec.load); rec.wait = Infinity; skillPool ??= rollSkills(7); rec.skill = skillPool.length ? skillPool.pop() : SKILL_MID; }
   function setHost(h) {
     hostPid = h | 0;
     const mine = hostPid === pid;
-    if (mine) skillPool = null; // the bots are mine now: a fresh roll
+    if (mine) skillPool = null;
     for (const r of remotes.values()) {
       if (!r.rec.bot || mine === !!r.rec.hostBot) continue;
       const b = r.body, live = !!b && !b.dead;
       const pos = live ? b.g.position.clone() : null, yaw = live ? b.aimYaw : 0, hp = live ? b.hp : 0, armor = live ? b.armor : 0;
       if (mine) hostRec(r.rec); else { r.rec.hostBot = false; r.rec.remote = true; }
       if (!live) continue;
-      dropBody(r); // the same bot carries on from where it stands, as an AI body of mine or a remote one
-      const nb = spawnBody(r, pos.x, pos.y, pos.z, wrapAng(yaw - Math.PI)); // (spawnBody turns a camera yaw into a body yaw)
+      dropBody(r); // the bot carries on from where it stands
+      const nb = spawnBody(r, pos.x, pos.y, pos.z, wrapAng(yaw - Math.PI));
       nb.hp = hp; nb.armor = armor;
     }
   }
-  function fill(n) { // the room is short of bots and I'm the host: make them, rolled like offline bots (names, looks, gear)
+  function fill(n) { // make bots for empty slots
     if (hostPid !== pid || !api.on || n <= 0) return;
     const next = nameMaker(recs.map(r => r.name)), bots = [];
     for (let i = 0; i < Math.min(n, 7); i++) {
@@ -492,7 +465,7 @@ net = (() => {
     }
     send({ t: 'bot+', bots });
   }
-  function hostTick() { // my bots without a body (new, or dead and due): ask the server to spawn them, offering free spots like for myself
+  function hostTick() { // ask the server to spawn my bots that need a body
     const t = now(), lt = localNow();
     for (const r of remotes.values()) {
       if (!r.rec.hostBot || r.body) continue;
@@ -519,15 +492,15 @@ net = (() => {
     else flareFx(p);
   }
 
-  // ---- positions coming in: a short history per player, drawn a little in the past so there's always something to smooth between
+  // positions coming in, drawn a little in the past
   function snap(m) {
     const st = m[1];
     for (let i = 2; i < m.length; i++) {
       const [who, ts, x, y, z, yaw, pitch, gun, flags, fd, burn] = m[i];
       if (who === pid) continue;
-      const r = remotes.get(who); if (!r || r.rec.hostBot) continue; // (my own bots don't come back to me)
+      const r = remotes.get(who); if (!r || r.rec.hostBot) continue; // my own bots don't come back to me
       r.rec.alive = true;
-      if (!r.body) spawnBody(r, x, y, z, yaw); // joined mid-match before their spawn reached us
+      if (!r.body) spawnBody(r, x, y, z, yaw); // joined before their spawn reached us
       const buf = r.buf;
       if (buf.length && ts <= buf[buf.length - 1].ts) continue; // out of order
       buf.push({ ts, x, y, z, yaw: bodyYaw(yaw), pitch, gun, flags });
@@ -544,12 +517,12 @@ net = (() => {
     let x, y, zz, yaw, pitch, cur = buf[buf.length - 1];
     let a = null, b = null;
     for (let i = buf.length - 1; i >= 0; i--) if (buf[i].ts <= t) { a = buf[i]; b = buf[i + 1] || null; break; }
-    // r.seenT = the server time of where it's drawn (your hits on it are checked against where it was then)
+    // seenT: when it's drawn, for checking hits
     if (a && b) {
       const k = Math.min(1, (t - a.ts) / Math.max(1, b.ts - a.ts)); r.seenT = a.ts + (b.ts - a.ts) * k;
       x = a.x + (b.x - a.x) * k; y = a.y + (b.y - a.y) * k; zz = a.z + (b.z - a.z) * k;
       yaw = a.yaw + wrapAng(b.yaw - a.yaw) * k; pitch = a.pitch + (b.pitch - a.pitch) * k; cur = a;
-    } else if (a) { // past the newest position: carry on for a moment, then hold still
+    } else if (a) { // past the newest position: coast, then stop
       const prev = buf[buf.length - 2], over = Math.min(50, t - a.ts) / 1000;
       const vx = prev && a.ts > prev.ts ? (a.x - prev.x) / ((a.ts - prev.ts) / 1000) : 0, vz = prev && a.ts > prev.ts ? (a.z - prev.z) / ((a.ts - prev.ts) / 1000) : 0;
       x = a.x + vx * over; y = a.y; zz = a.z + vz * over; yaw = a.yaw; pitch = a.pitch; cur = a; r.seenT = a.ts + over * 1000;
@@ -560,17 +533,15 @@ net = (() => {
     z.aimYaw = yaw; z.aimPitch = pitch;
     z.g.rotation.y = yaw - z.holdTurn; z.headPiv.rotation.y = z.holdTurn; z.headPiv.rotation.x = z.aim.rotation.x = -pitch;
     const grounded = !!(cur.flags & 8);
-    if (sp > .4) { // legs swing with how fast they're going, a footstep each time a leg swings through
+    if (sp > .4) { // legs and footsteps
       z.t += dt * 6 * 2.2 * Math.min(1.3, sp / 6);
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
       const ph = Math.sin(z.t) > 0;
       if (ph !== z.stepPh) { z.stepPh = ph; if (grounded) sfx('step_' + FOOT_OK(surfaceAt(pos.x, pos.z, z.r, pos.y)) + (ph ? '' : '2'), { at: pos, far: 22, v: .8 }); }
     } else { z.pivL.rotation.x *= .8; z.pivR.rotation.x *= .8; }
-    // the gun in their hands
     if (cur.gun !== BASE[z.gun].id) { const i = gi(cur.gun); if (i !== undefined) { z.gun = i; z.ammo = 1; holdGun(z); sfx('equip', { at: pos, far: 15, v: .7 }); } }
     const W = BASE[z.gun];
-    // their reload: the sound, and the reload animation on the gun in their hands for as long as their reload takes at their stars
-    // (deathmatch.js holdReload), cut short if they stop reloading (switched guns, died)
+    // their reload animation and sound
     const rlT = z.rec.W?.[z.gun]?.reload ?? W.reload;
     if (r.q & 2) { if (!W.inf) sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); z.rlLeft = W.inf || W.melee ? 0 : rlT; }
     if (!r.reloadWas) z.rlLeft = 0;
@@ -587,7 +558,7 @@ net = (() => {
     z.stab = Math.max(0, z.stab - dt); knifeChop(z);
     if (z.spin) { if (z.muzzle > 0) z.spinV = 30; z.spin.rotation.z += z.spinV * dt; z.spinV = Math.max(0, z.spinV - dt * 25); }
     if (z.round) z.round.visible = true;
-    // flame and heat ray: on while they hold the trigger
+    // flame and heat ray stay on while they hold fire
     const firing = !!(cur.flags & 4) && (W.flame || W.beam);
     if (firing) {
       eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); z.flashM.getWorldPosition(fv);
@@ -613,9 +584,9 @@ net = (() => {
     z.mats.forEach(m => m.emissive.setHex(e));
   }
 
-  // ---- what you send: your position 20 times a second, with any shots and hits since the last one
+  // send your position 20 times a second, with shots and hits
   function sendState() {
-    if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby || document.hidden) return; // hidden tab: nothing is sent, so the server parks you (afk) until you're back
+    if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby || document.hidden) return; // hidden tab sends nothing, the server marks you afk
     let flags = evFlags; evFlags = 0;
     if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8;
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
@@ -623,7 +594,7 @@ net = (() => {
     const f = fired; fired = 0;
     clock.off += Math.max(-3, Math.min(3, clock.target - clock.off)); // slide, don't jump
     const tc = lastTc = Math.max(lastTc + 1, Math.round(now()));
-    // the bots I host ride along: where each is, what it holds, and its shots and claims since the last packet
+    // my bots ride along in my packets
     const botRows = [];
     if (hostPid === pid) for (const r of remotes.values()) {
       if (!r.rec.hostBot) continue;
@@ -632,20 +603,19 @@ net = (() => {
       let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (b.aimT > 0) bf |= 1;
       if (b.drownFlag) { bf |= 128; b.drownFlag = false; }
       const q = b.g.position;
-      botRows.push([r.rec.pid, r3(q.x), r3(q.y), r3(q.z), r3(wrapAng(b.aimYaw - Math.PI)), r3(b.aimPitch), BASE[b.gun].id, bf, r.fired, r.hits]); // body yaw -> the camera yaw everyone sends
+      botRows.push([r.rec.pid, r3(q.x), r3(q.y), r3(q.z), r3(wrapAng(b.aimYaw - Math.PI)), r3(b.aimPitch), BASE[b.gun].id, bf, r.fired, r.hits]);
       r.fired = 0; r.hits = [];
     }
     send(['s', ++seq, tc, r3(P.pos.x), r3(P.pos.y), r3(P.pos.z), r3(P.yaw), r3(P.pitch), BASE[cur].id, flags, f, h, botRows]);
   }
   setInterval(sendState, NET_RATE);
-  // the armory mid-match (a gun swapped into a slot, stars, armor, boots, a hat): every profile save during an online match sends
-  // the server your gear again, so its stats, armor and hat/boot effects match what you're using
+  // armory changes mid-match get sent to the server
   let gearT = 0;
   function gearChanged() { if (!api.on || !welcomed) return; clearTimeout(gearT); gearT = setTimeout(() => send({ t: 'gear', gear: myGear() }), 150); }
   const onSave0 = onSave; onSave = () => { onSave0(); gearChanged(); };
   setInterval(() => { if (api.on) send({ t: 'ping', c: localNow() }); }, 1000);
   document.addEventListener('visibilitychange', () => { if (document.hidden && api.on) send({ t: 'afk' }); });
-  // o.by = the bot of mine that did it (its claim goes in its own row, from its eye); nothing else's hits are mine to claim
+  // o.by = the bot of mine that did it
   function claim(victim, o = {}) {
     if (!api.on) return;
     const vp = victim === P ? pid : victim?.pid; if (!vp) return;
@@ -653,12 +623,11 @@ net = (() => {
     const list = h ? h.hits : hits;
     const pt = o.point || (victim === P ? centre.set(P.pos.x, P.pos.y + 1, P.pos.z) : victim.g.position), kind = o.kind | 0, gun = o.gun || BASE[cur].id;
     const eye = h ? botEye.set(h.body.g.position.x, h.body.g.position.y + 1.6, h.body.g.position.z) : camera.position;
-    if (kind === 0) { // one claim per shot and victim: a shotgun's pellets add up. Two shots before the next packet are two claims
+    if (kind === 0) { // one claim per shot and victim (pellets add up)
       const same = list.find(c => c.s === shotN && c[0] === vp && c[6] === 0 && c[7] === gun && c[2] === (o.head ? 1 : 0) && c[12] === (o.pj | 0));
       if (same) { same[1] += o.pellets ?? 1; return; }
     }
-    // when the victim was where you saw it: another player is drawn a little in the past (the time applyRemote drew it at),
-    // a bot you run yourself is where it is now
+    // where the victim was when you saw it
     const r = remotes.get(vp), seen = r && r.body === victim && r.seenT ? r.seenT : now();
     const c = [vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(seen), o.pj | 0];
     c.s = shotN; list.push(c);
@@ -674,19 +643,18 @@ net = (() => {
   }
   const boom = (id, p, by) => { if (!api.on || !id) return; const m = { t: 'boom', id, p: [r2(p.x), r2(p.y), r2(p.z)] }; if (by && by.pid) m.by = by.pid; send(m); };
 
-  // ---- spawning: the server only puts you in once your mouse is locked and you say where (spawnSpot, like offline)
+  // spawning: once your mouse is locked
   function tryReady() {
     if (!api.on || alive || readySent && localNow() - readyT < 3000 || !welcomed) return;
     if (respawnAt && now() < respawnAt - 150) return;
-    // a few free spots, farthest from enemies first: the server takes the one farthest from where it has them
-    // (a server from before increment B reads the first one as x/z/yaw)
+    // a few free spots, the server picks the farthest from enemies
     const spots = spawnSpots(YOU_T, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, 0))]);
     send({ t: 'ready', spots, x: spots[0][0], z: spots[0][1], yaw: spots[0][2], y: spots[0][3] });
     readySent = true; readyT = localNow(); api.banner = 'SPAWNING…';
   }
   function onLock(isLocked) { if (!api.on) return; if (isLocked) tryReady(); }
 
-  // ---- the match HUD each frame (instead of updateDM's bot match): clock from the server, place, scoreboard, respawning
+  // match HUD from the server
   function matchTick(dt) {
     if (!api.on) return;
     renderT = now() - interpDelay();
@@ -706,7 +674,7 @@ net = (() => {
     lastSec = sec;
     const place = ranked().indexOf(youRec) + 1, others = remotes.size;
     const clockHtml = (phase !== 'play' ? `<div class="clock">${others ? 'STARTING SOON' : 'WAITING FOR PLAYERS'}</div>` : `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div>`)
-      + (phase === 'play' && !others ? '<div class="place">WAITING FOR PLAYERS</div>' : ''); // alone mid-match: the server wraps the match up in 30 s unless someone joins
+      + (phase === 'play' && !others ? '<div class="place">WAITING FOR PLAYERS</div>' : ''); // alone: the server ends the match in 30 s unless someone joins
     const top = clockHtml + (MR.team
       ? `<div class="teams"><b style="color:${TEAMS[0].css}">${TEAMS[0].name} ${teamKills(0)}</b>–<b style="color:${TEAMS[1].css}">${teamKills(1)} ${TEAMS[1].name}</b></div><div class="place">YOU: ${youRec.kills} KILLS</div>`
       : `<div class="place">${ord(place)} OF ${recs.length}  ·  ${MR.kills ? '' : youRec.score + ' PTS  ·  '}${youRec.kills} KILLS</div>`)
@@ -717,18 +685,18 @@ net = (() => {
     if (show) { const h = boardHTML(); if (h !== lastBoard) $('board').innerHTML = lastBoard = h; }
   }
 
-  // ---- the lobby: a join-by-link button, the room code in the pause menu
+  // lobby: join links and the room code
   const joinParam = (new URLSearchParams(location.search).get('join') || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
-  if (cg.on) { // CrazyGames: an invite link (or instant multiplayer, "play with friends") goes straight in once the game has loaded
+  if (cg.on) { // CrazyGames invite links and instant multiplayer
     const inv = fromInvite(cgCall(s => s.game.inviteParams)), instant = !inv && cgCall(s => s.game.isInstantMultiplayer);
     const go = () => {
       if (document.body.classList.contains('boot')) return setTimeout(go, 300);
       if (inv) return start(inv);
-      const m = PLAY_MODES.find(m => m.id === mode && m.id !== 'zombies') || PLAY_MODES.find(m => m.id !== 'zombies'); // instant: a private room of your usual mode
+      const m = PLAY_MODES.find(m => m.id === mode && m.id !== 'zombies') || PLAY_MODES.find(m => m.id !== 'zombies'); // instant multiplayer: a private room of your usual mode
       start({ mode: m.id, map: m.maps?.includes(mapId) ? mapId : m.maps?.[0] || mapId, create: true });
     };
     if (inv || instant) setTimeout(go, 300);
-    // their "join" on a friend's profile while the game is already open
+    // joining a friend while the game's already open
     cgCall(s => s.game.addJoinRoomListener(p => { const o = fromInvite(p); if (!o || (api.on && (o.code ? o.code === code : o.room === room))) return; if (api.on) leave(); start(o); }));
   } else if (joinParam.length === 6) {
     $('joinCode').textContent = joinParam; $('joinBtn').style.display = '';
@@ -737,7 +705,7 @@ net = (() => {
   $('inviteBtn').addEventListener('click', e => {
     e.stopPropagation();
     if (!code) return;
-    const url = cg.on ? cgCall(s => s.game.inviteLink({ join: code })) : location.origin + location.pathname + '?join=' + code; // on CrazyGames, a link to the game there
+    const url = cg.on ? cgCall(s => s.game.inviteLink({ join: code })) : location.origin + location.pathname + '?join=' + code;
     navigator.clipboard?.writeText(url).then(() => netToast('Invite link copied'), () => netToast(url, 6000));
     sfx('ui');
   });
@@ -748,7 +716,7 @@ net = (() => {
     now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
-  Object.defineProperties(api, { // read live (Object.assign would have copied them once)
+  Object.defineProperties(api, { // read live
     pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' }, host: { get: () => api.on && hostPid === pid },
   });
   return api;

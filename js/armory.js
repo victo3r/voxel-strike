@@ -1,25 +1,24 @@
-// Star upgrades cost a share of the gun's own price: UPG[0] for ★★, UPG[1] for ★★★ (so less than buying the gun again).
+// upgrade prices, as a share of the gun price
 const UPG = [.75, .9];
-let armCat = 'primary', armOpen = false, armSel = -1, armDet = false; // armSel = the gun card you clicked, armDet = showing its details
-const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought yet (starters are always 0: no stars)
-// the stars you take into a match: all of them unless you picked fewer (prof.use). Bots never roll more than this
+let armCat = 'primary', armOpen = false, armSel = -1, armDet = false;
+const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought
+// stars you use in a match (bots never get more)
 const gunUse = i => { const st = gunStars(i), u = prof.use?.[BASE[i].id]; return u ? Math.max(1, Math.min(st, u)) : st; };
 const upgPrice = i => Math.round(BASE[i].price * UPG[gunStars(i) - 1]);
-const inMatch = () => !inLobby && pvp() && !matchOver; // online too: the change goes to the server as well (js/net.js gearChanged)
+const inMatch = () => !inLobby && pvp() && !matchOver;
 
-// the main stats at the stars you're using: damage, fire rate, capacity (mag size, left out for melee: it never runs out) and mobility.
-// [label, value, unit]. One-shot guns fire once per reload, so that's their fire rate. A beam fires nonstop
+// main stats for a gun card
 function mainStats(i, L = Math.max(0, gunUse(i) - 1)) {
   const w = BASE[i], s = statsAt(i, L);
   const per = v => v >= 20 ? Math.round(v) : +v.toFixed(1);
   return [
-    ['DAMAGE', w.beam ? Math.round(s.dmg / s.rate) : s.dmg * w.pellets, w.beam ? '/ SEC' : ''], // a shotgun: every pellet hitting
+    ['DAMAGE', w.beam ? Math.round(s.dmg / s.rate) : s.dmg * w.pellets, w.beam ? '/ SEC' : ''],
     ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(s.rate, s.reload) : s.rate)), w.beam ? '' : '/ SEC'],
     ['CAPACITY', w.inf ? ico('inf') : s.mag, ''],
     ['MOBILITY', w.mob ?? 60, ''],
   ].filter(r => !(w.melee && r[0] === 'CAPACITY'));
 }
-// what each star does to a gun, for its details: [label, value at ★, ★★, ★★★]. Damage per second is every shot hitting
+// stats per star for the details view
 function starTable(i) {
   const w = BASE[i], S = [0, 1, 2].map(L => statsAt(i, L)), rows = [];
   rows.push(['DAMAGE', ...S.map(s => w.beam ? Math.round(s.dmg / s.rate) + '/s' : s.dmg * w.pellets)]);
@@ -29,17 +28,16 @@ function starTable(i) {
   rows.push(['RELOAD', ...S.map(s => s.reload.toFixed(2) + 's')]);
   return rows;
 }
-// a row of stat boxes: [label, value, unit]
 const statBoxes = rows => `<div class="ms" style="grid-template-columns:repeat(${rows.length},1fr)">${rows.map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>`;
 const attrTags = list => list.length ? `<div class="at">${list.map(a => `<span>${a}</span>`).join('')}</div>` : '';
-// tags for how a gun works, listed under its description
+// gun tags
 function gunAttrs(w) {
   const a = [];
   if (w.melee) a.push('MELEE');
   else if (w.beam) a.push('BEAM');
   else if (w.action) a.push(w.action);
   else if (w.auto) a.push('AUTOMATIC');
-  else if (autoFire(w)) a.push('RAPID FIRE'); // hold to keep shooting (weapons.js autoFire)
+  else if (autoFire(w)) a.push('RAPID FIRE');
   else if (w.mag > 1) a.push('SEMI-AUTO');
   if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : 'HOLO SIGHT');
   if (w.quiet) a.push('SUPPRESSED');
@@ -64,10 +62,10 @@ const DESC = {
   rocket: 'One rocket, one big boom, and anyone near it feels it',
   flare: 'One burning flare that sets whoever it hits on fire',
 };
-// the rest of the stats for the details view, at the stars you're using
+// extra stats for the details view
 function gunSpecs(i) {
   const w = BASE[i], out = [], rl = +statsAt(i, Math.max(0, gunUse(i) - 1)).reload.toFixed(1);
-  if (!w.melee && w.start) out.push(['RELOAD', rl + 's']); // (guns with stars show it by star, above)
+  if (!w.melee && w.start) out.push(['RELOAD', rl + 's']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
   if (w.rocket) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
   if (w.flare) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`], ['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
@@ -76,16 +74,12 @@ function gunSpecs(i) {
 }
 const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
 const isLocked = i => !hasGun(i) && prof.lv < (BASE[i].unlock ?? 0);
-// stars you're using, then stars you own but left off (dimmed), then ones you haven't bought
 const starTxt = i => BASE[i].start ? '' : starRow(gunUse(i), gunStars(i), 3);
-// the ◀ ▶ picker under your character for which star to use. k = what the arrows send, label = what's picked
+// star picker under your character
 const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>${ico('left')}</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>${ico('right')}</button></div>`;
-// the armory's pages run down the left (the y axis). Each page has its own row of sections along the top (the x axis):
-// WEAPONS has the gun categories, WEAR has SKINS, ARMOR, BOOTS and HATS (more things to wear can go in WEAR_CATS later)
+// armory pages and their sections
 const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
 const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS']];
-// armorPrev = the star you're looking at in the armor details (your character wears it), armorCard = the Basic Armor card is picked,
-// gearSel = the boots or hat card you clicked (index into BOOTS or HATS, -1 = none yet)
 let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1;
 const myArmor = () => prof.armor | 0;
 const pageIcon = p => p === 'weapons' ? SPRITES[loadoutGun('primary')] : armorSprite(Math.max(0, wornArmor() - 1));
@@ -98,7 +92,7 @@ function renderArmory() {
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img src="${SPRITES[loadoutGun(c)]}"><span>${label}</span></button>`).join('');
   const eq = loadoutGun(armCat);
-  if (BASE[armSel]?.cat !== armCat) armSel = eq; // a new category starts on the gun you have equipped in it
+  if (BASE[armSel]?.cat !== armCat) armSel = eq;
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
@@ -111,8 +105,7 @@ function renderArmory() {
   renderAct();
   if (inLobby) heroGun(armSel);
 }
-// ---- the card in the bottom right corner, next to your character: the item you picked, its stats, and its buttons at the bottom.
-// (Cards in the list only show the name: click one to see it here, click it again for its details: the model, what it is, star by star)
+// ---- the item card in the corner
 const actCard = (name, stars, body, pick, btns) => `<div class="an"><span>${name} <span class="st">${stars}</span></span>` +
   (armDetOk() ? `<button class="more" data-det="1">${armDet ? ico('left') + ' LIST' : 'DETAILS ' + ico('right')}</button>` : '') + `</div>${body}${pick}<div class="ab">${btns}</div>`;
 const armDetOk = () => armPage === 'weapons' || (wearCat !== 'skins' && (wearCat !== 'armor' || armorCard));
@@ -130,12 +123,12 @@ function renderAct() {
   $('armAct').innerHTML = actCard(w.name, starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns);
   placeAct();
 }
-// the SHOOT and RELOAD buttons sit just left of your character, in the lobby, on the WEAPONS page (he puts the gun away for WEAR)
+// SHOOT and RELOAD buttons
 function placeAct() {
   if (!armOpen) return;
   const h = $('heroAct'), on = inLobby && armPage === 'weapons' && innerWidth > 700;
   h.style.display = on ? 'flex' : 'none';
-  $('heroReload').style.display = BASE[armSel]?.inf ? 'none' : ''; // nothing to reload on the knife (it never runs out)
+  $('heroReload').style.display = BASE[armSel]?.inf ? 'none' : '';
   if (on) { const edge = $('armory').getBoundingClientRect().right; h.style.left = Math.max(edge, heroScreen.x - innerHeight * .2 - 50) + 'px'; h.style.top = heroScreen.y + 'px'; }
 }
 function renderDetail() {
@@ -146,19 +139,17 @@ function renderDetail() {
     `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div><p>${DESC[w.id] ?? ''}</p>` +
     (table ? `<div class="sh">WHAT EACH STAR DOES</div>${table}` : '') +
     `<div class="ds">${gunSpecs(i).map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
-  pvShow(i + ':' + u, g => makeGun(i, g, Math.max(0, u - 1), false), -Math.PI / 2); // starts side-on, muzzle to the right
+  pvShow(i + ':' + u, g => makeGun(i, g, Math.max(0, u - 1), false), -Math.PI / 2);
 }
 
-// ---- WEAR page. ARMOR has one card, Basic Armor. Click it to pick it, click it again for its details: the chestplate spins there,
-// and the arrows in the bottom corners step through its stars (your character wears whichever one you're looking at).
-// The button under him buys the next star
+// ---- WEAR page: armor
 const ARMOR_DESC = 'Soaks up hits before your health does and fills back up every spawn, and every star makes it tougher';
 function renderWear() {
   const n = myArmor(), w = wornArmor(), T = armorOf(w || 1);
   const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, w - 1)) : (G => { const on = G.worn(); return on ? G.sprite(on.id, on.st) : G.sprite(G.list[0].id, 1); })(GEAR[c]);
   $('armTabs').innerHTML = WEAR_CATS.map(([c, label]) =>
     `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="${c === 'skins' ? 'hd' : 'ai'}" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
-  if (wearCat === 'skins') armDet = false; // skins have no details view
+  if (wearCat === 'skins') armDet = false;
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (wearCat === 'skins') { renderSkins(); return; }
@@ -173,9 +164,8 @@ function renderWear() {
   }
   heroArmor(armDet ? armorPrev : w || 1);
   renderAct();
-  if (inLobby) heroGun(-1); // he puts the gun away and stands facing you, so you see the armor
+  if (inLobby) heroGun(-1); // put the gun away to show the armor
 }
-// the armor's stars like a gun's: the one you wear, the better ones you own (dimmed), then the ones you don't have
 const armorStarTxt = () => starRow(wornArmor(), myArmor(), ARMOR_MAX);
 function renderArmorDetail() {
   const s = armorPrev, T = armorOf(s), n = myArmor();
@@ -186,13 +176,13 @@ function renderArmorDetail() {
     `<div class="dn">${T.name} <span class="st">${armorStars(s)}</span></div><p>${desc}</p><div class="ds">` +
     [['ARMOR BAR', '+' + T.hp], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE'], ['UNLOCKS AT', 'LVL ' + T.unlock],
       ['PRICE', COIN + T.price], ['STATUS', state]].map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('') + '</div>';
-  pvShow('armor' + s, g => armorModel(s, g), .5); // turned a little, so you see its front and a side
+  pvShow('armor' + s, g => armorModel(s, g), .5);
 }
 function armorStep(d) {
   const s = Math.max(1, Math.min(ARMOR_MAX, armorPrev + d)); if (s === armorPrev) return;
   armorPrev = s; sfx('ui'); renderArmory();
 }
-// under your character: which star to wear (◀ ▶, or WEAR on the star you're looking at in the details), and the next star to buy
+// armor buttons
 function renderArmorAct() {
   const n = myArmor(), w = wornArmor(), next = armorOf(n + 1);
   let btns = '';
@@ -201,22 +191,19 @@ function renderArmorAct() {
   else if (prof.lv < next.unlock) btns += `<button disabled>${ico('lock')} ${n ? next.name.toUpperCase() + ' ' : ''}AT LVL ${next.unlock}</button>`;
   else btns += `<button data-arm="1" ${prof.coins < next.price ? 'disabled' : ''}>${n ? starRow(n + 1) + ' ' + next.name.toUpperCase() : 'BUY'} ${COIN}${next.price}</button>`;
   const pick = !armDet && n > 1 ? lvPick('wa', 'WEARING ' + armorOf(w).name.toUpperCase(), w <= 1, w >= n) : '';
-  const T = armorOf(armDet ? armorPrev : w || 1); // the star you're looking at in the details, else the one you wear (or would buy)
+  const T = armorOf(armDet ? armorPrev : w || 1);
   const body = `<div class="tn">${T.name.toUpperCase()}${armDet ? '' : n ? ' · WEARING' : ' · NOT OWNED'}</div>` +
     statBoxes([['ARMOR BAR', '+' + T.hp, ''], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE', '']]);
   $('armAct').innerHTML = actCard(ARMOR_ITEM, n ? armorStarTxt() : '', body, pick, btns);
   placeAct();
 }
-// picks star s to wear (your best = no pick saved, so buying the next star puts it straight on)
 function wearStar(s) {
   const n = myArmor(); s = Math.max(1, Math.min(n, s)); if (s === wornArmor()) return;
   prof.armorUse = s === n ? 0 : s; saveProf(); armorSync(false); sfx('equip');
 }
-// ---- WEAR page, SKINS: one card per look (the presets, plus your own once you've made one). Click one to put it on.
-// In the lobby, the last card (and the button under him) opens the customizer
+// ---- WEAR page: skins
 const SKINS_DESC = 'Pick a look, or make your own with CUSTOMIZE in the lobby';
-// a look seen from the front, Minecraft-style: head, neck, body with an arm each side, two legs, cut straight from its skin.
-// Skin pixels are scaled up K times with a black outline round the outside, like the other sprites
+// skin icon, front view
 const lookSpriteCache = new Map();
 function skinSprite(look, head) {
   const key = (head ? 'h' : 'b') + lookKey(look);
@@ -225,7 +212,7 @@ function skinSprite(look, head) {
   const c = document.createElement('canvas'); c.width = W + 2; c.height = H + 2;
   const g = c.getContext('2d'), cut = (sx, sy, w, h, x, y) => g.drawImage(src, sx, sy, w, h, x + 1, y + 1, w, h);
   if (head) cut(8, 8, 8, 8, 0, 0);
-  else { // the character's right side is on your left, as if he's facing you
+  else {
     cut(8, 8, 8, 8, 4, 0); cut(36, 4, 4, 1, 6, 8); cut(20, 20, 8, 12, 4, 9);
     cut(44, 20, 4, 12, 0, 9); cut(36, 52, 4, 12, 12, 9); cut(4, 20, 4, 12, 4, 21); cut(20, 52, 4, 12, 8, 21);
   }
@@ -250,19 +237,17 @@ function renderSkins() {
     (inLobby ? '<div class="card" data-cust="1"><span class="plus">' + ico('pencil') + '</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '');
   heroArmor(wornArmor()); wearGear();
   renderAct();
-  if (inLobby) heroGun(-1); // he puts the gun away and faces you
+  if (inLobby) heroGun(-1);
 }
 function renderSkinAct() {
   const p = lookChoices()[lookIndex()];
   $('armAct').innerHTML = actCard(p?.name ?? 'CUSTOM', '', '<div class="tn">WEARING</div>', '', inLobby ? '<button data-cust="1">' + ico('pencil') + ' CUSTOMIZE</button>' : '');
   placeAct();
 }
-// out of the armory and into the customizer (lobby.js), which comes back here when you're done
+// open the customizer
 function openCust() { closeArmory(); showCust(true); }
 
-// ---- WEAR page, BOOTS and HATS: one card per item. Click one to pick it (your character tries it on), click it again for its details.
-// The buttons under him buy, wear, take off and upgrade it, and pick which of its stars you wear.
-// GEAR[section] says where that kind of item keeps its things (js/boots.js, js/hats.js)
+// ---- WEAR page: boots and hats
 const GEAR = {
   boots: { list: BOOTS, I: BOOT_I, own: 'boots', use: 'bootUse', on: 'bootOn', stars: bootStars, using: bootUse, worn: wornBoots,
     sprite: bootSprite, model: bootsModel, face: .6, put: b => heroBoots(b),
@@ -279,11 +264,10 @@ const GEAR = {
       raider: 'A dark hood that sometimes halves a hit and hides your red outline from anyone outside its stealth range',
     } },
 };
-// he wears your boots and hat (not the ones you're looking at)
 const wearGear = () => { for (const k in GEAR) GEAR[k].put(GEAR[k].worn()); };
 const isGear = () => armPage === 'wear' && !!GEAR[wearCat];
 const pct = v => Math.round(v * 100) + '%';
-// what an item does at st stars, as [label, value]. GEAR_STATS: [field, label, how its value reads]
+// gear stats as [label, value]
 const plusPct = v => '+' + pct(v);
 const GEAR_STATS = [['spd', 'SPEED', plusPct], ['dmg', 'DAMAGE', plusPct], ['dr', 'DAMAGE CUT', pct], ['hs', 'HEADSHOT BLOCK', pct],
   ['half', 'HALF DAMAGE', pct], ['stealth', 'STEALTH', v => v + 'M']];
@@ -297,14 +281,13 @@ const gearList = G => G.list.map((B, i) => i).sort((a, b) => G.list[a].unlock - 
 const gearLocked = (G, B) => !G.stars(B.id) && prof.lv < B.unlock;
 const gearUpg = (G, B) => Math.round(B.price * UPG[G.stars(B.id) - 1]);
 const gearStarTxt = (G, id) => starRow(G.using(id), G.stars(id), 3);
-const gearShown = (G, B) => Math.max(1, G.using(B.id)); // the stars to show it at (1 if you don't have it yet)
-// the section's GEAR entry, with gearSel pointing at a real item (the one you wear, or the first to unlock)
+const gearShown = (G, B) => Math.max(1, G.using(B.id));
 function gearNow() {
   const G = GEAR[wearCat];
   if (!G.list[gearSel]) { const on = G.worn(); gearSel = on ? G.I[on.id] : gearList(G)[0]; }
   return G;
 }
-// he wears what you wear, except the item you picked here, which he tries on
+// he tries on the item you picked
 function gearDress() {
   heroArmor(wornArmor());
   const G = isGear() && gearNow(), B = G && G.list[gearSel];
@@ -332,7 +315,7 @@ function renderGearDetail() {
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
     `<div class="dn">${B.name} <span class="st">${gearStarTxt(G, B.id)}</span></div>` +
     `<p>${G.about[B.id] ?? ''}</p><div class="ds">${specs.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
-  pvShow(wearCat + ':' + B.id + st, g => G.model(B.id, st, g), G.face); // turned a little, so you see the front and a side
+  pvShow(wearCat + ':' + B.id + st, g => G.model(B.id, st, g), G.face);
 }
 function renderGearAct() {
   const G = gearNow(), B = G.list[gearSel], st = G.stars(B.id), worn = prof[G.on] === B.id && st;
@@ -348,7 +331,7 @@ function renderGearAct() {
   $('armAct').innerHTML = actCard(B.name, gearStarTxt(G, B.id), body, pick, btns);
   placeAct();
 }
-// the buttons for boots and hats. What they do is read live (js/hats.js youFx), so changes mid-match take effect straight away
+// boots and hats buttons
 function gearClick(d) {
   const G = GEAR[wearCat], B = G?.list[gearSel]; if (!B) return;
   const st = G.stars(B.id), own = prof[G.own] ??= {}, use = prof[G.use] ??= {};
@@ -357,25 +340,24 @@ function gearClick(d) {
     prof.coins -= B.price; own[B.id] = 1; prof[G.on] = B.id; sfx('buy');
   } else if (d.gup) {
     if (!st || st >= 3 || prof.coins < gearUpg(G, B)) return;
-    prof.coins -= gearUpg(G, B); own[B.id] = st + 1; delete use[B.id]; sfx('upgrade'); // the new star goes straight on
+    prof.coins -= gearUpg(G, B); own[B.id] = st + 1; delete use[B.id]; sfx('upgrade');
   } else if (d.gwear) { prof[G.on] = B.id; sfx('equip'); }
   else if (d.goff) { prof[G.on] = ''; sfx('equip'); }
-  else if (d.gu) { // which of its stars you wear (your best = no pick saved)
+  else if (d.gu) {
     const u = Math.max(1, Math.min(st, G.using(B.id) + +d.gu));
     if (u === st) delete use[B.id]; else use[B.id] = u;
     sfx('equip');
   }
   saveProf(); showProf();
-}// changed armor during a match: it's on right away. A worse one cuts the bar down to its size.
-// fill: you just bought a star, so the new part of the bar comes filled (switching between stars you own never fills it)
+}
+// armor changed mid-match
 function armorSync(fill = true) {
   if (!inMatch()) return;
   const T = armorOf(wornArmor()), gain = fill ? Math.max(0, T.hp - P.maxArmor) : 0;
   P.maxArmor = T.hp; P.dr = T.dr; P.armor = Math.min(P.maxArmor, P.armor + gain);
 }
 
-// ---- the spinning model in the details view (a gun, or a chestplate): its own little renderer, so it isn't blurred behind the panel.
-// key = what's showing (it's only rebuilt when that changes), build(g) adds the model to g, face = the turn it starts at
+// ---- spinning model in the details view
 let pv = null;
 function pvShow(key, build, face) {
   if (!pv) {
@@ -386,7 +368,7 @@ function pvShow(key, build, face) {
     sc.add(new THREE.HemisphereLight(0xffffff, 0x3a4a40, 1.5), spin);
     const key = new THREE.DirectionalLight(0xffffff, 1.8); key.position.set(2, 3, 4); sc.add(key);
     pv = { cv, r, sc, cam, spin, key: '', on: false, t: 0, drag: null, v: .7 };
-    // drag it to turn it (and tip it up or down a little); let go and it carries on turning, easing back to its slow spin
+    // drag to turn it
     cv.addEventListener('pointerdown', e => { pv.drag = [e.clientX, e.clientY]; pv.v = 0; cv.setPointerCapture(e.pointerId); cv.classList.add('drag'); });
     cv.addEventListener('pointermove', e => {
       if (!pv.drag) return;
@@ -400,7 +382,7 @@ function pvShow(key, build, face) {
   $('detView').append(pv.cv);
   if (pv.key !== key) {
     pv.key = key;
-    pv.spin.clear(); // gun and armor geometry is shared, nothing to free
+    pv.spin.clear();
     const g = new THREE.Group(); build(g);
     const box = new THREE.Box3().setFromObject(g), sph = box.getBoundingSphere(new THREE.Sphere());
     g.position.sub(sph.center); pv.spin.add(g);
@@ -409,10 +391,10 @@ function pvShow(key, build, face) {
   }
   if (!pv.on) { pv.on = true; pv.t = performance.now(); requestAnimationFrame(pvTick); }
 }
-// close enough that the gun fills the width when it's side-on, but never so close it leaves the top or bottom as it turns
+// fit the model in view
 function pvFit() {
   const tv = Math.tan(THREE.MathUtils.degToRad(pv.cam.fov / 2)), th = tv * pv.cam.aspect;
-  const d = Math.max(pv.rad / th * 1.1, pv.halfH / tv * 1.25 + pv.rad); // the second: its near end, when it points at you
+  const d = Math.max(pv.rad / th * 1.1, pv.halfH / tv * 1.25 + pv.rad);
   pv.cam.position.set(0, d * .22, d); pv.cam.lookAt(0, 0, 0);
 }
 function pvTick(now) {
@@ -424,7 +406,7 @@ function pvTick(now) {
   }
   if (!pv.drag) {
     pv.v += (.7 - pv.v) * Math.min(1, dt * 1.5); pv.spin.rotation.y += pv.v * dt;
-    pv.spin.rotation.x *= Math.exp(-dt * 1.2); // tipped: it settles back level
+    pv.spin.rotation.x *= Math.exp(-dt * 1.2);
   }
   pv.r.render(pv.sc, pv.cam);
   requestAnimationFrame(pvTick);
@@ -438,7 +420,7 @@ function armSync(i, how) {
   if (slotGun[s] !== loadoutGun(BASE[i].cat)) { slotGun[s] = loadoutGun(BASE[i].cat); if (slotOf(cur) === s) { const g = slotGun[s]; cur = -1; equip(g); } }
   renderHotbar();
 }
-// click a card to pick it (your character holds it), click it again for its details
+// click a card to pick it, again for details
 $('armList').addEventListener('click', e => {
   const c = e.target.closest('.card'); if (!c) return;
   if (c.dataset.cust) { openCust(); return; }
@@ -458,7 +440,7 @@ function armClick(e) {
   else if (b.dataset.av) { armorStep(+b.dataset.av); return; }
   else if (b.dataset.wa) wearStar(wornArmor() + +b.dataset.wa);
   else if (b.dataset.wear) wearStar(+b.dataset.wear);
-  else if (b.dataset.use) { // which of a gun's stars you take into a match (your best = no pick saved, so an upgrade goes straight on)
+  else if (b.dataset.use) {
     const i = armSel, st = gunStars(i), u = Math.max(1, Math.min(st, gunUse(i) + +b.dataset.use));
     if (u === st) delete prof.use[BASE[i].id]; else prof.use[BASE[i].id] = u;
     saveProf(); armSync(i, 'use'); sfx('equip');
@@ -487,21 +469,20 @@ function armClick(e) {
 }
 $('armory').addEventListener('click', armClick);
 $('armAct').addEventListener('click', armClick);
-$('armAct').addEventListener('pointerdown', e => e.stopPropagation()); // clicking a button shouldn't start spinning him
+$('armAct').addEventListener('pointerdown', e => e.stopPropagation());
 $('heroAct').addEventListener('pointerdown', e => e.stopPropagation());
-const armIcon = () => $('armIcon').src = SPRITES[loadoutGun('primary')]; // the lobby's ARMORY button shows your primary gun
+const armIcon = () => $('armIcon').src = SPRITES[loadoutGun('primary')]; // ARMORY button shows your primary
 armIcon();
-// in the lobby the home buttons hide and the camera slides over (lobby.js). In a match the menu hides so you see the game behind it
 function armShow(on) {
   $('armory').style.display = on ? 'flex' : 'none';
   $('armAct').style.display = on ? 'flex' : 'none';
-  if (!on) $('heroAct').style.display = 'none'; // (placeAct shows it)
+  if (!on) $('heroAct').style.display = 'none';
   if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; }
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
 function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; armShow(true); renderArmory(); }
 function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; gearSel = -1; heroArmor(wornArmor()); wearGear(); }
-$('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // stopPropagation so the click doesn't re-lock the mouse
+$('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // don't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => {
   if (armOpen && armDet && armPage === 'wear' && wearCat === 'armor' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { armorStep(e.code === 'ArrowLeft' ? -1 : 1); return; }

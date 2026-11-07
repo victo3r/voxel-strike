@@ -1,13 +1,9 @@
-// useMap(id) swaps which one is in the scene and points the globals the rest of the game uses
-// (A, solids, ground, crateMeshes, MAP) at that map.
-// Each map has a fixed layout: same pads, crates and trees every game.
-// Pad count depends on map size. Each map's pads list must have exactly that many spots.
+// pickup pads per map size
 const PAD_COUNT = { small: 4, medium: 6, large: 8 };
-// most players a match can have on a map this size
+// max players per map size
 const MAX_PLAYERS = { small: 4, medium: 8, large: 8 };
 const MAPS = {};
-// the map that's loaded right now. A = arena half-size, solids = things you bump into,
-// crateMeshes = things that stop bullets and block line of sight (besides the ground)
+// the loaded map
 let MAP = null, A = 24, solids = [], ground = null, crateMeshes = [];
 
 let building = null;
@@ -16,25 +12,23 @@ function startMap(id, def) {
   return building;
 }
 const add = (...objs) => building.root.add(...objs);
-// what a material sounds like to walk on: 'grass', 'sand', 'wood', 'stone' or 'metal'. Solids built from it pick it up
+// footstep sound for a material
 const surf = (m, s) => { m.userData.surf = s; return m; };
-function addBlock(x, z, w, d, h, m) { // a solid box you can stand on; stops bullets
+function addBlock(x, z, w, d, h, m) { // solid box, stops bullets
   const mesh = box(w, h, d, m); mesh.position.set(x, h / 2, z); add(mesh);
   building.solids.push({ mesh, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top: h, surf: m.userData.surf });
   building.cover.push(mesh);
   return mesh;
 }
-// a box whose texture repeats every k units instead of stretching over the whole face
+// box with a tiled texture
 function tbox(w, h, d, m, k = 1) {
   const geo = new THREE.BoxGeometry(w, h, d), uv = geo.attributes.uv.array;
-  const size = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]; // +x, -x, +y, -y, +z, -z
+  const size = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
   for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const j = (f * 4 + i) * 2; uv[j] *= size[f][0] / k; uv[j + 1] *= size[f][1] / k; }
-  const mesh = new THREE.Mesh(geo, m); mesh.userData.uvk = k; // bakeMap lines its texture up with the world grid
+  const mesh = new THREE.Mesh(geo, m); mesh.userData.uvk = k;
   return mesh;
 }
-// Texture each face of a tbox from where it sits in the world instead of from its own corner, so neighbouring boxes
-// (deck slabs, pool walls, steps, floors) carry the same grid of tiles or planks across the joins.
-// Runs once per map, after everything's in place (bakeMap)
+// line tiled textures up with the world so tiles match across boxes
 const uvP = new THREE.Vector3(), uvN = new THREE.Vector3(), uvM = new THREE.Matrix3();
 function alignUV(o) {
   const g = o.geometry, P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, k = o.userData.uvk;
@@ -42,24 +36,22 @@ function alignUV(o) {
   for (let i = 0; i < P.count; i++) {
     uvP.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); uvN.fromBufferAttribute(N, i).applyMatrix3(uvM);
     const ax = Math.abs(uvN.x), ay = Math.abs(uvN.y), az = Math.abs(uvN.z);
-    // walls facing x run along z, walls facing z run along x (both up the y), floors and ceilings take x and z.
-    // The sign flips keep the texture reading the right way round on the faces pointing the other way
     if (ax >= ay && ax >= az) U.setXY(i, -Math.sign(uvN.x) * uvP.z / k, uvP.y / k);
     else if (az >= ay) U.setXY(i, Math.sign(uvN.z) * uvP.x / k, uvP.y / k);
     else U.setXY(i, uvP.x / k, -Math.sign(uvN.y) * uvP.z / k);
   }
   U.needsUpdate = true;
 }
-// a solid box from height bot up to top, so it can float (upper floors, the wall above a window, stairs)
+// solid box from bot to top (floors, stairs)
 function addSlab(x, z, w, d, bot, top, m, cover = true, k = 1) {
   const mesh = tbox(w, top - bot, d, m, k); mesh.position.set(x, (bot + top) / 2, z); add(mesh);
   building.solids.push({ mesh, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, bot, top, surf: m.userData.surf });
   if (cover) building.cover.push(mesh);
   return mesh;
 }
-// a solid area with no mesh of its own (tree trunks drawn by an instanced mesh, invisible walls)
+// solid area with no mesh
 const addSolid = (x, z, w, d, top, surf) => { const s = { mesh: null, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top, surf }; building.solids.push(s); return s; };
-// invisible wall: stops players and zombies (even jumping off a tall crate) but bullets go through
+// invisible wall, bullets go through
 const addWall = (x, z, w, d) => addSolid(x, z, w, d, 99);
 function addGround(G, mat) {
   const g = new THREE.Mesh(new THREE.PlaneGeometry(G * 2, G * 2), mat);
@@ -68,13 +60,13 @@ function addGround(G, mat) {
 }
 
 const dummy = new THREE.Object3D(), tint = new THREE.Color(), unit = new THREE.BoxGeometry(1, 1, 1);
-function instanced(geo, mat, list) { // list of [x, y, z, sx, sy, sz, rotY, color]
+function instanced(geo, mat, list) { // [x, y, z, sx, sy, sz, rotY, color]
   const m = new THREE.InstancedMesh(geo, mat, list.length);
   list.forEach(([x, y, z, sx, sy, sz, ry, c], i) => {
     dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix();
     m.setMatrixAt(i, dummy.matrix); m.setColorAt(i, tint.setHex(c ?? 0xffffff));
   });
-  m.computeBoundingSphere(); // so bullets and line of sight checks can hit it
+  m.computeBoundingSphere(); // so bullets can hit it
   add(m); return m;
 }
 const seeThru = t => new THREE.MeshLambertMaterial({ map: t, alphaTest: .3, side: THREE.DoubleSide });
@@ -90,7 +82,7 @@ const grassMat = seeThru(tex(g => {
 }));
 grassMat.alphaTest = .5;
 const grassGeo = new THREE.PlaneGeometry(1, 1).translate(0, .5, 0);
-// things that are only there for looks and get hidden on low graphics (grass, fireflies, light shafts)
+// decoration, hidden on low graphics
 const detailObjs = [];
 const detail = o => { detailObjs.push(o); o.visible = gfxQ().detail; return o; };
 function grassTufts(tufts) {
@@ -99,12 +91,10 @@ function grassTufts(tufts) {
 }
 const crate1 = surf(crateMat(1), 'wood'), crate2 = surf(crateMat(2), 'wood');
 const addCrates = list => { for (const [x, z, tall] of list) addBlock(x, z, 1.2, 1.2, tall ? 2.4 : 1.2, tall ? crate2 : crate1); };
-// fixed random numbers: the same seed gives the same layout every game
+// seeded random, same layout every game
 const seeded = s => () => (s = s * 16807 % 2147483647) / 2147483647;
 
-// daytime sky: a square pixel sun out along skyDir, with a soft glow, and flat blocky clouds. skyDir can be off from where the light comes from,
-// so the sun shows in the sky from the way you usually face without lighting those sides from behind.
-// None of it is fogged, so it shows past the fog. n clouds in a ring from r0 to r1 out, between heights y0 and y1
+// daytime sky: pixel sun and blocky clouds
 const sunTex = tex(g => {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
     const e = Math.min(x, y, 15 - x, 15 - y), v = e < 1 ? 0 : e < 2 ? 1 : 2;
@@ -123,7 +113,7 @@ function addSky(rnd, skyDir, n, r0, r1, y0, y1) {
   sun.scale.setScalar(14); sun.position.copy(d); add(sun);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, fog: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   glow.scale.setScalar(46); glow.position.copy(d).multiplyScalar(1.01); add(glow);
-  for (let i = 0; i < n; i++) { // a wide slab with a smaller one on top
+  for (let i = 0; i < n; i++) {
     const a = rnd() * 6.28, r = r0 + rnd() * (r1 - r0), x = Math.cos(a) * r, z = Math.sin(a) * r, y = y0 + rnd() * (y1 - y0);
     const w = 12 + rnd() * 18, dd = 7 + rnd() * 10;
     const c1 = box(w, 3 + rnd() * 2, dd, cloudMat); c1.position.set(x, y, z); add(c1);
@@ -131,24 +121,22 @@ function addSky(rnd, skyDir, n, r0, r1, y0, y1) {
   }
 }
 
-// what's under your feet at x, z (for footsteps): the thing you're standing on, or the map's ground there
+// what's under your feet, for footsteps
 function surfaceAt(x, z, r, feet) {
-  const keep = [groundRamp, groundSolid]; // don't disturb what the movement code just read
+  const keep = [groundRamp, groundSolid]; // movement code just read these
   groundAt(x, z, r, feet + .05);
   const s = groundSolid, base = s ? s.surf || 'stone' : MAP.surf || 'grass';
   [groundRamp, groundSolid] = keep;
   return MAP.surfAt ? MAP.surfAt(x, z, feet, base, s) : base;
 }
 
-// Every separate mesh costs a draw call each frame, and a map is made of hundreds of small boxes. So the first time a map
-// is loaded, its meshes that never move are merged: one mesh per look (material) per 20x20 area, so the parts out of view
-// still get skipped. The originals are taken out of the scene but kept, with their positions, for bullets and line of sight
+// merge static meshes into chunks to cut draw calls
 function bakeMap(m) {
   m.root.updateMatrixWorld(true);
   m.root.traverse(o => { if (o.isMesh && o.userData.uvk) alignUV(o); });
   const C = 20, groups = new Map(), sig = new Map(), bb = new THREE.Box3(), c = new THREE.Vector3();
   const shown = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
-  const look = mt => { // materials made separately but looking the same can share a mesh
+  const look = mt => { // identical materials can share a mesh
     const k = [mt.type, mt.color?.getHex(), mt.emissive?.getHex(), mt.emissiveIntensity, mt.map?.uuid, mt.side, mt.alphaTest, mt.fog].join();
     return sig.get(k) || sig.set(k, mt).get(k);
   };
@@ -171,7 +159,7 @@ function bakeMap(m) {
     let v = 0, i = 0;
     for (const o of list) {
       const g = o.geometry, P = g.attributes.position, Nr = g.attributes.normal, U = g.attributes.uv, n = P.count, w = o.matrixWorld;
-      const flip = w.determinant() < 0; // a mirrored mesh: turn its triangles round so they still face out
+      const flip = w.determinant() < 0; // mirrored mesh, flip its triangles
       nm.getNormalMatrix(w);
       for (let k = 0; k < n; k++) {
         p.fromBufferAttribute(P, k).applyMatrix4(w); pos[(v + k) * 3] = p.x; pos[(v + k) * 3 + 1] = p.y; pos[(v + k) * 3 + 2] = p.z;
@@ -194,14 +182,14 @@ function bakeMap(m) {
   m.baked = true;
 }
 
-// how far you can see (fog) on the loaded map; low graphics pulls it in so less gets drawn
+// fog distance, closer on low graphics
 function applyView() {
   if (!MAP) return;
   const e = MAP.env, k = gfxQ().view;
   scene.fog.near = e.fogNear * k; scene.fog.far = e.fogFar * k;
   camera.far = Math.max(60, 200 * k); camera.updateProjectionMatrix();
 }
-// apply the graphics settings to everything that can change without a reload
+// apply graphics settings
 function applyGfx() {
   renderer.setPixelRatio(pixelRatio()); renderer.setSize(innerWidth, innerHeight);
   const an = Math.min(gfxQ().aniso, renderer.capabilities.getMaxAnisotropy());

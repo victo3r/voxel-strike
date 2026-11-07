@@ -1,6 +1,6 @@
 startMap('forest', {
   name: 'The Forest', size: 'medium', half: 36,
-  env: { sky: 0x0f2a22, fog: 0x15342b, fogNear: 10, fogFar: 62, hemiSky: 0xa8e0c0, hemiGround: 0x1c2a16, hemi: .8, sunColor: 0xbccdf0, sun: .45, sunDir: [-.45, 1, .3] }, // the "sun" here is the moon
+  env: { sky: 0x0f2a22, fog: 0x15342b, fogNear: 10, fogFar: 62, hemiSky: 0xa8e0c0, hemiGround: 0x1c2a16, hemi: .8, sunColor: 0xbccdf0, sun: .45, sunDir: [-.45, 1, .3] }, // sun = moon
   pads: [[-5, 26], [6, -25], [-26, 4], [26, -2], [19, 19], [-19, -19]],
   crates: [[4.8, 4.2, 0], [5.4, 5.6, 0], [-5.2, -4.4, 1], [-6, 4.4, 0], [5.6, -4.8, 0],
     [16.8, 16.6, 0], [17.2, 15.2, 1], [21.6, 20.8, 0], [15.6, 21, 0], [22.4, 16.4, 0],
@@ -16,7 +16,7 @@ addGround(G, lam({ map: tex(g => {
 addWall(0, -FA, FA * 2 + .3, .3); addWall(0, FA, FA * 2 + .3, .3);
 addWall(-FA, 0, .3, FA * 2 + .3); addWall(FA, 0, .3, FA * 2 + .3);
 
-// they carry on past the edge of the map so they look like they lead somewhere
+// paths run past the edge so they lead somewhere
 const PATHS = [
   [[-3, 70], [-3, 40], [-5, 28], [1, 18], [3, 9], [0, 0], [-4, -9], [-1, -19], [6, -27], [5, -40], [5, -70]],
   [[-70, 7], [-40, 7], [-27, 5], [-17, 1], [-8, 2], [0, 0], [9, -2], [18, 3], [27, -3], [40, -1], [70, -1]],
@@ -42,10 +42,10 @@ function pathDist(x, z) {
   }
   return best;
 }
-// open spaces the trees stay out of: the middle clearing, the camp, the stash, and room round each pad
+// clearings with no trees
 const CLEARINGS = [[0, 0, 8.5], [19, 18.5, 5.5], [-19, -19, 5], ...M.pads.map(([x, z]) => [x, z, 2.6])];
 const inClearing = (x, z, r) => CLEARINGS.some(([cx, cz, cr]) => Math.hypot(x - cx, z - cz) < cr + r);
-// fallen logs [x, z, length, runs along x?] and mossy rocks [x, z, w, d, h], placed by hand (built further down)
+// fallen logs and mossy rocks
 const LOGS = [[-12, 13, 5, 1], [13, -12, 4.5, 0], [-26, -9, 5, 0], [25, 10, 4.4, 1], [-11, -27, 4.6, 1], [11, 28, 4.2, 0]];
 const ROCKS = [[-9, 21, 1.8, 1.5, 1.3], [-7.8, 22.2, 1.1, 1, .7], [21, -19, 2, 1.6, 1.5], [10, 12, 1.4, 1.3, 1], [-23, 18, 1.6, 1.8, 1.2],
   [28, 24, 1.5, 1.3, 1.1], [-29, -26, 1.8, 1.5, 1.3], [-12, -3.5, 1.3, 1.2, .9], [14, -30, 1.6, 1.4, 1.2], [31, -14, 1.4, 1.6, 1]];
@@ -59,7 +59,7 @@ const glowTex = (() => {
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
-const LAMP_C = 0xffb35a, LIGHTS = 8; // lantern color, how many lanterns get a real light (the rest just glow, it's cheaper)
+const LAMP_C = 0xffb35a, LIGHTS = 8; // only a few lanterns get a real light
 const postMat = lam({ map: tex(g => { noise(g, [70, 50, 32], 20); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(4, 0, 1, 16); g.fillRect(11, 0, 1, 16); }) });
 const ironMat = lam({ color: 0x2b2f33 });
 const lanternMat = lam({ color: 0xffd08a, emissive: 0xffa040, emissiveIntensity: 1.2 });
@@ -76,7 +76,7 @@ PATHS.forEach((pts, p) => {
       next += 10.5;
       if (Math.max(Math.abs(x), Math.abs(z)) > FA - 1.2 || lamps.some(l => Math.hypot(l.x - x, l.z - z) < 6)) continue;
       if (M.pads.some(([px, pz]) => Math.hypot(px - x, pz - z) < 2) || hitsFixed(x, z, .6)) continue;
-      lamps.push({ x, z, ax: -uz * side, az: ux * side }); // arm points back over the path
+      lamps.push({ x, z, ax: -uz * side, az: ux * side });
       side = -side;
     }
     walked += len;
@@ -84,7 +84,7 @@ PATHS.forEach((pts, p) => {
 });
 lamps.forEach((l, i) => {
   const post = box(.22, 3.1, .22, postMat); post.position.set(l.x, 1.55, l.z); add(post);
-  building.cover.push(post); addSolid(l.x, l.z, .3, .3, 3.1); // as tall as the post, no higher: a rocket jump clears it
+  building.cover.push(post); addSolid(l.x, l.z, .3, .3, 3.1);
   const arm = box(.1, .1, .9, postMat); arm.position.set(l.x + l.ax * .4, 3, l.z + l.az * .4); arm.rotation.y = Math.atan2(l.ax, l.az); add(arm);
   const hx = l.x + l.ax * .8, hz = l.z + l.az * .8;
   const lan = box(.32, .42, .32, lanternMat); lan.position.set(hx, 2.55, hz); add(lan);
@@ -117,7 +117,7 @@ function bigTree(x, z, inside) {
   (inside ? trunks : edgeTrunks).push([x, .3, z, w * 1.4, .6, w * 1.4, 0]);
   if (inside) addSolid(x, z, w * 1.4, w * 1.4, h - .9);
   leaves.push([x, h + .6, z, s, 3, s, ry, c], [x, h + 2.8, z, s * .62, 2, s * .62, ry, c]);
-  // the leaf clumps are turned, so the part you can stand on is the biggest square that fits inside each one
+  // standable square inside each turned leaf clump
   const fit = 1 / (Math.abs(Math.cos(ry)) + Math.abs(Math.sin(ry))), clump = (cx, cz, size, bot, top) => {
     const hw = size / 2 * fit, sol = addSolid(cx, cz, hw * 2, hw * 2, top, 'grass'); sol.bot = bot;
   };
@@ -139,7 +139,7 @@ for (let tries = 0, k = 0; k < 170 && tries < 6000; tries++) {
   if (e < FA + 1.6 || pathDist(x, z) < PW / 2 + 1.6 || !roomFor(x, z, e < FA + 8 ? 3.6 : 6)) continue;
   bigTree(x, z, false); k++;
 }
-const trunkMesh = instanced(unit, barkMat, trunks); building.cover.push(trunkMesh); // bullets stop on the trunks inside the map
+const trunkMesh = instanced(unit, barkMat, trunks); building.cover.push(trunkMesh);
 instanced(unit, barkMat, edgeTrunks); instanced(unit, leafMat, leaves);
 
 const bushes = [];
@@ -173,8 +173,7 @@ for (let i = 0; i < 40; i++) {
   const cp = box(.3, .12, .3, capMats[i % 2]); cp.position.set(x, .25, z); add(cp);
 }
 
-// everything uses one direction (MOON): the moon sits that way in the sky, the main light shines from there,
-// and every shaft leans the same way, so they all look like they come from the moon
+// moon and light shafts
 const MOON = new THREE.Vector3(...M.env.sunDir).normalize(), MOON_C = 0xcfdcff;
 const moonTex = tex(g => {
   g.clearRect(0, 0, 16, 16);
@@ -189,19 +188,19 @@ const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, fog: fals
 moon.scale.setScalar(9);
 const moonGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: MOON_C, fog: false, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false }));
 moonGlow.scale.setScalar(42);
-add(moonGlow); add(moon); // they follow the camera (see M.tick) so the moon always looks infinitely far away
+add(moonGlow); add(moon); // follows the camera so it looks far away
 
-// shafts only go where the moon can actually be seen through the leaves
-const CANOPY = 34; // shafts start high above the leaves and fade in slowly, so they look like they reach up to the moon
-const blocked = (x, z) => leaves.some(([lx, ly, lz, s]) => { // would a ray from this ground spot to the moon hit a leaf clump?
+// shafts only where the moon shows through the leaves
+const CANOPY = 34;
+const blocked = (x, z) => leaves.some(([lx, ly, lz, s]) => {
   const t = ly / MOON.y;
   return Math.hypot(x + MOON.x * t - lx, z + MOON.z * t - lz) < s * .62;
 });
 const shaftLen = CANOPY / MOON.y, up = new THREE.Vector3(0, 1, 0);
-const shaftTex = (() => { // long soft fade-in up in the sky, full through the canopy, fades out just above the ground
+const shaftTex = (() => {
   const c = document.createElement('canvas'); c.width = 2; c.height = 128;
   const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 128);
-  const h = y => 1 - y / CANOPY; // height above the ground -> spot on the texture (0 = top, 1 = ground)
+  const h = y => 1 - y / CANOPY;
   gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(h(20), 'rgba(255,255,255,.55)'); gr.addColorStop(h(11), 'rgba(255,255,255,1)');
   gr.addColorStop(h(4), 'rgba(255,255,255,.75)'); gr.addColorStop(h(.8), 'rgba(255,255,255,.15)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 2, 128);
@@ -212,11 +211,11 @@ const moonPoolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: MOON_C, t
 const shaftGeo = new THREE.CylinderGeometry(1.0, 1.5, shaftLen, 14, 1, true);
 const shafts = [], srnd = seeded(91), gaps = [];
 for (let x = -FA + 3; x <= FA - 3; x += 1.5) for (let z = -FA + 3; z <= FA - 3; z += 1.5) gaps.push([x, z, srnd()]);
-gaps.sort((a, b) => a[2] - b[2]); // check the spots in a fixed shuffled order so they spread over the map
+gaps.sort((a, b) => a[2] - b[2]);
 for (const [x, z] of gaps) {
   if (shafts.length >= 8) break;
   if (shafts.some(s => Math.hypot(s.x - x, s.z - z) < 8)) continue;
-  if ([[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]].some(([ox, oz]) => blocked(x + ox, z + oz))) continue; // the gap has to be wide enough
+  if ([[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]].some(([ox, oz]) => blocked(x + ox, z + oz))) continue; // gap too narrow
   const m = new THREE.Mesh(shaftGeo, shaftMat.clone());
   m.quaternion.setFromUnitVectors(up, MOON);
   m.position.set(x + MOON.x * shaftLen / 2, MOON.y * shaftLen / 2, z + MOON.z * shaftLen / 2); add(detail(m));
@@ -231,7 +230,7 @@ for (let i = 0; i < 70; i++) {
   const x = (rnd() * 2 - 1) * FA, y = .4 + rnd() * 3.2, z = (rnd() * 2 - 1) * FA;
   m.position.set(x, y, z); add(detail(m)); flies.push({ m, x, y, z, p: rnd() * 6.3, s: .4 + rnd() * .8 });
 }
-M.tick = () => { // runs every frame while this map is loaded
+M.tick = () => { // every frame
   const t = performance.now() / 1000;
   for (const f of flies) {
     f.m.position.set(f.x + Math.sin(t * f.s * .7 + f.p) * .8, f.y + Math.sin(t * f.s + f.p * 2) * .4, f.z + Math.cos(t * f.s * .5 + f.p) * .8);
@@ -242,4 +241,4 @@ M.tick = () => { // runs every frame while this map is loaded
   moon.position.copy(camera.position).addScaledVector(MOON, 150); moonGlow.position.copy(moon.position);
 };
 }
-useMap('yard'); // the yard is loaded until you pick something else in the lobby
+useMap('yard'); // default map

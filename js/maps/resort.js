@@ -1,7 +1,7 @@
 startMap('resort', {
   name: 'The Resort', size: 'large', half: 42,
   env: { sky: 0x8fd4ff, fog: 0xc4e8ff, fogNear: 50, fogFar: 160, hemiSky: 0xffffff, hemiGround: 0xd9c38e, hemi: 1.05, sunColor: 0xfff0d8, sun: 1.4, sunDir: [14, 22, 9] },
-  pads: [[24, -22], [26, 4], [-18, 14], [-18, -14], [0, 30], [2, -30], [-33.5, -3], [12, 14]], // [-33.5, -3] is inside the hotel
+  pads: [[24, -22], [26, 4], [-18, 14], [-18, -14], [0, 30], [2, -30], [-33.5, -3], [12, 14]], // one pad is inside the hotel
   crates: [], // crates don't suit a resort
 });
 {
@@ -9,15 +9,14 @@ const M = MAPS.resort, RA = M.half, rnd = seeded(777);
 const G = 200;
 const LX = 29, LZ = -31; // the lighthouse
 const HUTS = [[-34, 27, [1, 0]], [-34, -27, [1, 0]], [6, 36, [0, -1]]];
-// the sea gets deeper in steps away from the shore, down to SEA_D out by the edge of the map, and drowns you.
-// The pool is safe: you can go in, and get back out up the steps at its west end
-const SEA_D = 3, POOL = [-21, -9, -5, 5], POOL_Y = .7, POOL_F = -1.5; // the pool's water level and floor
+// the deep sea drowns you, the pool is safe
+const SEA_D = 3, POOL = [-21, -9, -5, 5], POOL_Y = .7, POOL_F = -1.5; // pool water level and floor
 const inPool = (x, z, r = 0) => x + r > POOL[0] && x - r < POOL[1] && z + r > POOL[2] && z - r < POOL[3];
 const drawSeabed = g => {
   noise(g, [200, 182, 136], 16);
   for (let i = 0; i < 7; i++) { g.fillStyle = ['rgba(150,125,85,.45)', 'rgba(235,225,195,.5)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
 };
-// the deepest part of the sea floor, under everything
+// deep sea floor
 addGround(G, lam({ map: tex(drawSeabed, G * 2, G * 2) })).position.y = -SEA_D;
 addWall(0, -RA, RA * 2 + .3, .3); addWall(0, RA, RA * 2 + .3, .3);
 addWall(-RA, 0, .3, RA * 2 + .3); addWall(RA, 0, .3, RA * 2 + .3);
@@ -32,37 +31,35 @@ const glowTex = (() => {
 const flatPlane = (w, d, m, x, y, z) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), m); p.rotation.x = -Math.PI / 2; p.position.set(x, y, z); add(p); return p; };
 const decal = o => lam({ ...o, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 const rectSlab = ([x0, x1, z0, z1], bot, top, m, cover, k) => addSlab((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, bot, top, m, cover, k);
-// a rectangle [x0, x1, z0, z1] with a hole cut out of it, as up to 4 rectangles
+// rectangle minus a hole, as up to 4 rectangles
 const rectMinus = ([x0, x1, z0, z1], [h0, h1, k0, k1]) =>
   [[x0, x1, z0, k0], [x0, x1, k1, z1], [x0, h0, k0, k1], [h1, x1, k0, k1]].filter(([a, b, c, d]) => b - a > .01 && d - c > .01);
 const plain = c => lam({ color: c });
-// tops you can stand on (roofs, umbrellas, palm crowns): solids added at the end, so they don't change where the palms and tufts go.
-// Round ones (r) are a circle of that radius. peak = how high the middle is, edge = how high the rim is (see topAt)
+// tops you can stand on (roofs, umbrellas, palm crowns)
 const later = [];
 function standOn(x, z, rx, rz, bot, edge, peak, round, surf) {
   later.push({ mesh: null, minX: x - rx, maxX: x + rx, minZ: z - rz, maxZ: z + rz, bot, top: peak, surf, round: round ? rx : 0,
     peak: peak > edge ? { x, z, rx, rz, edge } : null });
 }
 
-// --- the island: a grid of 1x1 cells over the whole map. Each is sea, wet sand, sand or grass, and grass can be raised into hills ---
-// Hills go up in half-block terraces, at most half a block between any two touching cells (diagonals too),
-// so you, bots and zombies can walk up them anywhere without jumping.
+// --- the island ---
+// hills step up half a block at a time so you can walk up them
 const hash = (i, j, s) => { let h = (i * 374761393 + j * 668265263 + s * 982451653) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
 const vnoise = (x, z, f, s) => { // smooth noise, -1 to 1
   x *= f; z *= f; const i = Math.floor(x), j = Math.floor(z), u = x - i, v = z - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
   const a = hash(i, j, s), b = hash(i + 1, j, s), c = hash(i, j + 1, s), d = hash(i + 1, j + 1, s);
   return (a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv) * 2 - 1;
 };
-const N = 84, O = 42, LAND_Y = .06, WATER_Y = .035; // cell i covers x from i - O to i - O + 1
+const N = 84, O = 42, LAND_Y = .06, WATER_Y = .035; // grid size and offset
 const ci = x => Math.floor(x + O), inGrid = (i, j) => i >= 0 && j >= 0 && i < N && j < N, at = (i, j) => j * N + i;
 const SEA = 0, WETS = 1, SAND = 2, GRASS = 3;
 const kind = new Uint8Array(N * N), H = new Float32Array(N * N), dSea = new Int16Array(N * N);
-const SF = new Float32Array(N * N); // the sea floor's height in each sea cell (0 on land)
+const SF = new Float32Array(N * N); // sea floor height per cell
 const isLand = (x, z) => ((x + 3.5) / 37) ** 4 + ((z - .5) / 40) ** 4 <= 1 + .12 * vnoise(x, z, .12, 1) || Math.hypot(x - LX, z - LZ) < 7.5 + vnoise(x, z, .3, 2);
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (isLand(i - O + .5, j - O + .5)) kind[at(i, j)] = GRASS;
 const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const seaAt = (i, j) => !inGrid(i, j) || kind[at(i, j)] === SEA;
-{ // how many cells to the sea, for the beach
+{ // distance to the sea, for the beach
   const q = [];
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (kind[at(i, j)] && D4.some(([a, b]) => seaAt(i + a, j + b))) { dSea[at(i, j)] = 1; q.push([i, j]); }
   for (let k = 0; k < q.length; k++) {
@@ -70,7 +67,7 @@ const seaAt = (i, j) => !inGrid(i, j) || kind[at(i, j)] === SEA;
     for (const [a, b] of D4) { const n = at(i + a, j + b); if (!seaAt(i + a, j + b) && !dSea[n]) { dSea[n] = dSea[at(i, j)] + 1; q.push([i + a, j + b]); } }
   }
 }
-{ // the sea floor: 1 block down for the first 2 cells off the shore, 2 for the next 3, then SEA_D
+{ // sea floor gets deeper in steps
   const dL = new Int16Array(N * N), q = [];
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (!kind[at(i, j)] && D4.some(([a, b]) => !seaAt(i + a, j + b))) { dL[at(i, j)] = 1; q.push([i, j]); }
   for (let k = 0; k < q.length; k++) {
@@ -83,10 +80,10 @@ const seaFloor = (i, j) => inGrid(i, j) ? SF[at(i, j)] : -SEA_D;
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   const c = at(i, j), x = i - O + .5, z = j - O + .5;
   if (!kind[c]) continue;
-  // the beach is wider on the east side, where the pier and the loungers are
+  // wider beach on the east side
   kind[c] = dSea[c] === 1 ? WETS : dSea[c] <= 3 + 1.5 * vnoise(x, z, .15, 3) || x > 18.5 + 2 * vnoise(x, z, .1, 4) ? SAND : GRASS;
 }
-// hills: [x, z, radius, height]. Kept off everything built on the ground, the pads and the crates
+// hills: [x, z, radius, height]
 const HILLS = [[-28, -22, 10, 5], [-24, 25, 10, 5.5], [12, -26, 8, 4], [0, -6, 5.5, 2.5]];
 const KEEP_R = [[-25, -5, -9, 9, 2], [-38.5, -28.5, -7.5, 6.5, 1.5],[-4.5, 4.5, -21, -14.5, 2.5], [.5, 15.5, 16.5, 27.5, 2], ...HUTS.map(([x, z]) => [x - 1.6, x + 1.6, z - 1.6, z + 1.6, 2])];
 const KEEP_C = [...M.pads.map(([x, z]) => [x, z, 3]), ...M.crates.map(([x, z]) => [x, z, 2.2])];
@@ -99,7 +96,7 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   for (const [hx, hz, r, h] of HILLS) { const d = Math.hypot(x - hx, z - hz); if (d < r) raw = Math.max(raw, h * (1 - (d / r) ** 2) + .25 * vnoise(x, z, .25, 5)); }
   H[c] = Math.max(0, Math.floor(raw * 2) / 2);
 }
-for (let changed = true; changed;) { // no cell more than half a block above any of its 8 neighbours
+for (let changed = true; changed;) { // no cell more than half a block above a neighbour
   changed = false;
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const c = at(i, j); if (!H[c]) continue;
@@ -111,13 +108,12 @@ for (let changed = true; changed;) { // no cell more than half a block above any
 const kindAt = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? kind[at(i, j)] : SEA; };
 const hAt = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? H[at(i, j)] : 0; };
 M.land = (x, z) => kindAt(x, z) !== SEA;
-// a paved path: from the pier round both sides of the pool to the hotel door, to the tiki bar and the lighthouse, and out to each hut.
-// Each route is smoothed into a curve, and every land cell close to it gets paving (up and over the hills too)
+// paved paths
 const ROUTES = [
-  [[19, 12], [13, 11], [6, 9.8], [-1, 10.6], [-7, 10.6], [-13, 11.4], [-21, 11.4], [-26.6, 10.6], [-29, 7.5], [-29, 0]], // pier, south of the pool, hotel door
-  [[-29, 0], [-25.4, 0]],                                                                                            // the door out to the pool deck
-  [[-29, 0], [-29, -7.8], [-27, -10.6], [-21, -11.4], [-13, -11.4], [-6, -11.2], [-2, -13.8], [2, -14.2]],             // north of the pool to the tiki bar
-  [[2, -14.2], [8, -13.4], [15, -15.2], [21, -19.6], [25.5, -24.4], [29, -27.4]],                                    // on to the lighthouse door
+  [[19, 12], [13, 11], [6, 9.8], [-1, 10.6], [-7, 10.6], [-13, 11.4], [-21, 11.4], [-26.6, 10.6], [-29, 7.5], [-29, 0]], // pier to hotel door
+  [[-29, 0], [-25.4, 0]],                                                                                            // hotel to pool deck
+  [[-29, 0], [-29, -7.8], [-27, -10.6], [-21, -11.4], [-13, -11.4], [-6, -11.2], [-2, -13.8], [2, -14.2]],             // to the tiki bar
+  [[2, -14.2], [8, -13.4], [15, -15.2], [21, -19.6], [25.5, -24.4], [29, -27.4]],                                    // to the lighthouse
   [[6, 9.8], [7.2, 4], [6.4, -4], [4.4, -10], [2, -14.2]],                                                             // across the middle
   [[-1, 10.6], [-2.6, 17], [-2.2, 24], [1, 30], [5.6, 33.4]],                                                          // south hut
   [[-27.6, 10.9], [-29.6, 17], [-30.6, 23], [-31.8, 27]],                                                              // south-west hut
@@ -144,26 +140,26 @@ const PATH = new Uint8Array(N * N);
     if (kind[at(i, j)] >= SAND && segs.some(s => dist(x, z, s) < 1.05)) PATH[at(i, j)] = 1;
   }
 }
-const onPath = (x, z, r = 0) => { // is there paving within r of (x, z)?
+const onPath = (x, z, r = 0) => { // paving within r?
   for (let j = ci(z - r); j <= ci(z + r); j++) for (let i = ci(x - r); i <= ci(x + r); i++) if (inGrid(i, j) && PATH[at(i, j)]) return true;
   return false;
 };
 const drawPaving = g => {
   noise(g, [214, 196, 162], 12);
-  g.fillStyle = 'rgba(120,98,70,.55)'; // the gaps between the stones
+  g.fillStyle = 'rgba(120,98,70,.55)'; // gaps between stones
   g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 8); g.fillRect(9, 0, 1, 8); g.fillRect(4, 8, 1, 8); g.fillRect(12, 8, 1, 8);
   g.fillStyle = 'rgba(255,248,228,.45)'; for (const [x, y] of [[2, 2], [11, 3], [6, 11], [14, 12], [1, 13]]) g.fillRect(x, y, 2, 1);
 };
 const paving = tex(drawPaving);
 
-// meshes made of cell faces. quads: [material index, 4 corners [x, y, z, u, v], normal]
+// meshes made of cell faces
 function cellMesh(quads, mats) {
   quads.sort((p, q) => p[0] - q[0]);
   const pos = [], nor = [], uv = [], col = [], ind = [], geo = new THREE.BufferGeometry();
   let start = 0;
   quads.forEach(([m, vs, n], k) => {
     const [a, b, c] = vs, cr = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])];
-    if (cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2] < 0) vs = [...vs].reverse(); // front face outwards
+    if (cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2] < 0) vs = [...vs].reverse(); // face outwards
     const base = pos.length / 3;
     for (const v of vs) { pos.push(v[0], v[1], v[2]); nor.push(...n); uv.push(v[3], v[4]); const k = v[5] ?? 1; col.push(k, k, k); }
     ind.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -176,7 +172,7 @@ function cellMesh(quads, mats) {
   geo.setIndex(ind); geo.computeBoundingSphere(); geo.computeBoundingBox();
   const mesh = new THREE.Mesh(geo, mats); add(mesh); return mesh;
 }
-// shading: a corner of a top face is darker for each of the 4 cells round it that's higher, so the foot of every step stands out
+// darker corners at the foot of each step
 const occ = (x, z, h) => { let n = 0; for (const [a, b] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { const i = x + O + a, j = z + O + b; if (inGrid(i, j) && H[at(i, j)] > h + .01) n++; } return 1 - .14 * n; };
 const topQuad = (m, x0, z0, y, h = y) => [m, [[x0, y, z0, 0, 1, occ(x0, z0, h)], [x0 + 1, y, z0, 1, 1, occ(x0 + 1, z0, h)], [x0 + 1, y, z0 + 1, 1, 0, occ(x0 + 1, z0 + 1, h)], [x0, y, z0 + 1, 0, 0, occ(x0, z0 + 1, h)]], [0, 1, 0]];
 const drawGrass = g => {
@@ -188,15 +184,14 @@ const drawSand = g => {
   for (let i = 0; i < 7; i++) { g.fillStyle = ['rgba(170,140,95,.45)', 'rgba(255,245,215,.6)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
 };
 const lawn = tex(drawGrass);
-// flat ground, drawn just above the sea so the water stops at the shore, the shore dropping down to the sea floor,
-// and the sea floor's steps. Not under the pool, which is a hole. In chunks, because bullets hit it
+// ground, shore and sea floor
 {
   const wet = tex(g => noise(g, [198, 176, 130], 12));
   const mats = [decal({ map: wet, vertexColors: true }), decal({ map: tex(drawSand), vertexColors: true }), decal({ map: lawn, vertexColors: true }),
     lam({ vertexColors: true, map: tex(g => { noise(g, [176, 156, 112], 16); g.fillStyle = 'rgba(120,100,70,.4)'; for (const y of [3, 9, 14]) g.fillRect(0, y, 16, 1); }) }),
     lam({ vertexColors: true, map: tex(drawSeabed) }), decal({ map: paving, vertexColors: true })];
   const CH = 14;
-  // the side of cell (x0, z0) facing (a, b), from y0 up to y1
+  // side of a cell, from y0 up to y1
   const side = (quads, x0, z0, a, b, y0, y1) => {
     const ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0, v = y1 - y0;
     quads.push([3, a ? [[ex, y0, z0, 0, 0, .6], [ex, y0, z0 + 1, 1, 0, .6], [ex, y1, z0 + 1, 1, v], [ex, y1, z0, 0, v]]
@@ -206,7 +201,7 @@ const lawn = tex(drawGrass);
     const quads = [];
     for (let j = cj; j < cj + CH; j++) for (let i = cii; i < cii + CH; i++) {
       const c = at(i, j), x0 = i - O, z0 = j - O;
-      if (!kind[c]) { // a sea cell: its step of the sea floor, and the drop to any deeper step next to it
+      if (!kind[c]) { // sea cell
         if (SF[c] <= -SEA_D) continue;
         quads.push(topQuad(4, x0, z0, SF[c], 0));
         for (const [a, b] of D4) if (seaAt(i + a, j + b) && seaFloor(i + a, j + b) < SF[c]) side(quads, x0, z0, a, b, seaFloor(i + a, j + b), SF[c]);
@@ -219,7 +214,7 @@ const lawn = tex(drawGrass);
     if (quads.length) building.cover.push(cellMesh(quads, mats));
   }
 }
-// the hills, in chunks so a shot only has to check the chunks near it
+// hills, in chunks so shots only check nearby ones
 {
   const mats = [lam({ map: lawn, vertexColors: true }), lam({ vertexColors: true, map: tex(g => {
     noise(g, [128, 92, 60], 22); g.fillStyle = 'rgba(70,45,25,.4)'; for (let i = 0; i < 6; i++) g.fillRect(Math.random() * 16 | 0, 4 + Math.random() * 12 | 0, 2, 1);
@@ -235,10 +230,10 @@ const lawn = tex(drawGrass);
       for (const [a, b] of D4) {
         const nh = inGrid(i + a, j + b) ? H[at(i + a, j + b)] : 0;
         if (nh >= h) continue;
-        // a paved cell's step is paved down its face too (the tiles run from the foot up); a grass cell's shows earth with the grass lip at the top
+        // step faces: paving, or earth with a grass lip
         const paved = !!PATH[c], v0 = paved ? 0 : 1 - (h - nh), v1 = paved ? h - nh : 1;
         const ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0;
-        const lo = nh ? .78 : .72; // the bottom of a step is in shadow
+        const lo = nh ? .78 : .72; // shadow at the foot of a step
         const corners = a ? [[ex, nh, z0, 0, v0, lo], [ex, nh, z0 + 1, 1, v0, lo], [ex, h, z0 + 1, 1, v1], [ex, h, z0, 0, v1]]
           : [[x0, nh, ez, 0, v0, lo], [x0 + 1, nh, ez, 1, v0, lo], [x0 + 1, h, ez, 1, v1], [x0, h, ez, 0, v1]];
         quads.push([paved ? 2 : 1, corners, [a, 0, b]]);
@@ -248,11 +243,11 @@ const lawn = tex(drawGrass);
   }
 }
 
-// --- the sea: clear turquoise round the island, deep blue further out ---
+// --- the sea ---
 const waterMat = (rgb, op, rx, ry) => new THREE.MeshLambertMaterial({ transparent: true, opacity: op, depthWrite: false, map: tex(g => {
   noise(g, rgb, 14); g.fillStyle = 'rgba(255,255,255,.3)'; for (let i = 0; i < 5; i++) g.fillRect(Math.random() * 14 | 0, Math.random() * 16 | 0, 3, 1);
 }, rx, ry) });
-// the shallows fade into the deep water over a few rings, so there's no hard line between them
+// shallows fade into deep water
 const REEF = 56, FADE = 3.5, RINGS = 8;
 const waters = [new THREE.Mesh(new THREE.CircleGeometry(REEF, 48), waterMat([70, 200, 205], .55, REEF * 2 / 3, REEF * 2 / 3))];
 for (let k = 1; k <= RINGS; k++) {
@@ -262,7 +257,7 @@ for (let k = 1; k <= RINGS; k++) {
 }
 waters.push(new THREE.Mesh(new THREE.RingGeometry(REEF + RINGS * FADE, G * 1.5, 48, 1), waterMat([30, 125, 175], .93, G, G)));
 for (const w of waters) { w.rotation.x = -Math.PI / 2; w.position.set(-3, WATER_Y, 0); add(w); }
-// foam along every bit of shoreline, on the water side
+// shoreline foam
 let foam;
 {
   const quads = [], W = .6, y = WATER_Y + .01;
@@ -271,7 +266,7 @@ let foam;
     const x0 = i - O, z0 = j - O;
     for (const [a, b] of D4) {
       if (!seaAt(i + a, j + b)) continue;
-      const e = a > 0 ? x0 + 1 : a < 0 ? x0 : b > 0 ? z0 + 1 : z0, s = a + b; // s: which way the sea is
+      const e = a > 0 ? x0 + 1 : a < 0 ? x0 : b > 0 ? z0 + 1 : z0, s = a + b; // which way the sea is
       quads.push([0, a ? [[e, y, z0, 0, 1], [e + s * W, y, z0, 0, 0], [e + s * W, y, z0 + 1, 1, 0], [e, y, z0 + 1, 1, 1]]
         : [[x0, y, e, 0, 1], [x0, y, e + s * W, 0, 0], [x0 + 1, y, e + s * W, 1, 0], [x0 + 1, y, e, 1, 1]], [0, 1, 0]]);
     }
@@ -283,11 +278,9 @@ let foam;
 }
 
 // --- the lighthouse ---
-// Four floors and a gallery on top. The stairs wind up round the inside walls, half a floor per wall,
-// with a landing in each corner, so every floor has its stairs on two walls and a hole above them.
-// Local coords: u = x - LX, v = z - LZ (north is -v). The inside splits into a 3x3 grid: corners, a strip along each wall, the middle.
+// four floors and a gallery, stairs wind up the inside walls
 const LH = 3.6, FLOORS = 4, HALF = LH / 2, RUNS = FLOORS * 2;
-const LO = 2.8, LI = 2.3, CELL = 1.1, GA = 3.6; // half-widths: outside of the walls, inside, gallery. CELL = stair width
+const LO = 2.8, LI = 2.3, CELL = 1.1, GA = 3.6; // wall and gallery half-widths, stair width
 const GY = FLOORS * LH; // gallery floor
 const paint = rgb => lam({ map: tex(g => { noise(g, rgb, 12); g.fillStyle = 'rgba(0,0,0,.07)'; for (const y of [3, 7, 11, 15]) g.fillRect(0, y, 16, 1); for (const [x, y] of [[4, 0], [12, 4], [4, 8], [12, 12]]) g.fillRect(x, y, 1, 3); }) });
 const white = surf(paint([240, 238, 232]), 'stone'), red = surf(paint([200, 52, 44]), 'stone');
@@ -299,18 +292,17 @@ const G3 = [-LI, -LI + CELL, LI - CELL, LI], E0 = LI - CELL;
 const cellR = (i, j) => [G3[i], G3[i + 1], G3[j], G3[j + 1]];
 const SIDES = ['W', 'N', 'E', 'S'];
 const CORNER = [cellR(0, 2), cellR(0, 0), cellR(2, 0), cellR(2, 2)]; // SW, NW, NE, SE
-const EDGE = [cellR(0, 1), cellR(1, 0), cellR(2, 1), cellR(1, 2)];   // along the W, N, E, S walls
-// stair run j climbs along wall j % 4 from corner j % 4 to corner (j + 1) % 4, from height j * HALF to (j + 1) * HALF
+const EDGE = [cellR(0, 1), cellR(1, 0), cellR(2, 1), cellR(1, 2)];   // W, N, E, S
+// stair run j climbs along wall j % 4
 const RUN = [{ ax: 'z', a: E0, b: -E0 }, { ax: 'x', a: -E0, b: E0 }, { ax: 'z', a: -E0, b: E0 }, { ax: 'x', a: E0, b: -E0 }];
 
-// walls. Openings: [centre along the wall, width, bottom, top] (heights from that floor).
-// Each floor gets a window in the middle of every wall except the one its upper stair run climbs past
+// walls with doors and windows
 const DOOR = [0, 1.4, 0, 2.4], WIN = [0, 1, 1, 2.3];
 for (let k = 0; k < FLOORS; k++) {
   const y0 = k * LH, y1 = y0 + LH - (k === FLOORS - 1 ? .3 : 0), m = LEVEL_MAT[k % LEVEL_MAT.length];
   SIDES.forEach((side, w) => {
     const holes = k === 0 && side === 'S' ? [DOOR] : w === (2 * k + 1) % 4 ? [] : [WIN];
-    const end = side === 'N' || side === 'S' ? LO : LI; // N and S run the full width so they cover the corners
+    const end = side === 'N' || side === 'S' ? LO : LI; // N and S walls cover the corners
     const piece = (a0, a1, b, t) => {
       if (a1 - a0 < .01 || t - b < .01) return;
       if (side === 'N') lh(a0, a1, -LO, -LI, b, t, m); else if (side === 'S') lh(a0, a1, LI, LO, b, t, m);
@@ -323,13 +315,13 @@ for (let k = 0; k < FLOORS; k++) {
     piece(a, end, y0, y1);
   });
 }
-// stairs. You collide with a smooth slope (so you walk straight up), the steps are just what you see
+// stairs: you walk on a smooth slope
 const STEPS = 6, stairMat = surf(lam({ map: tex(g => { noise(g, [120, 84, 50], 16); g.fillStyle = 'rgba(40,22,10,.5)'; g.fillRect(0, 0, 16, 2); }) }), 'wood');
 for (let j = 0; j < RUNS; j++) {
   const [u0, u1, v0, v1] = EDGE[j % 4], f = RUN[j % 4], fl = Math.floor(j / 2) * LH, bot = j * HALF, o = f.ax === 'x' ? LX : LZ;
   const rect = { mesh: null, minX: LX + u0, maxX: LX + u1, minZ: LZ + v0, maxZ: LZ + v1 };
   building.solids.push({ ...rect, bot, top: bot + HALF, ramp: { ax: f.ax, a: o + f.a, b: o + f.b }, surf: 'wood' });
-  if (bot > fl) building.solids.push({ ...rect, bot: fl, top: bot, surf: 'wood' }); // filled in underneath, so you can't walk under the upper run
+  if (bot > fl) building.solids.push({ ...rect, bot: fl, top: bot, surf: 'wood' }); // filled in underneath
   for (let s = 0; s < STEPS; s++) {
     const p0 = f.a + (f.b - f.a) * s / STEPS, p1 = f.a + (f.b - f.a) * (s + 1) / STEPS, lo = Math.min(p0, p1), hi = Math.max(p0, p1);
     const h = bot + HALF * (s + 1) / STEPS - fl;
@@ -337,9 +329,9 @@ for (let j = 0; j < RUNS; j++) {
     m.position.set(LX + (f.ax === 'z' ? (u0 + u1) / 2 : (lo + hi) / 2), fl + h / 2, LZ + (f.ax === 'z' ? (lo + hi) / 2 : (v0 + v1) / 2));
     add(m); building.cover.push(m);
   }
-  if (j % 2 === 0) { const [c0, c1, d0, d1] = CORNER[(j + 1) % 4]; lh(c0, c1, d0, d1, fl, fl + HALF, stairMat); } // the landing halfway up
+  if (j % 2 === 0) { const [c0, c1, d0, d1] = CORNER[(j + 1) % 4]; lh(c0, c1, d0, d1, fl, fl + HALF, stairMat); } // landing
 }
-// floors 1 to 3 and the gallery deck. Floor k has a hole over the two runs (and the landing) that come up to it
+// upper floors with holes for the stairs
 const holeOf = k => [EDGE[(2 * k + 2) % 4], EDGE[(2 * k + 3) % 4], CORNER[(2 * k + 3) % 4]];
 for (let k = 1; k <= FLOORS; k++) {
   const hole = holeOf(k), cells = [];
@@ -352,7 +344,7 @@ for (const s of [-1, 1]) for (let i = -2.4; i <= 2.41; i += 1.2) { // brackets u
   const b1 = box(.8, .5, .25, ironMat); b1.position.set(LX + s * (LO + .4), GY - .55, LZ + i); add(b1);
   const b2 = box(.25, .5, .8, ironMat); b2.position.set(LX + i, GY - .55, LZ + s * (LO + .4)); add(b2);
 }
-// railing: drawn about waist high, but the invisible part goes higher so you can't jump off. Bullets go over it
+// railing, too high to jump off
 for (const s of [-1, 1]) {
   building.solids.push({ mesh: null, minX: LX - GA, maxX: LX + GA, minZ: LZ + s * GA - .15, maxZ: LZ + s * GA + .15, bot: GY, top: GY + 1.9 });
   building.solids.push({ mesh: null, minX: LX + s * GA - .15, maxX: LX + s * GA + .15, minZ: LZ - GA, maxZ: LZ + GA, bot: GY, top: GY + 1.9 });
@@ -366,7 +358,7 @@ for (const s of [-1, 1]) {
     const p2 = box(.08, 1, .08, ironMat); p2.position.set(LX + s * (GA - .05), GY + .5, LZ + q); add(p2);
   }
 }
-// lantern room in the middle: a red base, glass all round (you can shoot through it, not walk through it)
+// lantern room, you can shoot through the glass
 const LR = 1.1;
 lh(-LR, LR, -LR, LR, GY, GY + .6, red);
 building.solids.push({ mesh: null, minX: LX - LR, maxX: LX + LR, minZ: LZ - LR, maxZ: LZ + LR, bot: GY + .6, top: GY + 2.4 });
@@ -375,7 +367,7 @@ glass.position.set(LX, GY + 1.5, LZ); add(glass);
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = box(.1, 1.8, .1, ironMat); p.position.set(LX + sx * (LR - .04), GY + 1.5, LZ + sz * (LR - .04)); add(p); }
 const CY = GY + 2.9; // underside of the canopy
 const chimney = box(1.3, CY - GY - 2.4, 1.3, ironMat); chimney.position.set(LX, (GY + 2.4 + CY) / 2, LZ); add(chimney);
-// the canopy: a red roof over the whole gallery, held up by a post in each corner
+// red canopy
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(LX + sx * (GA - .12), LZ + sz * (GA - .12), .16, .16, GY, CY, ironMat);
 const CW = GA + .3;
 addSlab(LX, LZ, CW * 2, CW * 2, CY, CY + .25, red);
@@ -389,13 +381,12 @@ const lampM = box(.7, .7, .7, new THREE.MeshLambertMaterial({ color: 0xfff0b0, e
 const lampHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffe9a0, transparent: true, opacity: .7, blending: THREE.AdditiveBlending, depthWrite: false }));
 lampHalo.scale.setScalar(2.8); lampHalo.position.set(LX, LAMP_Y, LZ); add(lampHalo);
 
-// rocks round the point it stands on (kept clear of the door on the south side)
+// rocks round the lighthouse
 const rockMat = surf(lam({ map: tex(g => { noise(g, [128, 122, 112], 30); g.fillStyle = 'rgba(70,60,50,.5)'; for (let i = 0; i < 8; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }) }), 'stone');
 for (const [x, z, w, d, h] of [[26, -36.5, 3, 2.5, 1.2], [30, -37, 3.5, 2.2, 1.6], [33.5, -35, 2.6, 3, 1.4], [35.5, -31, 2.4, 3.2, 1.1],
   [34.5, -27.5, 2, 2, .8], [37.5, -34, 2.2, 2.4, .7], [23.5, -36, 1.8, 1.6, .9], [36.5, -38.5, 3, 2.6, 1.8], [32, -39.5, 2.4, 2, 1]]) addSlab(x, z, w, d, -SEA_D, h, rockMat); // down to the sea floor
 
-// how bots and zombies get between the floors: the door, then round the corners.
-// Stop j is corner j % 4 at height j * HALF: even j = on floor j / 2, odd j = the landing halfway up
+// how bots and zombies get between floors
 const CN = CORNER.map(([u0, u1, v0, v1]) => ({ x: LX + (u0 + u1) / 2, z: LZ + (v0 + v1) / 2 }));
 const stop = j => CN[j % 4];
 const DOOR_IN = { x: LX, z: LZ + 1.6 }, DOOR_OUT = { x: LX, z: LZ + LO + 1.4 };
@@ -408,7 +399,7 @@ function placeOf(p) { // -1 = outside, j = at stop j's floor or landing, j + .5 
   return Math.max(0, Math.min(FLOORS, Math.round(p.y / LH))) * 2;
 }
 const near = (p, q) => Math.hypot(p.x - q.x, p.z - q.z) < .9;
-// from p, which spot to walk to next to get to where t is, or null if it can just head straight there
+// next spot to walk to, or null to go straight there
 M.nav = (p, t) => {
   const a = placeOf(p), b = placeOf(t);
   if (a === b) return null;
@@ -419,7 +410,7 @@ M.nav = (p, t) => {
   return near(p, stop(a)) ? stop(a - 1) : stop(a);
 };
 
-// --- the pool: a raised deck with a step all round, and a hole in the middle 2.5 blocks deep, with steps down at the west end ---
+// --- the pool ---
 const tile = surf(lam({ map: tex(g => { noise(g, [234, 226, 208], 9); g.fillStyle = '#c8bca6'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 8, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(8, 0, 1, 16); }) }), 'stone');
 const drawPoolTile = g => { noise(g, [72, 172, 214], 10); g.fillStyle = '#e4f4fb'; for (const i of [0, 4, 8, 12]) { g.fillRect(0, i, 16, 1); g.fillRect(i, 0, 1, 16); } };
 const poolTile = surf(lam({ map: tex(drawPoolTile) }), 'stone');
@@ -427,11 +418,11 @@ const DECK = [-24, -6, -8, 8], DECK_STEP = [-25, -5, -9, 9], RIM = .25, POOL_O =
 const DECK_Y = 1, DECK_STEP_Y = .5;
 rectMinus(DECK, POOL_O).forEach(r => rectSlab(r, 0, DECK_Y, tile, true, 2));
 rectMinus(DECK_STEP, DECK).forEach(r => rectSlab(r, 0, DECK_STEP_Y, tile, true, 2));
-// the pool's walls: blue tiles from the floor up to just under the water, deck tiles above that
+// pool walls
 rectMinus(POOL_O, POOL).forEach(r => { rectSlab(r, POOL_F, POOL_Y - .1, poolTile, true, 2); rectSlab(r, POOL_Y - .1, DECK_Y, tile, true, 2); });
 flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], decal({ map: tex(drawPoolTile, (POOL[1] - POOL[0]) / 2, (POOL[3] - POOL[2]) / 2) }), (POOL[0] + POOL[1]) / 2, POOL_F + .01, 0);
 const poolWater = flatPlane(POOL[1] - POOL[0], POOL[3] - POOL[2], waterMat([95, 205, 235], .6, 4, 3), (POOL[0] + POOL[1]) / 2, POOL_Y, 0);
-// the steps: from the deck at the west wall down to the floor. You collide with a smooth slope, the steps are what you see
+// pool steps
 const PS = { x0: POOL[0], x1: POOL[0] + 4, z0: -1.25, z1: 1.25 }, PSTEPS = 5;
 building.solids.push({ mesh: null, minX: PS.x0, maxX: PS.x1, minZ: PS.z0, maxZ: PS.z1, bot: POOL_F, top: DECK_Y, ramp: { ax: 'x', a: PS.x1, b: PS.x0 }, surf: 'stone' });
 for (let s = 0; s < PSTEPS; s++) {
@@ -439,23 +430,21 @@ for (let s = 0; s < PSTEPS; s++) {
   const m = tbox(w, h, PS.z1 - PS.z0, tile, 2); m.position.set(PS.x0 + w * (s + .5), POOL_F + h / 2, 0); add(m); building.cover.push(m);
 }
 const chrome = surf(plain(0xd6dde3), 'metal');
-for (const z of [PS.z0 - .12, PS.z1 + .12]) { // a handrail either side, curving over from the deck down onto the top step
+for (const z of [PS.z0 - .12, PS.z1 + .12]) { // handrails
   const up = box(.07, 1, .07, chrome); up.position.set(PS.x0 - .55, DECK_Y + .5, z); add(up);
   const top = box(.9, .07, .07, chrome); top.position.set(PS.x0 - .1, DECK_Y + 1, z); add(top);
   const down = box(.07, 1.3, .07, chrome); down.position.set(PS.x0 + .35, DECK_Y + .35, z); add(down);
 }
-// down in the pool, below the deck. Anywhere on the steps counts until you're right up at the top
+// down in the pool
 const POOL_LOW = p => inPool(p.x, p.z) && p.y < DECK_Y - .05;
 const POOL_BOT = { x: PS.x1 + .7, z: 0 }, POOL_UP = { x: PS.x0 - 1.6, z: 0 };
 const onSteps = p => p.x > PS.x0 && p.x < PS.x1 && p.z > PS.z0 && p.z < PS.z1;
-// bots and zombies in the pool chasing someone out of it: to the bottom of the steps, then up them and off onto the deck
-// (they don't go back in after someone who isn't in it, see walkDry)
+// in the pool: head for the steps to get out
 const poolNav = (p, t) => POOL_LOW(t) ? null : POOL_LOW(p) ? (Math.abs(p.z) < .8 && p.x < POOL_BOT.x + .2 ? POOL_UP : POOL_BOT) : onSteps(p) ? POOL_UP : null;
-// out of the pool, with it in the way of where it's going: to a corner of the walk round it. The walk is far enough out
-// to miss the umbrella poles, and a corner only counts if it can get there without crossing the pool
+// out of the pool: walk round it
 const ROUND = .7, CROSS = .4;
 const PC = [[POOL_O[0] - ROUND, POOL_O[2] - ROUND], [POOL_O[1] + ROUND, POOL_O[2] - ROUND], [POOL_O[1] + ROUND, POOL_O[3] + ROUND], [POOL_O[0] - ROUND, POOL_O[3] + ROUND]].map(([x, z]) => ({ x, z }));
-function crossesPool(a, b) { // does the line from a to b pass over the water (with room for a body)?
+function crossesPool(a, b) { // does a to b pass over the water?
   const lo = [POOL[0] - CROSS, POOL[2] - CROSS], hi = [POOL[1] + CROSS, POOL[3] + CROSS], d = [b.x - a.x, b.z - a.z], s = [a.x, a.z];
   let t0 = 0, t1 = 1;
   for (let k = 0; k < 2; k++) {
@@ -467,7 +456,7 @@ function crossesPool(a, b) { // does the line from a to b pass over the water (w
 }
 function poolAround(p, t) {
   if (POOL_LOW(p) || onSteps(p)) return null;
-  if (inPool(p.x, p.z, CROSS)) { // right at the edge (its middle can hang over the water a little): if it's heading in, back off the edge first
+  if (inPool(p.x, p.z, CROSS)) { // at the edge heading in: back off first
     const ds = [p.x - POOL[0] + CROSS, POOL[1] + CROSS - p.x, p.z - POOL[2] + CROSS, POOL[3] + CROSS - p.z], k = ds.indexOf(Math.min(...ds));
     const n = [[-1, 0], [1, 0], [0, -1], [0, 1]][k];
     if ((t.x - p.x) * n[0] + (t.z - p.z) * n[1] >= 0) return null;
@@ -477,14 +466,14 @@ function poolAround(p, t) {
   let best = null, bd = Infinity;
   for (const c of PC) {
     const dc = Math.hypot(c.x - p.x, c.z - p.z);
-    if (dc < .5 || crossesPool(p, c)) continue; // already there, or the pool's in the way of this one too
+    if (dc < .5 || crossesPool(p, c)) continue; // already there, or blocked by the pool
     const d = dc + Math.hypot(t.x - c.x, t.z - c.z) + (crossesPool(c, t) ? 6 : 0);
     if (d < bd) { bd = d; best = c; }
   }
   return best;
 }
 
-// loungers and umbrellas. y0 = what they stand on, along = 'x' or 'z' (which way they lie), dir = which end the back is at
+// loungers and umbrellas
 const towelCols = [0xe8505a, 0x3ab0e0, 0xf2c94c, 0x5cc48a, 0xf08bb4];
 const umbCols = [['#e8505a', '#ffffff'], ['#2a8fd6', '#ffffff'], ['#f2a33a', '#fff3d0'], ['#3bb27a', '#ffffff']];
 const loungeMat = plain(0xf4f1ea), legMat = plain(0x9aa0a6);
@@ -523,7 +512,7 @@ const wood = surf(lam({ map: tex(g => { noise(g, [140, 96, 58], 18); g.fillStyle
 const thatch = lam({ map: tex(g => { noise(g, [200, 164, 92], 26); g.fillStyle = 'rgba(120,85,40,.55)'; for (let i = 0; i < 12; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 4); }) });
 const BX = 0, BZ = -18;
 addSlab(BX, BZ + 2, 6.4, .6, 0, 1.1, wood);
-for (const s of [-1, 1]) addSlab(BX + s * 2.9, BZ + .4, .6, 2.6, 0, 1.1, wood); // gap at the back on both sides so you (and bots) can walk behind it
+for (const s of [-1, 1]) addSlab(BX + s * 2.9, BZ + .4, .6, 2.6, 0, 1.1, wood); // gaps so you can walk behind the bar
 const counterTop = box(7, .1, 1, plain(0x6a4428)); counterTop.position.set(BX, 1.15, BZ + 2); add(counterTop);
 addSlab(BX, BZ - 2.2, 6.4, .5, 0, 1.6, wood);
 const bottleCols = [0x3a7a3a, 0x8a3a1a, 0xd8d0b0, 0x2a5a8a, 0xb04a2a, 0x5a3a7a];
@@ -531,32 +520,32 @@ for (let i = 0; i < 11; i++) { const b = box(.12, .32 + (i % 3) * .06, .12, plai
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(BX + sx * 3.3, BZ + .1 + sz * 2.55, .3, .3, 0, 3, wood);
 const barRoof = box(8, .35, 6.6, thatch); barRoof.position.set(BX, 3.15, BZ); add(barRoof); building.cover.push(barRoof);
 const barCone = new THREE.Mesh(new THREE.ConeGeometry(5.6, 1.8, 4), thatch); barCone.rotation.y = Math.PI / 4; barCone.scale.set(1, 1, .82); barCone.position.set(BX, 4.2, BZ); add(barCone);
-standOn(BX, BZ, 4, 3.3, 2.975, 3.325, 3.325, false, 'wood'); // the flat edge of the roof
-standOn(BX, BZ, 5.6 / Math.SQRT2, 5.6 / Math.SQRT2 * .82, 3.3, 3.3, 5.1, false, 'wood'); // and the thatch peak on it
+standOn(BX, BZ, 4, 3.3, 2.975, 3.325, 3.325, false, 'wood'); // roof edge
+standOn(BX, BZ, 5.6 / Math.SQRT2, 5.6 / Math.SQRT2 * .82, 3.3, 3.3, 5.1, false, 'wood'); // thatch peak
 for (const x of [-2.2, -.7, .8, 2.3]) { addSlab(BX + x, BZ + 3, .45, .45, 0, .6, wood); const seat = box(.55, .08, .55, plain(0xc0392b)); seat.position.set(BX + x, .64, BZ + 3); add(seat); }
 
 // --- beach huts ---
-function hut(x, z, face) { // face = which way the door looks: [dx, dz]
+function hut(x, z, face) { // face = door direction
   addSlab(x, z, 3.2, 3.2, 0, 2.6, wood);
   const r = new THREE.Mesh(new THREE.ConeGeometry(2.9, 1.7, 4), thatch); r.rotation.y = Math.PI / 4; r.position.set(x, 3.45, z); add(r); building.cover.push(r);
   standOn(x, z, 2.9 / Math.SQRT2, 2.9 / Math.SQRT2, 2.6, 2.6, 4.3, false, 'wood');
   const door = box(face[0] ? .04 : 1, 1.9, face[0] ? 1 : .04, plain(0x4a2e18)); door.position.set(x + face[0] * 1.61, .95, z + face[1] * 1.61); add(door);
-  for (const s of [-1, 1]) { // a window either side of the door
+  for (const s of [-1, 1]) { // windows
     const w = box(face[0] ? .04 : .6, .6, face[0] ? .6 : .04, plain(0x2c4a5a));
     w.position.set(x + face[0] * 1.61 + (face[0] ? 0 : s * 1), 1.6, z + face[1] * 1.61 + (face[0] ? s * 1 : 0)); add(w);
   }
 }
 for (const [x, z, face] of HUTS) hut(x, z, face);
 
-// --- the hotel: a one-floor lobby west of the pool, with a roof terrace you get to up the stairs on its north side ---
-const HX0 = -38, HX1 = -30, HZ0 = -6, HZ1 = 6, HT = .3, RH = 3.4, RT = 3.7; // footprint, wall thickness, ceiling, roof top
+// --- the hotel ---
+const HX0 = -38, HX1 = -30, HZ0 = -6, HZ1 = 6, HT = .3, RH = 3.4, RT = 3.7; // footprint, walls, ceiling, roof
 const stucco = surf(lam({ map: tex(g => { noise(g, [244, 238, 226], 10); g.fillStyle = 'rgba(0,0,0,.05)'; for (const y of [5, 11]) g.fillRect(0, y, 16, 1); }) }), 'stone');
 const teal = plain(0x2fb5a8);
-// walls. Openings: [centre along the wall, width, bottom, top]. The windows are too short to climb through, but you can shoot through them
+// walls, windows too short to climb through
 const H_DOOR = [0, 2.4, 0, 2.6], hWin = c => [c, 1.6, 1, 2.4];
 const H_WALLS = { E: [hWin(-3.6), H_DOOR, hWin(3.6)], W: [hWin(-3), hWin(3)], N: [], S: [hWin(-35.5), hWin(-32.5)] };
 for (const [side, holes] of Object.entries(H_WALLS)) {
-  const ns = side === 'N' || side === 'S', lo = ns ? HX0 : HZ0 + HT, hi = ns ? HX1 : HZ1 - HT; // N and S run the full width so they cover the corners
+  const ns = side === 'N' || side === 'S', lo = ns ? HX0 : HZ0 + HT, hi = ns ? HX1 : HZ1 - HT; // N and S walls cover the corners
   const piece = (a0, a1, b, t) => {
     if (a1 - a0 < .01 || t - b < .01) return;
     if (side === 'N') addSlab((a0 + a1) / 2, HZ0 + HT / 2, a1 - a0, HT, b, t, stucco); else if (side === 'S') addSlab((a0 + a1) / 2, HZ1 - HT / 2, a1 - a0, HT, b, t, stucco);
@@ -567,12 +556,12 @@ for (const [side, holes] of Object.entries(H_WALLS)) {
   piece(a, hi, 0, RH);
 }
 addSlab((HX0 + HX1) / 2, (HZ0 + HZ1) / 2, HX1 - HX0, HZ1 - HZ0, RH, RT, stucco); // the roof
-for (const s of [-1, 1]) { // teal trim round the outside of the walls, near the top
+for (const s of [-1, 1]) { // teal trim
   const bx = box(HX1 - HX0 + .06, .22, .04, teal); bx.position.set((HX0 + HX1) / 2, RH - .3, s < 0 ? HZ0 - .01 : HZ1 + .01); add(bx);
   const bz = box(.04, .22, HZ1 - HZ0 + .06, teal); bz.position.set(s < 0 ? HX0 - .01 : HX1 + .01, RH - .3, (HZ0 + HZ1) / 2); add(bz);
 }
 flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(g, [226, 214, 190], 8); g.fillStyle = '#bfae8e'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, 4, 6) }), (HX0 + HX1) / 2, LAND_Y + .01, (HZ0 + HZ1) / 2);
-// a flat canopy over the door, held up by a pillar at each outer corner. You can stand on it
+// door canopy you can stand on
 {
   const X0 = HX1, X1 = -27.25, CZ = 2.6, BOT = 2.95, TOP = 3.2, cx = (X0 + X1) / 2, w = X1 - X0;
   addSlab(cx, 0, w, CZ * 2, BOT, TOP, stucco);
@@ -580,7 +569,7 @@ flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(
   flatPlane(w - .1, CZ * 2 - .1, decal({ map: stripes }), cx, TOP + .005, 0);
   const fascia = box(.08, .34, CZ * 2 + .16, teal); fascia.position.set(X1 + .04, (BOT + TOP) / 2, 0); add(fascia);
   for (const s of [-1, 1]) { const f = box(w + .08, .34, .08, teal); f.position.set(cx + .04, (BOT + TOP) / 2, s * (CZ + .04)); add(f); }
-  for (const z of [-1.1, 1.1]) { // little lights in the underside
+  for (const z of [-1.1, 1.1]) { // lights
     const l = box(.32, .04, .32, new THREE.MeshLambertMaterial({ color: 0xfff4d0, emissive: 0xffe2a0, emissiveIntensity: .9 })); l.position.set(cx + .2, BOT - .02, z); add(l);
   }
   const PY = 0;
@@ -592,7 +581,7 @@ flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(
     const band = box(.34, .1, .34, teal); band.position.set(px, BOT - .26, pz); add(band);
   }
 }
-// inside: a reception desk with a key board behind it, a sofa, and a plant either side of the door
+// reception desk, sofa and plants
 addSlab(-36.6, 0, .7, 3, 0, 1.05, wood);
 const desk = box(.9, .08, 3.2, plain(0x6a4428)); desk.position.set(-36.6, 1.09, 0); add(desk);
 const keyBoard = box(.04, .9, 2.2, teal); keyBoard.position.set(HX0 + HT + .02, 1.9, 0); add(keyBoard);
@@ -604,7 +593,7 @@ for (const z of [-4.9, 4.9]) {
   const leaves = box(.8, .9, .8, leafMat); leaves.position.set(HX1 - HT - .45, 1, z); add(leaves);
   standOn(HX1 - HT - .45, z, .4, .4, .55, 1.45, 1.45, false, 'grass');
 }
-// roof terrace: a low wall round the edge with a gap at the top of the stairs, two loungers, an umbrella and an AC unit to hide behind
+// roof terrace
 const PH = .8, PT = .25, H_GAP = -36;
 addSlab(HX1 - PT / 2, (HZ0 + HZ1) / 2, PT, HZ1 - HZ0, RT, RT + PH, stucco);
 addSlab(HX0 + PT / 2, (HZ0 + HZ1) / 2, PT, HZ1 - HZ0, RT, RT + PH, stucco);
@@ -613,7 +602,7 @@ addSlab((H_GAP + HX1) / 2, HZ0 + PT / 2, HX1 - PT - H_GAP, PT, RT, RT + PH, stuc
 lounger(-33, 3.2, RT, 'x', -1, towelCols[0]); lounger(-33, 1.2, RT, 'x', -1, towelCols[1]);
 umbrella(-35.4, 2.2, RT, umbCols[1]);
 addSlab(-33.5, -3, 1.6, 1.2, RT, RT + 1.1, surf(plain(0x9aa0a6), 'metal'));
-// the stairs up: a ramp along the outside of the north wall, rising west to a landing at roof height
+// stairs up the north wall
 const HS = { x0: H_GAP, x1: -29, z0: -7.4, z1: HZ0 }, HSTEPS = 10;
 addSlab((HX0 + H_GAP) / 2, (HS.z0 + HS.z1) / 2, H_GAP - HX0, HS.z1 - HS.z0, 0, RT, stucco); // the landing
 building.solids.push({ mesh: null, minX: HS.x0, maxX: HS.x1, minZ: HS.z0, maxZ: HS.z1, bot: 0, top: RT, ramp: { ax: 'x', a: HS.x1, b: HS.x0 }, surf: 'stone' });
@@ -621,7 +610,7 @@ for (let s = 0; s < HSTEPS; s++) {
   const w = (HS.x1 - HS.x0) / HSTEPS, h = RT * (HSTEPS - s) / HSTEPS;
   const m = tbox(w, h, HS.z1 - HS.z0, stucco); m.position.set(HS.x0 + w * (s + .5), h / 2, (HS.z0 + HS.z1) / 2); add(m); building.cover.push(m);
 }
-// how bots and zombies get in, out and up: through the door, or round to the bottom of the stairs and up to the gap in the roof wall
+// how bots and zombies get in and up
 const H_IN = { x: HX1 - 1.3, z: 0 }, H_OUT = { x: HX1 + 1, z: 0 };
 const H_SB = { x: HS.x1 + .6, z: (HS.z0 + HS.z1) / 2 }, H_ST = { x: (HX0 + H_GAP) / 2, z: (HS.z0 + HS.z1) / 2 }, H_RE = { x: (HX0 + H_GAP) / 2, z: HZ0 + 1.4 };
 const inside = (x, z) => x > HX0 + HT && x < HX1 - HT && z > HZ0 + HT && z < HZ1 - HT;
@@ -637,10 +626,10 @@ function hotelNav(p, t) {
   if (a === 'in') return near(p, H_IN) ? H_OUT : H_IN;
   if (a === 'out') return b === 'in' ? (near(p, H_OUT) ? H_IN : H_OUT) : near(p, H_SB) ? H_ST : H_SB;
   if (a === 'stair') return b === 'roof' ? (p.x < H_GAP + .5 ? H_RE : H_ST) : H_SB;
-  return H_ST; // on the roof: back to the top of the stairs
+  return H_ST; // on the roof: to the stairs
 }
 
-// --- volleyball court: a sand pit in the grass with a low wooden border ---
+// --- volleyball court ---
 const PIT = [.5, 15.5, 16.5, 27.5];
 flatPlane(PIT[1] - PIT[0], PIT[3] - PIT[2], decal({ map: tex(drawSand, PIT[1] - PIT[0], PIT[3] - PIT[2]) }), 8, LAND_Y + .01, 22);
 for (const [w, d, x, z] of [[15.2, .2, 8, PIT[2]], [15.2, .2, 8, PIT[3]], [.2, 11.2, PIT[0], 22], [.2, 11.2, PIT[1], 22]]) {
@@ -657,12 +646,11 @@ const ball = box(.3, .3, .3, plain(0xf4f0e0)); ball.position.set(10.5, .15, 20.4
 const PZ = 12, PX0 = 18, PX1 = 60, PW = 3;
 building.solids.push({ mesh: null, minX: PX0, maxX: PX1, minZ: PZ - PW / 2, maxZ: PZ + PW / 2, bot: 0, top: .5, surf: 'wood' });
 const pierDeck = tbox(PX1 - PX0, .12, PW, plank); pierDeck.position.set((PX0 + PX1) / 2, .44, PZ); add(pierDeck); building.cover.push(pierDeck);
-for (let x = PX0 + .4; x < PX1; x += 3) for (const s of [-1, 1]) { const p = box(.26, SEA_D + .5, .26, wood); p.position.set(x, (.5 - SEA_D) / 2, PZ + s * (PW / 2 - .15)); add(p); building.cover.push(p); } // posts down to the sea floor
+for (let x = PX0 + .4; x < PX1; x += 3) for (const s of [-1, 1]) { const p = box(.26, SEA_D + .5, .26, wood); p.position.set(x, (.5 - SEA_D) / 2, PZ + s * (PW / 2 - .15)); add(p); building.cover.push(p); } // posts
 for (const x of [26, 34, 40]) for (const s of [-1, 1]) addSlab(x, PZ + s * 1.25, .3, .3, .5, .85, ironMat); // bollards
 const hullBlue = plain(0x1f4e8c), hullWhite = plain(0xf6f6f2), seatMat = plain(0xd8cfb8), navy = plain(0x14284a), glassDark = plain(0x1b2a3a);
 const chromeM = plain(0xdfe5ea), blackM = plain(0x222326), accentM = plain(0xe8505a);
-// boat hulls seen from above: a flat stern at x = 0, straight sides, then curving in to a point at the bow (x = L).
-// stern > 0 points the back end as well (the rowboat). ox shifts it forward, for a hole set inside a bigger hull
+// boat hull outline from above
 function hullShape(L, W, bow, stern = 0, ox = 0, hole = false) {
   const s = hole ? new THREE.Path() : new THREE.Shape(), h = W / 2;
   s.moveTo(ox + stern, -h); s.lineTo(ox + L - bow, -h);
@@ -673,7 +661,7 @@ function hullShape(L, W, bow, stern = 0, ox = 0, hole = false) {
   else s.lineTo(ox, -h);
   return s;
 }
-// the outline pulled up from y0 to y1, its stern at x, centred on z
+// hull piece from y0 to y1
 function hullPiece(shape, y0, y1, m, x, z, cover = true) {
   const g = new THREE.ExtrudeGeometry(shape, { depth: y1 - y0, bevelEnabled: false, curveSegments: 12 }).rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(g, m); mesh.position.set(x, y0, z); add(mesh);
@@ -686,19 +674,19 @@ function rod(a, b, m, t = .05) {
   const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), r = box(t, t, L, m);
   r.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); r.lookAt(b[0], b[1], b[2]); add(r); return r;
 }
-// a rail round the front of a hull at height y, with posts down to y0. Follows hullShape(L, W, bow) set at (x, z), from 'from' along the hull forward
+// bow rail
 function bowRail(L, W, bow, x, z, y0, y, from) {
   const pts = hullShape(L, W, bow).getPoints(8).filter((p, k, all) => p.x >= from && !(k && p.distanceTo(all[k - 1]) < .01)).map(p => [x + p.x, z - p.y]);
   for (let k = 0; k < pts.length - 1; k++) rod([pts[k][0], y, pts[k][1]], [pts[k + 1][0], y, pts[k + 1][1]], chromeM, .045);
   pts.forEach(([px, pz], k) => { if (k % 2 === 0 || k === pts.length - 1) rod([px, y0, pz], [px, y, pz], chromeM, .045); });
 }
 
-// speedboat tied up on the south side of the pier. Its deck is a step up from the pier, so you can walk onto it
+// speedboat you can walk onto
 const SB = { x0: 35, x1: 40.6, z: 15.25, w: 2.4 };
 const sbx = (SB.x0 + SB.x1) / 2, sL = 6.45, sBow = 2.1;
 building.solids.push({ mesh: null, minX: SB.x0, maxX: SB.x1, minZ: SB.z - SB.w / 2, maxZ: SB.z + SB.w / 2, bot: 0, top: 1 });
 building.solids.push({ mesh: null, minX: SB.x1, maxX: SB.x1 + 1, minZ: SB.z - .7, maxZ: SB.z + .7, bot: 0, top: 1 });
-// sits a little way down in the water: a narrower bottom, blue sides, a dark rub rail, white topsides with a red stripe, a rim round the deck
+// hull
 hullPiece(hullShape(sL - .35, SB.w - .6, sBow - .1), -.4, .15, hullBlue, SB.x0 + .15, SB.z);
 hullPiece(hullShape(sL, SB.w, sBow), .15, .56, hullBlue, SB.x0, SB.z);
 hullPiece(hullShape(sL + .1, SB.w + .1, sBow + .05), .56, .65, navy, SB.x0 - .05, SB.z, false);
@@ -708,7 +696,7 @@ hullPiece(rim(sL, SB.w, sBow, .16), 1, 1.15, hullWhite, SB.x0, SB.z, false);
 hullPiece(hullShape(sL - .4, SB.w - .32, sBow - .24, 0, .16), 1, 1.01, plank, SB.x0, SB.z, false); // teak floor
 hullPiece(hullShape(sBow + .1, SB.w, sBow), 1, 1.13, hullWhite, SB.x0 + sL - sBow - .1, SB.z, false); // the foredeck
 bowRail(sL - .24, SB.w - .2, sBow - .14, SB.x0 + .1, SB.z, 1.13, 1.42, sL - sBow - .5);
-// steering console with a dash, wheel and throttle, a windscreen in front of it
+// steering console
 addSlab(sbx + .9, SB.z - .4, .8, .7, 1, 1.75, hullWhite);
 const dash = box(.5, .08, .66, blackM); dash.rotation.z = .5; dash.position.set(sbx + .95, 1.79, SB.z - .4); add(dash);
 const wheel = new THREE.Mesh(new THREE.TorusGeometry(.17, .03, 6, 14), blackM); wheel.rotation.y = Math.PI / 2; wheel.rotation.x = .5; wheel.position.set(sbx + .44, 1.78, SB.z - .4); add(wheel);
@@ -721,18 +709,18 @@ rod([sbx + .7, 1.75, SB.z - .02], [sbx + .6, 1.92, SB.z - .02], chromeM, .05);
   for (const s of [-1, 1]) { const p = box(.06, .52, .06, chromeM); p.position.set(0, .26, s * (SB.w / 2 - .22)); ws.add(p); }
   ws.position.set(sbx + 1.5, 1.13, SB.z); ws.rotation.z = .45; add(ws);
 }
-for (const s of [-1, 1]) { // two seats facing forward
+for (const s of [-1, 1]) { // seats
   const z = SB.z + s * .45, sx = sbx + .05;
   const post = box(.18, .3, .18, chromeM); post.position.set(sx, 1.15, z); add(post);
   const cush = box(.55, .14, .5, hullWhite); cush.position.set(sx, 1.37, z); add(cush);
   const back = box(.14, .5, .5, hullWhite); back.position.set(sx - .27, 1.67, z); add(back);
   const pip = box(.56, .03, .4, hullBlue); pip.position.set(sx, 1.45, z); add(pip);
 }
-// a bench across the back, with a backrest along the stern
+// back bench
 addSlab(sbx - 1.4, SB.z, .8, SB.w - .5, 1, 1.32, hullWhite);
 const benchC = box(.78, .1, SB.w - .52, seatMat); benchC.position.set(sbx - 1.4, 1.37, SB.z); add(benchC);
 const benchB = box(.16, .42, SB.w - .52, seatMat); benchB.position.set(SB.x0 + .3, 1.62, SB.z); add(benchB);
-// the outboard motor on the stern
+// outboard motor
 {
   const mx = SB.x0 - .38, motorM = plain(0x2a2a2e);
   const bracket = box(.3, .3, .5, motorM); bracket.position.set(SB.x0 - .1, .95, SB.z); add(bracket);
@@ -743,7 +731,7 @@ const benchB = box(.16, .42, SB.w - .52, seatMat); benchB.position.set(SB.x0 + .
   const plate = box(.55, .04, .32, motorM); plate.position.set(mx + .05, -.2, SB.z); add(plate);
   for (let i = 0; i < 3; i++) { const b = box(.04, .34, .1, chromeM); b.position.set(mx - .14, -.36, SB.z); b.rotation.x = i * 2.094; add(b); }
 }
-// red and green lights on the bow, cleats, fenders against the pier and ropes to the bollards
+// lights, cleats, fenders and ropes
 for (const [s, c] of [[-1, 0xe03a3a], [1, 0x3ad06a]]) { const l = box(.12, .08, .04, new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: .6 })); l.position.set(SB.x0 + sL - sBow + .1, 1.06, SB.z + s * (SB.w / 2 + .01)); add(l); }
 for (const [cx, cz] of [[SB.x0 + .3, SB.z - SB.w / 2 + .12], [SB.x0 + .3, SB.z + SB.w / 2 - .12], [SB.x0 + sL - .9, SB.z - .2]]) { const c = box(.22, .06, .07, chromeM); c.position.set(cx, 1.18, cz); add(c); }
 for (const fx of [36.6, 39.2]) {
@@ -754,29 +742,29 @@ const ropeM = plain(0xd8c8a0);
 rod([SB.x0 + sL - .9, 1.2, SB.z - .2], [40, .85, PZ + 1.25], ropeM, .04);
 rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
 
-// a yacht moored past the end of the pier, out of reach
+// yacht, out of reach
 {
   const X0 = 46.6, Z = 7, L = 14.6, W = 4, BOW = 5;
   hullPiece(hullShape(L - .6, W - .8, BOW - .4), -.4, .3, navy, X0 + .3, Z, false);
   hullPiece(hullShape(L, W, BOW), .3, 1.7, hullWhite, X0, Z, false);
-  hullPiece(hullShape(L + .04, W + .04, BOW + .02), .32, .52, hullBlue, X0 - .02, Z, false); // the stripe along the waterline
-  hullPiece(hullShape(L + .03, W + .03, BOW + .01), 1.5, 1.56, hullBlue, X0 - .015, Z, false); // and a thin one under the deck
+  hullPiece(hullShape(L + .04, W + .04, BOW + .02), .32, .52, hullBlue, X0 - .02, Z, false); // stripes
+  hullPiece(hullShape(L + .03, W + .03, BOW + .01), 1.5, 1.56, hullBlue, X0 - .015, Z, false);
   hullPiece(rim(L, W, BOW, .2), 1.7, 1.9, hullWhite, X0, Z, false);
   hullPiece(hullShape(L - .5, W - .4, BOW - .3, 0, .2), 1.7, 1.72, plank, X0, Z, false);
-  for (const s of [-1, 1]) { // windows along the hull, then round portholes further forward
+  for (const s of [-1, 1]) { // windows and portholes
     const win = box(4.2, .26, .02, glassDark); win.position.set(X0 + 4, 1.12, Z + s * (W / 2 + .01)); add(win);
     for (const px of [7.1, 7.9, 8.7]) { const p = new THREE.Mesh(new THREE.CircleGeometry(.12, 10), glassDark); p.position.set(X0 + px, 1.12, Z + s * (W / 2 + .012)); if (s < 0) p.rotation.y = Math.PI; add(p); }
     const anchor = box(.3, .34, .04, blackM); anchor.position.set(X0 + L - 1.6, 1.25, Z + s * (W / 2 - .25 + .02)); add(anchor);
   }
-  // swim platform and ladder off the back
+  // swim platform
   const plat = box(1, .12, W - .6, plank); plat.position.set(X0 - .5, .55, Z); add(plat);
   for (const s of [-1, 1]) rod([X0 - .8, .1, Z + s * .3], [X0 - .8, .95, Z + s * .3], chromeM, .045);
   for (const y of [.25, .45]) rod([X0 - .8, y, Z - .3], [X0 - .8, y, Z + .3], chromeM, .04);
-  // the cabin, its wraparound windows, and the roof hanging over it
+  // cabin
   hullPiece(hullShape(7.6, 3.2, 2.4), 1.72, 3, hullWhite, X0 + 1.8, Z, false);
   hullPiece(hullShape(7.64, 3.24, 2.42), 2.15, 2.7, glassDark, X0 + 1.78, Z, false);
   hullPiece(hullShape(8.6, 3.6, 2.6), 3, 3.14, hullWhite, X0 + 1, Z, false);
-  // flybridge on top with a tinted screen, a rail round it, and a radar arch
+  // flybridge and radar arch
   hullPiece(hullShape(4.4, 3, 1.4), 3.14, 3.7, hullWhite, X0 + 2, Z, false);
   hullPiece(hullShape(4.44, 3.04, 1.42), 3.45, 3.62, glassDark, X0 + 1.98, Z, false);
   bowRail(4.4, 3, 1.4, X0 + 2, Z, 3.7, 4.1, 1.2);
@@ -785,7 +773,7 @@ rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
   const radar = new THREE.Mesh(new THREE.CylinderGeometry(.36, .36, .26, 14), hullWhite); radar.position.set(X0 + 2.6, 5.3, Z - .5); add(radar);
   rod([X0 + 2.6, 5.15, Z + .7], [X0 + 2.6, 6.6, Z + .7], blackM, .04);
   rod([X0 + 2.6, 5.15, Z + .95], [X0 + 2.6, 6.1, Z + .95], blackM, .04);
-  // rail round the bow, a flag on the stern, a table and bench on the back deck, and a life ring
+  // bow rail, flag, table, life ring
   bowRail(L - .3, W - .25, BOW - .2, X0 + .12, Z, 1.9, 2.4, L - BOW - 1.6);
   rod([X0 + .2, 1.9, Z + 1.4], [X0 + .2, 3.1, Z + 1.4], chromeM, .04);
   const flag = box(.6, .36, .02, accentM); flag.position.set(X0 - .1, 2.9, Z + 1.4); add(flag);
@@ -796,7 +784,7 @@ rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(.28, .08, 6, 14), plain(0xff7a2a)); ring.rotation.y = Math.PI / 2; ring.position.set(X0 + 1.76, 2.45, Z + 1.05); add(ring);
 }
 
-// an old rowboat turned upside down on the sand, with its oars next to it
+// upside-down rowboat
 {
   const X0 = 13.9, Z = 35.5, L = 4.2, W = 1.7;
   for (const [w, d, y0, y1] of [[4, 1.6, 0, .5], [3.4, 1, .5, .8]]) building.solids.push({ mesh: null, minX: 16 - w / 2, maxX: 16 + w / 2, minZ: Z - d / 2, maxZ: Z + d / 2, bot: y0, top: y1, surf: 'wood' });
@@ -819,17 +807,17 @@ const trunkMat = lam({ map: tex(g => { noise(g, [158, 124, 84], 16); g.fillStyle
 const frondMat = seeThru(tex(g => {
   g.clearRect(0, 0, 16, 16);
   for (let y = 0; y < 16; y++) {
-    const w = y < 2 ? 2 : y > 13 ? 3 : 7; // narrow near the trunk and at the tip
+    const w = y < 2 ? 2 : y > 13 ? 3 : 7;
     for (let x = 8 - w; x < 8 + w; x++) {
-      if ((x + y) % 3 === 0 && Math.abs(x - 7.5) > 1) continue; // gaps between the leaflets
+      if ((x + y) % 3 === 0 && Math.abs(x - 7.5) > 1) continue;
       g.fillStyle = Math.abs(x - 7.5) < 1 ? '#5a7a2a' : `rgb(${60 + (x * 7 + y * 3) % 30},${130 + (x * 5 + y * 11) % 40},${40 + (x * 3) % 20})`;
       g.fillRect(x, y, 1, 1);
     }
   }
 }));
-const frondGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).rotateY(Math.PI).translate(0, 0, .5); // lies flat, sticks out along +z
+const frondGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).rotateY(Math.PI).translate(0, 0, .5); // lies flat along +z
 const PALM_TINTS = [0xffffff, 0xe6f2c8, 0xd4e8b0, 0xf2ffe0];
-function inst(geo, mat, list) { // like instanced(), but things can tip as well: [x, y, z, sx, sy, sz, rx, ry, color]
+function inst(geo, mat, list) { // like instanced(), but things can tip
   const m = new THREE.InstancedMesh(geo, mat, list.length), o = new THREE.Object3D(); o.rotation.order = 'YXZ';
   list.forEach(([x, y, z, sx, sy, sz, rx, ry, c], i) => {
     o.position.set(x, y, z); o.rotation.set(rx, ry, 0); o.scale.set(sx, sy, sz); o.updateMatrix();
@@ -838,7 +826,7 @@ function inst(geo, mat, list) { // like instanced(), but things can tip as well:
   m.computeBoundingSphere(); add(m); return m;
 }
 const trunksIn = [], trunksOut = [], fronds = [], nuts = [], palms = [];
-function palm(x, z, inside, y0 = 0) { // y0 = the height of the ground it grows from
+function palm(x, z, inside, y0 = 0) { // y0 = ground height
   const h = 5.5 + rnd() * 3, a = rnd() * 6.28, lean = .8 + rnd() * 1.6, n = 9, out = inside ? trunksIn : trunksOut, top = y0 + h;
   let tx = x, tz = z; const segs = [];
   for (let i = 0; i < n; i++) {
@@ -848,8 +836,7 @@ function palm(x, z, inside, y0 = 0) { // y0 = the height of the ground it grows 
     segs.push([tx, tz, y0 + h * i / n, y0 + h * (i + 1) / n, s]);
   }
   if (inside) {
-    // the trunk's solids follow its lean: runs of segments within .3 of each other share one box (a few per palm), so you bump into
-    // the trunk where you see it and not into the air beside it. Then the crown you can stand on
+    // trunk solids follow its lean, then the crown
     for (let i = 0; i < n;) {
       let j = i; const xs = [segs[i][0]], zs = [segs[i][1]];
       while (j + 1 < n && Math.max(...xs, segs[j + 1][0]) - Math.min(...xs, segs[j + 1][0]) <= .3 && Math.max(...zs, segs[j + 1][1]) - Math.min(...zs, segs[j + 1][1]) <= .3) { j++; xs.push(segs[j][0]); zs.push(segs[j][1]); }
@@ -870,26 +857,24 @@ function palm(x, z, inside, y0 = 0) { // y0 = the height of the ground it grows 
   palms.push([x, z]);
 }
 const padSpots = M.pads.map(([x, z]) => [x, z, 2.4]).concat(M.crates.map(([x, z]) => [x, z, 1.2]));
-// places on the ground that aren't solids but still shouldn't have trees or grass in them: [x0, x1, z0, z1]
+// spots kept clear of trees and grass
 const NO_GROW = [[PIT[0] - 1, PIT[1] + 1, PIT[2] - 1, PIT[3] + 1]];
 const overlaps = (x, z, r, s) => x + r > s.minX && x - r < s.maxX && z + r > s.minZ && z - r < s.maxZ;
 const free = (x, z, r) => !inPool(x, z, r + .5) && !building.solids.some(s => overlaps(x, z, r, s))
   && !NO_GROW.some(([a, b, c, d]) => overlaps(x, z, r, { minX: a, maxX: b, minZ: c, maxZ: d }))
   && padSpots.every(([px, pz, pr]) => Math.hypot(px - x, pz - z) > pr + r);
-// a palm's fronds spread about 3.5 out from the trunk, a couple of blocks up, so keep it away from anything tall
-// enough to poke through them (walls, roofs, umbrellas)
-// (taken before any palms go in, so their own crowns don't count)
+// keep palms away from tall things
 const tallThings = [...building.solids, ...later];
 const roomAbove = (x, z, y0) => !tallThings.some(s => (s.top ?? 99) > y0 + 2.5 && overlaps(x, z, 3.5, s));
-// a palm needs dry land with the same height all round it, so the trunk doesn't stand on the edge of a step
+// palms need flat dry land
 const flatDry = (x, z) => { const h = hAt(x, z); for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) { const k = kindAt(x + a, z + b); if (k < SAND || hAt(x + a, z + b) !== h) return false; } return true; };
 for (let tries = 0, k = 0; k < 30 && tries < 4000; tries++) {
   const x = (rnd() * 2 - 1) * (RA - 2), z = (rnd() * 2 - 1) * (RA - 2);
   if (!flatDry(x, z) || Math.hypot(x, z) < 5 || !free(x, z, 1.4) || !roomAbove(x, z, hAt(x, z)) || onPath(x, z, 1.2) || palms.some(([a, b]) => Math.hypot(a - x, b - z) < 5.5)) continue;
-  if (Math.abs(x - LX) < 6.5 && Math.abs(z - LZ) < 6.5) continue; // not under the gallery
+  if (Math.abs(x - LX) < 6.5 && Math.abs(z - LZ) < 6.5) continue;
   palm(x, z, true, hAt(x, z)); k++;
 }
-// groves: patches where the palms grow close together, with tall ferns under them. [x, z, radius]
+// groves: [x, z, radius]
 const GROVES = [[-16, -31, 7], [14, -34, 6], [-20, 30, 7.5], [-11, 22, 4.5], [26, 27, 4.5]];
 for (const [gx, gz, gr] of GROVES) {
   for (let tries = 0, k = 0; k < Math.round(gr * 1.4) && tries < 900; tries++) {
@@ -898,25 +883,24 @@ for (const [gx, gz, gr] of GROVES) {
     palm(x, z, true, hAt(x, z)); k++;
   }
 }
-// little islands out at sea, each with a few palms
+// little islands
 const isleMat = lam({ map: tex(drawSand, 6, 6) });
 for (const [x, z, r] of [[92, -48, 7], [-78, 74, 6], [-96, -36, 8], [34, 104, 5], [-30, -100, 6]]) {
   const isle = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 2, SEA_D + .4, 12), isleMat); isle.position.set(x, (.4 - SEA_D) / 2, z); add(isle);
   const n = 2 + (r > 6 ? 2 : 1);
   for (let i = 0; i < n; i++) { const a = rnd() * 6.28, d = rnd() * (r - 2); palm(x + Math.cos(a) * d, z + Math.sin(a) * d, false, .4); }
 }
-M.palms = palms; M.trunks = trunksIn; // the trunk segments drawn inside the map, for the map checks (test/maps.mjs)
-M.cell = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? { kind: kind[at(i, j)], h: H[at(i, j)], paved: !!PATH[at(i, j)] } : null; }; // what the island is at a point
-building.cover.push(inst(unit, trunkMat, trunksIn)); // bullets stop on the trunks inside the map, not on the leaves
+M.palms = palms; M.trunks = trunksIn;
+M.cell = (x, z) => { const i = ci(x), j = ci(z); return inGrid(i, j) ? { kind: kind[at(i, j)], h: H[at(i, j)], paved: !!PATH[at(i, j)] } : null; };
+building.cover.push(inst(unit, trunkMat, trunksIn)); // bullets stop on trunks, not leaves
 inst(unit, trunkMat, trunksOut); inst(frondGeo, frondMat, fronds); inst(unit, plain(0xffffff), nuts);
 
-// grass tufts on the lawn and up the hills (not in the volleyball pit or the pool)
+// grass tufts
 const tufts = [];
 function tuft(x, z, s, tall = 1) {
   if (kindAt(x, z) !== GRASS || x > PIT[0] - .5 && x < PIT[1] + .5 && z > PIT[2] - .5 && z < PIT[3] + .5 || !free(x, z, .4)) return;
   const h = hAt(x, z), hw = .55 * s, i0 = ci(x), j0 = ci(z);
-  // the tuft can face any way, so it reaches hw out in every direction. Skip it if that would hang off a terrace or poke into one,
-  // or reach onto the path
+  // skip tufts that hang off a step or reach the path
   for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
     const i = i0 + a, j = j0 + b, nx = i - O, nz = j - O;
     if (inGrid(i, j) && H[at(i, j)] === h && kind[at(i, j)] === GRASS && !PATH[at(i, j)]) continue;
@@ -925,15 +909,14 @@ function tuft(x, z, s, tall = 1) {
   tufts.push([x, h, z, 1.1 * s, .8 * s * tall, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
 }
 for (let tries = 0; tufts.length < 600 && tries < 9000; tries++) tuft(-O + rnd() * N, -O + rnd() * N, .6 + rnd() * .6);
-for (const [gx, gz, gr] of GROVES) for (let k = 0; k < gr * 14; k++) { // ferns: bigger and taller, thick in the groves
+for (const [gx, gz, gr] of GROVES) for (let k = 0; k < gr * 14; k++) { // ferns
   const a = rnd() * 6.28, d = Math.sqrt(rnd()) * gr;
   tuft(gx + Math.cos(a) * d, gz + Math.sin(a) * d, 1 + rnd() * .7, 1.35);
 }
 grassTufts(tufts);
 
 building.solids.push(...later);
-// the hills as solids you stand on: for each terrace height, the cells at least that high merged into rectangles.
-// Added last so the palms and tufts above could still be placed on them
+// hill solids, added last
 for (let L = .5; L <= 8; L += .5) {
   const used = new Uint8Array(N * N), on = (i, j) => inGrid(i, j) && H[at(i, j)] >= L && !used[at(i, j)];
   let any = false;
@@ -950,26 +933,25 @@ for (let L = .5; L <= 8; L += .5) {
 // --- sky ---
 addSky(rnd, [12, 17, -32], 16, 50, 160, 40, 58);
 
-// the ground under your middle: the sea and the pool go down to their floor, so you drop in when you step off the edge
+// ground height, the sea and pool drop to their floor
 M.floor = (x, z) => inPool(x, z) ? POOL_F : kindAt(x, z) === SEA ? seaFloor(ci(x), ci(z)) : 0;
-// only the deepest step of the sea (out past the 1- and 2-block shallows) drowns you, once you're half a block under. The pool doesn't
+// only the deep sea drowns you
 M.sea = (x, z, feet) => !inPool(x, z) && kindAt(x, z) === SEA && feet < WATER_Y - .5;
 M.water = (x, z, feet) => M.sea(x, z, feet) && seaFloor(ci(x), ci(z)) <= -SEA_D;
-// below the pool's or the shallows' surface: for the splash going in, and the blue tint when your eyes are under
+// underwater, for the splash and blue tint
 M.wet = (x, z, y) => inPool(x, z) ? y < POOL_Y : kindAt(x, z) === SEA && y < WATER_Y && !M.water(x, z, y);
-M.trapped = POOL_LOW; // in the pool: bots use the steps to get out even while they can see their target
-// a building's stairs, door or steps out of the pool on the way to a target. Whichever building the walker is in comes first
+M.trapped = POOL_LOW; // bots use the steps to get out
+// routes through doors, stairs and pool steps
 const lhNav = M.nav;
-// and round the pool if it's in the way of that (unless the target is in it)
 M.around = (p, t) => POOL_LOW(t) ? null : poolAround(p, t);
 M.nav = (p, t) => {
   const w = poolNav(p, t) ?? (hotelPlace(p) !== 'out' ? hotelNav(p, t) : lhNav(p, t) ?? hotelNav(p, t));
   return (POOL_LOW(t) ? null : poolAround(p, w ?? t)) ?? w;
 };
-// footsteps: the sand and the lawn on the ground
+// footsteps
 M.surfAt = (x, z, y, base, s) => {
   if (s) return base;
-  if (Math.abs(x - LX) < LI && Math.abs(z - LZ) < LI || inPool(x, z) || inside(x, z)) return 'stone'; // the lighthouse's and hotel's ground floors, the pool floor
+  if (Math.abs(x - LX) < LI && Math.abs(z - LZ) < LI || inPool(x, z) || inside(x, z)) return 'stone'; // stone floors
   if (x > PIT[0] && x < PIT[1] && z > PIT[2] && z < PIT[3]) return 'sand';
   if (onPath(x, z)) return 'stone';
   return kindAt(x, z) === GRASS ? 'grass' : 'sand';

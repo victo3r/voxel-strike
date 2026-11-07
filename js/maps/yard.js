@@ -2,18 +2,18 @@ startMap('yard', {
   name: 'The Yard', size: 'small', half: 24,
   env: { sky: 0x87ceeb, fog: 0x87ceeb, fogNear: 35, fogFar: 120, hemiSky: 0xffffff, hemiGround: 0x556633, hemi: 1.1, sunColor: 0xffffff, sun: 1.3, sunDir: [10, 20, 5] },
   pads: [[12, 0], [-12, 0], [0, 12], [0, -12]],
-  // [x, z, tall] (tall: 1 = double-height crate)
+  // [x, z, tall]
   crates: [[-20, 17, 1], [-11.5, 9, 0], [-7, 10, 0], [1.5, 7.5, 0], [12.5, -10.5, 0], [8.5, 8, 1], [7.5, -1.5, 0], [12.5, -15, 0], [17, 7.5, 0],
     [3, 16.5, 0], [-5, -6.5, 0], [-6.5, -14, 1], [-3, -8, 0], [15, -17.5, 1], [-3, -12.5, 0], [-18, -5.5, 0], [6.5, 17, 0], [-13.5, -4, 1]],
 });
 {
-const YA = 24; // arena half-size (where the fence is)
-const G = 160; // how far the ground goes out; the fog hides the edge
+const YA = 24; // fence line
+const G = 160;
 addGround(G, lam({ map: tex(g => noise(g, [90, 160, 60], 40), G * 2, G * 2) }));
 addWall(0, -YA, YA * 2 + .3, .3); addWall(0, YA, YA * 2 + .3, .3);
 addWall(-YA, 0, .3, YA * 2 + .3); addWall(YA, 0, .3, YA * 2 + .3);
 
-const FH = 2.6, GATE = 2.2; // chain-link height (barbed wire sits above it), half-width of the gate gap
+const FH = 2.6, GATE = 2.2; // fence height, half gate width
 const metal = lam({ color: 0x8a9099 }), darkMetal = lam({ color: 0x4a4f55 });
 const chainMat = (rx, ry) => seeThru(tex(g => { g.fillStyle = '#b4bcc4'; for (let i = 0; i < 16; i++) { g.fillRect(i, i, 1, 1); g.fillRect(15 - i, i, 1, 1); } }, rx, ry));
 const barbMat = rx => seeThru(tex(g => {
@@ -31,7 +31,7 @@ function fenceRun(x1, z1, x2, z2, chain = true) {
   const n = Math.max(1, Math.round(len / 3)); for (let i = 0; i <= n; i++) postSpots.push([x1 + (x2 - x1) * i / n, z1 + (z2 - z1) * i / n]);
 }
 fenceRun(-YA, YA, YA, YA); fenceRun(YA, -YA, YA, YA); fenceRun(-YA, -YA, -YA, YA);
-fenceRun(-YA, -YA, -GATE, -YA); fenceRun(GATE, -YA, YA, -YA); fenceRun(-GATE, -YA, GATE, -YA, false); // barbed wire runs over the gate too
+fenceRun(-YA, -YA, -GATE, -YA); fenceRun(GATE, -YA, YA, -YA); fenceRun(-GATE, -YA, GATE, -YA, false);
 const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(.14, FH + 1.05, .14), metal, postSpots.length);
 postSpots.forEach(([x, z], i) => { dummy.position.set(x, (FH + 1.05) / 2, z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); posts.setMatrixAt(i, dummy.matrix); });
 add(posts);
@@ -51,14 +51,14 @@ const dirt = new THREE.MeshLambertMaterial({ map: tex(g => noise(g, [135, 105, 7
 const road = new THREE.Mesh(new THREE.PlaneGeometry(4.5, G - YA), dirt); road.rotation.x = -Math.PI / 2; road.position.set(0, .02, -YA - (G - YA) / 2); add(road);
 
 const wood = lam({ map: tex(g => { noise(g, [115, 82, 50], 25); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 5, 16, 1); g.fillRect(0, 11, 16, 1); }) });
-const TX = YA + 5, TZ = -YA - 5, TH = 7; // tower spot and platform height
+const TX = YA + 5, TZ = -YA - 5, TH = 7; // watch tower
 const tower = new THREE.Group(); tower.position.set(TX, 0, TZ); add(tower);
 const tw = (w, h, d, x, y, z, m = wood) => { const b = box(w, h, d, m); b.position.set(x, y, z); tower.add(b); return b; };
-for (const sx of [-1.4, 1.4]) for (const sz of [-1.4, 1.4]) { tw(.35, TH, .35, sx, TH / 2, sz); tw(.22, 2.3, .22, sx, TH + 1.45, sz); } // legs + roof posts
+for (const sx of [-1.4, 1.4]) for (const sz of [-1.4, 1.4]) { tw(.35, TH, .35, sx, TH / 2, sz); tw(.22, 2.3, .22, sx, TH + 1.45, sz); }
 const brLen = Math.hypot(2.8, 3.2), brA = Math.atan2(2.8, 3.2);
 for (const yc of [1.8, 5.2]) for (const s of [-1.4, 1.4]) for (const d of [-1, 1]) {
-  tw(.14, brLen, .14, 0, yc, s).rotation.z = brA * d; // X braces on the north/south faces
-  tw(.14, brLen, .14, s, yc, 0).rotation.x = brA * d; // and the east/west faces
+  tw(.14, brLen, .14, 0, yc, s).rotation.z = brA * d; // braces
+  tw(.14, brLen, .14, s, yc, 0).rotation.x = brA * d;
 }
 tw(3.8, .3, 3.8, 0, TH + .15, 0);
 for (const s of [-1.84, 1.84]) { tw(3.8, .9, .12, 0, TH + .75, s); tw(.12, .9, 3.8, s, TH + .75, 0); }
@@ -72,7 +72,7 @@ const lampBody = box(.45, .4, .55, darkMetal), lens = box(.36, .3, .05, new THRE
 lens.position.z = .29; lamp.add(lampBody, lens);
 
 const rnd = seeded(1337);
-// gap = how far outside the fence it must be, r = how much room it needs (keeps things off the road and the tower)
+// scenery outside the fence
 const clear = (x, z, gap, r) => Math.max(Math.abs(x), Math.abs(z)) > YA + gap && !(Math.abs(x) < 2.3 + r && z < -YA) && Math.hypot(x - TX, z - TZ) > 2.8 + r;
 function scatter(n, gap, r, R) { const out = []; while (out.length < n) { const x = (rnd() * 2 - 1) * R, z = (rnd() * 2 - 1) * R; if (clear(x, z, gap, r)) out.push([x, z]); } return out; }
 const trunks = [], leaves = [];
@@ -89,7 +89,7 @@ const bushes = [...scatter(40, 1.4, 1.2, 40), ...scatter(60, 4, 1.2, 100)].map((
 instanced(unit, leafMat, bushes);
 grassTufts(scatter(900, .7, .3, 70).map(([x, z]) => { const s = .8 + rnd() * .7; return [x, 0, z, 1.1 * s, 1 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]; }));
 addCrates(MAPS.yard.crates);
-// tall grass inside the fence too (on the detail settings that show it, like the other maps): clear of the pads, the crates and the fence
+// tall grass
 const yardTufts = [];
 for (let tries = 0; yardTufts.length < 300 && tries < 6000; tries++) {
   const x = (rnd() * 2 - 1) * (YA - .9), z = (rnd() * 2 - 1) * (YA - .9), s = .7 + rnd() * .6, hw = .6 * s;
@@ -98,6 +98,6 @@ for (let tries = 0; yardTufts.length < 300 && tries < 6000; tries++) {
   yardTufts.push([x, 0, z, 1.1 * s, .85 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]);
 }
 grassTufts(yardTufts);
-MAPS.yard.tufts = yardTufts.length; // for the map checks
+MAPS.yard.tufts = yardTufts.length;
 addSky(seeded(4242), [3, 17, -36], 14, 45, 140, 38, 52);
 }

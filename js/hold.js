@@ -1,13 +1,9 @@
-// how a character (a bot, or you in the armory) holds a weapon, worked out from its hold (see HOLDS in weapons.js).
-// Everything here is in character pixels (one skin pixel, 32 to a character's height) in the character's own space:
-// it faces +z, its right shoulder is on the -x side. Arms are straight Minecraft arms, so a fist can only be exactly
-// one arm's length from its shoulder. The solver tries arm directions and body turns and keeps the pose that fits
-// the hold's rules best with nothing poking through anything: no gun inside an arm or the body, no arm through the body,
-// arms not crossing, and each fist stopping just outside the grip it holds.
-const SH_R = [-6, 22, 0], SH_L = [6, 22, 0]; // shoulders (character.js buildChar)
-const ARM_LEN = 10, ARM_R = 2.15, FIST_GAP = .2; // shoulder to the end of the fist, an arm's half-width (a bit over, for its corners), gap to the grip
+// works out how bots and the armory character hold each gun
+// (in character pixels, facing +z, right shoulder on -x)
+const SH_R = [-6, 22, 0], SH_L = [6, 22, 0]; // shoulders
+const ARM_LEN = 10, ARM_R = 2.15, FIST_GAP = .2;
 const TORSO = [-4, 12, -2, 4, 24, 2], HEAD = [-4, 24, -4, 4, 32, 4], LEGS = [-4, 0, -2, 4, 12, 2]; // [x0, y0, z0, x1, y1, z1]
-// per hold: right arm angles to try (yaw toward his middle, pitch up) and what it prefers
+// right arm angles to try for each hold type
 const HOLD_RULES = {
   pistol: { yaw: [.05, .4], pitch: [-.35, .1], want: { pitch: -.08, yaw: .15 } },
   melee: { yaw: [.05, .4], pitch: [-.35, .1], want: { pitch: -.1, yaw: .2 } },
@@ -21,17 +17,17 @@ const gunQ = (turn, pitch) => new THREE.Quaternion().setFromEuler(new THREE.Eule
 // distance from a point to a box (0 inside)
 const boxDist = (b, x, y, z) => Math.hypot(Math.max(b[0] - x, 0, x - b[3]), Math.max(b[1] - y, 0, y - b[4]), Math.max(b[2] - z, 0, z - b[5]));
 const inBox = (b, x, y, z, m = .15) => x > b[0] + m && x < b[3] - m && y > b[1] + m && y < b[4] - m && z > b[2] + m && z < b[5] - m;
-// a straight arm from shoulder S along unit d: does it go through his body or head (turned by headYaw)?
+// does an arm go through the body or head?
 function armHitsBody(S, d, headYaw) {
   const c = Math.cos(-headYaw), s = Math.sin(-headYaw);
-  for (let a = 5; a <= ARM_LEN; a += 1) { // the first few pixels sit against his shoulder, like any Minecraft arm
+  for (let a = 5; a <= ARM_LEN; a += 1) {
     const x = S[0] + d.x * a, y = S[1] + d.y * a, z = S[2] + d.z * a;
     if (boxDist(TORSO, x, y, z) < ARM_R - .8 || boxDist(LEGS, x, y, z) < ARM_R - .8) return true;
     if (boxDist(HEAD, x * c + z * s, y, -x * s + z * c) < ARM_R - .3) return true;
   }
   return false;
 }
-// do two arms (shoulders S1, S2, directions d1, d2) run into each other?
+// do the two arms run into each other?
 function armsCross(d1, d2) {
   for (let a = 3; a <= ARM_LEN; a += 1) for (let b = 3; b <= ARM_LEN; b += 1) {
     const dx = SH_R[0] + d1.x * a - SH_L[0] - d2.x * b, dy = SH_R[1] + d1.y * a - SH_L[1] - d2.y * b, dz = SH_R[2] + d1.z * a - SH_L[2] - d2.z * b;
@@ -39,9 +35,7 @@ function armsCross(d1, d2) {
   }
   return false;
 }
-// cells: the gun's outside pixels already moved into character space. How far the fist on an arm from shoulder S along d
-// (fist end at S + d * ARM_LEN) is from the gun: positive = a gap, negative = the gun is inside the arm by that much.
-// Also returns which pixel is nearest
+// gap between a fist and the gun (negative = inside), and the nearest pixel
 function armGap(cells, S, d) {
   let gap = Infinity, near = -1;
   for (let k = 0; k < cells.length; k += 3) {
@@ -51,12 +45,11 @@ function armGap(cells, S, d) {
   }
   return [gap, near];
 }
-const HOLD_V = 1; // bump when the solver changes, so saved poses are worked out again
+const HOLD_V = 1; // bump when the solver changes
 const holdCache = {};
-// the solved poses, worked out ahead of time so nothing has to be solved while you play. A pose whose key no longer matches its model
-// (the model or the solver changed) is solved again in the browser and saved there; paste fresh ones in here when that happens
+// poses solved ahead of time
 const HOLD_BAKED = {"voxel":{"T":[-4.999507225951752,23.962162162162162,9.971555726979133],"q":[-5.202002294619858e-19,0.9987502603949663,-1.0395333140070583e-17,-0.04997916927067831],"dR":[0.09983341664682815,4.163336342344337e-17,0.9950041652780258],"dL":null,"turn":0.1,"key":"voxel:1:782"},"hitman":{"T":[-4.999507225951752,23.962162162162162,9.971555726979133],"q":[-5.202002294619858e-19,0.9987502603949663,-1.0395333140070583e-17,-0.04997916927067831],"dR":[0.09983341664682815,4.163336342344337e-17,0.9950041652780258],"dL":null,"turn":0.1,"key":"hitman:1:1066"},"heatray":{"T":[0.6053638997664856,24.893515985821303,8.790000384259335],"q":[0,0.8775825618903728,0,-0.47942553860420295],"dR":[0.6021629944769967,-0.09983341664682821,0.7921066954666632],"dL":[-0.03936882929446331,0.04501276934877527,0.9982103715527791],"turn":0.9999999999999999,"key":"heatray:1:1361"},"shotgun":{"T":[0.7414040757299662,24.84083130162355,8.21933015558425],"q":[0,0.8525245220595059,0,-0.522687228930659],"dR":[0.6434125828796871,-0.04997916927067839,0.7638863337114382],"dL":[0.17098631358752847,0.18453966468265118,0.967837172630067],"turn":1.0999999999999999,"key":"shotgun:1:777"},"ar":{"T":[1.3228224711347876,25.079430110756284,7.609872020072989],"q":[0,0.8892927216231682,0,-0.4573384471789555],"dR":[0.6962204094818634,-0.09983341664682818,0.710851904647886],"dL":[0.23739131483980747,0.23994654515125505,0.9413134542269138],"turn":0.95,"key":"ar:1:765"},"sniper":{"T":[0.9392109096790309,25.16773037082086,7.972981681239201],"q":[0,0.9004471023526769,0,-0.4349655341112303],"dR":[0.6598225275935204,-0.09983341664682821,0.7447600425645288],"dL":[0.013349690767664407,0.14763307447729568,0.9889521025190193],"turn":0.8999999999999999,"key":"sniper:1:913"},"eradicator":{"T":[0.4971303175691239,13.66550922538754,8.199413312103236],"q":[-0.015863524429421214,0.7725934478102308,-0.01931886112569872,-0.6344087756314406],"dR":[0.2107384169986177,-0.7512804051402926,0.6254335076194388],"dL":[-0.4720789677123661,-0.4626611097190838,0.7503906621201604],"turn":1.3749999999999998,"key":"eradicator:1:924"},"knife":{"T":[-4.232427899449705,20.65283083589054,11.695302546018866],"q":[-0.009341841276862295,0.989408419118104,-0.12432425003286977,-0.07434508076219135],"dR":[0.14869156426260063,-0.09983341664682815,0.9838313410528056],"dL":null,"turn":0.15,"key":"knife:1:592"},"flame":{"T":[1.7396716553991445,24.497297297297298,8.555940976760082],"q":[0,0.8892927216231682,0,-0.4573384471789555],"dR":[0.6631354426633498,-3.469446951953614e-17,0.748499421966165],"dL":[0.16321637089707464,0.2759744123497839,0.9472056482091837],"turn":0.95,"key":"flame:1:828"},"rocket":{"T":[-0.410379544366693,26.005663933764627,7.166530858355576],"q":[0,0.9058136834259365,0,-0.423676257203938],"dR":[0.6440163796955248,-0.024997395914712395,0.7646031865493059],"dL":[-0.11320120798813117,0.0009228947893039295,0.9935716555816373],"turn":0.875,"key":"rocket:1:851"},"flare":{"T":[-4.855607873492845,23.46918590143899,11.405749405674307],"q":[0.0009370545160351008,0.9985747039691013,0.01872547014188566,-0.04997038412721173],"dR":[0.09955276675415414,-0.07492970727274233,0.9922070275903181],"dL":null,"turn":0.1,"key":"flare:1:657"},"thrasher":{"T":[1.3210638693194414,25.07752944960266,7.6455497617481765],"q":[0,0.8775825618903728,0,-0.47942553860420295],"dR":[0.6962204094818634,-0.09983341664682818,0.710851904647886],"dL":[0.2566386284485023,0.30697657738716577,0.9164616714973591],"turn":1,"key":"thrasher:1:1119"},"semisniper":{"T":[1.3147227972195066,25.359635674805208,7.601602126586256],"q":[0,0.8892927216231682,0,-0.4573384471789555],"dR":[0.6977490461889918,-0.07492970727274241,0.7124126665847352],"dL":[0.22191674244463033,0.24113664825064987,0.9447783212443043],"turn":0.95,"key":"semisniper:1:1066"}};
-// a weapon's pose key: changes when its model or the solver does (spaces don't count, so line endings can't change it)
+// pose key: changes when the gun model or the solver does
 const holdSig = w => w.id + ':' + HOLD_V + ':' + GUN_MODELS[w.id].toString().replace(/\s/g, '').length;
 function holdFor(i) {
   const w = BASE[i], key = holdSig(w);
@@ -71,38 +64,33 @@ function solveHoldPose(i) {
   const w = BASE[i], hold = holdOf(w), R = HOLD_RULES[hold], s = 1 / BOT_U; // world units -> character pixels
   const px = gunPx(i), mdl = gunPieces(i, 0).m, raw = gunCells(i), n = raw.length;
   const local = Float32Array.from(raw, v => v * s), pxs = px * s;
-  // is pixel k (an index into cells) part of box b, give or take a pixel
   const inPart = (b, k, slack = 1.2) => Math.abs(local[k] - b[3] * pxs) <= (b[0] / 2 + slack) * pxs && Math.abs(local[k + 1] - b[4] * pxs) <= (b[1] / 2 + slack) * pxs && Math.abs(local[k + 2] - b[5] * pxs) <= (b[2] / 2 + slack) * pxs;
   const G = mdl.grip, F = mdl.fore, two = !!F && hold !== 'pistol' && hold !== 'melee', one = hold === 'pistol' || hold === 'melee';
   const cells = new Float32Array(n), q = new THREE.Quaternion(), tmp = v3(), T = v3();
-  // spots the right arm can aim through: the grip's middle and lower down it, even just under it (a fist is far bigger than a grip,
-  // so it still closes on the grip, and the gun's body and stock ride up above the arm instead of going into it)
+  // where the right fist can grab the grip
   const aims = [0, -.25, -.5, -.75].map(f => v3(G[3], G[4] + f * G[1], G[5]).multiplyScalar(pxs));
-  // spots through the fore the left arm can aim at: a 3x3x3 grid over it, so its fist can land anywhere on the fore's outside
+  // where the left fist can grab the front
   const foreAims = [];
   if (two) for (const fx of [-.4, 0, .4]) for (const fy of [-.4, 0, .4]) for (const fz of [-.4, 0, .4]) foreAims.push(v3(F[3] + fx * F[0], F[4] + fy * F[1], F[5] + fz * F[2]).multiplyScalar(pxs));
   const place = () => { for (let k = 0; k < n; k += 3) { tmp.set(local[k], local[k + 1], local[k + 2]).applyQuaternion(q).add(T); cells[k] = tmp.x; cells[k + 1] = tmp.y; cells[k + 2] = tmp.z; } };
   let best = null, bestC = Infinity;
-  // one pose: the right arm at yaw/pitch, the gun turned by turn. tol = how far off touching the fore the left fist may be
   function tryPose(yaw, pitch, turn, tol) {
     const d = armDir(yaw, pitch), E = v3(...SH_R).addScaledVector(d, ARM_LEN + FIST_GAP);
     if (armHitsBody(SH_R, d, turn)) return;
-    // melee: the knife sticks straight out of the fist, tipped up. Pistol: pointing where the arm points, a bit less up or down
     const gp = hold === 'melee' ? Math.asin(d.y) + .35 : hold === 'pistol' ? Math.asin(d.y) * .5 : hold === 'heavy' ? .05 : 0;
     q.copy(gunQ(turn, gp));
     const c0 = .6 * (pitch - R.want.pitch) ** 2 + (R.want.yaw !== undefined ? .6 * (yaw - R.want.yaw) ** 2 : 0) + .25 * turn * turn;
     if (c0 >= bestC) return;
     const hc = Math.cos(-turn), hs = Math.sin(-turn);
     for (const aim of aims) {
-      // put the grip spot on the arm's line, then slide the gun along it until it's just clear of the fist
+      // slide the gun along the arm until it's just clear of the fist
       T.copy(E).sub(tmp.copy(aim).applyQuaternion(q)); place();
       let [gap, near] = armGap(cells, SH_R, d);
       if (near < 0) continue;
       T.addScaledVector(d, FIST_GAP - gap); place();
       [gap, near] = armGap(cells, SH_R, d);
-      if (near < 0 || Math.abs(gap - FIST_GAP) > .05 || !inPart(G, near)) continue; // the fist has to be on the grip, not some other part
-      // nothing of the gun in his body or head (the head turns to look along the gun), and nothing in front of his face:
-      // a gun goes under his chin or off to the right of his head, never across his eyes. Heavy guns stay low (maxY)
+      if (near < 0 || Math.abs(gap - FIST_GAP) > .05 || !inPart(G, near)) continue;
+      // keep the gun out of the body and away from the face
       let bad = false;
       for (let k = 0; k < n && !bad; k += 3) {
         const x = cells[k], y = cells[k + 1], z = cells[k + 2], hx = x * hc + z * hs, hz = -x * hs + z * hc;
@@ -112,15 +100,15 @@ function solveHoldPose(i) {
       let c = c0 + (aim === aims[0] ? 0 : .05);
       const mz = v3(0, mdl.muzzle[0] * pxs, mdl.muzzle[1] * pxs).applyQuaternion(q).add(T);
       if (R.gunY) c += .03 * (mz.y - R.gunY) ** 2;
-      if (R.rest) { // a shoulder gun lies over his right shoulder: the tube's line passes just above it
+      if (R.rest) { // shoulder guns rest on the right shoulder
         const o = v3().applyQuaternion(q).add(T), ax = v3(0, 0, 1).applyQuaternion(q), p = v3(SH_R[0], SH_R[1] + 2 + 4 * pxs, 0).sub(o);
-        const off = p.sub(ax.multiplyScalar(p.dot(ax))).length(); // rest = how far off the shoulder the tube's line can pass
+        const off = p.sub(ax.multiplyScalar(p.dot(ax))).length();
         if (off > R.rest) continue;
         c += .25 * off * off;
       }
       if (c >= bestC) continue;
       let dL = null;
-      if (two) { // the left fist on the fore: a miss costs more the further it is from touching, no reach at all costs 4
+      if (two) { // left fist on the front of the gun
         let lc = 4;
         for (const fa of foreAims) {
           const dd = tmp.copy(fa).applyQuaternion(q).add(T).sub(v3(...SH_L)).normalize();
@@ -136,7 +124,7 @@ function solveHoldPose(i) {
     }
   }
   const range = (a, b, st) => { const o = []; for (let x = a; x <= b + 1e-6; x += st) o.push(x); return o; };
-  // a coarse pass over everything, then a fine one round the best pose so the fists land right on their grips
+  // coarse pass, then a fine one around the best pose
   for (const yaw of range(...R.yaw, .1)) for (const pitch of range(...R.pitch, .1)) for (const turn of one ? [yaw] : range(...R.turn, .1)) tryPose(yaw, pitch, turn, 1.4);
   const coarse = best;
   if (coarse) {
@@ -147,7 +135,7 @@ function solveHoldPose(i) {
   if (best) delete best.a;
   return best ?? { T: [SH_R[0], 20, 10], q: gunQ(0, 0).toArray(), dR: [0, 0, 1], dL: null, turn: 0 };
 }
-// works out every weapon's hold ahead of time, one per idle moment, so nothing stalls the first time someone pulls one out
+// solve any missing poses in idle time
 {
   const later = window.requestIdleCallback || (f => setTimeout(f, 50));
   let k = 0;

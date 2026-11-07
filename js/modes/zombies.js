@@ -1,26 +1,24 @@
 const zombies = [];
 let wave = 0, toSpawn = 0, spawnT = 0, waveWait = 1.5, kills = 0, coins = 0;
-// the run: perks bought in the shop (each 0-3), what the account earned over it, bosses killed, time since you died, a horde wave,
-// the last countdown number shown. A run pays the account through PAY_WAVES waves, then it's for the high score
+// zombie waves run state
 let runCoins = 0, runXp = 0, bossKills = 0, deadT = 0, horde = false, countShown = 0;
 const perk = { spd: 0, dmg: 0, hp: 0 }, PAY_WAVES = 30, DEAD_T = .9;
-// gun damage is tuned for deathmatch, so zombie hp is scaled by ZHP to keep waves playing the same
+// zombie hp scale, since gun damage is tuned for deathmatch
 const ZHP = .56;
-// hp is a multiplier on the wave's base zombie hp; coins are per kill (headshots add 2 more)
+// zombie types (hp is a multiplier on the wave base)
 const ZTYPES = {
   walker: { hp: 1,   speed: () => Math.min(1.8 + wave * .15, 4.5), scale: 1,    dmg: 10, atk: 1,   coins: 2, shirt: shirtTex },
   runner: { hp: .45, speed: () => Math.min(3.6 + wave * .12, 5.6), scale: .85,  dmg: 6,  atk: .6,  coins: 3, shirt: runShirtTex },
   brute:  { hp: 3.5, speed: () => Math.min(1.1 + wave * .04, 2),   scale: 1.45, dmg: 25, atk: 1.5, coins: 8, shirt: bruteShirtTex, tint: 0x9fb08f },
-  // exploder dmg is the blast damage at point blank
   exploder: { hp: .6, speed: () => Math.min(2.6 + wave * .08, 4.2), scale: .95, dmg: 30, atk: 1, coins: 4, shirt: boomShirtTex, tint: 0xc8ff90, tank: true },
-  // spitters hang back and lob acid at you (dodge sideways); the hive boss does too, and calls runners up out of the ground beside it
+  // spitters lob acid, the hive boss also summons runners
   spitter: { hp: .7, speed: () => Math.min(1.9 + wave * .1, 3.8), scale: 1.05, dmg: 12, atk: 1, coins: 5, shirt: spitShirtTex, tint: 0xd8b0ff, spit: true },
   boss:   { hp: 15,  speed: () => Math.min(2.4 + wave * .05, 3.6), scale: 2.3,  dmg: 30, atk: 1.6, coins: 40, shirt: bossShirtTex, tint: 0xff9a8a, crown: true },
   hive:   { hp: 12,  speed: () => Math.min(1.7 + wave * .04, 2.8), scale: 2.1,  dmg: 20, atk: 1.6, coins: 50, shirt: hiveShirtTex, tint: 0xc890ff, crown: true, spit: true, hive: true },
 };
-const FUSE = .7, BLAST = 3.5; // exploder fuse time and blast radius
-const WIND = .8, CHARGE_T = 1.6, CHARGE_SPD = 12; // boss wind-up time, max charge time, charge speed (you run at 6)
-function pickType() { // runners from wave 3, brutes from 5, exploders from 7, spitters from 9, all get more common later. A horde wave is walkers and runners only
+const FUSE = .7, BLAST = 3.5; // exploder fuse and blast radius
+const WIND = .8, CHARGE_T = 1.6, CHARGE_SPD = 12; // boss charge (you run at 6)
+function pickType() { // tougher types show up in later waves
   const r = Math.random(); let c = 0;
   if (horde) return r < .4 ? 'runner' : 'walker';
   if (wave >= 5 && r < (c += Math.min(.22, .1 + (wave - 5) * .02))) return 'brute';
@@ -46,17 +44,17 @@ function makeZombie(x, z, type) {
     tankMat = lam({ color: 0xdd2222 });
     const tank = box(.34, .44, .18, tankMat); tank.position.set(0, 1.05, -.24); g.add(tank); parts.push(tank); mats.push(tankMat);
   }
-  if (T.crown) { // gold crown, not hittable
+  if (T.crown) {
     const gold = lam({ color: 0xffcc22, emissive: 0x553300 });
     const band = box(.56, .12, .56, gold); band.position.y = 1.91; g.add(band);
     for (const sx of [-.2, 0, .2]) { const sp = box(.1, .16, .1, gold); sp.position.set(sx, 2.05, .23); g.add(sp); }
   }
-  const hp = (60 + wave * 18) * T.hp * ZHP * (horde ? .7 : 1); // a horde is more of them, each a bit weaker
+  const hp = (60 + wave * 18) * T.hp * ZHP * (horde ? .7 : 1); // horde: more zombies, a bit weaker
   const zz = { g, parts, mats, tankMat, pivL, pivR,
     type, hp, maxHp: hp, speed: T.speed(), dmg: Math.round(T.dmg * (1 + wave * .05)), atkRate: T.atk, coins: T.coins, scale: T.scale,
     r: .3 * T.scale, reach: Math.max(1.1, 1.1 * T.scale), t: Math.random() * 6, atk: 0, flash: 0, dead: 0,
     fuse: 0, beepT: 0, chargeT: 2 + Math.random() * 2, charging: 0, wind: 0, stun: 0, glow: 0, cdx: 0, cdz: 0, hitP: false,
-    boss: !!T.crown, spit: !!T.spit, hive: !!T.hive, spitT: 1.5 + Math.random() * 2, windS: 0, sumT: 5 }; // spitT: until its next spit, windS: winding one up, sumT: the hive's next summons
+    boss: !!T.crown, spit: !!T.spit, hive: !!T.hive, spitT: 1.5 + Math.random() * 2, windS: 0, sumT: 5 };
   zz.parts.forEach(p => p.userData.zombie = zz);
   addOutline(zz);
   zombies.push(zz);
@@ -66,112 +64,105 @@ function spawnZombie(type = pickType()) {
   const r0 = .3 * ZTYPES[type].scale;
   for (let tries = 0; tries < 80; tries++) {
     let x, z;
-    if (MAP.water) { x = (Math.random() * 2 - 1) * (A - 2); z = (Math.random() * 2 - 1) * (A - 2); } // the edges are sea: anywhere on dry land
+    if (MAP.water) { x = (Math.random() * 2 - 1) * (A - 2); z = (Math.random() * 2 - 1) * (A - 2); } // anywhere on dry land
     else { const side = Math.random() * 4 | 0, r = (Math.random() * 2 - 1) * (A - 2), e = A - 1.5; x = side === 0 ? -e : side === 1 ? e : r; z = side === 2 ? -e : side === 3 ? e : r; }
     if (!blocked(x, z, r0, 0) && !overWater(x, z, 0) && !poolAt(x, z) && Math.hypot(x - P.pos.x, z - P.pos.z) > (MAP.water ? 14 : 10)) {
       const zz = makeZombie(x, z, type);
-      if (!zz.boss) sfx('zDie', { at: zz.g.position, far: 45, rate: .5, v: .45 }); // a low groan from where it came up, so you know which way to look
+      if (!zz.boss) sfx('zDie', { at: zz.g.position, far: 45, rate: .5, v: .45 }); // a groan so you know where it came up
       return zz;
     }
   }
 }
-// the look and sound of a hit on a zombie or bot: sparks for burn ticks, else a red flash, a splash of blood and a grunt
+// hit effects on a zombie or bot
 function hitFx(zz, point, head, quiet) {
   if (quiet) { burst(point, 0xff7a1a, 2); return; }
   const big = zz.type === 'brute' || zz.boss;
   zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4);
-  // the hit sound comes from whoever got hit (zombies sound lower), so it's quiet when they're far away
   hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
 }
-// quiet = burn damage: small orange sparks, no red flash or hit marker
-// by = the deathmatch bot doing the damage, or null if it's you
-// kind = what did it, for online play (0 bullet, 1 knife, 2 beam tick, 3 flame tick, 4 rocket splash, 5 flare, 6 flare splash),
-// pj = the rocket or flare's id when it was one
+// quiet = burn tick, by = the bot that did it (null = you)
+// kind and pj say what hit it, for online play
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0) {
-  if (!Number.isFinite(dmg)) return; // a bad number here would leave it with NaN health, and then nothing could ever kill it
-  if (zz.type === 'bot' && friendly(by, zz)) return; // team modes: no friendly fire
-  if (net.on && (zz.remote || zz.pid)) { // online: the server owns its health (other players, and the bots the room runs). Show the hit, and claim it
+  if (!Number.isFinite(dmg)) return; // a bad number would make it unkillable
+  if (zz.type === 'bot' && friendly(by, zz)) return; // no friendly fire
+  if (net.on && (zz.remote || zz.pid)) { // online the server owns its health
     if (!quiet) { hitFx(zz, point, head, false); if (!by) hitMarker(head ? 'head' : 'body'); }
-    net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by }); // by: a bot I host did it
+    net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by });
     return;
   }
-  if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // its hat: a helmet can stop a headshot, a hood can halve the hit
-  // boots that add damage (yours, or the bot's that hit it). Health isn't rounded, so even a few % on a small hit counts
-  dmg *= 1 + (by ? by.rec?.fx.dmg ?? 0 : youFx().dmg + perk.dmg * .1); // perk: Sharpshooter from the zombie-waves shop
-  if (zz.type === 'bot') { // bots wear armor like yours: the cut first (armor and boots add up), then the armor bar soaks what's left
+  if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // hats can block or soften headshots
+  // damage boots
+  dmg *= 1 + (by ? by.rec?.fx.dmg ?? 0 : youFx().dmg + perk.dmg * .1); // Sharpshooter perk
+  if (zz.type === 'bot') { // bot armor works like yours
     dmg *= 1 - zz.dr - zz.rec.fx.dr;
     const soak = Math.min(zz.armor, dmg); zz.armor -= soak; zz.hp -= dmg - soak;
   } else zz.hp -= dmg;
   const dies = zz.hp <= 0 && !zz.dead;
-  if (dies) zz.dead = .0001; // marked dead before the effects below, so a problem in a sound or particle can't leave it unkillable
-  if (zz.type === 'bot' && by !== zz) { // remember who's hurting it and how much they've done in the last 2s (not its own rocket)
+  if (dies) zz.dead = .0001; // mark dead first so a broken effect can't make it unkillable
+  if (zz.type === 'bot' && by !== zz) { // recent damage, for kill credit
     const who = by ?? YOU_T;
     if (zz.hitBy !== who || zz.hitByT <= 0) zz.hitDmg = 0;
     zz.hitBy = who; zz.hitByT = 2; zz.hitDmg += dmg;
-    (zz.helpers ??= new Set()).add(by ? by.rec : youRec); // everyone who hurt it this life, for assists (a new bot body each life)
+    (zz.helpers ??= new Set()).add(by ? by.rec : youRec); // for assists
   }
   const big = zz.type === 'brute' || zz.boss;
   hitFx(zz, point, head, quiet);
-  // your hit marker: red if it died (burns too), else gold for a headshot, white for the body. Burn ticks alone don't show one
+  // hit marker: red kill, gold headshot, white body
   if (!by && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
   if (dies) {
     if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); if (zz.boss) bossKills++; }
     if (zz.type === 'bot') botDown(zz, by, head);
     else {
-      if (!by && zz.boss) sfx('killSpecial'); // regular zombies die too often for a kill sound; their death groan is enough
-      if (zz.type === 'exploder') explode(zz); // shooting one still sets it off, so keep your distance
+      if (!by && zz.boss) sfx('killSpecial'); // walkers die too often for a kill sound
+      if (zz.type === 'exploder') explode(zz);
       else if (zz.boss) { sfx('bossRoar', { at: zz.g.position, far: 80, rate: .75 }); banner(`BOSS DOWN!\n+${zz.coins} ${COIN}`, true); }
       else sfx('zDie', { at: zz.g.position, far: 35, rate: big ? .7 : 1 });
     }
   }
 }
-// the look and sound of a hit on you: a grunt (a clank when your armor or helmet took it), and a flash of the screen
-// (silver when the armor took all of it). silver defaults to armorOnly; hurtPlayer keeps them apart (a helmet-stopped headshot clanks but flashes red)
+// hit effects on you (silver flash = armor took all of it)
 function youHitFx(head, armorOnly, silver = armorOnly) {
   hurtSfx(P, armorOnly ? 'armorHit' : head ? 'hurtHead' : 'hurt');
   if (P.hp <= 0) sfx('die');
   $('hit').style.background = silver ? '#c9ced6' : 'red';
   $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
 }
-// pierce = damage that skips armor and hits HP directly. by = the deathmatch bot that shot you. head = it was a headshot
-// kind and pj: what did it, for online play (see hurtZombie)
+// pierce skips armor, by = the bot that shot you
 function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0) {
-  if (respawnT > 0 || matchOver || !pvp() && dead || by && friendly(by, YOU_T)) return; // by = null is your own rocket, that still hurts
-  if (net.on) { // online: the server decides what you took (it comes back as a dmg event). Send the claim (e.g. your own rocket)
+  if (respawnT > 0 || matchOver || !pvp() && dead || by && friendly(by, YOU_T)) return; // your own rocket still hurts
+  if (net.on) { // online the server decides the damage
     net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by });
     return;
   }
-  if (by?.rec) d *= 1 + by.rec.fx.dmg; // a bot in damage boots
-  if (by?.rec) youHelpers.add(by.rec); // for assists, cleared when you respawn
-  const wasHead = head; [d, head] = gearHit(youFx(), d, head); // your hat: Warrior Helmet can stop a headshot, Raider Hood can halve the hit
-  d *= 1 - P.dr - youFx().dr; // worn armor from Amethyst up and Warrior Boots cut every hit, added together (health can go fractional, the HUD rounds it up)
+  if (by?.rec) d *= 1 + by.rec.fx.dmg;
+  if (by?.rec) youHelpers.add(by.rec); // for assists
+  const wasHead = head; [d, head] = gearHit(youFx(), d, head); // hats can block or soften headshots
+  d *= 1 - P.dr - youFx().dr; // armor and boots cut every hit
   const soak = pierce ? 0 : Math.min(P.armor, d);
   P.armor -= soak; P.hp -= d - soak;
-  youHitFx(head, soak === d || wasHead && !head, soak === d); // a headshot your helmet stopped clanks; silver flash = armor took all of it
+  youHitFx(head, soak === d || wasHead && !head, soak === d);
   if (P.hp <= 0 && pvp()) { P.hp = 0; youDown(by); return; }
   if (P.hp <= 0 && !dead) { P.hp = 0; zombiesDead(); }
 }
-// set someone on fire: t seconds of it, dmgPerTick every quarter second. by = who lit them (null = you), gunId = what with
-// ('flame' or 'flare', for online play). max = keep whichever is longer/stronger if they're already burning (a flare does)
+// set someone on fire
 function applyBurn(victim, t, dmgPerTick, by, gunId, max = false) {
-  if (net.on) { net.burn(victim, gunId, by); return; } // online: the server runs the burn
+  if (net.on) { net.burn(victim, gunId, by); return; } // online the server runs the burn
   if (victim === P) { burnYou(t, dmgPerTick, by); return; }
   if (max) { victim.burn = Math.max(victim.burn || 0, t); victim.burnDmg = Math.max(victim.burnDmg || 0, dmgPerTick); }
   else { victim.burn = t; victim.burnDmg = dmgPerTick; }
   victim.burnBy = by;
 }
-// fell into deep water: a splash, then you're out, whatever your HP and armor
-function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 14); } // at the surface, you've already gone under
+// drowning
+function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 14); }
 function drownYou() {
   if (respawnT > 0 || matchOver || dead || P.drowned) return;
   sfx('splash'); splash(P.pos);
   P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0; P.drowned = true;
-  if (net.on) { P.drownFlag = true; return; } // online: you tell the server (a flag in your next packet) and it calls it. You sink meanwhile
+  if (net.on) { P.drownFlag = true; return; } // online the server calls it
   if (pvp()) { youDown(null); return; }
   zombiesDead();
 }
-// after you drown you keep sinking to the bottom, and the screen goes blue once your eyes are under.
-// The same blue when you're alive with your eyes under the pool's surface. Called every frame
+// blue screen when your eyes are underwater
 let underTint = null;
 function drownTick(dt) {
   if (!underTint) { underTint = document.createElement('div'); underTint.style.cssText = 'position:fixed;inset:0;background:#1a6c9c;opacity:.5;pointer-events:none;display:none'; $('hit').before(underTint); }
@@ -183,18 +174,18 @@ function drownTick(dt) {
   const under = show && inWater(P.pos.x, P.pos.z, camera.position.y - .5) || !inLobby && MAP.wet?.(camera.position.x, camera.position.z, camera.position.y);
   underTint.style.display = under ? 'block' : 'none';
 }
-// a bot or zombie in the water. A zombie counts as your kill (you lured it in). A bot's death goes to nobody
+// a bot or zombie drowned (a zombie counts as your kill)
 function drownZombie(z) {
   if (z.dead || z.drownFlag) return;
   sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position); z.drowned = true;
   if (z.type === 'bot') {
-    if (net.on && z.pid) { z.drownFlag = true; return; } // a bot I host online: the flag goes in its next row and the server calls it
+    if (net.on && z.pid) { z.drownFlag = true; return; } // online the server calls it
     z.hp = 0; z.dead = .0001; botDown(z, null, false, true); return;
   }
-  if (z.type === 'exploder') z.boomed = true; // the water puts its fuse out
+  if (z.type === 'exploder') z.boomed = true; // water puts the fuse out
   hurtZombie(z, z.hp + 1, z.g.position.clone(), false, true);
 }
-// high score: best wave reached, ties go to more kills. Saved in the browser like your keybinds.
+// high score: best wave, then kills
 let best = { wave: 0, kills: 0 }, newBest = false;
 try { best = JSON.parse(localStorage.getItem('voxelstrike-best')) ?? best; } catch {}
 function saveBest() {
@@ -208,27 +199,23 @@ function explode(z) {
   z.boomed = true; z.dead ||= .0001; z.g.visible = false;
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
-// an explosion at p: hurts you and every zombie within radius R, less the further away (exploders and rockets both use this)
-// by = the deathmatch bot whose rocket it was: it gets the kills, and takes no more than ROCKET_SELF itself, like you do from yours.
-// rocket = it was a rocket, so it also throws everyone in it (rocket jumping, see launch in combat.js). Exploders don't
-// the look and sound of an explosion at p: sparks, smoke, a growing fireball and a bang
+// explosion effect
 function blastFx(p, R) {
   burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
 }
-// pj = the rocket's id, for online play
 function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
   blastFx(p, R);
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
-  if (net.on) { // online: the server works out who it hurt from your claims. Only your own rocket throws you, right away
+  if (net.on) { // online the server works out who got hurt
     const gun = rocket ? 'rocket' : 'flare', kind = rocket ? 4 : 6;
     if (pd < R && !dead && respawnT <= 0) {
       if (pDmg) net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by });
       if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true);
     }
     for (const o of zombies) {
-      if (o === skip || o.dead || !o.pid) continue; // other players and the room's bots
+      if (o === skip || o.dead || !o.pid) continue; // other players and room bots
       const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
       if (od < R) net.claim(o, { kind, point: c, gun, pj, by });
     }
@@ -247,9 +234,7 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
   }
 }
 
-// the shop between waves. A run starts with your loadout, armor and stars (setupMode in deathmatch.js), so the shop sells what
-// a run can add on top: consumables, perks that last the run, and guns: ones you own but left in the armory come cheap (at their
-// stars), ones you don't own are rented for the run at ★ and can be starred up here. Prices are the run's zombie coins
+// shop between waves
 const SHOP = [
   { name: 'Medkit',  price: 15, heal: 50, desc: '+50 HP' },
   { name: 'Armor Plate', price: 40, armor: 25, desc: `+25 max armor, refills it (cap ${ARMOR_CAP})` },
@@ -269,22 +254,18 @@ const SHOP = [
   { gun: 'eradicator', price: 280, desc: '120 round bullet hose' },
   { gun: 'rocket', price: 450, desc: 'big splash damage' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
-const PERK_MAX = 3, FETCH = .25; // perks stack this many times; a gun you own costs this share of its rent to fetch from the armory
-// the guns on offer: OFFERS a visit, one gun each from OFFERS different categories, picked afresh each wave (openShop).
-// A category's candidates are the guns not in the run, minus its starters once you hold a better gun there (so the default guns
-// stop showing, and a big collection never fills the shop). The categories are drawn with the ones where an offer would be a step up
-// (a higher tier than what you hold: the armory's unlock level, starters are tier 0) three times as likely, and within a category
-// higher tiers are more likely. Yours come at a quarter price, the rest are rented; rentals in the run always show their upgrades
+const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
+// gun offers: one gun from each of a few categories, upgrades more likely
 const OFFERS = 3, tierOf = g => BASE[g].start ? 0 : BASE[g].unlock || 1;
-let shopOffer = []; // SHOP indices of this visit's gun cards
+let shopOffer = [];
 function pickOffers() {
-  const held = {}; // the best tier you hold in each category
+  const held = {};
   BASE.forEach((w, g) => { if (owned[g]) held[w.cat] = Math.max(held[w.cat] ?? -1, tierOf(g)); });
   const cats = {};
   SHOP.forEach((it, i) => {
     if (it.gun === undefined || owned[it.gun]) return;
     const cat = BASE[it.gun].cat;
-    if (BASE[it.gun].start && (held[cat] ?? 0) > 0) return; // a default gun, once you hold something better there
+    if (BASE[it.gun].start && (held[cat] ?? 0) > 0) return; // skip starter guns once you have better
     (cats[cat] ??= []).push(i);
   });
   const pool = Object.entries(cats).map(([cat, list]) => ({ list, w: list.some(i => tierOf(SHOP[i].gun) > (held[cat] ?? -1)) ? 3 : 1 }));
@@ -295,21 +276,21 @@ function pickOffers() {
 }
 const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i));
 let shopOpen = false, shopWave = 0, bonus = 0, armorBought = 0, waveReward = '';
-// each armor plate costs 25 more than the last; a rented gun's stars cost 75% of its rent for ★★ and 125% for ★★★; perks go up by half each time
-const rental = g => owned[g] && !hasGun(g); // in the run on rent: starrable here
+// shop prices go up each time you buy
+const rental = g => owned[g] && !hasGun(g); // rented this run, so it can be upgraded
 const isUpg = it => it.gun !== undefined && rental(it.gun);
 const maxed = it => (isUpg(it) && lvl[it.gun] >= 2) || (it.armor && P.maxArmor >= ARMOR_CAP) || (it.perk && perk[it.perk] >= PERK_MAX);
 const priceOf = it => it.armor ? it.price + armorBought * 25 : it.perk ? Math.round(it.price * (1 + perk[it.perk] * .5)) : isUpg(it) ? Math.round(it.price * (lvl[it.gun] ? 1.25 : .75)) : it.gun !== undefined && hasGun(it.gun) ? Math.ceil(it.price * FETCH) : it.price;
 function renderShop() {
   $('shopInfo').innerHTML = `Wave ${wave} cleared! +${bonus} bonus   ·   <span class="pc">${COIN}${coins}</span>   ·   ${ico('heart')} ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ${ico('shield')} ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
-  // consumables and perks always, then this visit's gun offers, and the upgrades of the rentals in the run
+  // shop items for this visit
   const list = SHOP.map((it, i) => [it, i]).filter(([it, i]) => it.gun === undefined || isUpg(it) || shopOffer.includes(i) && !owned[it.gun]);
   $('items').innerHTML = list.map(([it, i]) => {
     const upg = isUpg(it), done = maxed(it);
     const off = done || (it.heal && P.hp >= P.max) || (it.refill && ammoFull()) || coins < priceOf(it);
     let label = it.name, desc = it.desc, cost = COIN + priceOf(it);
     if (it.gun !== undefined) {
-      const mine = hasGun(it.gun); // yours, left in the armory: cheap, and it comes at its stars
+      const mine = hasGun(it.gun); // yours from the armory: cheap
       label = `<small class="cat">${CATS[slotOf(it.gun)][1]}${mine ? ' · YOURS' : ' · RENT'}</small><br>${label}` + (mine && gunUse(it.gun) ? ` <span class="cat">${starRow(gunUse(it.gun), gunUse(it.gun), 3)}</span>` : '');
     }
     if (upg) {
@@ -326,14 +307,14 @@ function renderShop() {
 function buy(i) {
   const it = SHOP[i], price = priceOf(it); if (coins < price || maxed(it)) return;
   coins -= price;
-  if (isUpg(it)) { // star upgrade on a rental: also refills the mag to the new size
+  if (isUpg(it)) { // upgrading also refills the mag
     const g = it.gun; lvl[g]++; applyLvl(g); ammo[g] = WEAPONS[g].mag;
     if (g === cur) { cancelReload(); buildGun(); renderHotbar(); } else equip(g);
     sfx('upgrade');
   }
   else if (it.gun !== undefined) {
     const g = it.gun;
-    if (hasGun(g)) giveGun(g); // yours: at the stars you use (deathmatch.js)
+    if (hasGun(g)) giveGun(g);
     else { lvl[g] = 0; applyLvl(g); owned[g] = true; ammo[g] = WEAPONS[g].mag; reserve[g] = resMax(g); }
     equip(g);
   }
@@ -346,11 +327,11 @@ function buy(i) {
 function openShop() { shopOpen = true; shopOffer = pickOffers(); renderShop(); document.exitPointerLock(); }
 $('items').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) buy(+b.dataset.i); });
 $('next').addEventListener('click', () => {
-  shopOpen = false; $('shop').style.display = 'none'; waveWait = 3; // the next wave counts down from 3 (main.js)
-  rerollPads(); // so pickups match what you own now (e.g. ammo once you have a 2nd gun, armor once you've bought some)
+  shopOpen = false; $('shop').style.display = 'none'; waveWait = 3;
+  rerollPads(); // so pickups match what you own now
   lockMouse();
 });
-// ---- the end of a run: you're dead, the last moments play out (DEAD_T), then the results screen (the deathmatch one, reused)
+// end of a run
 function zombiesDead() { dead = true; deadT = 0; saveBest(); }
 function zombiesOver() {
   matchOver = true; $('menu').style.display = 'none'; $('banner').style.opacity = 0;
@@ -363,20 +344,20 @@ function zombiesOver() {
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '');
   $('post').style.display = 'flex';
   sfx(newBest ? 'win' : 'lose');
-  setTimeout(cgMidgame, 1500); // CrazyGames: a midgame ad once you've seen how you did (js/crazy.js)
+  setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
   document.exitPointerLock();
 }
-// ---- spit: spitters and the hive lob globs of acid at you. They fly straight with a little drop, and burst on you, the ground or a crate
+// acid spit
 const GLOB_SPD = 13, GLOB_G = 5, globs = [];
 const globGeo = new THREE.BoxGeometry(.28, .28, .28), globMat = lam({ color: 0x8fd83a, emissive: 0x2a5a00 });
 const spitFrom = new THREE.Vector3(), spitTo = new THREE.Vector3();
 function spit(z) {
   const from = spitFrom.set(z.g.position.x, z.g.position.y + 1.45 * z.scale, z.g.position.z), to = spitTo.set(P.pos.x, P.pos.y + 1, P.pos.z);
-  const n = z.type === 'hive' ? 3 : 1; // the hive spits a fan of three
+  const n = z.type === 'hive' ? 3 : 1; // the hive spits three
   for (let k = 0; k < n; k++) {
     const v = to.clone().sub(from), d = Math.max(1, v.length()); v.normalize();
     if (n > 1) { const a = (k - 1) * .2, c = Math.cos(a), sn = Math.sin(a), x = v.x * c - v.z * sn, zz = v.x * sn + v.z * c; v.x = x; v.z = zz; }
-    v.multiplyScalar(GLOB_SPD); v.y += d * GLOB_G / GLOB_SPD * .5; // aimed a touch high so the drop brings it back onto you
+    v.multiplyScalar(GLOB_SPD); v.y += d * GLOB_G / GLOB_SPD * .5; // aim a bit high to make up for the drop
     const m = new THREE.Mesh(globGeo, globMat); m.position.copy(from); scene.add(m);
     globs.push({ m, v, life: 3, dmg: z.dmg });
   }

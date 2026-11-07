@@ -1,9 +1,7 @@
-// Bots never talk on their own. They only answer when you say something (hi, gg, lol, compliments, trash talk,
-// or now and then a plain "?" / "ok" to anything else). Bots with names in another language usually answer in it.
-// The NATO-named bot never talks.
+// bot chat replies (bots only answer, never start)
 let chatting = false, chatQ = [], chatGap = 0;
-const BOT_CHAT = false; // bots answering in chat is off: it gave the same replies every time, and online rooms have real people to talk to
-const CHAT_KEEP = 9; // seconds a line stays up before it fades (they all show while you're typing)
+const BOT_CHAT = false; // off for now: the replies got repetitive
+const CHAT_KEEP = 9; // seconds a line stays up
 const SAY = {
   en: { hi: ['hi', 'hey', 'yo', 'hello', 'sup', 'hii', 'gl hf', 'hey guys', 'heyy'], gg: ['gg', 'gg wp', 'ggs', 'good game', 'gg ez'],
     died: ['nice shot', 'lucky', 'bruh', 'how', 'wow', 'lag', 'ugh', 'nooo', 'who keeps shooting me', 'bro what', 'ok that was clean', 'camper'],
@@ -37,18 +35,17 @@ function chatLine(html) {
 }
 const chatSay = (r, text) => chatLine(`${nameTag(r)}<span>: ${esc(text)}</span>`);
 
-// a bot maybe says something of this kind, after a short human-ish delay. chance = how likely it bothers.
+// a bot maybe replies after a short delay
 function botSay(r, kind, chance = 1, delay = 1 + Math.random() * 2) {
   if (!r || r.you || r.quiet || Math.random() > chance) return;
   const mine = SAY[r.lang] ?? SAY.en, en = SAY.en;
-  // other-language bots switch to English a third of the time
   const pool = (r.lang !== 'en' && Math.random() < .35) || !mine[kind] ? en[kind] : mine[kind];
   if (!pool) return;
   let text = pickN(pool);
   if (Math.random() < .15 && /^[a-z ]+$/.test(text)) text = text.toUpperCase();
   chatQ.push({ r, text, t: delay });
 }
-// each frame (from updateDM): send queued bot lines when they're due, with a gap so they don't all land at once
+// send queued bot lines, spaced out
 function chatTick(dt) {
   chatGap -= dt;
   for (const m of chatQ) m.t -= dt;
@@ -71,7 +68,7 @@ function botsHear(text) {
 }
 
 function openChat() {
-  if (chatting || !pvp() || matchOver && !net.on || !chatOn()) return; // chat turned off: no typing either
+  if (chatting || !pvp() || matchOver && !net.on || !chatOn()) return;
   chatting = true; for (const k in keys) keys[k] = false;
   $('chat').classList.add('open'); $('chatIn').value = ''; $('chatIn').focus();
 }
@@ -89,16 +86,14 @@ $('chatIn').addEventListener('keydown', e => {
   } else if (e.code === 'Escape') { e.preventDefault(); closeChat(); }
 });
 $('chatIn').addEventListener('keyup', e => e.stopPropagation());
-document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement !== renderer.domElement) closeChat(); }); // Esc unlocks the mouse first
-function resetChat() { closeChat(); chatQ = []; chatGap = 0; $('chatLog').innerHTML = ''; reported?.clear(); reportAsk = 0; } // a new match: new player ids
+document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement !== renderer.domElement) closeChat(); }); // Esc unlocks the mouse, so close chat too
+function resetChat() { closeChat(); chatQ = []; chatGap = 0; $('chatLog').innerHTML = ''; reported?.clear(); reportAsk = 0; } // new match, new player ids
 
-// ---- PLAYERS (settings tab, and the pause menu's PLAYERS button online): show chat on or off, and everyone in your online match
-// with MUTE (their chat stops showing for you, until you close the page) and REPORT (pick why; the server saves it with their
-// last chat lines for the owner to read, room.js onReport). Swearing and links are already starred by the server's filter
-const muted = new Set(), reported = new Set(); // muted: names (lowercase); reported: player ids this match
-const chatOn = () => opts.chat && !cgNoChat(); // CrazyGames' own chat setting overrides yours (js/crazy.js)
+// players list: show chat, mute and report
+const muted = new Set(), reported = new Set(); // muted names, reported ids this match
+const chatOn = () => opts.chat && !cgNoChat(); // CrazyGames' chat setting wins
 const chatHidden = name => !chatOn() || muted.has(String(name).toLowerCase());
-let reportAsk = 0; // the player whose REPORT is asking why
+let reportAsk = 0; // whose report is asking why
 const REPORT_WHY = [['chat', 'CHAT'], ['name', 'NAME'], ['cheat', 'CHEATING']];
 function renderPlayers() {
   const list = net.on ? recs.filter(r => !r.you) : [];
@@ -113,7 +108,7 @@ function renderPlayers() {
   }).join('');
 }
 $('plist').addEventListener('click', e => {
-  const b = e.target.closest('button[data-pl]'); if (!b) return; // (+ ADD is friends.js's)
+  const b = e.target.closest('button[data-pl]'); if (!b) return; // + ADD is handled in friends.js
   e.stopPropagation(); sfx('ui');
   const pid = +b.dataset.pid, r = recs.find(r => r.pid === pid), act = b.dataset.pl;
   if (!r) return renderPlayers();

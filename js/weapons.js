@@ -1,18 +1,7 @@
-// one hotbar slot per category. You can own several guns in a category,
-// but only the one in your loadout (picked in the armory, js/armory.js) is in your hotbar during a match.
+// one hotbar slot per category
 const CATS = [['primary', 'PRIMARY'], ['backup', 'BACKUP'], ['melee', 'MELEE'], ['special', 'SPECIAL'], ['sniper', 'SNIPER'], ['premium', 'PREMIUM']];
 const CAT_I = Object.fromEntries(CATS.map(([k], i) => [k, i]));
-// id = permanent name used in saves and code. Never rename or reuse an id, or saved guns point at the wrong weapon.
-//   (the list order and display names can change freely)
-// start = starter weapon: everyone has it in deathmatch from day one, and it can't be upgraded
-// free = you start zombie waves with it (zombie waves sells everything else in its own shop)
-// inf = never runs out of ammo (just the knife)
-// unlock = account level you need before you can buy it in the armory. price = its armory price in account coins
-// mob = mobility out of 100: how fast you run while holding it. 60 is normal speed, and every point is 1% faster or slower
-// hold = how it's carried: pistol, rifle, heavy, shoulder or melee (see HOLDS below)
-// zoom = aiming zooms this many times: through a holo sight on guns that have one, through the scope on scope guns
-// quiet = suppressed: heard from less far away. action = how it fires, shown in its attributes (otherwise automatic or semi-auto)
-// beam = fires a constant beam, dmg every rate seconds while you hold the trigger, out to range. mag = its charge
+// weapon stats (ids are used in saves, never rename them)
 const BASE = [
   { id: 'voxel', hold: 'pistol', name: 'Voxel Gun', cat: 'backup', start: true, free: true, mob: 70, dmg: 20, rate: .26, mag: 12, reload: 1.0, pellets: 1, spread: 0, auto: false, color: 0x444444, len: .3 },
   { id: 'hitman', hold: 'pistol', name: 'Hitman', cat: 'backup', unlock: 3, price: 60, mob: 70, zoom: 2, quiet: true, dmg: 20, rate: .2, mag: 18, reload: 1.1, pellets: 1, spread: 0, auto: false, color: 0x2c2c30, len: .4 },
@@ -22,61 +11,50 @@ const BASE = [
   { id: 'sniper', hold: 'rifle', name: 'Sniper Rifle', cat: 'sniper', start: true, mob: 55, action: 'BOLT ACTION', zoom: 5, dmg: 80, rate: 1.1, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x1a1a1a, len: .9, scope: true },
   { id: 'eradicator', hold: 'heavy', name: 'Eradicator', cat: 'primary', unlock: 12, price: 450, mob: 55, dmg: 9, rate: .05, mag: 120, reload: 2.6, pellets: 1, spread: .012, auto: true, color: 0x777777, len: .7 },
   { id: 'knife', hold: 'melee', name: 'Combat Knife', cat: 'melee', start: true, free: true, inf: true, melee: true, mob: 80, dmg: 35, rate: .4, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xd8dde3, len: .3, model: 'knife' },
-  // flamethrower: short cone that hits everything in front of you and sets it on fire. mag = fuel
   { id: 'flame', hold: 'rifle', name: 'Flamethrower', cat: 'special', start: true, mob: 60, flame: true, dmg: 5, rate: .06, range: 7, mag: 100, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0x555555, len: .5, model: 'flame' },
   { id: 'rocket', hold: 'shoulder', name: 'Rocket Launcher', cat: 'premium', unlock: 6, price: 150, mob: 55, rocket: true, dmg: 150, rate: 1.1, mag: 1, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x4b5b3b, len: .8, model: 'rocket' },
-  // flare gun: burn = damage per quarter second, burnT = seconds
   { id: 'flare', hold: 'pistol', name: 'Flare Gun', cat: 'premium', start: true, mob: 65, flare: true, dmg: 65, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, model: 'flare' },
   { id: 'thrasher', hold: 'rifle', name: 'Thrasher', cat: 'primary', unlock: 2, price: 50, mob: 60, zoom: 3, dmg: 12, rate: .08, mag: 35, reload: 1.5, pellets: 1, spread: .006, auto: true, color: 0x3c3c44, len: .6 },
   { id: 'semisniper', hold: 'rifle', name: 'Semi Auto Sniper Rifle', cat: 'sniper', unlock: 4, price: 100, mob: 55, zoom: 4, dmg: 60, rate: 1 / 1.8, mag: 10, reload: 1.8, pellets: 1, spread: 0, auto: false, color: 0x3e3f44, len: .9, scope: true },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
-const autoFire = w => !!w.auto || w.rate < .25; // holding the trigger keeps shooting: automatics, and anything over 4 shots a second (the Hitman)
+const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
 const W_ID = Object.fromEntries(BASE.map((w, i) => [w.id, i]));
-const gi = id => W_ID[id]; // weapon id -> its index in BASE/WEAPONS
-// star upgrades: getting a gun gives ★, then two flat upgrades to ★★ and ★★★. Kept small on purpose, so stars never make a fight
-// much shorter and a gun from a higher armory level beats a low one maxed out. Every star adds +20% mag size and cuts reload time
-// by 10%, and every star raises its damage per second, by less the faster the gun fires (STAR_DPS: +4% a star at over 6.6 shots a
-// second, +6% at over 2, else +8%). Fast guns (and the beam) get it as fire rate, since a point of damage is a lot on them (the
-// Thrasher stays at 12 and goes 12.5 -> 13 -> 13.5 shots a second); the rest as damage, rounded but always at least +1 a star
-// (the Hitman 20 -> 21 -> 22). One-shot guns (rocket launcher, flare gun) keep their single shot
+const gi = id => W_ID[id];
+// star upgrades, kept small so higher-level guns still win
 const lvl = BASE.map(() => 0); // 0 = ★, 1 = ★★, 2 = ★★★
 const WEAPONS = BASE.map(w => ({ ...w }));
 const STAR_DPS = b => b.rate < .15 ? .04 : b.rate < .5 ? .06 : .08, STAR_MAG = .2, STAR_RELOAD = .1, STAR_FAST = .15;
 const magAt = (b, L) => b.mag === 1 ? 1 : Math.round(b.mag * (1 + STAR_MAG * L));
-// gun i's stats with L upgrades (0 = ★). Bots get their own copy at whatever stars they rolled
+// a gun's stats at a star level
 const statsAt = (i, L) => {
   const b = BASE[i], k = 1 + STAR_DPS(b) * L, fast = b.rate < STAR_FAST;
   return { ...b, dmg: fast ? b.dmg : Math.max(b.dmg + L, Math.round(b.dmg * k)), rate: fast ? +(b.rate / k).toFixed(4) : b.rate, mag: magAt(b, L), reload: +(b.reload * (1 - STAR_RELOAD * L)).toFixed(2) };
 };
 function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, rate: s.rate, mag: s.mag, reload: s.reload }); }
-// starters never have stars; every other gun does (bought in the armory, or rented for a zombie-waves run and starred in its shop)
 const upgradable = i => !BASE[i].start;
 const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
 let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0;
-// camera recoil (combat.js recoilKick, main.js recoilTick): a shot kicks the view up `up` degrees and a little to one side (`side`),
-// then it drifts back down at `back` (1 = a pistol's quick settle; lower is slower: the sniper doesn't kick far but eases back over
-// most of a second, scoped too). Aiming down sights softens a kick by ADS_SOFT. Camera-only: your aim ends up back where it was,
-// but a shot fired mid-kick goes where the camera points. Kept small on purpose, it's for feel. The knife has none
+// camera recoil per gun
 const RECOIL = {
   voxel: { up: 1.4, side: .3, back: 1 }, hitman: { up: 1.1, side: .25, back: 1 }, flare: { up: 2, side: .35, back: .8 },
   ar: { up: .55, side: .25, back: 1 }, thrasher: { up: .5, side: .22, back: 1 }, eradicator: { up: .25, side: .2, back: 1.2 },
   shotgun: { up: 2.8, side: .5, back: .6 }, rocket: { up: 2.6, side: .35, back: .5 },
   sniper: { up: 1.8, side: .2, back: .28 }, semisniper: { up: 1.3, side: .18, back: .4 },
-  heatray: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 }, // every tick while held: a faint tremble
+  heatray: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 },
 };
-const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4; // rise: how fast the view gets to the kick (per second); back: the settle rate at back 1
-const rec = { tp: 0, ty: 0, p: 0, y: 0 }; // where the kick wants the view (pitch/yaw, degrees) and where the view is on its way there
+const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4;
+const rec = { tp: 0, ty: 0, p: 0, y: 0 };
 const ammo = WEAPONS.map(w => w.mag);
 const resMax = i => BASE[i].inf ? Infinity : WEAPONS[i].mag * 4;
 const reserve = WEAPONS.map(w => w.inf ? Infinity : 0);
-const owned = WEAPONS.map(w => !!w.free); // zombie waves starts you with the voxel gun and knife; deathmatch gives you your account's guns
+const owned = WEAPONS.map(w => !!w.free);
 const slotOf = i => CAT_I[BASE[i].cat];
-const slotGun = CATS.map(() => -1); // which weapon each hotbar slot holds (-1 = empty)
+const slotGun = CATS.map(() => -1);
 function resetSlots() { slotGun.fill(-1); BASE.forEach((w, i) => { if (w.free) slotGun[slotOf(i)] = i; }); }
 resetSlots();
-const hasGun = i => !!BASE[i].start || !!prof.guns[BASE[i].id]; // starters are free for everyone, the rest you buy in the armory
-function loadoutGun(cat) { // the gun in your loadout for this category. Falls back to the starter if the save points at something you don't have
+const hasGun = i => !!BASE[i].start || !!prof.guns[BASE[i].id];
+function loadoutGun(cat) { // loadout gun, or the starter
   const i = gi(prof.loadout[cat]);
   return i !== undefined && BASE[i].cat === cat && hasGun(i) ? i : BASE.findIndex(w => w.cat === cat && w.start);
 }
@@ -92,52 +70,32 @@ function renderHotbar() {
 const vm = new THREE.Group(); camera.add(vm); vm.position.set(.32, -.3, -.55);
 const flashMesh = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 }));
 const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
-let gunSpin = null, gunSpinV = 0; // the eradicator's barrel cluster, and how fast it's spinning
-let gunRound = null; // the rocket sitting in the launcher's tube, hidden while it's empty
-let gunHolo = null; // [y, z] of the holo sight's window on the gun in your hands (aiming brings it to the middle of the screen)
-let gunMag = null, gunArmL = null, gunHand = null; // its loose part (see GUN_MODELS: mag) and your left arm (gunHand on one-handed guns): a reload moves them (RELOAD_ANIM)
-const vmRl = {}; // the reload in your hands, for reloadSwap
-// ---- switching guns: the one in your hands goes down, the next comes up, and you can't fire until it's up. drawT = how long that
-// takes in all, .2 s for the lightest (the knife) to .4 s for the heaviest, by the gun's mobility. The first SWAP_DOWN of it is the
-// old gun going down. gunShown = the gun whose model is built (the new one is built at the bottom of the swap)
+let gunSpin = null, gunSpinV = 0;
+let gunRound = null;
+let gunHolo = null;
+let gunMag = null, gunArmL = null, gunHand = null; // parts a reload moves
+const vmRl = {};
+// switching guns (lighter guns come up faster)
 const drawT = w => Math.min(.4, Math.max(.2, .2 + (80 - (w.mob ?? 60)) * .008)), SWAP_DOWN = .35;
-let gunShown = -1, swapOff = 0, swapDown = false, swapLen = .3; // swapOff: how far down the gun is (0 up, 1 off the bottom of the screen)
-// ---- reload animations: what the gun in your hands does while it reloads, as keyframes over the reload (0 = start, 1 = done), so a
-// starred gun's faster reload just plays faster. Each frame is [when, { ... }], everything 0 unless given, easing from one to the next:
-//   x, y, z: the gun moves (metres; +z is back toward you). rx, ry, rz: it turns (radians; rx > 0 tips the muzzle up, rz < 0 rolls
-//     its underside toward the middle of the screen, rz > 0 rolls its right side up)
-//   mx, my, mz: its loose part (gunMag) moves from where it sits, in the gun's own space (my < 0 = down out of the gun)
-//   ay, az: your left arm moves from the fore grip
-//   hand: one-handed guns only: your left hand, holding the loose part from below (1), or down off the screen (0)
-// RELOAD_SWAP[id] = [out, in]: at `out` the spent part lets go and falls away (dropPart: it tumbles to the ground and lies there a
-// moment), and the part on the gun stays hidden until `in`, when the fresh one comes up in your hand. Bots and other players
-// play the same reload on the gun in their hands (holdReload in deathmatch.js), and so does your character in the armory
+let gunShown = -1, swapOff = 0, swapDown = false, swapLen = .3;
+// reload animations, as keyframes from 0 (start) to 1 (done)
 const POSE_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz', 'ay', 'az', 'hand'];
-// a box magazine swapped from below: roll the gun (brought up and in, so you see the mag well), pull the mag a little way out and let it
-// fall, your left hand goes down for a fresh one, brings it up and slaps it home, then a tug on the charging handle
+// box magazine swap
 const magSwap = (roll, drop, lift = .2) => { const h = { rz: roll, rx: lift, y: .06, x: -.07 }; return [[0, {}], [.14, h], [.3, { ...h, my: -drop * .4, ay: -.15 }], [.42, { ...h, my: -drop, ay: -.42 }], [.56, { ...h, my: -drop * .35, ay: -.18 }], [.7, { ...h, y: .07 }], [.74, { ...h, y: .085 }], [.86, { rx: .05, z: .035 }], [.93, { z: -.01 }], [1, {}]]; };
-// shells pushed in one at a time (a dip of the gun and your hand for each), or a bolt gun's rounds: n dips between t0 and t1 on top of pose h
+// rounds pushed in one at a time
 const dips = (h, n, t0, t1, d = .025) => Array.from({ length: n }, (_, i) => { const t = t0 + (t1 - t0) * i / n, w = (t1 - t0) / n; return [[t + w * .45, { ...h, y: (h.y || 0) - d, ay: -.05 }], [t + w * .9, h]]; }).flat();
 const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46] };
 const RELOAD_ANIM = (() => {
-  // a pistol: tipped up, the mag drops free, your left hand brings a fresh one up from below and slaps it in, then racks the slide
   const pistol = roll => { const h = { rx: .45, rz: roll, y: .07, x: -.06 }; return [[0, {}], [.16, h], [.3, { ...h, my: -.26 }], [.31, { ...h, my: -.45 }], [.46, { ...h, my: -.11, hand: 1 }], [.58, { ...h, my: -.09, hand: 1 }], [.66, { ...h, y: .03, hand: 1 }], [.72, { ...h, y: .045, hand: .7 }], [.8, { ...h, y: .02 }], [.86, { rx: .08, z: .04 }], [.93, { z: -.012 }], [1, {}]]; };
   const sg = { rz: -.5, rx: .28, y: -.04 }, bolt = { rz: .3, rx: .1, y: -.03, mz: .09, my: .02 }, box = { rz: -.4, ry: -.22, y: -.05 }, cell = { rx: .38, rz: -.25, y: .02 }, tank = { rz: -.5, rx: .18, y: -.02 };
   return {
     voxel: pistol(-.3), hitman: pistol(-.4), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), semisniper: magSwap(-.35, .38, .16),
-    // the shotgun: rolled over, four shells thumbed in, then the pump racked back and forward (your left hand goes with it)
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
-    // the bolt gun: bolt up and back, rounds pressed in, bolt forward and down
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
-    // the minigun: tipped so its ammo box comes up, the box off and a full one on, the belt slapped in
     eradicator: [[0, {}], [.15, box], [.36, { ...box, my: -.36, ay: -.3 }], [.48, { ...box, my: -.48, ay: -.42 }], [.6, { ...box, my: -.36, ay: -.3 }], [.74, { ...box, y: -.04 }], [.78, { ...box, y: -.015 }], [.9, { y: -.02 }], [1, {}]],
-    // the heat ray: muzzle up, the spent heat cell pulled down out of the body and dropped, a fresh one pushed in until it seats
     heatray: [[0, {}], [.14, cell], [.3, { ...cell, my: -.3, ay: -.3 }], [.42, { ...cell, my: -.42, ay: -.42 }], [.54, { ...cell, my: -.3, ay: -.3 }], [.68, cell], [.72, { ...cell, y: .04 }], [.86, { rx: .05, z: .02 }], [.93, { z: -.01 }], [1, {}]],
-    // the flamethrower: rolled over, the empty tank dropped off its straps, a full one up and twisted tight
     flame: [[0, {}], [.14, tank], [.34, { ...tank, my: -.38, ay: -.3 }], [.46, { ...tank, my: -.5, ay: -.42 }], [.58, { ...tank, my: -.38, ay: -.3 }], [.74, tank], [.8, { ...tank, rz: -.58 }], [.9, { rx: .05 }], [1, {}]],
-    // the launcher: down off your shoulder while the next rocket goes in the front (main.js slides it in), then back up
     rocket: [[0, {}], [.14, { rx: -.32, y: -.1, z: .05 }], [.85, { rx: -.32, y: -.1, z: .05 }], [.94, { rx: .04 }], [1, {}]],
-    // the flare gun: broken open (muzzle down), your left hand comes up with a new flare and pushes it in, snapped shut
     flare: [[0, {}], [.18, { rx: -.75, y: .03 }], [.4, { rx: -.75, y: .03, my: -.4 }], [.52, { rx: -.75, y: .03, my: -.12, hand: 1 }], [.64, { rx: -.75, y: .03, hand: 1 }], [.72, { rx: -.75, y: .03 }], [.84, { rx: .12 }], [1, {}]],
   };
 })();
@@ -149,16 +107,14 @@ function reloadPose(id, k) {
   for (const c of POSE_KEYS) o[c] = (a[c] || 0) + ((b[c] || 0) - (a[c] || 0)) * u;
   return o;
 }
-// the spent part leaving and the fresh one arriving (RELOAD_SWAP), for whoever reloads: st keeps where the last frame was (st.rk),
-// k = how far through the reload (-1 = not reloading), part = the gun's loose part, sc = the scene it falls into
+// drop the old mag and show the new one partway through a reload
 function reloadSwap(st, id, k, part, sc) {
   const S = RELOAD_SWAP[id], was = st.rk ?? -1; st.rk = k;
   if (!part || !S) return;
   if (k >= S[0] && was < S[0] && was >= 0) dropPart(part, sc);
   part.visible = !(k >= S[0] && k < S[1]);
 }
-// a copy of a gun part let go: it tumbles down (sideways a little), lands on the ground, lies there for DROP_LIE seconds and shrinks
-// away. Its meshes share the gun's geometry, so nothing needs freeing
+// dropped mags: fall, lie on the ground a moment, shrink away
 const drops = [], DROP_LIE = 2.5, _dp = new THREE.Vector3(), _dq = new THREE.Quaternion(), _ds = new THREE.Vector3();
 function dropPart(part, sc, floor) {
   part.updateWorldMatrix(true, false);
@@ -172,7 +128,7 @@ function dropPart(part, sc, floor) {
 function dropTick(dt) {
   for (let i = drops.length - 1; i >= 0; i--) {
     const d = drops[i], m = d.m;
-    if (d.lie > 0) { // on the ground: still, then shrinking away
+    if (d.lie > 0) {
       if ((d.lie += dt) > DROP_LIE) { const k = 1 - (d.lie - DROP_LIE) / .3; if (k <= 0) { d.sc.remove(m); drops.splice(i, 1); continue; } m.scale.setScalar(d.s * k); }
       continue;
     }
@@ -182,7 +138,7 @@ function dropTick(dt) {
   }
 }
 function clearDrops(sc) { for (let i = drops.length - 1; i >= 0; i--) if (!sc || drops[i].sc === sc) { drops[i].sc.remove(drops[i].m); drops.splice(i, 1); } }
-// where a gun part's pixels sit round its own pivot (the middle of its box), for hands that hold it
+// middle of a gun part, for hands that hold it
 function partMid(part) {
   if (part.userData.mid) return part.userData.mid;
   const b = new THREE.Box3();
@@ -190,30 +146,21 @@ function partMid(part) {
   part.userData.half = b.isEmpty() ? [0, 0, 0] : b.getSize(new THREE.Vector3()).multiplyScalar(.5).toArray();
   return part.userData.mid = b.isEmpty() ? new THREE.Vector3() : b.getCenter(new THREE.Vector3());
 }
-// a part's box in its gun's space, the way vmArm takes a grip: { c: middle, h: half sizes }
 const partBounds = part => { const m = partMid(part); return { c: [part.position.x + m.x, part.position.y + m.y, part.position.z + m.z], h: part.userData.half }; };
 
-// gun models are voxel pixel art. Every size and spot in GUN_MODELS is in gun pixels, GPX world units each (times GUN_SCALE).
-// Guns point down -z with the grip near the origin. The pieces are filled into a grid of pixels (later pieces paint over
-// earlier ones), and only the outside of that grid is drawn, one little square per pixel with a touch of shading.
-// A pixel turns black where the surface folds away round an outside corner, so the black outline is part of the pixel art.
-// Anything 2 pixels across is all outline, so a part that should show its color needs to be 3 or more pixels across
-// (4 to show 2 rows of color). Glowing pixels (lenses, flames) are never black.
-// Sizes should be whole pixels, and a box with an odd size should sit on a half pixel so it lines up with the grid
+// voxel models: boxes filled into a pixel grid, edges drawn black
 const GPX = .02, GUN_SCALE = { knife: .75 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
-const gunPal = [null], gunPalI = {}; // palette index -> { c: color, glow }
+const gunPal = [null], gunPalI = {};
 function palIdx(col, glow = false) {
   const k = (glow ? 'g' : '') + col;
   if (gunPalI[k] === undefined) gunPalI[k] = gunPal.push({ c: new THREE.Color(col), glow }) - 1;
   return gunPalI[k];
 }
-// each face: its normal, then two edges along it with a × b = normal, so the squares face outward
 const VOX_FACES = [
   [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]], [[0, 1, 0], [0, 0, 1], [1, 0, 0]],
   [[0, -1, 0], [1, 0, 0], [0, 0, 1]], [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [0, 1, 0], [1, 0, 0]],
 ];
-const VOX_RING = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]; // the 8 pixels round one on a face
-// fills pieces ([w, h, d, palette index, x, y, z] boxes centered on x, y, z) into a grid of pixels
+const VOX_RING = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 function voxelGrid(pieces) {
   const boxes = pieces.map(([w, h, d, m, x, y, z]) => [Math.round(x - w / 2), Math.round(y - h / 2), Math.round(z - d / 2), Math.round(x + w / 2), Math.round(y + h / 2), Math.round(z + d / 2), m]);
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
@@ -224,19 +171,18 @@ function voxelGrid(pieces) {
   const at = (x, y, z) => x < 0 || y < 0 || z < 0 || x >= NX || y >= NY || z >= NZ ? 0 : cell[(z * NY + y) * NX + x];
   return { lo, NX, NY, NZ, cell, at };
 }
-// the drawn surface of a set of pieces, px = world units per gun pixel. Returns { lit, glow } geometries (either can be null)
+// turn a model's pixels into geometry
 function voxelGeos(pieces, px) {
   const { lo, NX, NY, NZ, cell, at } = voxelGrid(pieces);
-  const out = { lit: [[], [], []], glow: [[], [], []] }; // positions, normals, colors
-  const CORNER = [0, 1, 2, 0, 2, 3], ca = [0, 1, 1, 0], cb = [0, 0, 1, 1]; // the two triangles of a square, and each corner's steps along a and b
+  const out = { lit: [[], [], []], glow: [[], [], []] };
+  const CORNER = [0, 1, 2, 0, 2, 3], ca = [0, 1, 1, 0], cb = [0, 0, 1, 1];
   for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
     const m = cell[(z * NY + y) * NX + x]; if (!m) continue;
     const P = gunPal[m];
     for (let f = 0; f < 6; f++) {
       const [n, a, b] = VOX_FACES[f];
       if (at(x + n[0], y + n[1], z + n[2])) continue;
-      // black where the face runs off an edge of the shape (not in the corners where one part sits against another). The pixels
-      // diagonally off an edge count too: without them the inside corners of a rim (round a hole, say) stay coloured and the line breaks
+      // black outline wherever the surface turns an outside corner
       let black = false;
       for (let e = 0; e < 8 && !black && !P.glow; e++) {
         const sa = VOX_RING[e][0], sb = VOX_RING[e][1];
@@ -245,7 +191,7 @@ function voxelGeos(pieces, px) {
       let r = 0, g = 0, bl = 0;
       if (!black) {
         const h = Math.imul(x * 73856093 ^ y * 19349663 ^ z * 83492791 ^ (f + 1) * 2654435761, 1597334677) >>> 0;
-        const sh = P.glow ? 1 : .82 + (h % 1000) / 1000 * .18; // one shade per pixel, like a texture
+        const sh = P.glow ? 1 : .82 + (h % 1000) / 1000 * .18;
         r = P.c.r * sh; g = P.c.g * sh; bl = P.c.b * sh;
       }
       const [pos, nor, col] = out[P.glow ? 'glow' : 'lit'];
@@ -268,20 +214,7 @@ function voxelGeos(pieces, px) {
   return { lit: geo(out.lit), glow: geo(out.glow) };
 }
 
-// HOLDS: every weapon has a hold, and the hold decides how it's carried in first person, by bots and in the armory,
-// so a new weapon only needs a hold and its grip (and fore) boxes to be held right:
-//   pistol   one hand. The arm points straight out and the gun sits at the end of the fist
-//   rifle    two hands, up at the shoulder: right fist on the grip, left fist on the fore (handguard, pump)
-//   heavy    two hands, low at the hip (miniguns)
-//   shoulder a big tube resting over the right shoulder, held by two grips near its front
-//   melee    in one fist, sticking straight out of the end of it and tipped up a little
-// Fists never go inside a weapon: they stop just outside the grip, so the weapon looks attached to the end of the hand.
-// Two-handed holds turn the body sideways (like a real shooting stance) when that's what it takes for the left hand to reach.
-//
-// each model returns, in gun pixels: muzzle [y, z], grip = [w, h, d, x, y, z] the box the right fist holds,
-// fore = the box the left fist holds (null on one-handed weapons), bands = z spots for the gold upgrade bands
-// and band = [width, height, y] for them, plus sub-parts that move on their own: spin (the eradicator's barrels), round (the loaded
-// rocket) and mag (what a reload handles: a magazine, the sniper's bolt, the shotgun's pump, an ammo box, a heat cell, a fuel tank)
+// gun models (grip and fore are where the hands go)
 const GUN_MODELS = {
   voxel({ p, mat, dark, glow, sub, at }) {
     const teal = glow(0x2ee6d6), grip = mat(0x3a3a3e);
@@ -344,7 +277,6 @@ const GUN_MODELS = {
     p(4, 8, 4, dk, 0, -9, -8); // front handle
     return { muzzle: [0, -35], grip: [4, 10, 3, 0, -1, 11.5], fore: [2, 4, 10, 0, 7, -5], bands: [-2, -5], band: [12, 12, 0], spin, mag }; // left hand on the carry handle
   },
-  // edge along the bottom, straight spine along the top, the edge curving up to meet it at the tip
   knife({ p, mat }) {
     const brown = mat(0x5a3a1a), dbrown = mat(0x3a2412), steel = mat(0x8a8f96), blade = mat(0xc4cad2);
     p(4, 4, 8, brown, 0, 1, 0); for (const z of [-2.5, 2.5]) p(4, 4, 1, dbrown, 0, 1, z); // handle and its wraps, a pixel up so it lines up with the blade
@@ -368,7 +300,6 @@ const GUN_MODELS = {
     p(4, 7, 4, dk, 0, -7.5, -16); // front handle
     return { muzzle: [0, -28], grip: [4, 8, 5, 0, -7, 1.5], fore: [8, 15, 7, 0, -3.5, -16.5], bands: [-7, -1], band: [8, 8, 0], mag }; // fore: the front handle and the shroud above it
   },
-  // held by two grips near the front, with the long back end going over your shoulder
   rocket({ p, mat, dark, glow, sub, at }) {
     const olive = mat(0x6f8253), dk = mat(0x45533a), hole = mat(0x101010);
     p(8, 8, 52, olive, 0, 0, 4); // tube
@@ -393,8 +324,6 @@ const GUN_MODELS = {
     p(1, 1, 5, dark, 0, -4.5, -3.5); p(1, 3, 1, dark, 0, -2.5, -6.5); p(1, 2, 1, mat(0x888888), 0, -2, -3.5); // guard and trigger
     return { muzzle: [2, -18], grip: [4, 9, 5, 0, -6.5, .5], fore: null, bands: [-6, -11], band: [8, 8, 2], mag };
   },
-  // a black pistol with a long suppressor and a holo sight on the slide. holo = [y, z] of the middle of the sight's window,
-  // which lines up with the middle of the screen when you aim
   hitman({ p, mat, dark, glow, sub, at }) {
     const slide = mat(0x3a3a40), grip = mat(0x2e2e33), can = mat(0x26262b), ring = mat(0x45454c);
     p(4, 4, 14, slide, 0, 2, -7); p(4, 1, 14, mat(0x55555d), 0, 3.5, -7); // slide and its lighter top
@@ -411,7 +340,6 @@ const GUN_MODELS = {
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -8.5, -2); mg(2, 6, 2, mat(0x8a8a90), 0, -5, -2); // its magazine: the floor plate, and the steel body up inside the grip
     return { muzzle: [2, -34], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -13], band: [6, 8, 1], holo: [7, -6], mag };
   },
-  // a black rifle with orange stripes, a straight box mag, a toothed muzzle brake and a holo sight on the top rail
   thrasher({ p, mat, dark, glow, sub, at }) {
     const body = mat(0x3c3c44), dk = mat(0x2b2b31), acc = mat(0xe0632a), vent = mat(0x141418);
     p(4, 6, 9, dk, 0, 0, 4.5); p(4, 8, 1, dark, 0, -1, 9.5); p(4, 1, 7, acc, 0, .5, 4.5); // stock, butt, stripe
@@ -430,7 +358,6 @@ const GUN_MODELS = {
     p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
     return { muzzle: [1, -38], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 10, 0, 0, -21], bands: [-3, -14], band: [8, 8, 0], holo: [7, -10], mag };
   },
-  // a dark grey semi-auto sniper with tan furniture, a straight box mag, a scope with a green lens and a muzzle brake
   semisniper({ p, mat, dark, glow, sub, at }) {
     const body = mat(0x3e3f44), tan = mat(0xb39a6b), dtan = mat(0x8a744c), vent = mat(0x1a1a1e);
     p(4, 6, 10, tan, 0, -1, 5); p(4, 8, 1, dark, 0, -1, 10.5); p(4, 2, 6, dtan, 0, 3, 4); // stock, butt pad, cheek riser
@@ -447,8 +374,7 @@ const GUN_MODELS = {
     p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0x666666), 0, -4, -5.5); // guard and trigger
     return { muzzle: [1, -46], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 12, 0, 0, -22], bands: [-6, -15], band: [8, 8, 0], mag };
   },
-  // a copper beam rifle. A big magnifying glass lies on top facing the sky to catch sunlight, and the barrel focuses that heat
-  // into the beam: cooling fins down the barrel, a glowing tip, and a glowing heat cell under the body
+  // a magnifying glass on top focuses sunlight into the beam
   heatray({ p, mat, dark, glow, sub, at }) {
     const cop = mat(0xb5652b), dcop = mat(0x7e4220), brass = mat(0xc9a43a), steel = mat(0x6e6e74), wood = mat(0x5a3a22);
     p(4, 6, 8, wood, 0, -.5, 4); p(4, 8, 1, mat(0x3a2414), 0, -1, 8.5); // stock and butt
@@ -469,30 +395,24 @@ const GUN_MODELS = {
     return { muzzle: [.5, -33], grip: [4, 7, 4, 0, -6, -.5], fore: [6, 4, 6, 0, -5, -14], bands: [-6, -10], band: [8, 7, -.5], mag };
   },
 };
-// builds gun i's model into group g with `stars` gold upgrade bands: the same model in your hands, a bot's, and the armory.
-// The geometry is made once per gun and star count and shared (meshes are marked userData.shared, so never dispose them).
-// Returns, in world units: muzzle [y, z], grip and fore boxes (x, y, z center and half sizes, fore null on one-handed weapons),
-// plus spin (the eradicator's barrels) and round (the loaded rocket)
+// shared gun geometry (never dispose meshes marked shared)
 const gunGeoCache = {};
-// every gun pixel also glows a little in its own color, so the side away from the sun still shows its color against the black outline
+// a little glow so the shady side still shows its color
 const gunLit = new THREE.MeshLambertMaterial({ vertexColors: true }), gunGlow = new THREE.MeshBasicMaterial({ vertexColors: true });
 gunLit.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * .45;'); };
 const gunPx = i => GPX * (GUN_SCALE[BASE[i].id] || 1);
-function gunPieces(i, stars) { // runs gun i's model: its pieces, its sub-parts' pieces and what the model returned
+function gunPieces(i, stars) {
   const main = [], subs = [];
   const c = { mat: col => palIdx(col), dark: palIdx(GUN_DARK), glow: col => palIdx(col, true) };
   c.p = (...a) => main.push(a);
-  // a sub-part that moves on its own, with its pieces placed from x, y, z. off = where its pivot sits from there
-  // (the eradicator's barrel cluster is 7 pixels across, so it spins about a half pixel)
+  // a part that moves on its own (barrels, mag, rocket)
   c.sub = (x, y, z, off = [0, 0, 0]) => { const s = { at: [x, y, z], off, list: [] }; subs.push(s); return s; };
   c.at = s => (...a) => s.list.push(a);
   const m = GUN_MODELS[BASE[i].id](c), [bw, bh, by] = m.band, gold = palIdx(0xffcc22);
   for (let s = 0; s < stars; s++) c.p(bw, bh, 2, gold, 0, by, m.bands[s]); // one gold band per upgrade
   return { m, main, subs };
 }
-// hotbar and armory sprites: gun i's 3D model seen side-on from its right, muzzle pointing right, one sprite pixel per gun pixel.
-// Each pixel is the nearest face's color with the same shading and black outline rule as the model, so the sprite always matches it.
-// The canvas is padded to 2:1 so every sprite fits the 2:1 image boxes the same way
+// hotbar and armory sprites, drawn from the 3D model
 const spriteCol = new THREE.Color();
 function gunSprite(i) {
   const { main, subs } = gunPieces(i, 0);
@@ -540,7 +460,7 @@ function makeGun(i, g, stars) {
   const sub = s => { if (!s) return null; const grp = new THREE.Group(); grp.position.set(...s.at.map(n => n * px)); add(grp, s.geos); g.add(grp); return grp; };
   return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin: sub(b.spin), round: sub(b.round), mag: sub(b.mag), holo: b.m.holo && b.m.holo.map(n => n * px) };
 }
-// the solid pixels on the outside of gun i (with no upgrade bands), as x, y, z centers in world units, for keeping arms out of it
+// the gun's outer pixels, for keeping arms out of it
 const gunCellCache = {};
 function gunCells(i) {
   if (gunCellCache[i]) return gunCellCache[i];
@@ -552,8 +472,7 @@ function gunCells(i) {
       out.push((x + lo[0] + .5) * px, (y + lo[1] + .5) * px, (z + lo[2] + .5) * px);
   return gunCellCache[i] = new Float32Array(out);
 }
-// how far along dir (a unit vector) from point c a fist's end has to be so no part of the gun lies in an arm of radius r
-// running from there along dir, plus a small gap: the fist stops just outside the gun instead of going into it
+// push a fist out until it's just outside the gun
 function fistOut(cells, c, dir, r, gap) {
   let t = 0;
   for (let k = 0; k < cells.length; k += 3) {
@@ -563,34 +482,29 @@ function fistOut(cells, c, dir, r, gap) {
   return t + gap;
 }
 const holdOf = w => w.hold;
-// a knife swing: t = 0 to 1 over the swing, back to where the arm is (0 = held, below 0 = raised, above 0 = chopped down).
-// The arm comes up first (to -.55 by .3), chops down through the target (.75 by .55), then comes back to held
-// (bots', other players' and your character's in the armory; your own first-person swing is knifeChopFP in main.js)
-const KNIFE_SWING = .36; // seconds, the whole swing (the knife swings every .4 s)
+// knife swing for characters: raise, chop down, come back
+const KNIFE_SWING = .36; // seconds
 const swingAt = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   t = Math.min(1, Math.max(0, t)); return t < .3 ? -.55 * e(t / .3) : t < .55 ? -.55 + 1.3 * e((t - .3) / .25) : .75 * (1 - e((t - .55) / .45)); };
 
-// your first-person arms: the arm from your own skin, its fist just outside the grip, running back off the bottom of the screen.
-// Two-handed weapons get your left arm too, on the fore
+// your first-person arms, in your own skin
 const ARM_U = .0325, UP_V = new THREE.Vector3(0, 1, 0);
 let armGeos = null;
 const armMats = {};
-function vmArm(left, box, dir, low = 0) { // low: aim that far down the box (0 = its middle, 1 = its bottom)
+function vmArm(left, box, dir, low = 0) {
   armGeos ??= [partBox(4, 12, 4, 40, 16, ARM_U), partBox(4, 12, 4, 32, 48, ARM_U)];
   const L = prof.look ?? PRESETS[0].look, k = JSON.stringify(L);
   const mat = armMats[k] ??= lam({ map: skinTexture(L) });
   dir.normalize();
   const c = [box.c[0], box.c[1] - low * box.h[1], box.c[2]], t = fistOut(gunCells(cur), c, dir, 2.2 * ARM_U, .006);
   const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir);
-  for (let s = 0; s < 3; s++) { // more lengths behind the arm, so its end never shows on screen
+  for (let s = 0; s < 3; s++) { // extra length so the arm's end never shows
     const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; m.userData.shared = true; piv.add(m);
   }
   vm.add(piv);
   return piv;
 }
-// which way each first-person arm runs from its fist, per hold: back toward you and down off the screen,
-// so the fist faces forward into the grip instead of pushing up under the gun
-// [x, y, z, low]: the direction, and how far down the grip the fist lands (low on the grip keeps the arm under a stock)
+// arm directions per hold
 const VM_ARMS = {
   pistol: [[.15, -.2, 1, .3]], rifle: [[.2, -.25, 1, .5], [-.35, -.3, 1, .6]], heavy: [[.25, -.25, 1, .4], [-.4, -.3, 1, .3]],
   shoulder: [[.2, -.25, 1, .5], [-.35, -.3, 1, .5]], melee: [[.15, -.15, 1, 0]],
@@ -602,10 +516,10 @@ function buildGun() {
   gunSpin = spin; gunRound = round; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
   vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
   gunArmL = fore && arms[1] ? vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]) : null;
-  // one-handed guns: your left hand only comes up during a reload, holding the loose part from below (RELOAD_ANIM hand)
+  // one-handed guns: the left hand only shows up to reload
   gunHand = !gunArmL && mag && !WEAPONS[cur].melee ? vmArm(true, partBounds(mag),new THREE.Vector3(-.3, -1, .45), 1) : null;
   if (gunHand) gunHand.visible = false;
-  for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone(); // where a reload's moves start from
+  for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone();
   vmRl.rk = -1;
   if (WEAPONS[cur].melee) return;
   flashMesh.position.set(0, my, mz - .04); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight);
@@ -613,7 +527,7 @@ function buildGun() {
 function cycle(d) { let s = slotOf(cur); do s = (s + d + CATS.length) % CATS.length; while (slotGun[s] < 0); equip(slotGun[s]); }
 function selectSlot(s) {
   if (slotGun[s] < 0) return;
-  if (slotOf(cur) === s && mode === 'zombies') { // zombie waves only (it has no loadouts): press the slot again to flip between guns you bought in it
+  if (slotOf(cur) === s && mode === 'zombies') { // zombie waves: press again to flip between guns
     const list = BASE.map((w, i) => i).filter(i => owned[i] && slotOf(i) === s);
     if (list.length > 1) equip(list[(list.indexOf(cur) + 1) % list.length]);
     return;
@@ -622,27 +536,25 @@ function selectSlot(s) {
 }
 function equip(i) {
   if (i === cur || !WEAPONS[i] || !owned[i]) return;
-  // the one in your hands goes down (from wherever it is, if you're already mid-swap), the new one comes up; no firing until then
   cur = i; slotGun[slotOf(i)] = i; cancelReload(); swapLen = drawT(WEAPONS[i]); swapDown = true;
   cd = Math.max(cd, swapLen * (SWAP_DOWN * (1 - swapOff) + 1 - SWAP_DOWN)); renderHotbar(); sfx('equip');
 }
-// the swap, every frame: down, the new model built at the bottom, up. Returns how far down the gun is (0 to 1)
 function swapTick(dt) {
   if (swapDown) { swapOff += dt / (swapLen * SWAP_DOWN); if (swapOff >= 1) { swapOff = 1; swapDown = false; if (gunShown !== cur) buildGun(); } }
   else if (swapOff > 0) swapOff = Math.max(0, swapOff - dt / (swapLen * (1 - SWAP_DOWN)));
   return swapOff;
 }
 const dry = () => sfx('dry');
-// each gun has its own reload sound, timed to its base reload. Upgraded guns reload faster, so the sound plays faster to match
+// reload sound speeds up with faster reloads
 let reloadSnd = null;
 function reload() {
-  const w = WEAPONS[cur]; if (w.melee || reloading > 0 || ammo[cur] === w.mag || swapOff > 0) return; // (not while it's still coming up)
+  const w = WEAPONS[cur]; if (w.melee || reloading > 0 || ammo[cur] === w.mag || swapOff > 0) return;
   if (!reserve[cur]) { dry(); return; }
   reloading = w.reload; reloadSnd = sfx('r_' + w.id, { rate: BASE[cur].reload / w.reload });
 }
 function cancelReload() { reloading = 0; stopSfx(reloadSnd); reloadSnd = null; }
 buildGun();
-// build every gun's plain model ahead of time, one per idle moment, so the first bot to pull one out doesn't stall a frame
+// build gun models in idle time so nothing stalls later
 {
   const later = window.requestIdleCallback || (f => setTimeout(f, 50));
   let k = 0;

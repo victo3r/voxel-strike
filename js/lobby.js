@@ -1,4 +1,4 @@
-// character proportions: 1 pixel = 1/16 block, head 8x8x8, body 8x12x4, arms and legs 4x12x4
+// lobby scene
 const lobbyScene = new THREE.Scene();
 const lobbyCam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, .1, 300);
 {
@@ -13,7 +13,7 @@ lobbyScene.fog = new THREE.Fog(0x173f37, 16, 62);
 lobbyScene.add(new THREE.HemisphereLight(0xcff6e8, 0x1d2f1a, 1));
 const lKey = new THREE.DirectionalLight(0xfff0d8, 1.6); lKey.position.set(-4, 8, 7); lobbyScene.add(lKey);
 const lRim = new THREE.DirectionalLight(0x5ff5e6, 1.4); lRim.position.set(3, 4, -6); lobbyScene.add(lRim);
-// light bouncing up off the grass, so faces pointing down (under the chin, arms, hands) aren't pitch black
+// bounce light so faces underneath aren't black
 const lBounce = new THREE.DirectionalLight(0xd8e8c0, .8); lBounce.position.set(0, -6, 2); lobbyScene.add(lBounce);
 
 const rgb = ([r, g, b], k = 0) => `rgb(${r + k | 0},${g + k | 0},${b + k | 0})`;
@@ -35,7 +35,7 @@ const lGround = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), lam({ map: tex
 lGround.rotation.x = -Math.PI / 2; lobbyScene.add(lGround);
 const lBark = pixMat(8, 16, g => { fillN(g, 8, 16, [92, 66, 42], 24); for (const x of [1, 4, 6]) for (let y = 0; y < 16; y++) if (Math.random() < .8) dot(g, rgb([62, 43, 27], (Math.random() - .5) * 18), x, y); });
 const lLeaf = pixMat(16, 16, g => { fillN(g, 16, 16, [72, 142, 52], 34); for (let i = 0; i < 14; i++) dot(g, 'rgba(10,40,10,.45)', Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); });
-function lInst(mat, list) { // one draw call for a whole list of [x, y, z, sx, sy, sz, tint?] boxes
+function lInst(mat, list) { // one draw call for a list of boxes
   const m = new THREE.InstancedMesh(lCube, mat, list.length), o = new THREE.Object3D(), c = new THREE.Color();
   list.forEach((p, i) => {
     o.position.set(p[0], p[1], p[2]); o.scale.set(p[3], p[4], p[5]); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
@@ -47,7 +47,7 @@ const L_OAK = [0xffffff, 0xe2f5d0, 0xcfe8b8, 0xbad9a8], L_PINE = [0x8fb59a, 0x7f
 const lPick = a => a[Math.random() * a.length | 0];
 const lTrunks = [], lLeaves = [], lSpots = [];
 const lFree = (x, z, gap) => lSpots.every(([a, b]) => (a - x) ** 2 + (b - z) ** 2 > gap * gap);
-const lBlocksView = (x, z) => Math.hypot(x, z) < 8.5 || (z > -4 && Math.abs(x) < 12); // keep the clearing and the line to the camera open
+const lBlocksView = (x, z) => Math.hypot(x, z) < 8.5 || (z > -4 && Math.abs(x) < 12); // keep the view to the camera clear
 function lForestTree(x, z) {
   if (Math.random() < .3) {
     const h = 2 + Math.random() * 1.5, layers = 3 + (Math.random() * 2 | 0), col = lPick(L_PINE);
@@ -90,7 +90,7 @@ for (const [x, z, r] of [[-7, -14, .3], [3, -18, .25], [11, -12, .35], [-15, -22
 const pedTop = stoneMat(2, 2), pedSide = stoneMat(2, .5);
 const ped = new THREE.Mesh(new THREE.BoxGeometry(2.2, .5, 2.2), [pedSide, pedSide, pedTop, pedTop, pedSide, pedSide]);
 ped.position.y = .25; lobbyScene.add(ped);
-const trim = box(2.34, .08, 2.34, lam({ color: 0xffd23f, emissive: 0x6a4d00 })); trim.position.y = .45; lobbyScene.add(trim); // just under the top, so it shows as a gold band round the edge
+const trim = box(2.34, .08, 2.34, lam({ color: 0xffd23f, emissive: 0x6a4d00 })); trim.position.y = .45; lobbyScene.add(trim); // gold trim
 const glowStrip = box(2.3, .06, 2.3, new THREE.MeshBasicMaterial({ color: 0x3ff0e0 })); glowStrip.position.y = .06; lobbyScene.add(glowStrip);
 const shadow = new THREE.Mesh(new THREE.CircleGeometry(.42, 20), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .35 }));
 shadow.rotation.x = -Math.PI / 2; shadow.position.y = .505; lobbyScene.add(shadow);
@@ -112,8 +112,7 @@ for (const x of [-3.1, 3.1]) {
   const pl = new THREE.PointLight(0xffb45a, 6, 7); pl.position.set(x, 2.3, -1.4); lobbyScene.add(pl);
   lamps.push(pl);
 }
-// flowers in small clumps: daisies (a cross of petals round a middle) and tulips (a cup of petals), on stems with a leaf or two.
-// [petal color, middle color]
+// flowers
 const FLOWER_COLS = [[0xff4d6d, 0xffd23f], [0xffd23f, 0xc0641a], [0xb48cff, 0xfff0a0], [0xffffff, 0xffc82e], [0xff8a3d, 0x7a3a10]];
 const lStemMat = lam({ color: 0x3f8f3a }), lLeafMat2 = lam({ color: 0x4fa844 });
 const flowerMats = new Map(), fMat = c => { if (!flowerMats.has(c)) flowerMats.set(c, lam({ color: c })); return flowerMats.get(c); };
@@ -124,16 +123,16 @@ function lFlower(x, z, tulip, [petal, mid]) {
   part(g, .035, h, .035, lStemMat, 0, h / 2, 0);
   for (const s of Math.random() < .5 ? [1] : [1, -1]) part(g, .12, .025, .05, lLeafMat2, s * .06, h * (.25 + Math.random() * .2), 0).rotation.z = s * .5;
   const pm = fMat(petal);
-  if (tulip) { // four petal walls round a middle, open at the top
+  if (tulip) {
     for (const [px, pz] of [[.045, 0], [-.045, 0], [0, .045], [0, -.045]]) part(head, px ? .035 : .1, .12, pz ? .035 : .1, pm, px, .06, pz);
     part(head, .06, .07, .06, fMat(mid), 0, .035, 0);
   } else {
     part(head, .07, .04, .07, fMat(mid), 0, .015, 0);
     for (const [px, pz] of [[.075, 0], [-.075, 0], [0, .075], [0, -.075]]) part(head, px ? .08 : .065, .025, pz ? .08 : .065, pm, px, 0, pz);
-    head.rotation.x = .35 + Math.random() * .3; // tipped toward the camera so you see the face
+    head.rotation.x = .35 + Math.random() * .3; // tipped toward the camera
   }
   g.add(head);
-  g.position.set(x, 0, z); g.scale.setScalar(1.25); g.rotation.y = tulip ? Math.random() * 6.3 : (Math.random() - .5) * .8; // daisies roughly face the camera
+  g.position.set(x, 0, z); g.scale.setScalar(1.25); g.rotation.y = tulip ? Math.random() * 6.3 : (Math.random() - .5) * .8;
   lobbyScene.add(g);
 }
 for (let c = 0; c < 6; c++) {
@@ -157,22 +156,18 @@ for (let i = 0; i < 45; i++) {
   lobbyScene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: .8 })));
 }
 
-// your character, built from your saved look (js/character.js). ◀ ▶ under it flips through the presets,
-// plus your own CUSTOM look (prof.myLook) once you've made one in the customizer
+// your character, arrows flip through the looks
 if (!prof.look) prof.look = { ...PRESETS[0].look };
-// compares looks by their settings, ignoring key order and unset/false keys
 const lookKey = l => JSON.stringify(Object.keys(l).sort().filter(k => l[k] != null && l[k] !== false).map(k => [k, l[k]]));
 const isPreset = l => PRESETS.some(p => lookKey(p.look) === lookKey(l));
 const lookChoices = () => prof.myLook && !isPreset(prof.myLook) ? [...PRESETS, { name: 'CUSTOM', look: prof.myLook }] : PRESETS;
 const lookIndex = () => { const k = lookKey(prof.look); return lookChoices().findIndex(p => lookKey(p.look) === k); };
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
-let heroCh, torso, headPiv, armL, armR; // armL = the arm on the left of the screen when it faces you (his right arm)
-// in the armory he holds the gun you picked the way its hold says (js/hold.js), with his straight arms out in front,
-// aimed off to the right so you see it side-on. Two-handed guns can turn him into a sideways stance so his left hand reaches.
-// The gun drifts around a little, pivoting on his right fist, and every 9 seconds he rolls it over to look at its side
-const holdG = new THREE.Group(); // in the character's space (hero units: character pixels / 16)
+let heroCh, torso, headPiv, armL, armR; // armL is on the left of the screen
+// armory: he holds the picked gun and fidgets with it
+const holdG = new THREE.Group();
 let holdKey = '', holdK = 0, pose = null;
-const GUN_S = 1 / 16 / BOT_U; // the same gun model, at the size the bots hold it
+const GUN_S = 1 / 16 / BOT_U; // bot-sized gun
 const DOWN = new THREE.Vector3(0, -1, 0);
 const SHR = new THREE.Vector3(...SH_R).divideScalar(16), SHL = new THREE.Vector3(...SH_L).divideScalar(16);
 const armTo = (sh, p, out) => out.setFromUnitVectors(DOWN, _av.copy(p).sub(sh).normalize());
@@ -181,13 +176,12 @@ function heroGun(i) {
   const key = i < 0 ? '' : i + ':' + gunUse(i);
   if (key === holdKey) return;
   holdKey = key;
-  holdG.clear(); // gun geometry is shared (makeGun), nothing to free
+  holdG.clear();
   heroFireStop();
   if (i < 0) { pose = null; hf.i = -1; return; }
   const g = new THREE.Group();
-  const parts = makeGun(i, g, Math.max(0, gunUse(i) - 1)); // gold bands for the stars you use, like in your hands
+  const parts = makeGun(i, g, Math.max(0, gunUse(i) - 1));
   g.scale.setScalar(GUN_S);
-  // what the SHOOT and RELOAD buttons work with: the gun at the stars you use, a full mag, its muzzle flash
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
   Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rs: { rk: -1 } });
   hf.flashM = box(.14, .14, .14, FLASH_MAT); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .04); hf.flashM.visible = false; g.add(hf.flashM);
@@ -195,11 +189,9 @@ function heroGun(i) {
   const kind = holdOf(BASE[i]);
   pose = { pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, sh: kind === 'shoulder', hv: kind === 'heavy' };
   holdG.add(g);
-  fid = { k: 'heft', t0: performance.now() / 1000 + .3 }; // a new gun: he feels its weight as it comes up
+  fid = { k: 'heft', t0: performance.now() / 1000 + .3 };
 }
-// ---- the armory's SHOOT and RELOAD buttons (beside him, lobby only): he fires the gun he holds, owned or not, at the stars you'd use.
-// Hold SHOOT to keep firing an automatic; a semi-auto fires once a press. An empty gun reloads by itself; RELOAD plays the reload
-// any time, even on a full mag, so you can watch it. The shots are only for show: tracers off into the trees, the flash, the sound
+// ---- armory SHOOT and RELOAD buttons (just for show)
 const hf = { i: -1, rs: { rk: -1 } };
 const heroFx = [], fxGeo = new THREE.BoxGeometry(1, 1, 1);
 const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: .9, depthWrite: false });
@@ -213,7 +205,7 @@ function heroTrigger(down) {
   if (!down) { heroFireStop(); return; }
   if (!heroCan()) return;
   hf.held = true;
-  if (!autoFire(hf.st)) heroShot(); // one shot a press; automatics keep going in heroTick
+  if (!autoFire(hf.st)) heroShot();
 }
 function heroReload() {
   const w = hf.st; if (!heroCan() || !w || w.melee || hf.rl > 0) return;
@@ -226,11 +218,11 @@ function heroShot() {
   if (hf.rl > 0 || hf.cd > 0) return;
   if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 }); hf.auto = .25; return; }
   hf.cd = w.rate; if (!w.inf) hf.ammo--;
-  hf.kick = w.beam || w.flame ? .06 : 1; // a beam or flame only trembles, so it stays on target
+  hf.kick = w.beam || w.flame ? .06 : 1; // beams and flames barely kick
   if (w.melee) { sfx('swing', { v: .7 }); return; }
-  hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq); // out of the muzzle, the way it points
-  if (w.flame) { // a puff of fire
-    flameHeld = .12; // the fire sound, like yours (sound.js)
+  hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
+  if (w.flame) {
+    flameHeld = .12;
     for (let k = 0; k < 2; k++) {
       const m = new THREE.Mesh(flameGeo, flameMats[Math.random() * 3 | 0]); m.position.copy(_hm); m.scale.setScalar(.6); lobbyScene.add(m);
       heroFx.push({ m, v: _hd.clone().multiplyScalar(6).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5)), life: .4, grow: 2 });
@@ -238,7 +230,7 @@ function heroShot() {
     return;
   }
   if (w.beam) {
-    beamHeld = .12; // the hum, like yours (sound.js)
+    beamHeld = .12;
     hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); lobbyScene.add(hf.beamM);
     hf.beamOn = .08; return;
   }
@@ -252,7 +244,6 @@ function heroShot() {
     heroFx.push({ m, v: d.multiplyScalar(w.rocket ? 25 : w.flare ? 30 : 90), life: w.rocket || w.flare ? .8 : .12 });
   }
 }
-// every frame in the lobby: the trigger held, the reload ticking, the flash, the kick settling, the shots flying
 function heroTick(dt) {
   for (let k = heroFx.length - 1; k >= 0; k--) {
     const f = heroFx[k]; f.life -= dt; f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt);
@@ -264,7 +255,7 @@ function heroTick(dt) {
   hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); hf.flash -= dt;
   if (hf.held && autoFire(w)) heroShot();
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
-  if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload(); // ran dry: he reloads
+  if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload();
   hf.flashM.visible = hf.flash > 0;
   if (hf.spin) { hf.spin.rotation.z += hf.spinV * dt; hf.spinV = Math.max(0, hf.spinV - dt * 25); }
   if (hf.round) hf.round.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .4);
@@ -279,16 +270,14 @@ $('heroShoot').innerHTML = ico('aim'); $('heroReload').innerHTML = ico('reload')
 $('heroShoot').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); $('heroShoot').setPointerCapture(e.pointerId); heroTrigger(true); });
 for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) $('heroShoot').addEventListener(ev, () => heroTrigger(false));
 $('heroReload').addEventListener('pointerdown', e => { e.stopPropagation(); heroReload(); });
-// fidgets: every few seconds he does one thing with the gun, taking turns: rolls it over to look at its side, lowers it for a moment,
-// gives it a quick shake, or bounces it in his hands to feel its weight. Big guns move less
+// fidgets with the gun every few seconds
 const FIDGETS = ['look', 'lower', 'shake', 'heft', 'look', 'shake', 'lower', 'heft'], FID_T = { look: 2, lower: 2.8, shake: 1, heft: .9 };
 let fid = null, fidN = 0, fidNext = 0;
 const SH_MID = new THREE.Vector3(0, SH_R[1] / 16, 0), X_AX = new THREE.Vector3(1, 0, 0), _wq = new THREE.Quaternion(), _fr = new THREE.Vector3();
 const smooth = x => x * x * (3 - 2 * x);
-// how far the fidget moves the gun at time t: low = turned down about his shoulders, roll = about its barrel, wy/wz = a wiggle about his fist
 function fidgetAt(t, sh, hv) {
   const o = { low: 0, roll: 0, wy: 0, wz: 0 };
-  if (hf.held || hf.rl > 0 || hf.kick > 0) { fid = null; fidNext = t + 2.5; return o; } // shooting or reloading: no fidgets till a while after
+  if (hf.held || hf.rl > 0 || hf.kick > 0) { fid = null; fidNext = t + 2.5; return o; } // no fidgets while shooting
   if (!fid && t >= fidNext) fid = { k: FIDGETS[fidN++ % FIDGETS.length], t0: t };
   if (!fid) return o;
   const p = (t - fid.t0) / FID_T[fid.k], big = sh || hv ? .55 : 1;
@@ -296,14 +285,14 @@ function fidgetAt(t, sh, hv) {
   if (p <= 0) return o;
   const env = Math.sin(p * Math.PI);
   if (fid.k === 'look') o.roll = sh ? 0 : .4 * env * env;
-  else if (fid.k === 'lower') o.low = .65 * big * (p < .22 ? smooth(p / .22) : p > .72 ? smooth((1 - p) / .28) : 1); // down, a moment, back up
+  else if (fid.k === 'lower') o.low = .65 * big * (p < .22 ? smooth(p / .22) : p > .72 ? smooth((1 - p) / .28) : 1);
   else if (fid.k === 'shake') { o.wy = .07 * big * env * Math.sin(p * Math.PI * 10); o.wz = .05 * big * env * Math.sin(p * Math.PI * 8 + 1); }
-  else o.low = .1 * big * Math.sin(p * Math.PI * 2) ** 2 * (1 - .4 * p); // heft: two little dips
+  else o.low = .1 * big * Math.sin(p * Math.PI * 2) ** 2 * (1 - .4 * p);
   return o;
 }
-// the hold eases between guns instead of snapping (these follow pose)
+// ease between guns
 const hPos = new THREE.Vector3(-.4, .6, .2), hQ = new THREE.Quaternion(), hFR = new THREE.Vector3(-.4, .8, .3), hFL = new THREE.Vector3(.4, .8, .3);
-let hLK = 0, hTurn = 0; // how much his left hand is on the gun (eases off on one-handed weapons), and how far he's turned
+let hLK = 0, hTurn = 0;
 const LOW_Q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(.3, -1, .3).normalize()), LOW_P = new THREE.Vector3(-.4, .6, .2);
 const _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _l = new THREE.Vector3(), sway = new THREE.Quaternion(), _e = new THREE.Euler();
 const _lq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _aq = new THREE.Quaternion(), _ax = new THREE.Vector3();
@@ -318,24 +307,21 @@ function dressHero() {
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
 }
-// the armor he's wearing: the star you wear, or the one you're looking at in the armory
+// gear he wears: yours, or what you're looking at
 let heroArmorN = 0;
 function heroArmor(n) { if (heroCh && n !== heroArmorN) { dressArmor(heroCh, heroArmorN = n); } }
-// the boots he's wearing: yours, or the pair you're looking at in the armory ({ id, st } or null)
 let heroBootsB = null;
 const bootKey = b => b ? b.id + b.st : '';
 function heroBoots(b) { if (heroCh && bootKey(b) !== bootKey(heroBootsB)) dressBoots(heroCh, heroBootsB = b); }
-// the hat he's wearing, the same way
 let heroHatH = null;
 function heroHat(h) { if (heroCh && bootKey(h) !== bootKey(heroHatH)) dressHat(heroCh, heroHatH = h); }
-// puts on look i of lookChoices() (the armory's WEAR > SKINS cards)
 function wearLook(i) {
   const p = lookChoices()[i]; if (!p || i === lookIndex()) return;
   prof.look = { ...p.look }; saveProf(); dressHero(); sfx('equip');
 }
 dressHero();
 
-// ---- customizer: replaces the lobby panel while it's open, the character updates as you change things ----
+// ---- customizer
 const CLOTH = [0xf0f0f0, 0x9a9aa2, 0x55606a, 0x33363d, 0x1c1c20, 0xb8342c, 0x8a2e2e, 0xd4577a, 0xe07a2c, 0xe8c33a,
   0x4f8a5a, 0x2a5a3a, 0x1c9e98, 0x3d5a8c, 0x2c3e80, 0x6a4fb0, 0x5a3a24, 0x4b4033];
 const hexCss = n => '#' + n.toString(16).padStart(6, '0');
@@ -390,7 +376,7 @@ $('custRows').addEventListener('click', e => {
     setLook(row, row.cycle[(Math.max(0, k) + +b.dataset.step + n) % n][0]);
   } else setLook(row, JSON.parse(decodeURIComponent(b.dataset.v)));
 });
-// dragging the color picker updates the character live; the rows only redraw once you let go
+// color picker updates live, rows redraw on release
 $('custRows').addEventListener('input', e => { if (e.target.type === 'color') setLook(C_ROWS[+e.target.dataset.r], parseInt(e.target.value.slice(1), 16), false); });
 $('custRows').addEventListener('change', e => { if (e.target.type === 'color') renderCust(); });
 $('custRand').onclick = () => {
@@ -405,13 +391,12 @@ function showCust(on) {
   if (on) renderCust();
   sfx('ui');
 }
-// the customizer opens from the armory (WEAR > SKINS > CUSTOMIZE), and closing it goes back there
 function custClose() { showCust(false); armPage = 'wear'; wearCat = 'skins'; openArmory(); }
 $('custDone').onclick = custClose;
-addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && custOpen()) { e.stopImmediatePropagation(); custClose(); } }); // stop: the armory's Esc would close it again
+addEventListener('keydown', e => { if (e.code === 'Escape' && inLobby && custOpen()) { e.stopImmediatePropagation(); custClose(); } }); // stop the armory closing too
 
-const REST = .45; // default 3/4 view
-const ARM_REST = 1.45; // in the armory he aims off to the right and a little away, so you see the gun side-on and him from the front 3/4
+const REST = .45;
+const ARM_REST = 1.45; // armory view angle
 let wasArm = false;
 let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, mNX = 0, mNY = 0;
 const heroScreen = { x: innerWidth * .7, y: innerHeight / 2 };
@@ -426,32 +411,31 @@ addEventListener('pointermove', e => {
   if (dragX !== null) { const d = (e.clientX - dragX) * .012; spin += d; spinV = d * 30; dragX = e.clientX; }
 });
 
-// frame the camera so the character sits in the middle of the #stage area, whatever the window size.
-// With the armory open, that's the part of the screen to the right of its panel. The camera glides to a new framing instead of jumping
+// keep the character centered in the stage area
 let frameCur = null;
 function frameLobby(dt = 0) {
   const W = innerWidth, H = innerHeight, r = stage.getBoundingClientRect();
   let left = r.left, sw = r.width || W;
   const sh = r.height || H;
   if (armOpen && W > 700) {
-    const a = $('armory').getBoundingClientRect().right - 40; if (a > left) { sw = r.right - a; left = a; } // -40: the panel fades out at its edge
-    const c = $('armAct').getBoundingClientRect(); if (c.width) sw = Math.max(sw * .5, sw - c.width * .55); // and he moves over a bit for the corner card
+    const a = $('armory').getBoundingClientRect().right - 40; if (a > left) { sw = r.right - a; left = a; }
+    const c = $('armAct').getBoundingClientRect(); if (c.width) sw = Math.max(sw * .5, sw - c.width * .55);
   }
   const tan = Math.tan(THREE.MathUtils.degToRad(lobbyCam.fov / 2));
-  const visH = Math.max(3.6 / (sh / H * .9), 2.2 / (sw / W * .9) / (W / H)); // ~3.6 blocks tall in the stage
+  const visH = Math.max(3.6 / (sh / H * .9), 2.2 / (sw / W * .9) / (W / H));
   const want = { cx: left + sw / 2, cy: r.top + sh * .5, dist: Math.max(5, Math.min(20, visH / 2 / tan)) };
   if (!frameCur || !dt) frameCur = want;
   else { const k = 1 - Math.exp(-dt * 7); for (const key in want) frameCur[key] += (want[key] - frameCur[key]) * k; }
   const { cx, cy, dist } = frameCur;
   lobbyCam.aspect = W / H;
   lobbyCam.position.set(0, 1.5 + dist * .14, dist); lobbyCam.lookAt(0, 1.4, 0);
-  lobbyCam.setViewOffset(W, H, W / 2 - cx, H / 2 - cy, W, H); // slide the picture so the hero lands on the stage
+  lobbyCam.setViewOffset(W, H, W / 2 - cx, H / 2 - cy, W, H);
   heroScreen.x = cx; heroScreen.y = cy;
 }
 
 function updateLobby(dt) {
   const t = performance.now() / 1000;
-  if (armOpen !== wasArm) { wasArm = armOpen; lastDrag = -1e9; } // opening or closing the armory: turn right away
+  if (armOpen !== wasArm) { wasArm = armOpen; lastDrag = -1e9; }
   if (dragX === null) {
     spin += spinV * dt; spinV *= Math.exp(-4 * dt);
     if (performance.now() - lastDrag > 2500) {
@@ -462,7 +446,7 @@ function updateLobby(dt) {
   hero.rotation.y = spin;
   armL.rotation.set(Math.sin(t * 1.1) * .05, 0, -.05 - Math.sin(t * 1.6) * .03);
   armR.rotation.set(-Math.sin(t * 1.1) * .05, 0, .05 + Math.sin(t * 1.6) * .03);
-  // armory: arms come up to hold the gun. The gun swings up with them, growing in as it leaves his side
+  // armory: arms up holding the gun
   holdK += ((armOpen && holdKey ? 1 : 0) - holdK) * Math.min(1, dt * 9);
   const e = holdK * holdK * (3 - 2 * holdK);
   if (pose) {
@@ -470,55 +454,50 @@ function updateLobby(dt) {
     hPos.lerp(pose.pos, k); hQ.slerp(pose.q, k); hFR.lerp(pose.fR, k); hTurn += (pose.turn - hTurn) * k;
     if (pose.fL) hFL.lerp(pose.fL, k);
     hLK += ((pose.fL ? 1 : 0) - hLK) * k;
-    // he keeps moving it a little, pivoting on his right fist (a slow drift), plus the fidgets above. A gun on his shoulder only drifts a little
     const sh = !!pose.sh, a = sh ? .35 : 1, f = fidgetAt(t, sh, pose.hv);
     sway.setFromEuler(_e.set(a * (.025 * Math.sin(t * .9 + 1) + .01 * Math.sin(t * 2.3)),
       a * (.04 * Math.sin(t * .7) + .015 * Math.sin(t * 1.9)) + f.wy, a * .03 * Math.sin(t * .5) + f.wz, 'YXZ'));
     _lq.setFromAxisAngle(_ax.set(0, 0, -1).applyQuaternion(hQ), f.roll);
     const tq = _tq.copy(sway).multiply(_lq);
-    // lowering turns the gun and both fists down about the line through his shoulders, so his arms keep their length
     _wq.setFromAxisAngle(X_AX, f.low);
     const down = v => v.sub(SH_MID).applyQuaternion(_wq).add(SH_MID);
     const gp = down(_p.copy(hPos).sub(hFR).applyQuaternion(tq).add(hFR));
     down(_l.copy(hFL).sub(hFR).applyQuaternion(tq).add(hFR)); down(_fr.copy(hFR));
     const q0 = _q.copy(_wq).multiply(tq).multiply(hQ);
-    // SHOOT and RELOAD: the gun kicks, or plays its reload (weapons.js RELOAD_ANIM) turning about its grip; both fists stay on it
-    // and his left hand goes to the loose part as it comes out (one-handed guns: it comes up to it)
+    // kick or reload animation
     const w = hf.i >= 0 && hf.st, ra = w && hf.rl > 0 ? reloadPose(w.id, 1 - hf.rl / w.reload) : null, kk = hf.kick || 0;
     let leftK = hLK;
     reloadSwap(hf.rs, w ? w.id : '', ra ? 1 - hf.rl / w.reload : -1, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(ra ? ra.mx : 0, ra ? ra.my : 0, ra ? ra.mz : 0));
     if (ra || kk > 0) {
-      // the knife swings instead of kicking: his whole arm comes up about his shoulder and chops down (below), and the blade
-      // tips back on the way up and down through the chop about his fist
+      // the knife chops instead
       const melee = w.melee, chop = melee && kk > 0 ? swingAt(1 - kk) : 0;
       const rq = _rq2.setFromEuler(_re2.set((ra ? ra.rx : 0) + (melee ? -chop * .8 : kk * .25), ra ? ra.ry : 0, ra ? ra.rz : 0));
       const off = _hv2.set(ra ? ra.x : 0, ra ? ra.y : 0, (ra ? ra.z : 0) + (melee ? 0 : kk * .04)).multiplyScalar(GUN_S).applyQuaternion(q0);
       const q0i = _q0i.copy(q0).invert(), q1 = _q1.copy(q0).multiply(rq), move = v => v.sub(gp).applyQuaternion(q0i).applyQuaternion(rq).applyQuaternion(q0).add(gp).add(off);
       move(_l); move(_fr); gp.add(off); q0.copy(q1);
-      if (chop) { // the arm swing: gun and both fists turn about his right shoulder (raised below 0, chopped down above)
+      if (chop) {
         _wq.setFromAxisAngle(X_AX, chop * .9); const sw = v => v.sub(SHR).applyQuaternion(_wq).add(SHR);
         sw(gp); sw(_fr); sw(_l); q0.premultiply(_wq);
       }
-      if (ra && hf.mag) { // where the loose part is now, in his space
+      if (ra && hf.mag) {
         const toPart = pose.fL ? Math.min(1, Math.max(0, -ra.ay / .3)) : ra.hand;
         _hv2.copy(partMid(hf.mag)).add(hf.mag.position).multiplyScalar(GUN_S).applyQuaternion(q0).add(gp);
         if (pose.fL) _l.lerp(_hv2, toPart); else { _l.copy(_hv2); leftK = Math.max(hLK, toPart); }
       }
     }
-    armL.quaternion.slerp(armTo(SHR, _fr, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * leftK); // armL is his right arm (heroCh.armR)
+    armL.quaternion.slerp(armTo(SHR, _fr, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * leftK);
     holdG.quaternion.copy(LOW_Q).slerp(q0, e);
     holdG.position.copy(LOW_P).lerp(gp, e);
   }
   holdG.visible = e > .01; holdG.scale.setScalar(Math.min(1, e * 2.5));
   torso.scale.z = 1 + Math.sin(t * 1.6) * .02;
-  // legs: a slow weight shift from side to side, a little sway forward and back, and every 7 seconds a small step in place,
-  // left and right foot in turn. The spread (LEG_SPREAD) stays underneath it all
+  // legs: idle sway and the odd step
   const shift = Math.sin(t * .8) * .035, rock = Math.sin(t * .6) * .03, sp = (t + 3) % 7, lift = sp < .7 ? Math.sin(sp / .7 * Math.PI) * .3 : 0, left = ((t + 3) / 7 | 0) % 2;
   heroCh.legR.rotation.set(rock - (left ? 0 : lift), 0, -LEG_SPREAD + shift);
   heroCh.legL.rotation.set(-rock - (left ? lift : 0), 0, LEG_SPREAD + shift);
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
-  // fade the head back to center as the cursor moves behind the body, so it never flips across at ±180°
+  // head follows the cursor without flipping
   const away = Math.abs(rel), look = away < 1.2 ? 1 : Math.max(0, 1 - (away - 1.2) / 1.4);
   headPiv.rotation.y += (Math.sign(rel) * Math.min(.9, away) * look - headPiv.rotation.y) * Math.min(1, dt * 6);
   headPiv.rotation.x += (-mNY * .45 * look - headPiv.rotation.x) * Math.min(1, dt * 6);
@@ -531,5 +510,5 @@ function updateLobby(dt) {
   glowStrip.material.color.setHSL(.48, .85, .5 + Math.sin(t * 2) * .08);
   heroTick(dt);
   frameLobby(dt);
-  if (armOpen) placeAct(); // the armory's buttons follow him as the camera glides
+  if (armOpen) placeAct();
 }
