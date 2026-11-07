@@ -40,7 +40,7 @@ $('boost').addEventListener('click', e => {
   else if (id === 'boostAd') {
     adNext = performance.now() + AD_GAP * 1000; // no second ad for a while, watched or not
     cgRewarded(() => { prof.boosts = boosts() + 1; saveProf(); renderBoost(); sfx('buy'); netToast('+1 2× BOOSTER'); },
-      code => { if (code === 'adsDisabled' || code === 'adblock') noAds = true; else adNext = 0; renderBoost(); netToast(code === 'adblock' ? 'Ads are blocked, so no ad booster this time' : 'No ad right now, try again later'); });
+      code => { if (code === 'adsDisabled' || code === 'adblock') noAds = true; else adNext = 0; renderBoost(); netToast(code === 'adblock' ? 'Ads are blocked, so no ad booster this time' : `No ad right now, try again later (${code})`); });
   }
   renderBoost();
 });

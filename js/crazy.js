@@ -53,12 +53,12 @@ function cgPlay(on) {
 }
 // rewarded ad: reward() only if watched to the end
 function cgRewarded(reward, fail = () => {}) {
-  if (!cg.on || cg.ad) return fail('other');
+  if (!cg.on || cg.ad) return fail(cg.on ? 'busy' : 'off');
   const end = () => { cg.ad = false; document.body.classList.remove('cgAd'); cgHush(); };
   cgCall(s => s.ad.requestAd('rewarded', {
     adStarted: () => { cg.ad = true; document.body.classList.add('cgAd'); cgHush(); },
     adFinished: () => { end(); reward(); },
-    adError: e => { end(); fail(e?.code || 'other'); },
+    adError: e => { end(); console.warn('CrazyGames rewarded ad', e); fail(e?.code || 'other'); },
   }));
 }
 // midgame ad on the results screen (sound off and clicks blocked while it plays)
