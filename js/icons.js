@@ -20,10 +20,15 @@ const ICON_ART = {
   sndOff: ['....#......', '...##......', '..###.#...#', '#####..#.#.', '#####...#..', '#####..#.#.', '..###.#...#', '...##......', '....#......'], // muted
   bolt: ['.....###', '....###.', '...###..', '..######', '.######.', '....###.', '...###..', '..###...', '.##.....'], // a booster
   video: ['###########', '#.........#', '#...#.....#', '#...##....#', '#...###...#', '#...##....#', '#...#.....#', '#.........#', '###########'], // watch an ad
+  check: ['.......#', '......##', '#....##.', '##..##..', '.####...', '..##....'], // done
   head: ['.....#.....', '...#####...', '..#..#..#..', '.#...#...#.', '.#.......#.', '#####.#####', '.#.......#.', '.#...#...#.', '..#..#..#..', '...#####...', '.....#.....'],
 };
 // full-color icons (drawn as they are, not in the text color). Each letter is a color from the icon's palette
 const ICON_PIX = {
+  // a red present with a gold ribbon and bow (the daily reward)
+  gift: { pal: { o: '#141414', r: '#d8433b', d: '#9e2a24', y: '#ffd75e' }, rows: [
+    '...oo...oo...', '..oyyo.oyyo..', '..oyoyoyoyo..', '...ooyyyoo...', 'ooooooyoooooo', 'orrrrryrrrrro', 'orrrrryrrrrro',
+    'ooooooyoooooo', '.orrrryrrrro.', '.orrrryrrrro.', '.orrrryrrrro.', '.oddddyddddo.', '.ooooooooooo.'] },
   // a die seen from above and to the right: 5 on the front, 1 on top, 2 on the side, lit from above
   dice: { pal: { o: '#141414', w: '#e9e9e9', l: '#ffffff', s: '#a9aeb7', p: '#1c1c1c', q: '#2e2f33' }, rows: [
     '...oooooooooooo', '..ollllpplllloo', '.olllllllllloso', 'oooooooooooosso', 'owwwwwwwwwwosso', 'owppwwwwppwosso',

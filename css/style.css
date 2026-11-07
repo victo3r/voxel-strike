@@ -287,8 +287,27 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 /* the 2x booster (js/boost.js): a button under your coins, and its card */
 #boostBtn{position:absolute;top:calc(28px + clamp(48px,7vmin,64px));right:calc(32px + clamp(48px,7vmin,64px));height:clamp(40px,5.5vmin,52px);display:flex;align-items:center;gap:8px;padding:0 14px;font:bold clamp(16px,2.4vmin,21px) monospace;color:#ffd75e;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);text-shadow:2px 2px 0 #000}
 #boostBtn b{color:#fff}#boostBtn:hover{background:var(--hov)}
+/* the daily reward (js/daily.js): a gift button under the booster button (a dot when there's one to claim), and its card */
+#dailyBtn{position:absolute;top:calc(40px + clamp(48px,7vmin,64px) + clamp(40px,5.5vmin,52px));right:calc(32px + clamp(48px,7vmin,64px));width:clamp(40px,5.5vmin,52px);height:clamp(40px,5.5vmin,52px);padding:0;font-size:clamp(20px,3vmin,26px);background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
+#dailyBtn:hover{background:var(--hov)}
+#dailyBtn.ready{border-color:#ffd75e;animation:dailyPulse 1.6s ease-in-out infinite}
+#dailyBtn.ready::after{content:'';position:absolute;top:-6px;right:-6px;width:12px;height:12px;background:#e8433b;border:2px solid #000}
+@keyframes dailyPulse{50%{box-shadow:0 0 14px rgba(255,215,94,.7),4px 4px 0 rgba(0,0,0,.4)}}
+#dailyBox{display:flex;flex-direction:column;gap:12px;width:min(640px,94vw);padding:20px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
+#dailyBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}#dailyBox p{margin:0;color:var(--muted);font-size:15px}
+#dailyBox .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+#dailyBox .day{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px;border:3px solid var(--line-dim);background:rgba(0,0,0,.25);font-size:13px}
+#dailyBox .day b{color:var(--muted)}
+#dailyBox .day .gift{display:flex;flex-direction:column;align-items:center;gap:3px;font:bold 15px monospace}
+#dailyBox .day .bz{color:#ffd75e;display:inline-flex;align-items:center;gap:3px}
+#dailyBox .day.big{background:rgba(160,120,20,.35)}
+#dailyBox .day.now{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.55)}#dailyBox .day.now b{color:#ffd75e}
+#dailyBox .day.done{opacity:.55}#dailyBox .day .ck{position:absolute;inset:auto 4px 4px auto;color:#5ee08a;font-size:18px}
+#dailyBox button{font:bold 16px monospace;padding:10px;color:#fff;background:var(--glass);border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
+#dailyBox button:hover:not(:disabled){background:var(--hov)}#dailyBox button:disabled{opacity:.5;cursor:default}
+#dailyBox button.go{background:rgba(36,170,98,.85);font-size:18px}
 #boostBtn.on{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.6),4px 4px 0 rgba(0,0,0,.4)}
-#boost{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
+#boost,#daily{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
 #boostBox{display:flex;flex-direction:column;gap:10px;width:min(360px,90vw);padding:20px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #boostBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}#boostBox p{margin:0;color:var(--muted);font-size:15px}
 #boostBox .bn{font-size:17px}#boostBox p.be{text-align:center;color:#ffd75e;font-size:14px}#boostBox .bn b{color:#ffd75e;font-size:22px}

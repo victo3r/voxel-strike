@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=112">
+<link id="css" rel="stylesheet" href="css/style.css?v=113">
 </head>
 <body class="boot">
 <div id="hud">
@@ -27,6 +27,7 @@
     <div id="lobbyCoins" class="pc"></div>
     <button id="lobbySet" class="sq small" title="Settings"><img id="setIcon"></button>
     <button id="boostBtn" title="2× Booster"></button>
+    <button id="dailyBtn" title="Daily reward"></button>
     <button id="lobbyArm" class="sq"><img id="armIcon"><b>ARMORY</b></button>
     <button id="playBtn" class="sq"><img id="playIcon"><b>PLAY</b></button>
     <button id="joinBtn" class="sq" style="display:none"><b>JOIN ROOM</b><small id="joinCode"></small></button>
@@ -46,6 +47,7 @@
   <div id="menuBtns"><button id="menuPlay">BACK TO GAME</button><button id="armBtn">ARMORY</button><button id="menuFriends">FRIENDS</button><button id="menuPlayers">PLAYERS</button><button id="ctrlBtn">SETTINGS</button><button id="lobbyBtn">EXIT GAME</button></div>
 </div>
 <div id="boost"><div id="boostBox"></div></div>
+<div id="daily"><div id="dailyBox"></div></div>
 <div id="away"><div id="awayBar"><span>CLICK TO PLAY</span><button id="awayMenu">MENU</button></div></div>
 <div id="armory">
   <div id="armHead"><h1>ARMORY</h1><div id="armInfo"></div><button id="armX">CLOSE</button></div>
@@ -161,9 +163,9 @@ import * as THREE from './lib/three.module.js'; // three.js r160 (MIT), kept her
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 121;
+const V = 122;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/boost.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
+  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
 // js/crazy.js first: on CrazyGames it loads their SDK and puts your saved progress in place, and the rest waits for that (cgReady)
 await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });
 await (window.cgReady || Promise.resolve());
