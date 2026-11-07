@@ -517,3 +517,7 @@ body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:
 /* pause key tip, CrazyGames only (Esc leaves their fullscreen). Always laid out, empty elsewhere: it's the menu's last child, which centres it */
 #menu #menuTip{margin:14px 0 0;font-size:14px;color:var(--muted)}
 #menu #menuTip:empty{margin:0}
+/* privacy policy (settings) */
+#privacy p{margin:0;max-width:560px;font-size:14px;line-height:1.5;color:var(--silver)}
+#privacy p b{color:#fff}
+#privacy .when{color:var(--muted);font-size:12px}

@@ -2,7 +2,7 @@
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link id="css" rel="stylesheet" href="css/style.css?v=124">
+<link id="css" rel="stylesheet" href="css/style.css?v=125">
 </head>
 <body class="boot">
 <!-- touchscreen-only devices get this note instead of the game -->
@@ -80,6 +80,7 @@
         <button data-t="friends">FRIENDS</button>
         <button data-t="players">PLAYERS</button>
         <button data-t="account">ACCOUNT</button>
+        <button data-t="privacy">PRIVACY</button>
       </div>
       <div id="setBody">
         <section data-t="controls">
@@ -144,6 +145,34 @@
             <small>There's no email, so write your password down somewhere safe</small>
           </div>
         </section>
+        <section data-t="privacy" id="privacy">
+          <h2>PRIVACY</h2>
+          <p class="when">Last updated November 7, 2026</p>
+          <p>Here's what Voxel Strike keeps about you, why, and how to get rid of it. We keep as little as we can.</p>
+          <h2>IF YOU JUST PLAY</h2>
+          <p>Your level, coins, guns, look and settings are saved in your browser on your own device. On CrazyGames they're also saved to your CrazyGames account through their system.</p>
+          <p>When you play online without an account, the game sends your in-game name and a random ID so the match can tell players apart. That ID isn't linked to you.</p>
+          <h2>IF YOU HAVE AN ACCOUNT</h2>
+          <p>We keep your username and a scrambled version of your password. The real password is never stored, and we never ask for an email.</p>
+          <p>If you log in through CrazyGames, they give us your CrazyGames user ID and username so we can make your account. We never see your CrazyGames password.</p>
+          <p>For signed-in players we also save your progress, your friends and friend requests, whether you're online and which match you're in (so friends can join you), your stats from public online matches for the leaderboards and player cards, and the look and gear you last played with.</p>
+          <h2>CHAT</h2>
+          <p>Chat messages go to the other players in your match and aren't saved. If someone reports a player, we save the report with the last few chat lines so we can check what happened.</p>
+          <h2>BEHIND THE SCENES</h2>
+          <p>Our server runs on Cloudflare. Like any website, it sees your internet address when you connect. We only use it to stop spam, like limiting how many accounts or rooms can be made from one place.</p>
+          <h2>ADS</h2>
+          <p>On CrazyGames, ads are shown by CrazyGames, not by us, and their privacy policy covers them.</p>
+          <h2>WHAT WE DON'T DO</h2>
+          <p>We don't sell your data or share it with advertisers, and we don't ask for your real name, email, age or where you live.</p>
+          <h2>HOW LONG WE KEEP IT</h2>
+          <p>Account data stays until you ask us to delete it. Reports are kept as long as we need them. Anything saved on your device stays until you clear your browser data.</p>
+          <h2>DELETING YOUR DATA</h2>
+          <p>Email <b>voxelstrikeprivacy@gmail.com</b> with your username or player ID (your # number on the FRIENDS page) and we'll delete your account and everything tied to it. You can also ask us what we have about you.</p>
+          <h2>KIDS AND PARENTS</h2>
+          <p>Lots of our players are young, so we don't collect anything we don't need. If you're a parent and want your kid's account removed, just send us an email.</p>
+          <h2>CHANGES</h2>
+          <p>If this ever changes, we'll update it here and change the date at the top.</p>
+        </section>
       </div>
     </div>
   </div>
@@ -168,7 +197,7 @@
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
 // bump V (and the css ?v=) on every update to skip old caches
-const V = 139;
+const V = 140;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js'];
 if (!document.body.classList.contains('touchOnly')) { // touch-only devices stop here
