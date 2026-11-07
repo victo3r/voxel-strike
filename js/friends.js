@@ -137,6 +137,27 @@ $('postBoard').addEventListener('click', async e => {
   const r = await frAdd('#' + b.dataset.id);
   if (r) b.textContent = r.result === 'friends' ? 'FRIENDS' : 'SENT'; else b.disabled = false;
 });
+// the PLAYERS list in the pause menu (chat.js renderPlayers): + ADD next to everyone in your match, when you're signed in.
+// A signed-in player gets a real request. A bot, or a guest (no account, nothing to send it to), just shows SENT and never
+// answers, so a bot looks like any other player
+const frAskedNoAcct = new Set(); // names, for this session
+function frPlayerBtn(r) {
+  if (!auth || !fr.me) return '';
+  const id = r.fid | 0;
+  if (!id) { const sent = frAskedNoAcct.has(r.name); return `<button data-fr="none" data-pid="${r.pid}"${sent ? ' disabled' : ''}>${sent ? 'SENT' : '+ ADD'}</button>`; }
+  if (id === fr.me.id) return '';
+  const done = frIds.has(id) || frOut.has(id);
+  return `<button data-fr="${frIn.has(id) ? 'acc' : 'add'}" data-id="${id}"${done ? ' disabled' : ''}>${frIds.has(id) ? 'FRIENDS' : frOut.has(id) ? 'SENT' : frIn.has(id) ? 'ACCEPT' : '+ ADD'}</button>`;
+}
+$('plist').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-fr]'); if (!b || b.disabled) return;
+  e.stopPropagation(); b.disabled = true; sfx('ui');
+  if (b.dataset.fr === 'none') { const r = recs.find(r => r.pid === +b.dataset.pid); if (r) frAskedNoAcct.add(r.name); renderPlayers(); return; }
+  const ok = b.dataset.fr === 'acc' ? await frCall('accept', { id: +b.dataset.id }) : await frCall('add', { who: '#' + b.dataset.id });
+  if (!ok) { netToast(frMsg || 'Something went wrong'); b.disabled = false; return; }
+  if (b.dataset.fr === 'acc') sfx('buy');
+  await frPoll(true); renderPlayers();
+});
 // polling: a tick every 5 s decides whether it's time (see the top); signing in or out refreshes at once
 setInterval(() => { if (auth && !document.hidden) frPoll(); }, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && auth) frPoll(); });

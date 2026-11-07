@@ -109,11 +109,11 @@ function renderPlayers() {
     const right = reported.has(r.pid) ? '<span class="st">REPORTED</span>'
       : reportAsk === r.pid ? REPORT_WHY.map(([w, l]) => btn('why:' + w, r.pid, l)).join('') + btn('cancel', r.pid, '✕', 'x')
       : btn('report', r.pid, 'REPORT', 'x');
-    return `<div class="frRow">${nameTag(r)}<span class="st"></span>${btn('mute', r.pid, m ? 'UNMUTE' : 'MUTE', m ? 'sure' : '')}${right}</div>`;
+    return `<div class="frRow">${nameTag(r)}<span class="st"></span>${typeof frPlayerBtn === 'function' ? frPlayerBtn(r) : ''}${btn('mute', r.pid, m ? 'UNMUTE' : 'MUTE', m ? 'sure' : '')}${right}</div>`;
   }).join('');
 }
 $('plist').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
+  const b = e.target.closest('button[data-pl]'); if (!b) return; // (+ ADD is friends.js's)
   e.stopPropagation(); sfx('ui');
   const pid = +b.dataset.pid, r = recs.find(r => r.pid === pid), act = b.dataset.pl;
   if (!r) return renderPlayers();
