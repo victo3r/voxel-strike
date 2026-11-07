@@ -135,6 +135,7 @@ function placeAct() {
   if (!armOpen) return;
   const h = $('heroAct'), on = inLobby && armPage === 'weapons' && innerWidth > 700;
   h.style.display = on ? 'flex' : 'none';
+  $('heroReload').style.display = BASE[armSel]?.inf ? 'none' : ''; // nothing to reload on the knife (it never runs out)
   if (on) { const edge = $('armory').getBoundingClientRect().right; h.style.left = Math.max(edge, heroScreen.x - innerHeight * .2 - 50) + 'px'; h.style.top = heroScreen.y + 'px'; }
 }
 function renderDetail() {

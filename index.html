@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=106">
+<link id="css" rel="stylesheet" href="css/style.css?v=107">
 </head>
 <body class="boot">
 <div id="hud">
@@ -42,7 +42,7 @@
   <h1 id="menuTitle">MENU</h1>
   <p id="msg"></p>
   <div id="roomRow" style="display:none"><span id="roomCode"></span><button id="inviteBtn">INVITE</button></div>
-  <div id="menuBtns"><button id="menuPlay">BACK TO GAME</button><button id="armBtn">ARMORY</button><button id="menuFriends">FRIENDS</button><button id="ctrlBtn">SETTINGS</button><button id="lobbyBtn">EXIT GAME</button></div>
+  <div id="menuBtns"><button id="menuPlay">BACK TO GAME</button><button id="armBtn">ARMORY</button><button id="menuFriends">FRIENDS</button><button id="menuPlayers">PLAYERS</button><button id="ctrlBtn">SETTINGS</button><button id="lobbyBtn">EXIT GAME</button></div>
 </div>
 <div id="away"><div id="awayBar"><span>CLICK TO PLAY</span><button id="awayMenu">MENU</button></div></div>
 <div id="armory">
@@ -67,6 +67,7 @@
         <button data-t="sound">SOUND</button>
         <button data-t="graphics">GRAPHICS</button>
         <button data-t="friends">FRIENDS</button>
+        <button data-t="players">PLAYERS</button>
         <button data-t="account">ACCOUNT</button>
       </div>
       <div id="setBody">
@@ -114,6 +115,12 @@
           <p id="frMsg"></p>
           <div id="friends"></div>
         </section>
+        <section data-t="players">
+          <h2>CHAT</h2>
+          <label class="tick"><input id="optChat" type="checkbox"> Show chat</label>
+          <h2>IN THIS MATCH</h2>
+          <div id="plist"></div>
+        </section>
         <section data-t="account">
           <h2>CLOUD SAVE</h2>
           <div id="acct"></div>
@@ -152,7 +159,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 115;
+const V = 116;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js'];
 for (const src of FILES) {

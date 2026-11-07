@@ -425,6 +425,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .frRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 8px;background:rgba(0,0,0,.2);border:2px solid var(--line-dim);font-size:15px}
 .frRow b{color:#fff}.frRow small{color:var(--muted);font-size:12px}.frRow .st{color:var(--muted);font-size:13px;margin-right:auto}
 .frRow.on .st{color:var(--acc-lt)}
+.plNone{color:var(--muted);font-size:14px;margin:4px 0}
 .frRow .full{color:#f96;font-size:12px;letter-spacing:1px}
 #binds .frRow button{font:bold 12px monospace;padding:4px 10px}#binds .frRow button.x{color:var(--silver);border-color:var(--line-dim);padding:4px 8px}#binds .frRow button.sure{color:#fff;border-color:#f96}
 .frNote{margin:0;font-size:14px;color:var(--silver);max-width:460px}.frErr{margin:0;color:#f96;font-size:13px}

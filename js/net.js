@@ -233,7 +233,7 @@ net = (() => {
       case 'warp': return warped(m);
       case 'host': return setHost(m.pid);
       case 'fill': return fill(m.n | 0);
-      case 'chat': return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80));
+      case 'chat': if (chatHidden(cleanName(m.name))) return; return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80)); // chat off or muted (chat.js)
       case 'over': return over(m);
       case 'kick': return;
       case 'probe': return;
@@ -717,7 +717,7 @@ net = (() => {
 
   Object.assign(api, {
     now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
-    matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), probe, pick,
+    matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
   Object.defineProperties(api, { // read live (Object.assign would have copied them once)
     pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' }, host: { get: () => api.on && hostPid === pid },

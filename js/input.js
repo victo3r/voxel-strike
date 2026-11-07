@@ -36,7 +36,7 @@ function renderSens() {
 }
 // other control options, per device like sensitivity. aa = aim assist (0 off, 1 low, 2 medium), toggleAim = press aim once
 // to aim and again to stop (instead of holding it), wheel = the scroll wheel switches guns
-const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true };
+const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true, chat: true }; // chat: show chat (off hides it and the chat key does nothing)
 let opts = { ...DEFAULT_OPTS };
 try { const o = JSON.parse(localStorage.getItem('voxelstrike-opts')); if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k]; } catch {}
 const saveOpts = () => { try { localStorage.setItem('voxelstrike-opts', JSON.stringify(opts)); } catch {} };
@@ -44,11 +44,12 @@ const AA_DESC = ['Off', 'Slows your aim near enemies and nudges it onto them, bu
 function renderOpts() {
   document.querySelectorAll('#aaQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.aa));
   $('aaDesc').textContent = AA_DESC[opts.aa];
-  $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel;
+  $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel; $('optChat').checked = opts.chat;
 }
 $('aaQ').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || +b.dataset.v === opts.aa) return; opts.aa = +b.dataset.v; saveOpts(); renderOpts(); sfx('ui'); });
 $('optToggleAim').addEventListener('change', e => { opts.toggleAim = e.target.checked; aimOn = false; saveOpts(); });
 $('optWheel').addEventListener('change', e => { opts.wheel = e.target.checked; saveOpts(); });
+$('optChat').addEventListener('change', e => { opts.chat = e.target.checked; saveOpts(); if (!opts.chat) $('chatLog').innerHTML = ''; });
 let aimOn = false; // toggle aim: whether you're aimed in right now
 renderOpts();
 
@@ -178,7 +179,7 @@ $('bindList').addEventListener('mousedown', e => {
 // settings page: CONTROLS / SOUND / GRAPHICS / ACCOUNT tabs. It opens on whichever tab you used last
 let setTab = 'controls';
 function showSetTab(t) {
-  setTab = t; rebinding = null; renderBinds();
+  setTab = t; rebinding = null; renderBinds(); if (t === 'players') renderPlayers();
   document.querySelectorAll('#setTabs button').forEach(b => b.classList.toggle('sel', b.dataset.t === t));
   document.querySelectorAll('#setBody section').forEach(s => s.style.display = s.dataset.t === t ? '' : 'none');
   $('setBody').scrollTop = 0;
@@ -308,6 +309,7 @@ document.addEventListener('pointerlockchange', () => {
     $('menuPlay').textContent = dead ? 'TRY AGAIN' : pvp() ? 'BACK TO GAME' : 'RESUME';
     $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : pvp() ? '' : 'Click to resume';
     $('armBtn').style.display = $('menuFriends').style.display = pvp() ? '' : 'none'; // zombie waves has its own shop between waves
+    $('menuPlayers').style.display = net.on ? '' : 'none'; // mute and report: online matches
     renderHelp();
   }
 });

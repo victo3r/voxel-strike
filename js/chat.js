@@ -71,7 +71,7 @@ function botsHear(text) {
 }
 
 function openChat() {
-  if (chatting || !pvp() || matchOver && !net.on) return;
+  if (chatting || !pvp() || matchOver && !net.on || !opts.chat) return; // chat turned off in settings: no typing either
   chatting = true; for (const k in keys) keys[k] = false;
   $('chat').classList.add('open'); $('chatIn').value = ''; $('chatIn').focus();
 }
@@ -90,4 +90,36 @@ $('chatIn').addEventListener('keydown', e => {
 });
 $('chatIn').addEventListener('keyup', e => e.stopPropagation());
 document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement !== renderer.domElement) closeChat(); }); // Esc unlocks the mouse first
-function resetChat() { closeChat(); chatQ = []; chatGap = 0; $('chatLog').innerHTML = ''; }
+function resetChat() { closeChat(); chatQ = []; chatGap = 0; $('chatLog').innerHTML = ''; reported?.clear(); reportAsk = 0; } // a new match: new player ids
+
+// ---- PLAYERS (settings tab, and the pause menu's PLAYERS button online): show chat on or off, and everyone in your online match
+// with MUTE (their chat stops showing for you, until you close the page) and REPORT (pick why; the server saves it with their
+// last chat lines for the owner to read, room.js onReport). Swearing and links are already starred by the server's filter
+const muted = new Set(), reported = new Set(); // muted: names (lowercase); reported: player ids this match
+const chatHidden = name => !opts.chat || muted.has(String(name).toLowerCase());
+let reportAsk = 0; // the player whose REPORT is asking why
+const REPORT_WHY = [['chat', 'CHAT'], ['name', 'NAME'], ['cheat', 'CHEATING']];
+function renderPlayers() {
+  const list = net.on ? recs.filter(r => !r.you) : [];
+  if (!list.length) { $('plist').innerHTML = `<p class="plNone">${net.on ? 'Nobody else is here yet' : 'Players in your online match show up here'}</p>`; return; }
+  const btn = (act, pid, label, cls = '') => `<button data-pl="${act}" data-pid="${pid}" class="${cls}">${label}</button>`;
+  $('plist').innerHTML = list.map(r => {
+    const m = muted.has(r.name.toLowerCase());
+    const right = reported.has(r.pid) ? '<span class="st">REPORTED</span>'
+      : reportAsk === r.pid ? REPORT_WHY.map(([w, l]) => btn('why:' + w, r.pid, l)).join('') + btn('cancel', r.pid, '✕', 'x')
+      : btn('report', r.pid, 'REPORT', 'x');
+    return `<div class="frRow">${nameTag(r)}<span class="st"></span>${btn('mute', r.pid, m ? 'UNMUTE' : 'MUTE', m ? 'sure' : '')}${right}</div>`;
+  }).join('');
+}
+$('plist').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  e.stopPropagation(); sfx('ui');
+  const pid = +b.dataset.pid, r = recs.find(r => r.pid === pid), act = b.dataset.pl;
+  if (!r) return renderPlayers();
+  if (act === 'mute') { const k = r.name.toLowerCase(); if (muted.has(k)) muted.delete(k); else muted.add(k); }
+  else if (act === 'report') reportAsk = pid;
+  else if (act === 'cancel') reportAsk = 0;
+  else if (act.startsWith('why:')) { net.report(pid, act.slice(4)); reported.add(pid); reportAsk = 0; }
+  renderPlayers();
+});
+$('menuPlayers').addEventListener('click', e => { e.stopPropagation(); showSetTab('players'); openSettings(); sfx('ui'); });
