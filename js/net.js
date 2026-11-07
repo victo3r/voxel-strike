@@ -256,9 +256,10 @@ net = (() => {
   // CrazyGames: report our room so friends can join and invite links work
   let cgInRoom = false;
   const roomParams = () => code ? { join: code } : { room, mode, map: mapId };
+  const humansIn = () => 1 + [...remotes.values()].filter(r => !r.rec.bot).length; // bots make room for people
   function cgRoom() {
     if (!cg.on) return;
-    if (api.on) { cgInRoom = true; cgCall(s => s.game.updateRoom({ roomId: room, isJoinable: true, inviteParams: roomParams() })); }
+    if (api.on) { cgInRoom = true; cgCall(s => s.game.updateRoom({ roomId: room, isJoinable: humansIn() < (rulesCap || 8), inviteParams: roomParams() })); }
     else if (cgInRoom) { cgInRoom = false; cgCall(s => s.game.leftRoom()); }
   }
   // an invite's params as a start()
@@ -309,6 +310,7 @@ net = (() => {
     if (!p || p.pid === pid) return;
     const r = addRemote(p, true);
     if (p.alive && p.pos) spawnBody(r, ...p.pos);
+    if (!p.bot) cgRoom();
   }
   function left(who, reason) {
     const r = remotes.get(who); if (!r) return;
@@ -318,6 +320,7 @@ net = (() => {
     const j = roster.recs.indexOf(r.rec); if (j >= 0) roster.recs.splice(j, 1);
     if (reason !== 'replaced') feed(`${nameTag(r.rec)} left`);
     if (r.rec.tag?.map) { r.rec.tag.map.dispose(); r.rec.tag.dispose(); }
+    if (!r.rec.bot) cgRoom();
   }
   // bodies: built like a bot's, driven by the network
   function spawnBody(r, x, y, z, yaw = 0) {
