@@ -12,6 +12,8 @@
 //     plays; CrazyGames decides how often (at most one every 3 minutes) and skips it when it's too soon
 //   - your progress (level, coins, guns, look, name, best waves) is kept in their Data module, so it follows a CrazyGames account
 //     across devices; a guest's progress moves into their account when they log in. Settings stay on each device
+//   - logged in to CrazyGames, you're signed in to our server with that account too (cloud.js cgSignIn): your CrazyGames username
+//     is your name, and friends and cloud saves work. There's no sign-up or password of ours there
 const CG_ON = /(^|\.)crazygames\.(com|io)$/.test(location.hostname) || /[?&]cg=1(&|$)/.test(location.search);
 const CG_KEYS = new Set(['voxelstrike-profile', 'voxelstrike-name', 'voxelstrike-best']); // the progress kept in their Data module
 const cg = { on: false, sdk: null, settings: { disableChat: false, muteAudio: false }, playing: false, ad: false, loaded: false };

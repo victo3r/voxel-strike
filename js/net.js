@@ -203,6 +203,7 @@ net = (() => {
     for (const r of remotes.values()) dropBody(r);
     remotes.clear(); hits = []; fired = 0; evFlags = 0;
     $('roomRow').style.display = 'none';
+    cgRoom();
   }
   function leave() {
     cancelStart();
@@ -272,6 +273,23 @@ net = (() => {
     lastTop = lastBoard = ''; lastSec = 0;
     if (!rejoining) lockMouse(); else if (locked) tryReady();
     send({ t: 'ping', c: localNow() });
+    cgRoom();
+  }
+  // CrazyGames: tell their site which room you're in, so friends there can join you with one click and invite links lead here
+  // (a private room by its code, a public one by its name). Leaving says so too
+  let cgInRoom = false;
+  const roomParams = () => code ? { join: code } : { room, mode, map: mapId };
+  function cgRoom() {
+    if (!cg.on) return;
+    if (api.on) { cgInRoom = true; cgCall(s => s.game.updateRoom({ roomId: room, isJoinable: true, inviteParams: roomParams() })); }
+    else if (cgInRoom) { cgInRoom = false; cgCall(s => s.game.leftRoom()); }
+  }
+  // an invite's params ({join: code} or {room, mode, map}) as a start()
+  function fromInvite(p) {
+    const c = String(p?.join || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
+    if (c.length === 6) return { code: c };
+    if (/^pub-[\w-]{1,60}$/.test(p?.room || '') && PLAY_MODES.some(m => m.id === p.mode) && MAPS[p.map]) return { room: p.room, mode: p.mode, map: p.map };
+    return null;
   }
   // another player's record, shaped like a bot's (deathmatch.js joinBot/makeBot) so hits, outlines, tags and angels all work
   // a player's gear as the rec fields the bot code reads: stars and stats by gun index, the loadout, boots, hat, armor tier and their effects
@@ -701,14 +719,25 @@ net = (() => {
 
   // ---- the lobby: a join-by-link button, the room code in the pause menu
   const joinParam = (new URLSearchParams(location.search).get('join') || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
-  if (joinParam.length === 6) {
+  if (cg.on) { // CrazyGames: an invite link (or instant multiplayer, "play with friends") goes straight in once the game has loaded
+    const inv = fromInvite(cgCall(s => s.game.inviteParams)), instant = !inv && cgCall(s => s.game.isInstantMultiplayer);
+    const go = () => {
+      if (document.body.classList.contains('boot')) return setTimeout(go, 300);
+      if (inv) return start(inv);
+      const m = PLAY_MODES.find(m => m.id === mode && m.id !== 'zombies') || PLAY_MODES.find(m => m.id !== 'zombies'); // instant: a private room of your usual mode
+      start({ mode: m.id, map: m.maps?.includes(mapId) ? mapId : m.maps?.[0] || mapId, create: true });
+    };
+    if (inv || instant) setTimeout(go, 300);
+    // their "join" on a friend's profile while the game is already open
+    cgCall(s => s.game.addJoinRoomListener(p => { const o = fromInvite(p); if (!o || (api.on && (o.code ? o.code === code : o.room === room))) return; if (api.on) leave(); start(o); }));
+  } else if (joinParam.length === 6) {
     $('joinCode').textContent = joinParam; $('joinBtn').style.display = '';
     $('joinBtn').addEventListener('click', () => { $('joinBtn').style.display = 'none'; sfx('ui'); start({ code: joinParam }); });
   }
   $('inviteBtn').addEventListener('click', e => {
     e.stopPropagation();
     if (!code) return;
-    const url = location.origin + location.pathname + '?join=' + code;
+    const url = cg.on ? cgCall(s => s.game.inviteLink({ join: code })) : location.origin + location.pathname + '?join=' + code; // on CrazyGames, a link to the game there
     navigator.clipboard?.writeText(url).then(() => netToast('Invite link copied'), () => netToast(url, 6000));
     sfx('ui');
   });

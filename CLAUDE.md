@@ -16,7 +16,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
   under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
   `maps.mjs`, `gear.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/measure-bots.mjs ladder` measures bot hit rates per
-  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`) also need the local dev server described in the server README; run
+  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
 - `node ../voxel-strike-server/scripts/check-tables.mjs` must pass after changing any number the server also uses (weapon stats,
   match rules, rewards, armor, gear, map sizes/pads): the server keeps its own copy in `tables.js`.
@@ -57,7 +57,9 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 
 - **CrazyGames** (`js/crazy.js`, loaded before everything else): their SDK loads only on their domains or with `?cg=1`, and every
   `cg*` call is a no-op elsewhere. It reports loading and gameplay start/stop, follows their mute and chat settings, asks for a
-  midgame ad on results screens, mirrors progress keys (`CG_KEYS`) into their Data module, and hides our own sign-in and friends.
+  midgame ad on results screens, mirrors progress keys (`CG_KEYS`) into their Data module, and replaces our own sign-in: a CrazyGames player is signed in to our server
+  with their account (`cgSignIn` in cloud.js, `POST /auth/cg`), named by their CrazyGames username, and online rooms are reported to their
+  site so friends can join and invite links work (`cgRoom` / `fromInvite` in net.js).
 
 ## Conventions
 

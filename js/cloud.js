@@ -38,7 +38,7 @@ function applySave(s) {
   prof.guns = { ...prof.guns }; prof.loadout = { ...prof.loadout }; prof.use = { ...prof.use }; prof.boots = { ...prof.boots }; prof.bootUse = { ...prof.bootUse }; prof.hats = { ...prof.hats }; prof.hatUse = { ...prof.hatUse };
   if (!prof.look) prof.look = { ...PRESETS[0].look };
   try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {}
-  const n = cleanName(s.name);
+  const n = cleanName(auth?.cg ? auth.user : s.name); // on CrazyGames you're always called your CrazyGames username
   if (n) { myName = n; $('nameIn').value = n; try { localStorage.setItem('voxelstrike-name', n); } catch {} }
   if (!keepBest && s.best) { best = { wave: s.best.wave | 0, kills: s.best.kills | 0 }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
   showProf(); dressHero(); armIcon();
@@ -119,7 +119,7 @@ function renderAcct() {
   // the ☁ next to your level: grey and dashed for a guest, green when saved, pulsing yellow while saving, red when offline
   const cb = $('cloudBtn'), cs = !auth ? 'guest' : cloudState || 'saving';
   cb.className = cs;
-  cb.title = { guest: 'Not signed in, click to save your progress', saved: `Saved to ${auth?.user}`, saving: 'Syncing…', offline: "Offline, it'll save when you're back online" }[cs];
+  cb.title = { guest: cg.on ? 'Log in to CrazyGames to save your progress and add friends' : 'Not signed in, click to save your progress', saved: `Saved to ${auth?.user}`, saving: 'Syncing…', offline: "Offline, it'll save when you're back online" }[cs];
   const el = $('acct');
   $('acctForm').style.display = auth ? 'none' : '';
   if (!auth) { el.innerHTML = ''; return; }
@@ -135,7 +135,11 @@ $('acct').addEventListener('click', async e => {
 });
 $('acctForm').addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'NumpadEnter') acctGo('login'); });
 $('acctIn').addEventListener('click', () => acctGo('login'));
-$('cloudBtn').addEventListener('click', () => { showSetTab('account'); openSettings(); sfx('ui'); });
+$('cloudBtn').addEventListener('click', () => {
+  sfx('ui');
+  if (!cg.on) { showSetTab('account'); openSettings(); return; }
+  if (!auth?.cg) cgCall(s => s.user.showAuthPrompt().then(() => cgSignIn(), () => {})); // CrazyGames' own log in window
+});
 $('acctNew').addEventListener('click', () => acctGo('signup'));
 
 async function acctGo(how) {
@@ -146,19 +150,60 @@ async function acctGo(how) {
   try { r = await api('POST', '/' + how, how === 'signup' ? { user, pass, save: snapshot() } : { user, pass }); }
   catch { $('acctErr').textContent = "Can't reach the server. Check your connection"; return; }
   if (!r.token) { $('acctErr').textContent = r.error || 'Something went wrong'; return; }
-  const otherAccount = sync.user && sync.user.toLowerCase() !== r.user.toLowerCase();
-  auth = { user: r.user, token: r.token };
-  try { localStorage.setItem('voxelstrike-auth', JSON.stringify(auth)); } catch {}
   $('acctPass').value = ''; $('acctErr').textContent = ''; sfx('buy');
-  sync = { user: r.user, rev: 0, dirty: false };
-  if (how === 'signup' || !r.save) { sync.rev = r.rev; saveSync(); if (!r.save) await push(); else setState('saved'); return; }
+  await signedIn(r, how === 'signup');
+}
+// whose progress this is: the username, or a CrazyGames player's account ID (their username can change)
+const acctKey = a => a.cg ? '#' + a.id : a.user.toLowerCase();
+// a sign-in reply ({user, id, token, rev, save}): start syncing. fresh = a new account made from this device's progress
+async function signedIn(r, fresh) {
+  auth = { user: r.user, token: r.token, id: r.id, ...(r.cg ? { cg: true, cgId: r.cgId } : {}) };
+  try { localStorage.setItem('voxelstrike-auth', JSON.stringify(auth)); } catch {}
+  const otherAccount = sync.user && sync.user.toLowerCase() !== acctKey(auth);
+  sync = { user: acctKey(auth), rev: 0, dirty: false };
+  if (auth.cg) cgLook();
+  if (fresh || !r.save) { sync.rev = r.rev; saveSync(); if (!r.save) await push(); else setState('saved'); return; }
   // signing in on a device that already has progress: the bigger save wins, unless this device was synced to a different account
   if (otherAccount || progress(r.save.prof) >= progress(prof)) { applySave(r.save); sync.rev = r.rev; saveSync(); setState('saved'); }
   else { sync.rev = r.rev; saveSync(); await push(); }
 }
 
 renderAcct();
-if (auth) { if (sync.user !== auth.user) { sync.user = auth.user; saveSync(); } pull(); }
+if (auth && !cg.on) { if (sync.user !== acctKey(auth)) { sync.user = acctKey(auth); saveSync(); } pull(); }
+
+// ---- CrazyGames: no username or password here, you're signed in with your CrazyGames account (POST /auth/cg with their signed
+// token, the server checks it). Guests play as guests; the ☁ button asks CrazyGames to log in. Signed in, your name is your
+// CrazyGames username (the name box is locked) and FRIENDS shows up (body.cgIn). Logging out of CrazyGames signs you out here too
+async function cgToken() { return cg.sdk.user.getUserToken(); } // their token (a function of its own, so the tests can hand over one)
+let cgBusy = false;
+async function cgSignIn() {
+  if (!cg.on || cgBusy) return;
+  cgBusy = true;
+  try {
+    let who = null; try { who = await cg.sdk.user.getUser(); } catch {}
+    if (!who) { if (auth?.cg) signedOut(); return; } // a guest, or just logged out
+    if (auth?.cg && auth.cgId === who.__dangerousUserId) { pull(); return; } // still signed in from last time
+    let tok = null; try { tok = await cgToken(); } catch {}
+    if (!tok) return;
+    const r = await api('POST', '/auth/cg', { token: tok, save: snapshot() });
+    if (!r.token) { setState('offline'); return; }
+    if (auth) api('POST', '/logout').catch(() => {}); // someone else was signed in on this device
+    await signedIn({ ...r, cgId: who.__dangerousUserId }, r.fresh);
+  } catch { setState('offline'); }
+  finally { cgBusy = false; cgLook(); }
+}
+function cgLook() {
+  const on = cg.on && !!auth?.cg;
+  document.body.classList.toggle('cgIn', on);
+  $('nameIn').readOnly = on;
+  if (on && myName !== auth.user) $('nameIn').value = setMyName(auth.user);
+  renderAcct();
+}
+if (cg.on) {
+  if (cg.sdk.user.isUserAccountAvailable) { cgCall(s => s.user.addAuthListener(() => cgSignIn())); cgSignIn(); }
+  else document.body.classList.add('cgNoAcct'); // accounts are off where the game is shown: no ☁ button
+  cgLook();
+}
 // pick up progress from your other devices when you come back to this tab or sit in the lobby
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') { if (inLobby) pull(); } // not mid-match: a pulled save would swap your gear under you
