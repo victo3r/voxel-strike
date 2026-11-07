@@ -135,7 +135,8 @@ $('acctIn').addEventListener('click', () => acctGo('login'));
 $('cloudBtn').addEventListener('click', () => {
   sfx('ui');
   if (!cg.on) { showSetTab('account'); openSettings(); return; }
-  if (!auth?.cg) cgCall(s => s.user.showAuthPrompt().then(() => cgSignIn(), () => {})); // CrazyGames' own log in window
+  if (!auth?.cg) { cgCall(s => s.user.showAuthPrompt().then(() => cgSignIn(), () => {})); return; } // CrazyGames' own log in window
+  netToast({ saving: 'Saving to your CrazyGames account…', offline: "You're offline, it'll save when you're back" }[cloudState] || 'Your progress is saved to your CrazyGames account');
 });
 $('acctNew').addEventListener('click', () => acctGo('signup'));
 
