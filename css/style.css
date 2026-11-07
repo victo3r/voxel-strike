@@ -491,13 +491,14 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 .lr{padding:4px 8px;background:rgba(0,0,0,.25);border:2px solid transparent;cursor:pointer;font-size:15px}
 .lr:hover{background:var(--hov)}.lr.you{border-color:#5ee08a;background:rgba(36,170,98,.3)}
 .lr .rk{color:var(--muted);text-align:right}.lr img{height:26px;image-rendering:pixelated}
-.lr b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lr .lv{color:var(--muted);font-size:12px}.lr .v{text-align:right;color:#ffd75e;font-weight:bold}
+.lr .nm{display:flex;align-items:baseline;gap:6px;min-width:0;overflow:hidden;white-space:nowrap}.lr .nm b{overflow:hidden;text-overflow:ellipsis}.lr .nm small{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}.lr .lv{color:var(--muted);font-size:12px}.lr .v{text-align:right;color:#ffd75e;font-weight:bold}
 .lbList .lr:nth-child(1) .rk{color:#ffd75e}.lbList .lr:nth-child(2) .rk{color:#d8dde6}.lbList .lr:nth-child(3) .rk{color:#e09a5a}
 .lbFoot{display:flex;gap:8px;justify-content:flex-end}
 .cTop{display:flex;gap:16px;align-items:center}.cSkin{height:150px;image-rendering:pixelated;filter:drop-shadow(4px 4px 0 rgba(0,0,0,.4))}
 .cWho{display:flex;flex-direction:column;gap:6px;min-width:0}.cWho h1{overflow:hidden;text-overflow:ellipsis}
 .cLv{font-size:18px}.cLv small{color:var(--muted);font-size:12px;margin-left:6px}
-.cGear{display:flex;gap:6px}.cGear img{height:38px;image-rendering:pixelated;background:rgba(0,0,0,.3);border:2px solid var(--line-dim);padding:3px}
+.cGear{display:flex;gap:6px}.cGear img{width:44px;height:44px;box-sizing:border-box;object-fit:contain;image-rendering:pixelated;background:rgba(0,0,0,.3);border:2px solid var(--line-dim);padding:4px}
+.cUser{color:var(--muted);font-size:13px;margin-top:-4px}
 .cStats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .cs{display:flex;flex-direction:column;align-items:center;padding:8px 4px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}
 .cs b{font-size:22px;color:#ffd75e}.cs span{font-size:11px;color:var(--muted)}

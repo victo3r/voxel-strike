@@ -432,7 +432,7 @@ function fpsTick(raw) {
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // spent mags lying about (weapons.js dropPart)
-  if (inLobby) { cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
+  if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pauses while the menu (or settings) is open. Bot matches keep running behind the menu, the way an online
   // match would: with the mouse unlocked your keys are released, so you just stand there
@@ -440,6 +440,7 @@ function fpsTick(raw) {
   const live = isLive();
   cgPlay(live && locked && !inLobby); // CrazyGames: you're playing (js/crazy.js)
   if (live) for (let k = 0; k < steps && (k === 0 || isLive()); k++) update(sdt);
+  if ((dead || respawnT > 0 || matchOver || inLobby) && $('rl').style.display !== 'none') $('rl').style.display = 'none'; // the reload ring only shows while you play (dead in Zombie Waves, waiting to respawn in a match, or done)
   else if (mode === 'zombies' && dead && !matchOver && (deadT += dt) >= DEAD_T) zombiesOver(); // zombie waves: you're dead, the world holds for a beat, then the results
   soundTick(dt, live);
   // bots and zombies are drawn a little low for a moment after stepping up a ledge, so they climb it smoothly
