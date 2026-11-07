@@ -406,7 +406,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #acctErr{color:#f96;min-height:1.2em}
 #acctForm small{color:var(--muted)!important;font-size:12px}
 /* until the first frame of the lobby is drawn, show only the background, then fade everything else in */
-.boot>*:not(canvas){opacity:0!important;pointer-events:none!important}
+.boot>*:not(canvas):not(#noTouch){opacity:0!important;pointer-events:none!important}
 .booting>*:not(canvas){transition:opacity .45s ease-out}
 #cloudBtn{font:bold 15px monospace;width:40px;height:32px;padding:0;line-height:0;display:flex;align-items:center;justify-content:center}
 #cloudBtn .ic{vertical-align:0;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.7))}
@@ -504,3 +504,9 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 .cs b{font-size:22px;color:#ffd75e}.cs span{font-size:11px;color:var(--muted)}
 .cFav{display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}.cFav span{font-size:11px;color:var(--muted)}.cFav img{height:30px;image-rendering:pixelated}
 #postBoard [data-fid],#friends .pn{cursor:pointer}#postBoard [data-fid]:hover,#friends .pn:hover{text-decoration:underline}
+/* touch-only devices (index.html): a full-screen note instead of the game */
+#noTouch{display:none}
+body.touchOnly #noTouch{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2f5a3a,#14241a);font-family:monospace;color:#fff;text-align:center;text-shadow:3px 3px 0 #000}
+body.touchOnly #noTouch>div{padding:24px 20px;border:4px solid #fff;background:rgba(0,0,0,.35);box-shadow:6px 6px 0 rgba(0,0,0,.45);max-width:420px}
+body.touchOnly #noTouch h1{margin:0 0 14px;font-size:clamp(30px,9vw,46px);color:#ffd75e;letter-spacing:2px}
+body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:1.4}

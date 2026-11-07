@@ -1,9 +1,14 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<link id="css" rel="stylesheet" href="css/style.css?v=117">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link id="css" rel="stylesheet" href="css/style.css?v=119">
 </head>
 <body class="boot">
+<!-- a phone or tablet with only a touchscreen: the game needs a keyboard and mouse, so it says so and doesn't load (style.css #noTouch).
+     A tablet or touch laptop with a mouse or trackpad plugged in has a fine pointer too, so it plays as normal -->
+<div id="noTouch"><div><h1>VOXEL STRIKE</h1><p>Grab a keyboard and mouse, this one's played on a computer!</p></div></div>
+<script>if (!matchMedia('(any-pointer: fine)').matches && matchMedia('(any-pointer: coarse)').matches) document.body.classList.add('touchOnly');</script>
 <div id="hud">
   <div id="hit"></div><canvas id="scope"></canvas><canvas id="holo"></canvas><canvas id="cross"></canvas><svg id="rl" viewBox="0 0 80 80" style="display:none"><circle class="bg" cx="40" cy="40" r="34"/><circle id="rlFg" cx="40" cy="40" r="34"/></svg><div id="hm"><i></i><i></i><i></i><i></i></div>
   <div id="top"></div><div id="bossbar"><div id="bossfill"></div><span>BOSS</span></div><div id="banner"></div>
@@ -164,9 +169,10 @@ import * as THREE from './lib/three.module.js'; // three.js r160 (MIT), kept her
 window.THREE = THREE;
 // Bump V (and the ?v= on the stylesheet above) on every update so browsers
 // grab the new files instead of mixing in old cached ones.
-const V = 129;
+const V = 130;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js'];
+if (!document.body.classList.contains('touchOnly')) { // touch-only devices stop at the keyboard-and-mouse screen above
 // js/crazy.js first: on CrazyGames it loads their SDK and puts your saved progress in place, and the rest waits for that (cgReady)
 await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });
 await (window.cgReady || Promise.resolve());
@@ -174,6 +180,7 @@ for (const src of FILES) {
   const s = document.createElement('script');
   s.src = src + '?v=' + V; s.async = false; // async=false keeps them running in list order
   document.body.append(s);
+}
 }
 </script>
 </body></html>
