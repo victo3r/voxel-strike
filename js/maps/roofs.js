@@ -1,12 +1,12 @@
 startMap('roofs', {
-  name: 'Rooftops', size: 'small', half: 24,
-  env: { sky: 0xf2a878, fog: 0xe7a07c, fogNear: 30, fogFar: 110, hemiSky: 0xffd6b0, hemiGround: 0x5a4660, hemi: 1, sunColor: 0xffb47a, sun: 1.25, sunDir: [-22, 9, 14] },
+  name: 'Rooftops', size: 'small', half: 27,
+  env: { sky: 0xf2a878, fog: 0xe7a07c, fogNear: 30, fogFar: 110, hemiSky: 0xffd6b0, hemiGround: 0x5a4660, hemi: 1, sunColor: 0xffb47a, sun: 1.25, sunDir: [-24, 8, 3] },
   pads: [[-12, -11, 6], [9, -9, 3], [-12, 10, 4.5], [0, 14, 0]],
   crates: [[-20, 21.5, 1], [-18.8, 22, 0], [-8, 22.5, 0], [-12, -22.5, 0], [15, -22.5, 1], [16.2, -22.6, 0], [22.6, -15, 0], [22.6, -13.8, 0], [22.5, 12, 1]],
 });
 {
 const M = MAPS.roofs, RA = M.half, rnd = seeded(5150);
-const G = 140;
+const G = 140, RING = 31.5; // ground size, the ring road round the fence
 const wall = (rgb, k = 12, lines) => tex(g => { noise(g, rgb, k); if (lines) lines(g); });
 addGround(G, lam({ map: tex(g => { noise(g, [72, 70, 74], 14); g.fillStyle = 'rgba(0,0,0,.18)'; for (let i = 0; i < 5; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }, G * 2, G * 2) }));
 addWall(0, -RA, RA * 2 + .3, .3); addWall(0, RA, RA * 2 + .3, .3);
@@ -21,22 +21,25 @@ const metal = surf(lam({ map: tex(g => { noise(g, [86, 72, 66], 14); g.fillStyle
 const plank = surf(lam({ map: tex(g => { noise(g, [146, 108, 70], 18); g.fillStyle = 'rgba(60,35,15,.45)'; for (const y of [0, 4, 8, 12]) g.fillRect(0, y, 16, 1); }) }), 'wood');
 const steel = surf(lam({ color: 0x8b9298 }), 'metal'), dark = lam({ color: 0x2c2c30 });
 const curb = surf(plaster([150, 148, 144]), 'stone');
+const acMat0 = surf(lam({ map: tex(g => { noise(g, [196, 198, 200], 8); g.fillStyle = 'rgba(0,0,0,.35)'; for (const y of [3, 6, 9, 12]) g.fillRect(1, y, 14, 1); }) }), 'metal');
 
 // buildings: footprint, roof height, wall. The north-east block is an L round its tower
 const BLD = [
-  { r: 1, x0: -19, x1: -4.5, z0: -19, z1: -4.5, h: 6, m: brick([150, 66, 50]) },
-  { r: 2, x0: 4.5, x1: 19.5, z0: -19, z1: -12, h: 3, m: plaster([214, 196, 160]) },
-  { r: 2, x0: 4.5, x1: 12, z0: -12, z1: -4.5, h: 3, m: plaster([214, 196, 160]) },
-  { r: 3, x0: 12, x1: 19.5, z0: -12, z1: -4.5, h: 7.5, m: plaster([150, 156, 164]) },
-  { r: 4, x0: -19.5, x1: -4.5, z0: 4.5, z1: 16, h: 4.5, m: brick([118, 78, 58]) },
-  { r: 5, x0: 4.5, x1: 18, z0: 4.5, z1: 19, h: 9, m: plaster([112, 130, 150]) },
+  { r: 1, x0: -19, x1: -4.5, z0: -19, z1: -4.5, h: 6, m: brick([150, 66, 50]), win: [.6, 1.5, 2.4, 1], door: 3, aw: 0x2f6a46 },
+  { r: 2, x0: 4.5, x1: 19.5, z0: -19, z1: -12, h: 3, m: plaster([214, 196, 160]), win: [1.3, 1, 2.8], open: [1] },
+  { r: 2, x0: 4.5, x1: 12, z0: -12, z1: -4.5, h: 3, m: plaster([214, 196, 160]), shop: [2, 1], aw: 0xc0392b, open: [0, 3] },
+  { r: 3, x0: 12, x1: 19.5, z0: -12, z1: -4.5, h: 7.5, m: plaster([150, 156, 164]), win: [.7, 2, 1.6], fh: 3.6, door: 3 },
+  { r: 4, x0: -19.5, x1: -4.5, z0: 4.5, z1: 16, h: 4.5, m: brick([118, 78, 58]), win: [1, 1.2, 2.5], shop: [3, 0], aw: 0x3a6ab0 },
+  { r: 5, x0: 4.5, x1: 18, z0: 4.5, z1: 19, h: 9, m: plaster([112, 130, 150]), win: [1.1, 1.3, 2.1], shop: [2, 0], aw: 0xd88a2a },
 ];
 const roofAt = (x, z) => BLD.reduce((b, B) => x > B.x0 && x < B.x1 && z > B.z0 && z < B.z1 && (!b || B.h > b.h) ? B : b, null);
 // stairs and bridges onto the roofs (they leave gaps in the parapets)
 const GAPS = [];
-for (const B of BLD) {
-  addSlab((B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2, B.x1 - B.x0, B.z1 - B.z0, 0, B.h, B.m, true, 2);
-  const cap = tbox(B.x1 - B.x0, .04, B.z1 - B.z0, tar); cap.position.set((B.x0 + B.x1) / 2, B.h + .015, (B.z0 + B.z1) / 2); add(cap);
+const PT = .25, PH = .8, CAP = .04;
+for (const B of BLD) { // walls, then the roof inside the parapets (sides where blocks join stay flush)
+  addSlab((B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2, B.x1 - B.x0, B.z1 - B.z0, 0, B.h - CAP, B.m, true, 2);
+  const o = i => B.open?.includes(i) ? 0 : PT, x0 = B.x0 + o(2), x1 = B.x1 - o(3), z0 = B.z0 + o(0), z1 = B.z1 - o(1);
+  addSlab((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, B.h - CAP, B.h, tar, false);
 }
 
 // fire escapes: open metal steps along a wall, a landing at the top, then a step sideways onto the roof
@@ -82,14 +85,13 @@ bridge(-12, -4.5, 6, -12, 4.5, 4.5); CONNS.push([1, 4, [[-12, -6, 6], [-12, 6, 4
 bridge(-4.5, -15, 6, 4.5, -15, 3); CONNS.push([1, 2, [[-6, -15, 6], [6, -15, 3]]]);
 bridge(16, -4.5, 7.5, 16, 4.5, 9); CONNS.push([3, 5, [[16, -6, 7.5], [16, 6, 9]]]);
 // parapets round the roofs, open where the stairs and bridges arrive
-const PT = .25, PH = .8;
 function parapet(x0, z0, x1, z1, y) {
-  const ax = z0 === z1, a = ax ? x0 : z0, b = ax ? x1 : z1, c = ax ? z0 : x0;
+  const ax = z0 === z1, a = ax ? x0 : z0 + PT, b = ax ? x1 : z1 - PT, c = ax ? z0 : x0;
   const cuts = GAPS.filter(([gx, gz]) => Math.abs((ax ? gz : gx) - c) < 1.2 && (ax ? gx : gz) > a - .5 && (ax ? gx : gz) < b + .5).map(([gx, gz]) => ax ? gx : gz).sort((p, q) => p - q);
   let s = a;
   for (const g of [...cuts, null]) {
     const e = g === null ? b : Math.max(s, g - .9);
-    if (e - s > .3) { const m = (s + e) / 2; addSlab(ax ? m : c, ax ? c : m, ax ? e - s : PT, ax ? PT : e - s, y, y + PH, capMat); }
+    if (e - s > .3) { const m = (s + e) / 2; addSlab(ax ? m : c, ax ? c : m, ax ? e - s : PT, ax ? PT : e - s, y - CAP, y + PH, capMat); }
     if (g !== null) s = Math.min(b, g + .9);
   }
 }
@@ -100,22 +102,52 @@ parapet(12, -12 + inset, 19.5, -12 + inset, 7.5); parapet(12, -4.5 - inset, 19.5
 parapet(-19.5, 4.5 + inset, -4.5, 4.5 + inset, 4.5); parapet(-19.5, 16 - inset, -4.5, 16 - inset, 4.5); parapet(-19.5 + inset, 4.5, -19.5 + inset, 16, 4.5); parapet(-4.5 - inset, 4.5, -4.5 - inset, 16, 4.5);
 parapet(4.5, 4.5 + inset, 18, 4.5 + inset, 9); parapet(4.5, 19 - inset, 18, 19 - inset, 9); parapet(4.5 + inset, 4.5, 4.5 + inset, 19, 9); parapet(18 - inset, 4.5, 18 - inset, 19, 9);
 
-// windows: a grid on every outside wall, some lit
+// windows: each building has its own shape, and every window is a little different
 {
-  const glass = [], lit = [], sills = [];
-  for (const B of BLD) for (const [ax, c, a, b, out] of [['x', B.z0, B.x0, B.x1, -1], ['x', B.z1, B.x0, B.x1, 1], ['z', B.x0, B.z0, B.z1, -1], ['z', B.x1, B.z0, B.z1, 1]]) {
-    const n = Math.floor((b - a - 1) / 2.2);
-    for (let fl = 0; fl * 3 + 2.2 < B.h; fl++) for (let i = 0; i < n; i++) {
-      const u = a + (b - a) / 2 + (i - (n - 1) / 2) * 2.2, y = fl * 3 + 1.5;
-      if (roofAt(ax === 'x' ? u : c + out * .5, ax === 'x' ? c + out * .5 : u)) continue; // that side faces another part of the building
-      const x = ax === 'x' ? u : c + out * .03, z = ax === 'x' ? c + out * .03 : u, w = ax === 'x' ? .9 : .06, d = ax === 'x' ? .06 : .9;
-      (rnd() < .3 ? lit : glass).push([x, y, z, w, 1.2, d, 0, 0xffffff]);
-      sills.push([ax === 'x' ? u : c + out * .08, y - .66, ax === 'x' ? c + out * .08 : u, ax === 'x' ? 1.1 : .16, .1, ax === 'x' ? .16 : 1.1, 0, 0xffffff]);
+  const frames = [], glass = [], lit = [], curt = [], sills = [], units = [], shops = [], doors = [], awn = [];
+  const LIT = [0xffc879, 0xffd9a0, 0xffb860, 0xffe6bf, 0xa8c8ff], DARK = [0x2a3a4c, 0x34424e, 0x243040, 0x3a4048], CURT = [0xb0483a, 0x5a7a4a, 0xd8c8a0, 0x4a5a8a, 0xc89040];
+  const pick = a => a[rnd() * a.length | 0];
+  BLD.forEach(B => [['x', B.z0, B.x0, B.x1, -1], ['x', B.z1, B.x0, B.x1, 1], ['z', B.x0, B.z0, B.z1, -1], ['z', B.x1, B.z0, B.z1, 1]].forEach(([ax, c, a, b, out], side) => {
+    const at = (u, y, off, w, h, d) => [ax === 'x' ? u : c + out * off, y, ax === 'x' ? c + out * off : u, ax === 'x' ? w : d, h, ax === 'x' ? d : w, 0];
+    const outside = u => !roofAt(ax === 'x' ? u : c + out * .5, ax === 'x' ? c + out * .5 : u); // not a wall shared with the rest of the block
+    const shop = B.shop?.includes(side), fh = B.fh || 3, mid = (a + b) / 2;
+    if (shop) { // shop windows and an awning along the street
+      const n = Math.floor((b - a - 1) / 3);
+      for (let i = 0; i < n; i++) {
+        const u = mid + (i - (n - 1) / 2) * 3; if (!outside(u)) continue;
+        if (i === (n >> 1)) doors.push(at(u, 1.05, .03, 1.1, 2.1, .06)); else { (rnd() < .6 ? lit : glass).push([...at(u, 1.3, .03, 2.3, 1.8, .06), rnd() < .6 ? pick(LIT.slice(0, 4)) : pick(DARK)]); frames.push(at(u, 1.3, .015, 2.5, 2, .03), at(u, 1.3, .07, .08, 1.8, .04)); }
+      }
+      if (outside(mid)) awn.push([ax, c, out, mid, b - a - 1.2, B.aw]);
+    } else if (B.door === side && outside(mid)) doors.push(at(mid, 1.05, .03, 1.1, 2.1, .06));
+    if (!B.win) return;
+    const [ww, wh, gap, pair] = B.win, n = Math.floor((b - a - 1) / gap);
+    for (let fl = shop ? 1 : 0; fl * fh + wh + 1 < B.h; fl++) for (let i = 0; i < n; i++) {
+      const u0 = mid + (i - (n - 1) / 2) * gap, y = fl * fh + 1.1 + wh / 2;
+      if (!outside(u0) || !fl && B.door === side && Math.abs(u0 - mid) < 1.4 || rnd() < .06) continue;
+      for (const u of pair ? [u0 - ww * .55, u0 + ww * .55] : [u0]) {
+        const r = rnd();
+        if (r < .3) lit.push([...at(u, y, .03, ww, wh, .06), pick(LIT)]); else glass.push([...at(u, y, .03, ww, wh, .06), pick(DARK)]);
+        if (rnd() < .25) curt.push([...at(u, y + wh * .25, .05, ww * .96, wh * .5, .04), pick(CURT)]); // blinds or curtains
+      }
+      sills.push([...at(u0, y - wh / 2 - .06, .08, pair ? ww * 2.3 : ww + .2, .1, .16), 0xffffff]);
+      if (B.m.map && fl && rnd() < .5) sills.push([...at(u0, y + wh / 2 + .07, .04, pair ? ww * 2.3 : ww + .2, .14, .08), 0xb8aa98]); // lintel
+      if (rnd() < .08) units.push([...at(u0, y - wh / 2 + .25, .2, .6, .42, .4), 0xffffff]); // a window air conditioner
     }
-  }
-  instanced(unit, lam({ color: 0x2a3a4c }), glass);
-  instanced(unit, new THREE.MeshBasicMaterial({ color: 0xffc879 }), lit);
+  }));
+  instanced(unit, lam({}), glass);
+  instanced(unit, dark, frames.map(f => [...f, 0xffffff]));
+  instanced(unit, new THREE.MeshBasicMaterial({}), lit);
+  instanced(unit, lam({}), curt);
   instanced(unit, lam({ color: 0xc8c0b4 }), sills);
+  instanced(unit, acMat0, units);
+  instanced(unit, lam({ color: 0x4a3426 }), doors.map(d => [...d, 0xffffff]));
+  const stripes = new Map(); // striped awnings, sloping down over the sidewalk
+  for (const [ax, c, out, u, len, color] of awn) {
+    if (!stripes.has(color)) stripes.set(color, lam({ map: tex(g => { g.fillStyle = '#' + color.toString(16).padStart(6, '0'); g.fillRect(0, 0, 16, 16); g.fillStyle = '#f2ece0'; for (const x of [0, 8]) g.fillRect(x, 0, 4, 16); }) }));
+    const m = tbox(ax === 'x' ? len : 1.2, .08, ax === 'x' ? 1.2 : len, stripes.get(color), 2); m.position.set(ax === 'x' ? u : c + out * .58, 2.75, ax === 'x' ? c + out * .58 : u);
+    if (ax === 'x') m.rotation.x = out * .35; else m.rotation.z = -out * .35;
+    add(m);
+  }
 }
 // sidewalks along the streets
 for (const [X0, X1, Z0, Z1] of [[-19, -4.5, -19, -4.5], [4.5, 19.5, -19, -4.5], [-19.5, -4.5, 4.5, 16], [4.5, 18, 4.5, 19]]) {
@@ -130,7 +162,7 @@ for (const [X0, X1, Z0, Z1] of [[-19, -4.5, -19, -4.5], [4.5, 19.5, -19, -4.5], 
   const paint = (c) => lam({ color: c, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const flat = (w, d, m, x, z) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), m); p.rotation.x = -Math.PI / 2; p.position.set(x, .02, z); add(p); };
   const yel = paint(0xe8c040), wht = paint(0xe8e6e0);
-  for (let s = -60; s < 60; s += 3) { if (Math.abs(s + .9) > 6) { flat(.15, 1.8, yel, 0, s + .9); flat(1.8, .15, yel, s + .9, 0); } }
+  for (let s = -66; s < 66; s += 3) { if (Math.abs(s + .9) > 6 && Math.abs(Math.abs(s + .9) - RING) > 4.5) { flat(.15, 1.8, yel, 0, s + .9); flat(1.8, .15, yel, s + .9, 0); } }
   for (const [x, z, ax] of [[0, -5.6, 1], [0, 5.6, 1], [-5.6, 0, 0], [5.6, 0, 0]]) for (let i = -3; i <= 3; i++) flat(ax ? .5 : 1.6, ax ? 1.6 : .5, wht, x + (ax ? i * .9 : 0), z + (ax ? 0 : i * .9));
 }
 
@@ -156,15 +188,15 @@ for (const [x, z, ry] of [[-22, -17, 0], [21.8, -9.5, 0], [-6, 21.5, Math.PI / 2
 }
 for (const [x, z, ax] of [[-1.2, -21, 1], [9.5, -1.5, 0], [-10, 1.8, 0], [1.4, 20.5, 1]]) addBlock(x, z, ax ? 2.4 : .7, ax ? .7 : 2.4, .85, concrete);
 const lampMat = new THREE.MeshBasicMaterial({ color: 0xffe2a0 });
-for (const [x, z] of [[-5.3, -5.3], [5.3, 5.3], [-5.3, 20], [20, -5.3]]) {
+for (const [x, z, dx, dz] of [[-3.8, -3.8, 1, 0], [3.8, 3.8, -1, 0], [-3.8, 20, 1, 0], [21, -3.8, 0, 1]]) { // on the sidewalk, leaning over the road
   addSlab(x, z, .16, .16, 0, 4.4, dark, false);
-  const arm = box(.9, .08, .08, dark); arm.position.set(x + (x < 0 ? .45 : -.45), 4.35, z); add(arm);
-  const head = box(.4, .18, .3, lampMat); head.position.set(x + (x < 0 ? .85 : -.85), 4.25, z); add(head);
+  const arm = box(dx ? .9 : .08, .08, dz ? .9 : .08, dark); arm.position.set(x + dx * .45, 4.35, z + dz * .45); add(arm);
+  const head = box(dx ? .4 : .3, .18, dz ? .4 : .3, lampMat); head.position.set(x + dx * .85, 4.25, z + dz * .85); add(head);
 }
 addCrates(M.crates);
 
 // --- rooftop things ---
-const acMat = surf(lam({ map: tex(g => { noise(g, [196, 198, 200], 8); g.fillStyle = 'rgba(0,0,0,.35)'; for (const y of [3, 6, 9, 12]) g.fillRect(1, y, 14, 1); }) }), 'metal');
+const acMat = acMat0;
 for (const [x, z, y, w, d, h] of [[-15, -16, 6, 1.6, 1.1, 1], [-8.5, -9, 6, 1.1, 1.6, 1], [17, -16.5, 3, 1.6, 1.1, 1], [-16, 13, 4.5, 1.6, 1.1, 1], [-8, 8.5, 4.5, 1.1, 1.6, 1], [8.5, 15.5, 9, 1.6, 1.2, 1.1], [14.5, -8.5, 7.5, 1.4, 1, .9]]) {
   addSlab(x, z, w, d, y, y + h, acMat);
   const fan = box(Math.min(w, d) * .7, .04, Math.min(w, d) * .7, dark); fan.position.set(x, y + h + .02, z); add(fan);
@@ -202,18 +234,58 @@ for (const [x, z] of [[-13, 8], [-10, 12.5]]) { addSlab(x, z, 2, 1.4, 4.5, 5.05,
 }
 // antennas and a dish on the tower
 for (const [x, z, h] of [[18, -10.5, 3], [17.2, -10.8, 2]]) { const a = box(.08, h, .08, dark); a.position.set(x, 7.5 + h / 2, z); add(a); }
-{ const dish = new THREE.Mesh(new THREE.CylinderGeometry(.6, .1, .25, 10), steel); dish.position.set(13.5, 8.1, -11); dish.rotation.x = -.9; add(dish); }
+{ const pole = box(.12, .7, .12, dark); pole.position.set(13.5, 7.85, -11); add(pole); const base = box(.5, .1, .5, dark); base.position.set(13.5, 7.55, -11); add(base); const dish = new THREE.Mesh(new THREE.CylinderGeometry(.6, .1, .25, 10), steel); dish.position.set(13.5, 8.3, -11.1); dish.rotation.x = -.9; add(dish); }
 
-// --- the city round the edge ---
+// --- round the edge: a fence, a ring road, then city blocks ---
 {
+  const link = seeThru(tex(g => { g.fillStyle = '#9aa0a6'; for (let i = 0; i < 16; i++) { g.fillRect(i, i, 1, 1); g.fillRect(15 - i, i, 1, 1); } }));
+  link.map.repeat.set(RA * 4, 4.8);
+  for (const [x, z, ry] of [[0, -RA, 0], [0, RA, 0], [-RA, 0, Math.PI / 2], [RA, 0, Math.PI / 2]]) {
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(RA * 2, 2.4), link); f.position.set(x, 1.2, z); f.rotation.y = ry; add(f);
+    const top = box(ry ? .08 : RA * 2, .08, ry ? RA * 2 : .08, steel); top.position.set(x, 2.4, z); add(top);
+    for (let u = -RA; u <= RA; u += 3) { const p = box(.1, 2.5, .1, steel); p.position.set(ry ? x : u, 1.25, ry ? u : z); add(p); }
+  }
+  // a curb under the fence (the blocks' own sidewalks line the far side of the ring road)
+  const strip = (x0, x1, z0, z1) => { const b = tbox(x1 - x0, .15, z1 - z0, curb, 2); b.position.set((x0 + x1) / 2, .075, (z0 + z1) / 2); add(b); };
+  const a = RA, b = RA + .8;
+  for (const sg of [-1, 1]) {
+    const lo = Math.min(sg * a, sg * b), hi = Math.max(sg * a, sg * b);
+    for (const [u0, u1] of [[-b, -3.1], [3.1, b]]) strip(u0, u1, lo, hi); // along z, corners included
+    for (const [u0, u1] of [[-a, -3.1], [3.1, a]]) strip(lo, hi, u0, u1); // along x, leaving the main roads open
+  }
+  // ring road markings
+  const yel = lam({ color: 0xe8c040, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  for (const sg of [-1, 1]) for (let u = -66; u < 66; u += 3) {
+    if (Math.abs(u + .9) < 4.5 || Math.abs(Math.abs(u + .9) - RING) < 4.5) continue;
+    for (const [w, d, x, z] of [[1.8, .15, u + .9, sg * RING], [.15, 1.8, sg * RING, u + .9]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), yel); m.rotation.x = -Math.PI / 2; m.position.set(x, .02, z); add(m); }
+  }
+  // city blocks between the roads: a raised sidewalk, buildings on lots, now and then a little park
   const skyline = (rgb, litA) => tex(g => { noise(g, rgb, 8); for (let y = 2; y < 16; y += 4) for (let x = 1; x < 16; x += 4) { g.fillStyle = Math.random() < litA ? '#ffcf86' : 'rgba(30,36,50,.85)'; g.fillRect(x, y, 2, 2); } });
-  const mats = [[150, 90, 80], [190, 176, 150], [120, 128, 140], [96, 84, 96], [170, 120, 90]].map(c => lam({ map: skyline(c, .35) }));
-  const r2 = seeded(31);
-  for (let k = 0; k < 90; k++) {
-    const a = r2() * Math.PI * 2, d = 40 + r2() * 32, x = Math.cos(a) * d, z = Math.sin(a) * d;
-    if (Math.max(Math.abs(x), Math.abs(z)) < 36 || Math.abs(x) < 7 || Math.abs(z) < 7) continue; // keep the roads clear
-    const w = 6 + r2() * 8, dd = 6 + r2() * 8, h = 8 + r2() * 26, m = mats[k % mats.length];
-    const b = tbox(w, h, dd, m, 4); b.position.set(x, h / 2, z); add(b);
+  const mats = [[150, 90, 80], [190, 176, 150], [120, 128, 140], [96, 84, 96], [170, 120, 90], [140, 150, 130]].map(c => lam({ map: skyline(c, .35) }));
+  const roofM = lam({ color: 0x4a4648 }), grass = lam({ map: tex(g => noise(g, [86, 130, 60], 26)) }), r2 = seeded(31);
+  const LINES = [-70, -RING, 0, RING, 70], edge = v => v === 0 ? 4.6 : 5;
+  let parks = 0;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    if ((i === 1 || i === 2) && (j === 1 || j === 2)) continue; // the map itself
+    const x0 = LINES[i] + edge(LINES[i]), x1 = LINES[i + 1] - edge(LINES[i + 1]), z0 = LINES[j] + edge(LINES[j]), z1 = LINES[j + 1] - edge(LINES[j + 1]);
+    const pad = tbox(x1 - x0 + 3, .15, z1 - z0 + 3, curb, 2); pad.position.set((x0 + x1) / 2, .075, (z0 + z1) / 2); add(pad);
+    const near = i === 1 || i === 2 || j === 1 || j === 2;
+    if (near && parks < 2 && r2() < .35) { // a park
+      parks++;
+      const gr = box(x1 - x0, .05, z1 - z0, grass); gr.position.set((x0 + x1) / 2, .17, (z0 + z1) / 2); add(gr);
+      for (let t = 0; t < 7; t++) {
+        const tx = x0 + 2 + r2() * (x1 - x0 - 4), tz = z0 + 2 + r2() * (z1 - z0 - 4), h = 2 + r2() * 1.5, s = 2.4 + r2() * 1.4;
+        const tr = box(.4, h, .4, barkMat); tr.position.set(tx, h / 2, tz); add(tr);
+        const lf = box(s, s * .8, s, leafMat); lf.position.set(tx, h + s * .35, tz); add(lf);
+      }
+      continue;
+    }
+    const cut = (a, b) => { const m = a + (b - a) * (.35 + r2() * .3); return [[a, m - .6], [m + .6, b]]; };
+    for (const [ax0, ax1] of cut(x0, x1)) for (const [az0, az1] of cut(z0, z1)) {
+      const h = near ? 9 + r2() * 14 : 16 + r2() * 22, w = ax1 - ax0, d = az1 - az0;
+      const b = tbox(w, h, d, mats[r2() * mats.length | 0], 4); b.position.set((ax0 + ax1) / 2, h / 2, (az0 + az1) / 2); add(b);
+      const top = box(w + .3, .4, d + .3, roofM); top.position.set((ax0 + ax1) / 2, h + .2, (az0 + az1) / 2); add(top);
+    }
   }
 }
 // sunset: a sky dome that fades from gold to purple, and the sun low over the roofs
@@ -225,10 +297,13 @@ const dome = (() => {
   const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
   m.renderOrder = -1; m.frustumCulled = false; m.onBeforeRender = (r, sc, cam) => m.matrixWorld.setPosition(cam.position); add(m); return m;
 })();
-const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(5, 20), new THREE.MeshBasicMaterial({ color: 0xffe0a0, fog: false, depthWrite: false, transparent: true }));
-const SUN_D = new THREE.Vector3(-22, 6, 14).normalize();
-sunDisc.renderOrder = -.5; sunDisc.frustumCulled = false; add(sunDisc);
-sunDisc.onBeforeRender = (r, sc, cam) => { sunDisc.position.copy(cam.position).addScaledVector(SUN_D, 50); sunDisc.lookAt(cam.position); sunDisc.updateMatrixWorld(); };
+const SUN_D = new THREE.Vector3(-1, .3, .12).normalize(); // low, down the west road
+const sunSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, color: 0xffd0a0, fog: false, depthWrite: false, depthTest: false, transparent: false, alphaTest: .5 }));
+const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, color: 0xffb080, fog: false, depthWrite: false, depthTest: false, transparent: false, blending: THREE.AdditiveBlending }));
+[[sunSpr, 6, -.5], [sunGlow, 26, -.6]].forEach(([o, k, ro]) => {
+  o.scale.setScalar(k); o.renderOrder = ro; o.frustumCulled = false; add(o);
+  o.onBeforeRender = (r, sc, cam) => { o.position.copy(cam.position).addScaledVector(SUN_D, 52); o.updateMatrixWorld(); };
+});
 
 // --- bots: which roof you're on, and the way between them ---
 const SEGS = []; // every stretch of stairs or bridge

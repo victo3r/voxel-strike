@@ -321,7 +321,7 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave();
 
 // the play button brings up mode select, then map select
 const ALL_MAPS = ['roofs', 'forest', 'resort', 'sky'];
-const V_MAPS = 7; // bump when the map pictures change
+const V_MAPS = 8; // bump when the map pictures change
 const MODES = [
   // zombies only on the yard for now
   { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Test your loadout and strategy against endless zombie waves', maps: ['yard'] },
