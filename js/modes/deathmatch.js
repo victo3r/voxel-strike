@@ -216,13 +216,12 @@ function scoreKill(killer, victim, head, helpers) {
     const pts = MR.kills ? 1 : KILL_PTS + (head ? HEAD_PTS : 0) + (st ? st[0] : killer.streak > STREAK_PTS_AFTER ? STREAK_PTS : 0);
     killer.score += pts;
     if (killer.you) {
-      toast(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#8ff0b6');
-      sfx(head || st ? 'killSpecial' : 'kill');
+      killNotice(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' · HEADSHOT' : ''}`, killer.streak, head);
     }
   }
   feed(killer && killer !== victim ? `${nameTag(killer)} ${head ? ico('head') : ico('skull')} ${nameTag(victim)}` : `${nameTag(victim)} ${ico('skull')}`);
   const st = killer && killer !== victim && STREAKS[killer.streak];
-  if (st) feed(`${nameTag(killer)} <b style="color:#ffd23f">${st[1]}!</b>`);
+  if (st) feed(`${nameTag(killer)} <b style="color:#8ff0b6">${st[1]}!</b>`);
 }
 
 // spawn spots: as far from enemies as possible
@@ -839,7 +838,7 @@ function endMatch(results) {
   const key = !!results && !results.priv && place === 1; // keys come from public online wins
   if (key) prof.keys = (prof.keys | 0) + 1;
   const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp } = grant(xp, gold); // doubled with a booster
-  $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), key && [`+1 ${ico('key')}`, 'KEY', 'tk'], boostTile()])
+  $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
     + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();

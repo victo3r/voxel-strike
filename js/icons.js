@@ -48,6 +48,34 @@ ICON_ART.down = [...ICON_ART.up].reverse();
   }
   ICON_PIX.bolt = { pal: { o: '#1a1408', y: '#ffc933', l: '#fff0a0', d: '#e09a12' }, rows };
 }
+// full-color icon with a dark outline drawn round it
+const outlined = (rows, pal) => {
+  const at = (x, y) => rows[y - 1]?.[x - 1] && rows[y - 1][x - 1] !== '.', W = Math.max(...rows.map(r => r.length)) + 2, H = rows.length + 2, out = [];
+  for (let y = 0; y < H; y++) { let r = ''; for (let x = 0; x < W; x++) r += at(x, y) ? rows[y - 1][x - 1] : [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => at(x + dx, y + dy)) ? 'o' : '.'; out.push(r); }
+  return { pal: { o: '#141414', ...pal }, rows: out };
+};
+// XP gem
+ICON_PIX.xp = outlined(['..lllgggddd..', '.llllgggdddd.', 'lllllgggddddd', 'ggggggggggggg', '.gggggggggdd.', '..ggggggggd..', '...gggggdd...', '....ggggd....', '.....ggd.....', '......g......'],
+  { l: '#c8ffe0', g: '#2fbf71', d: '#16804a' });
+// kill streak badges
+{
+  const SK = ['.bbbbbbb.', 'bbbbbbbbs', 'bbbbbbbbs', 'bbeebeebs', 'bbeebeebs', 'bbbbkbbbs', '.bbbbbbs.', '..bkbks..', '..bbbss..'];
+  const pad = (rows, l, r = l) => rows.map(x => '.'.repeat(l) + x + '.'.repeat(r));
+  const side = (a, b) => a.map((x, i) => x + '.' + b[i]);
+  const bone = { b: '#eeeae0', s: '#b9b3a6', e: '#1a1a1a', k: '#1a1a1a' };
+  ICON_PIX.s_k2 = outlined(side(SK, SK), bone);
+  ICON_PIX.s_k3 = outlined([...pad(SK, 5), ...side(SK, SK)], bone);
+  ICON_PIX.s_k4 = outlined(['.g.........g.', '.gg.......gg.', '..ggggggggg..', '.ggggggggggg.', 'ggyykgggyykgg', 'ggyykgggyykgg', 'ggggggggggggg', 'gkkkkkkkkkkkg', 'gkwkkwkwkkwkg', 'gkkkkkkkkkkkg', '.ggggggggggg.', '..ggggggggg..'],
+    { g: '#5fc94a', y: '#ffe14a', k: '#1a1a1a', w: '#ffffff' });
+  ICON_PIX.s_ace = outlined(['yyyyyyyyyyy', 'yrwwwwwwwwy', 'ywwwwwwwwwy', 'ywwwwrwwwwy', 'ywwwrwrwwwy', 'ywwwrwrwwwy', 'ywwrwwwrwwy', 'ywwrrrrrwwy', 'ywrwwwwwrwy', 'ywrwwwwwrwy', 'ywwwwwwwwwy', 'ywwwwwwwwry', 'yyyyyyyyyyy'],
+    { y: '#ffc933', w: '#fbf7ee', r: '#d8433b' });
+  const FL = ['.....r.....', '....rr.....', '....rrr..r.', '...rrnr..rr', '..rrnnrr.rr', '..rnnnnrrrr', '.rrnnynnnrr', '.rnnyyynnr.', 'rrnyylyynrr', 'rnnyllllynr', 'rnyylllyynr', '.rnyyyyynr.', '..rrnnnrr..'];
+  ICON_PIX.s_fury = outlined(FL, { r: '#d8331b', n: '#ff8a1e', y: '#ffd23f', l: '#fff6c8' });
+  ICON_PIX.s_rampage = outlined(['h...........h', 'hh.........hh', '.hh.bbbbbbbhh', '..hbbbbbbbbs.', '..bbbbbbbbbs.', '..bbeebeebbs.', '..bbeebeebbs.', '..bbbbkbbbbs.', '...bbbbbbbs..', '....bkbkbs...', '....bbbbss...'].map(r => r.slice(0, 13)),
+    { h: '#efe6cf', b: '#c9302c', s: '#8a1c1a', e: '#ffd23f', k: '#1a1a1a' });
+  ICON_PIX.s_violence = outlined([...pad(['..r...r...r', '.rnr.rnr.rn', 'rnynrnynrny'], 1, 1), ...pad(SK, 2)].map(r => r.padEnd(13, '.').slice(0, 13)),
+    { r: '#c4122f', n: '#ff4a8a', y: '#ffd0e8', b: '#3a1840', s: '#24102a', e: '#ff2a4a', k: '#ff2a4a' });
+}
 {
   const S = 8, css = [];
   for (const [name, rows] of Object.entries(ICON_ART)) {

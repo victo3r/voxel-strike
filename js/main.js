@@ -153,6 +153,7 @@ function update(dt) {
   $('cross').style.display = scoped ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
+  const sw = swapTick(dt); // first, so a gun built this frame gets its own pose
   const vw = WEAPONS[gunShown] ?? w, vhold = holdOf(vw); // pose the gun on screen: the old one while it lowers
   if (vw.melee) { // knife swing
     const c = kick > 0 ? knifeChopFP(1 - kick) : 0;
@@ -184,7 +185,6 @@ function update(dt) {
   reloadSwap(vmRl, w.id, ra ? 1 - reloading / w.reload : -1, gunMag, scene); // mag swap
   if (ra && w.id === 'eradicator' && reloading / w.reload < .12) gunSpinV = Math.max(gunSpinV, 16);
   // weapon swap
-  const sw = swapTick(dt);
   if (sw > 0) { const e = sw * sw * (3 - 2 * sw); vm.position.y -= e * .5; vm.rotation.x -= e * .9; }
   // reload ring
   const rl = $('rl');

@@ -112,3 +112,14 @@ function hitMarker(kind) {
       { transform: at(far), opacity: 0 }], { duration: dur });
   });
 }
+// kill notice under the crosshair: a streak gets its badge and name, the big ones animate and have their own sound
+const STREAK_ICON = { 2: 'k2', 3: 'k3', 4: 'k4', 5: 'ace', 10: 'fury', 20: 'rampage', 50: 'violence' };
+const STREAK_SND = { 5: 'streak_ace', 10: 'streak_fury', 20: 'streak_rampage', 50: 'streak_violence' };
+let killNoteT;
+function killNotice(text, streak, head) {
+  const el = $('killNote'), st = STREAKS[streak], k = st && STREAK_ICON[streak];
+  el.innerHTML = (st ? `<div class="ki">${ico('s_' + k)}</div><div class="kn">${st[1]}!</div>` : '') + `<div class="kt">${text}</div>`;
+  el.className = ''; void el.offsetWidth; el.className = 'show' + (k ? ' k-' + k : '');
+  clearTimeout(killNoteT); killNoteT = setTimeout(() => el.className = el.className.replace('show', 'gone'), streak >= 10 && st ? 2600 : 1500);
+  sfx(STREAK_SND[streak] && st ? STREAK_SND[streak] : head || st ? 'killSpecial' : 'kill');
+}

@@ -37,9 +37,9 @@ function grant(xp, coins) {
   return { ups, bonus, boostUp };
 }
 const xpBar = () => `<div class="xpbar"><div style="width:${prof.lv >= LV_MAX ? 100 : Math.min(100, prof.xp / xpNeed(prof.lv) * 100)}%"></div></div>`;
-// results screen rewards: same-size tiles, the amount over a small label
-const rewardRow = list => `<div class="rw">${list.filter(Boolean).map(([v, l, c]) => `<div class="rt ${c}"><b>${v}</b> <small>${l}</small></div>`).join('')}</div>`;
-const xpTile = n => [`+${n}`, 'XP', 'tx'], coinTile = n => [`+${n} ${COIN}`, 'COINS', 'tc'];
+// results screen rewards: same-size tiles, name on top, the icon, the amount
+const rewardRow = list => `<div class="rw">${list.filter(Boolean).map(([icon, l, v, c]) => `<div class="rt ${c}"><small>${l}</small><span class="ri">${icon}</span><b>${v}</b></div>`).join('')}</div>`;
+const xpTile = n => [ico('xp'), 'XP', `+${n}`, 'tx'], coinTile = n => [COIN, 'COINS', `+${n}`, 'tc'];
 const xpText = () => prof.lv >= LV_MAX ? 'MAX LEVEL' : `${prof.xp} / ${xpNeed(prof.lv)} XP`;
 function showProf() { // lobby level badge and coins
   $('prof').innerHTML = `<div class="lv"><b>LVL ${prof.lv}</b>${xpBar()}<small>${xpText()}</small></div>`;
