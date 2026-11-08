@@ -223,7 +223,7 @@ function heroShot() {
   if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 }); hf.auto = .25; return; }
   hf.cd = w.rate; if (!w.inf) hf.ammo--;
   hf.kick = w.beam ? 0 : w.flame ? .06 : 1; // a beam can't kick: its far end would jump
-  if (w.melee) { sfx('swing', { v: .7 }); return; }
+  if (w.melee) { sfx(w.swing || 'swing', { v: .7 }); return; }
   hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
   if (w.flame) {
     flameHeld = .12;
@@ -240,6 +240,7 @@ function heroShot() {
     hf.beamOn = .08; return;
   }
   sfx(w.id, { v: .5 }); hf.flash = .05;
+  if (w.starFx) starPuff(hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
   const n = w.pellets > 1 ? 5 : 1, mat = w.rocket ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {

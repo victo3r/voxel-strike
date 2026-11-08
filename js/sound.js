@@ -242,6 +242,19 @@ const SOUNDS = {
     s.tone({ type: 'sawtooth', f: 115, f2: 70, d: .04, v: .2, lp: 1400 });
     s.click({ f: 4800, v: .4 });
   }],
+  trex: [.75, .95, s => {
+    s.hiss({ f: 2800, f2: 180, d: .4, v: 1 });
+    s.tone({ f: 110, f2: 32, d: .32, v: 1 });
+    s.tone({ type: 'sawtooth', f: 90, f2: 55, d: .22, v: .25, lp: 700 }); // a little roar under the boom
+    s.hiss({ ft: 'highpass', f: 4000, d: .02, v: .5 });
+    s.pump(.4);
+  }],
+  starsmasher: [.2, .45, s => {
+    s.hiss({ ft: 'bandpass', f: 2300, f2: 1000, q: .8, d: .07, v: .9 });
+    s.tone({ f: 180, f2: 62, d: .06, v: .9 });
+    s.click({ f: 4600, v: .35 });
+    s.tone({ t: .01, f: 2637, f2: 2600, d: .09, v: .07 }); s.tone({ t: .03, f: 3520, f2: 3480, d: .08, v: .05 }); // a starry twinkle
+  }],
   sniper: [1.05, 1, s => {
     s.hiss({ ft: 'highpass', f: 3000, d: .03, v: 1 });
     s.hiss({ f: 4000, f2: 150, d: .6, v: .9 });
@@ -315,6 +328,11 @@ const SOUNDS = {
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
   djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // double jump
   swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife
+  saber: [.35, .5, s => { // a humming blade
+    s.tone({ type: 'sawtooth', f: 95, f2: 140, d: .3, v: .35, lp: 900 });
+    s.tone({ f: 190, f2: 260, d: .28, v: .3 });
+    s.hiss({ ft: 'bandpass', f: 700, f2: 2400, q: 3, a: .05, d: .2, v: .7, sweep: .2 });
+  }],
   slash: [.25, .6, s => {
     s.hiss({ ft: 'bandpass', f: 2200, f2: 7500, q: 4, a: .008, d: .2, v: 1, sweep: .18 });
     s.hiss({ ft: 'highpass', f: 5000, f2: 8000, a: .015, d: .15, v: .4 });
@@ -351,6 +369,15 @@ const SOUNDS = {
   }],
   zout_thrasher: [.25, .34, s => {
     s.tone({ type: 'square', f: 1500, f2: 900, a: .004, d: .045, v: .14, lp: 2400, glide: .04 });
+    s.hiss({ ft: 'bandpass', f: 1600, f2: 550, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
+  }],
+  zin_starsmasher: [.3, .4, s => {
+    s.hiss({ ft: 'bandpass', f: 600, f2: 1800, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 });
+    s.clack({ t: .05, f: 1800, d: .012, v: .55, body: .4 });
+    s.tone({ type: 'square', f: 1300, f2: 1900, t: .07, a: .004, d: .05, v: .14, lp: 2800, glide: .04 });
+  }],
+  zout_starsmasher: [.25, .34, s => {
+    s.tone({ type: 'square', f: 1700, f2: 1000, a: .004, d: .045, v: .12, lp: 2600, glide: .04 });
     s.hiss({ ft: 'bandpass', f: 1600, f2: 550, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
   }],
   zin_hitman: [.22, .32, s => {
@@ -391,6 +418,8 @@ const SOUNDS = {
     s.tone({ f: 2400, t: .82, d: .15, v: .3 });
   }],
   r_shotgun: [1.6, .45, s => { for (const t of [.15, .45, .75, 1.05]) s.shell(t); s.pump(1.3); }],
+  r_trex: [1.6, .45, s => { for (const t of [.15, .45, .75, 1.05]) s.shell(t); s.pump(1.3); }],
+  r_starsmasher: [1.6, .45, s => { s.magOut(.15); s.magIn(.75); s.clack({ t: .85, f: 1900, d: .015, v: .5, body: .3 }); s.rack(1.2); }],
   r_ar: [1.4, .45, s => { s.magOut(.15); s.magIn(.7); s.rack(1.05); }],
   r_thrasher: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.clack({ t: .82, f: 1800, d: .015, v: .5, body: .3 }); s.rack(1.12); }],
   r_sniper: [2, .45, s => { s.boltUp(.15); s.magOut(.45); s.magIn(1.1); s.boltDown(1.6); }],

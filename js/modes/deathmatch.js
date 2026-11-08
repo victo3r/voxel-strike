@@ -73,9 +73,9 @@ const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t
 const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res === 0 ? t[1] : t[t.length - 1]; };
 // bot loadouts: one gun per category (listed twice = twice as likely)
 const BOT_PICKS = {
-  primary: ['shotgun', 'ar', 'ar', 'thrasher', 'eradicator'],
+  primary: ['shotgun', 'ar', 'ar', 'thrasher', 'eradicator', 'trex', 'starsmasher'],
   backup: ['voxel', 'voxel', 'hitman', 'hitman', 'executioner'],
-  melee: ['knife', 'knife', 'herosword'],
+  melee: ['knife', 'knife', 'knife', 'herosword', 'herosword', 'blazesaber', 'windsaber'],
   special: ['flame', 'heatray', 'shockbeam'],
   sniper: ['sniper', 'sniper', 'semisniper', 'semisniper', 'tigerbite'],
   premium: ['flare', 'flare', 'rocket'],
@@ -84,12 +84,16 @@ const BOT_PICKS = {
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
-  herosword: [1, 2], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20],
+  herosword: [1, 2], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
   knife: d => d < 2.2 ? 1.25 : d < 4 ? .35 : 0,
   herosword: d => d < 2.8 ? 1.3 : d < 4.5 ? .4 : 0,
+  blazesaber: d => d < 2.8 ? 1.32 : d < 4.5 ? .4 : 0,
+  windsaber: d => d < 3 ? 1.35 : d < 4.8 ? .45 : 0,
+  trex: d => d < 5.5 ? 1.05 : d < 10 ? .9 : d < 15 ? .32 : .05,
+  starsmasher: d => d < 3 ? .6 : d < 28 ? .95 : .7,
   executioner: d => d < 24 ? .75 : .55,
   shockbeam: d => d < 3 ? .55 : d < 24 ? .88 : .2,
   tigerbite: d => d > 20 ? 1.15 : d > 14 ? .65 : d > 8 ? .25 : .1,
@@ -520,7 +524,7 @@ function burnTick(dt) {
 }
 // bot knife
 function botStab(b, W, t, dist) {
-  b.cd = W.rate; b.stab = KNIFE_SWING; sfx('swing', { at: b.g.position, far: 20 }); net.shot(W, b);
+  b.cd = W.rate; b.stab = KNIFE_SWING; sfx(W.swing || 'swing', { at: b.g.position, far: 20 }); net.shot(W, b);
   const p = tPos(t), pos = b.g.position, want = Math.atan2(p.x - pos.x, p.z - pos.z);
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
   if (dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing) return;
@@ -528,6 +532,7 @@ function botStab(b, W, t, dist) {
   sfx('slash', { at, far: 20 });
   if (t.you) hurtPlayer(Math.round(W.dmg * BOT.dmgMul), false, b, false, 1);
   else hurtZombie(t, W.dmg * BOT.dmgMul, at, false, false, b, 1);
+  if (W.burn && (t.you ? !dead : !t.dead)) applyBurn(t.you ? P : t, W.burnT, W.burn, b, W.id, true);
 }
 // bot flamethrower
 const coneV = new THREE.Vector3(), flameV = new THREE.Vector3();
@@ -556,6 +561,7 @@ function botFlame(b, W) {
 function botFire(b, W, dist) {
   botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);
   b.ammo--; b.muzzle = W.flame || W.beam ? 0 : .05; net.shot(W, b);
+  if (W.starFx) starPuff(b.flashM);
   // beams in long sweeps, everything else in short bursts
   if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto: about as fast as a person clicks

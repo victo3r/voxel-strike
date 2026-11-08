@@ -567,8 +567,8 @@ net = (() => {
     r.q = 0;
     if (r.fired) {
       const n = Math.min(r.fired, 3); r.fired = 0;
-      if (W.melee) { sfx('swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING; }
-      else if (!W.flame && !W.beam) { z.muzzle = .05; for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); }
+      if (W.melee) { sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING; }
+      else if (!W.flame && !W.beam) { z.muzzle = .05; for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (W.starFx && z.flashM) starPuff(z.flashM); }
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0;
     z.stab = Math.max(0, z.stab - dt); knifeChop(z);

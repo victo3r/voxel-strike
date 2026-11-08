@@ -105,7 +105,7 @@ function update(dt) {
   }
   launchMove(P, P.pos, .35, P.onGround, dt); // rocket blast push
   const jumpKey = held('jump');
-  if (jumpKey && P.onGround) { P.vy = 9; P.onGround = false; net.ev('jump'); }
+  if (jumpKey && P.onGround) { P.vy = 9 * Math.sqrt(1 + jumpOf(cur)); P.onGround = false; net.ev('jump'); } // height grows with v squared
   else if (jumpKey && !jumpWas && !P.onGround && !P.dj && youFx().dj) { // Raider Boots double jump
     P.dj = true; P.vy = Math.max(P.vy, DJ_V); sfx('djump'); burst(tmp.set(P.pos.x, P.pos.y + .1, P.pos.z), 0xe8eef2, 6); net.ev('djump');
   }
@@ -431,6 +431,7 @@ function fpsTick(raw) {
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // dropped mags
+  starTick(dt);
   if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pause in the menu, matches don't

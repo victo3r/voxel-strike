@@ -26,6 +26,7 @@ function starTable(i) {
   if (!w.beam && (w.mag > 1 || w.melee)) rows.push(['DMG / SEC', ...S.map(s => Math.round(s.dmg * w.pellets / s.rate))]);
   if (w.mag > 1) rows.push(['CAPACITY', ...S.map(s => s.mag)]);
   if (!w.melee) rows.push(['RELOAD', ...S.map(s => s.reload.toFixed(2) + 's')]);
+  if (w.jump) rows.push(['JUMP', ...w.jump.map(j => '+' + Math.round(j * 100) + '%')]);
   return rows;
 }
 const statBoxes = rows => `<div class="ms" style="grid-template-columns:repeat(${rows.length},1fr)">${rows.map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>`;
@@ -47,7 +48,9 @@ function gunAttrs(w) {
   if (w.laser) a.push('LASER');
   if (w.shock) a.push('SLOW');
   if (w.rocket) a.push('ROCKET', 'EXPLOSIVE');
-  if (w.flame || w.flare) a.push('FIRE');
+  if (w.flame || w.flare || w.burn) a.push('FIRE');
+  if (w.jump) a.push('JUMP BOOST');
+  if (w.starFx) a.push('STARS');
   if (w.flare) a.push('SPLASH');
   if (w.inf) a.push('INFINITE');
   return a;
@@ -69,6 +72,10 @@ const DESC = {
   herosword: 'A bronze blade with a gem in the guard and the pommel, made for heroes',
   shockbeam: 'A crackling bolt of electricity that leaves whoever it touches slow and twitchy',
   tigerbite: 'A striped sniper with a bite worse than its growl',
+  trex: 'A pump shotgun with a bite, six big pellets a blast',
+  starsmasher: 'A battle rifle that throws stars out of the muzzle with every shot',
+  blazesaber: 'A blade of fire that leaves whoever it hits burning',
+  windsaber: 'A white blade as light as the wind, run faster and jump higher',
   executioner: 'Purple laser bolts that hit like a sniper, from a pistol',
 };
 // extra stats for the details view
@@ -77,7 +84,9 @@ function gunSpecs(i) {
   if (!w.melee && w.start) out.push(['RELOAD', rl + 's']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
   if (w.rocket) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
-  if (w.flare) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`], ['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
+  if (w.burn) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`]);
+  if (w.flare) out.push(['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
+  if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
   if (w.shock) out.push(['SLOW', `${Math.round((1 - SLOW_K) * 100)}% FOR ${SLOW_T}s`]);
   if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;

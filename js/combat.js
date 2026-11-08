@@ -47,6 +47,7 @@ function shoot() {
   else if (w.flame) flame(w);
   else {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w)); recoilKick(w);
+    if (w.starFx) starPuff(flashMesh, scene, .6);
     sfx(w.id);
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);
@@ -71,13 +72,34 @@ function shoot() {
 }
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {
-  cd = w.rate; kick = 1; sfx('swing'); crossKick(kickFor(w)); net.shot(w);
+  cd = w.rate; kick = 1; sfx(w.swing || 'swing'); crossKick(kickFor(w)); net.shot(w);
   const targets = shotTargets();
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
     const hit = ray2.intersectObjects(targets, false)[0], zz = hit?.object.userData.zombie;
-    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx('slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1); return; }
+    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx('slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1); if (w.burn && !zz.dead) applyBurn(zz, w.burnT, w.burn, null, w.id, true); return; }
     if (hit) return;
+  }
+}
+// little stars out of the muzzle (Starsmasher)
+const starBits = [], STAR_MATS = [0xffe27a, 0xffffff, 0xffc84a].map(color => new THREE.SpriteMaterial({ color, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, map: (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.beginPath();
+  for (let k = 0; k < 10; k++) { const r = k % 2 ? 3 : 8, a = k * Math.PI / 5 - Math.PI / 2; g.lineTo(8 + Math.cos(a) * r, 8 + Math.sin(a) * r); }
+  g.fill(); const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
+})() }));
+const _sq = new THREE.Quaternion(), _sd = new THREE.Vector3();
+function starPuff(from, sc = scene, size = 1) { // from: the muzzle object
+  from.getWorldQuaternion(_sq); _sd.set(0, 0, -1).applyQuaternion(_sq);
+  for (let k = 0; k < 4; k++) {
+    const s = new THREE.Sprite(STAR_MATS[Math.random() * 3 | 0]); from.getWorldPosition(s.position); s.scale.setScalar((.07 + Math.random() * .06) * size); sc.add(s);
+    starBits.push({ s, sc, v: _sd.clone().multiplyScalar(2 + Math.random() * 2).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(2.2)), life: .35 + Math.random() * .15, k: s.scale.x });
+  }
+}
+function starTick(dt) {
+  for (let i = starBits.length - 1; i >= 0; i--) {
+    const b = starBits[i]; b.life -= dt; b.s.position.addScaledVector(b.v, dt); b.v.multiplyScalar(Math.exp(-3 * dt));
+    b.s.scale.setScalar(b.k * Math.max(0, Math.min(1, b.life * 4))); b.s.material.rotation += dt * 4;
+    if (b.life <= 0) { b.sc.remove(b.s); starBits.splice(i, 1); }
   }
 }
 const BURN_T = 2.5; // burn time after the flames stop
