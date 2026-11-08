@@ -23,10 +23,10 @@ const BASE = [
   { id: 'starsmasher', rar: 'legend', hold: 'rifle', name: 'Starsmasher', cat: 'primary', unlock: 30, price: 1150, mob: 60, zoom: 3, reticle: '255,215,90', starFx: true, dmg: 20, rate: .1, mag: 30, reload: 1.6, pellets: 1, spread: .005, auto: true, color: 0x24305a, len: .6 },
   { id: 'blazesaber', rar: 'legend', hold: 'melee', name: 'Blazesaber', cat: 'melee', unlock: 20, price: 750, inf: true, melee: true, tilt: 1.1, swing: 'saber', mob: 85, dmg: 60, rate: .55, range: 3.2, burn: 3, burnT: 2.5, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xff6a1a, len: .4, model: 'blazesaber' },
   { id: 'windsaber', rar: 'mythic', hold: 'melee', name: 'Windsaber', cat: 'melee', unlock: 40, price: 2000, inf: true, melee: true, tilt: 1.1, swing: 'saber', mob: 100, jump: [.25, .35, .45], dmg: 70, rate: .5, range: 3.4, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xe8f6ff, len: .4, model: 'windsaber' },
-  { id: 'frostwand', rar: 'epic', hold: 'pistol', name: 'Frost Wand', cat: 'special', unlock: 16, price: 460, mob: 65, beam: true, frost: true, wand: true, dmg: 7, rate: 1 / 15, range: 26, mag: 80, reload: 1.8, pellets: 1, spread: 0, auto: true, color: 0x9fe8ff, len: .5 },
+  { id: 'frostwand', rar: 'epic', hold: 'melee', name: 'Frost Wand', cat: 'special', unlock: 16, price: 460, mob: 65, beam: true, frost: true, wand: true, pool: true, dmg: 9, rate: 1 / 15, range: 26, mag: 240, reload: 3, pellets: 1, spread: 0, auto: true, color: 0x9fe8ff, len: .5 },
   { id: 'warhammer', rar: 'epic', hold: 'melee', name: 'War Hammer', cat: 'melee', unlock: 17, price: 490, inf: true, melee: true, tilt: 1.1, swing: 'hammer', hit: 'smash', knock: 1.5, mob: 65, dmg: 95, rate: .95, range: 3, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0x6a6e78, len: .4, model: 'warhammer' },
   { id: 'executioner', rar: 'epic', hold: 'pistol', name: 'Executioner', cat: 'backup', unlock: 14, price: 400, mob: 70, zoom: 4, reticle: '212,123,255', laser: true, dmg: 85, rate: 1 / 1.8, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0x5b3b8a, len: .4 },
-  { id: 'crossbow', rar: 'rare', hold: 'rifle', name: 'Crossbow', cat: 'sniper', unlock: 7, price: 175, mob: 60, zoom: 3, scope: true, quiet: true, bolt: true, headMul: 2.4, dmg: 85, rate: 1, mag: 1, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x6b4a2b, len: .8 },
+  { id: 'crossbow', rar: 'rare', hold: 'rifle', name: 'Crossbow', cat: 'sniper', unlock: 7, price: 175, mob: 60, zoom: 3, scope: true, quiet: true, bow: true, headMul: 2.4, dmg: 85, rate: 1, mag: 1, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x6b4a2b, len: .8 },
   { id: 'grenade', rar: 'epic', hold: 'rifle', name: 'Grenade Bouncer', cat: 'premium', unlock: 12, price: 350, mob: 60, grenade: true, dmg: 90, rate: .75, mag: 4, reload: 2.4, pellets: 1, spread: 0, auto: false, color: 0x3f7a3a, len: .7 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
@@ -59,7 +59,7 @@ const RECOIL = {
 const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4;
 const rec = { tp: 0, ty: 0, p: 0, y: 0 };
 const ammo = WEAPONS.map(w => w.mag);
-const resMax = i => BASE[i].inf ? Infinity : WEAPONS[i].mag * 4;
+const resMax = i => BASE[i].inf ? Infinity : BASE[i].pool ? 0 : WEAPONS[i].mag * 4; // pool guns: no spare, the mag is all you get
 const reserve = WEAPONS.map(w => w.inf ? Infinity : 0);
 const owned = WEAPONS.map(w => !!w.free);
 const slotOf = i => CAT_I[BASE[i].cat];
@@ -112,12 +112,12 @@ const POSE_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz', 'ay', 'az'
 const magSwap = (roll, drop, lift = .2) => { const h = { rz: roll, rx: lift, y: .06, x: -.07 }; return [[0, {}], [.14, h], [.3, { ...h, my: -drop * .4, ay: -.15 }], [.42, { ...h, my: -drop, ay: -.42 }], [.56, { ...h, my: -drop * .35, ay: -.18 }], [.7, { ...h, y: .07 }], [.74, { ...h, y: .085 }], [.86, { rx: .05, z: .035 }], [.93, { z: -.01 }], [1, {}]]; };
 // rounds pushed in one at a time
 const dips = (h, n, t0, t1, d = .025) => Array.from({ length: n }, (_, i) => { const t = t0 + (t1 - t0) * i / n, w = (t1 - t0) / n; return [[t + w * .45, { ...h, y: (h.y || 0) - d, ay: -.05 }], [t + w * .9, h]]; }).flat();
-const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], frostwand: [.3, .36] };
+const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42] };
 const RELOAD_ANIM = (() => {
   const pistol = roll => { const h = { rx: .45, rz: roll, y: .07, x: -.06 }; return [[0, {}], [.16, h], [.3, { ...h, my: -.26 }], [.31, { ...h, my: -.45 }], [.46, { ...h, my: -.11, hand: 1 }], [.58, { ...h, my: -.09, hand: 1 }], [.66, { ...h, y: .03, hand: 1 }], [.72, { ...h, y: .045, hand: .7 }], [.8, { ...h, y: .02 }], [.86, { rx: .08, z: .04 }], [.93, { z: -.012 }], [1, {}]]; };
   const sg = { rz: -.5, rx: .28, y: -.04 }, bolt = { rz: .3, rx: .1, y: -.03, mz: .09, my: .02 }, box = { rz: -.4, ry: -.22, y: -.05 }, cell = { rx: .38, rz: -.25, y: .02 }, tank = { rz: -.5, rx: .18, y: -.02 };
   return {
-    voxel: pistol(-.3), hitman: pistol(-.4), frostwand: pistol(-.25), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16),
+    voxel: pistol(-.3), hitman: pistol(-.4), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16),
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     trex: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
@@ -348,31 +348,33 @@ const GUN_MODELS = {
   },
   crossbow({ p, mat, dark, glow, sub, at }) {
     const wood = mat(0x6b4a2b), dk = mat(0x47301c), limb = mat(0x5c5c66), str = mat(0xe8e2d0);
-    p(4, 6, 10, wood, 0, -1, 7); p(4, 8, 1, dk, 0, -1, 12.5); // stock and butt
-    p(4, 3, 30, wood, 0, 0, -10); p(2, 1, 22, dk, 0, 2, -13); // rail and its groove
-    p(30, 2, 2, limb, 0, 1, -25); for (const s of [-1, 1]) { p(4, 2, 2, limb, s * 16, 1, -24); p(3, 2, 2, limb, s * 18.5, 1, -22.5); } // bow limbs
-    for (let k = 0; k < 9; k++) for (const s of [-1, 1]) p(2, 1, 1, str, s * (19 - k * 2.1), 1.5, -21.5 + k * 1.4); // string
-    p(6, 1, 2, dark, 0, -1, -27); // stirrup
-    p(3, 3, 10, mat(0x2a2a2e), 0, 5, -6); p(3, 3, 1, glow(0x66ccff), 0, 5, -11.5); p(2, 2, 2, dark, 0, 3, -6); // little scope
+    p(4, 6, 10, wood, 0, -1, 7); p(4, 8, 2, dk, 0, -1, 13); // stock and butt
+    p(4, 4, 30, wood, 0, 0, -13); p(2, 1, 22, dk, 0, 2.5, -15); // rail and its groove
+    p(20, 2, 2, limb, 0, 1, -27); for (const s of [-1, 1]) { p(2, 2, 4, limb, s * 11, 1, -25); p(2, 2, 2, limb, s * 13, 1, -22); } // bow, its tips swept back
+    for (let k = 0; k < 12; k++) for (const s of [-1, 1]) p(1, 1, 2, str, s * (12.5 - k), 2.5, Math.round(-21 + k * 1.45)); // string
+    p(6, 2, 2, dark, 0, -3, -27); // stirrup
+    p(2, 2, 10, mat(0x2a2a2e), 0, 7, -12); p(2, 2, 1, glow(0x66ccff), 0, 7, -17.5); p(1, 5, 2, dark, 1.5, 4.5, -10); // little scope on a mount
     const round = sub(0, 0, 0), r = at(round); // the loaded bolt
-    r(1, 1, 18, mat(0xc9a46a), 0, 2.5, -15); r(2, 2, 3, mat(GUN_STEEL), 0, 2.5, -25.5); r(3, 1, 2, mat(0xc8402a), 0, 2.5, -7);
-    p(4, 5, 4, wood, 0, -4.5, -1); p(4, 3, 4, wood, 0, -8.5, 0); // grip
-    p(1, 1, 4, dark, 0, -5.5, -5); p(1, 2, 1, mat(0x888888), 0, -3, -4.5); // guard and trigger
-    return { muzzle: [2.5, -28], grip: [4, 8, 5, 0, -6, -.5], fore: [4, 3, 10, 0, -1.5, -16], bands: [-6, -12], band: [6, 6, 0], round };
+    r(2, 1, 20, mat(0xc9a46a), 0, 3.5, -14); r(2, 2, 2, mat(GUN_STEEL), 0, 4, -25); r(4, 1, 2, mat(0xc8402a), 0, 4.5, -5);
+    p(4, 6, 4, wood, 0, -5, 0); p(4, 3, 4, wood, 0, -9.5, 1); // grip
+    p(1, 1, 4, dark, .5, -6.5, -4); p(1, 3, 1, mat(0x888888), .5, -3.5, -3.5); // guard and trigger
+    return { muzzle: [4, -27], grip: [4, 8, 5, 0, -6, 0], fore: [4, 4, 10, 0, -1, -17], bands: [-6, -12], band: [6, 6, 0], round };
   },
+
   grenade({ p, mat, dark, glow, sub, at }) {
     const green = mat(0x3f7a3a), dk = mat(0x2a3d28), yel = mat(0xffc933), hole = mat(0x101010);
-    p(6, 6, 18, green, 0, 1, -19); for (const z of [-14, -22]) p(7, 7, 1, yel, 0, 1, z); // fat barrel and its bouncy stripes
+    p(6, 6, 18, green, 0, 1, -19); for (const z of [-14, -24]) p(8, 8, 2, yel, 0, 1, z); // fat barrel and its bouncy stripes
     p(8, 8, 2, dk, 0, 1, -29); p(4, 4, 1, hole, 0, 1, -30.5); // muzzle
-    const spin = sub(0, -1, -5, [.5, .5, 0]), sp = at(spin); // the drum
-    sp(10, 10, 8, dk, 0, 0, 0); for (const [x, y] of [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5]]) sp(2, 2, 1, yel, x, y, -4.2);
-    p(4, 6, 10, dk, 0, 0, 7); p(4, 8, 1, green, 0, 0, 12.5); // stock and butt
-    p(4, 5, 4, dk, 0, -5.5, 2); p(4, 3, 4, dk, 0, -9.5, 3); // grip
-    p(1, 1, 4, dark, 0, -6.5, -1.5); p(1, 2, 1, mat(0x888888), 0, -5, -1); // guard and trigger
-    p(4, 7, 4, dk, 0, -4, -18); // front grip
-    const mag = sub(0, 0, 0), mg = at(mag); mg(1, 5, 5, mat(0x555a55), 5.5, -1, -5); // loading gate, swung open to reload
-    return { muzzle: [1, -31], grip: [4, 8, 5, 0, -7, 2.5], fore: [4, 7, 4, 0, -4, -18], bands: [-8, -12], band: [10, 10, 2], spin, mag };
+    const spin = sub(0, -1, -5), sp = at(spin); // the drum
+    sp(10, 10, 10, dk, 0, 0, 0); sp(2, 1, 4, yel, 0, 5.5, 0); sp(1, 2, 4, yel, -5.5, 0, 0); sp(2, 1, 4, yel, 0, -5.5, 0);
+    p(4, 6, 10, dk, 0, 0, 5); p(4, 8, 2, green, 0, 0, 11); // stock and butt
+    p(4, 6, 4, dk, 0, -6, 4); p(4, 3, 4, dk, 0, -10.5, 5); // grip
+    p(2, 1, 4, dark, 0, -9.5, 0); p(1, 3, 1, mat(0x888888), .5, -7.5, -1.5); // guard and trigger
+    p(4, 7, 4, dk, 0, -5.5, -18); // front grip
+    const mag = sub(0, 0, 0), mg = at(mag); mg(1, 6, 6, mat(0x555a55), 5.5, -1, -5); // loading gate, swung open to reload
+    return { muzzle: [1, -31], grip: [4, 8, 5, 0, -7, 4], fore: [4, 7, 4, 0, -5.5, -18], bands: [-17, -20], band: [8, 8, 1], spin, mag };
   },
+
   flare({ p, mat, dark, glow, sub, at }) {
     const red = mat(0xc8402a), grip = mat(0x3a3a3e);
     p(6, 6, 14, red, 0, 2, -9); p(6, 1, 14, mat(0xe8684a), 0, 4.5, -9); // fat barrel and its lighter top
@@ -461,19 +463,19 @@ const GUN_MODELS = {
   starsmasher({ p, mat, dark, glow, sub, at }) {
     const navy = mat(0x24305a), dnavy = mat(0x18203e), gold = mat(0xe8b84a), star = glow(0xffe68a), vent = mat(0x10142a);
     p(4, 5, 10, dnavy, 0, .5, 5); p(4, 8, 1, dark, 0, -1, 10.5); p(4, 3, 6, navy, 0, 4, 4); // stock, butt, cheek rest
-    p(6, 6, 20, navy, 0, 1, -9); p(6, 1, 20, gold, 0, -.5, -9); // the tall upper receiver and its gold stripe
+    p(6, 6, 26, navy, 0, 1, -12); p(6, 1, 26, gold, 0, -.5, -12); // the tall upper receiver and its gold stripe
     p(6, 3, 12, dnavy, 0, -3.5, -6); // lower receiver
-    for (const z of [-14, -17]) p(6, 1, 2, vent, 0, 2.5, z); // side rail slots
+    for (const z of [-14, -17, -20, -23]) p(6, 1, 2, vent, 0, 2.5, z); // side rail slots
     p(6, 1, 3, star, 0, 1.5, -7); p(6, 3, 1, star, 0, 1.5, -7); // a glowing star on each side
-    p(4, 1, 22, dark, 0, 4.5, -10); // top rail
+    p(4, 1, 28, dark, 0, 4.5, -13); // top rail
     p(6, 1, 4, dark, 0, 5.5, -6); for (const x of [-2.5, 2.5]) p(1, 4, 2, dark, x, 8, -6); p(6, 1, 2, dark, 0, 10.5, -6); // holo sight
     p(1, 1, 1, glow(0xffd24a), .5, 6.5, -4.5); // its emitter
-    p(4, 4, 14, mat(GUN_STEEL), 0, 2, -26); // barrel
+    p(4, 4, 8, mat(GUN_STEEL), 0, 2, -29); // barrel
     p(6, 6, 4, dnavy, 0, 2, -35); p(6, 6, 1, gold, 0, 2, -34.5); // flash hider and its gold ring
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 8, 5, dark, 0, -8, -8); mg(4, 1, 5, gold, 0, -10.5, -8); // mag with a gold band
     p(4, 4, 4, dnavy, 0, -7, 0); p(4, 3, 4, dnavy, 0, -10.5, 1); // pistol grip
     p(1, 1, 4, dark, 0, -8.5, -4); p(1, 2, 1, mat(0x666666), 0, -6, -3.5); // guard and trigger
-    return { muzzle: [2, -38], grip: [4, 7, 5, 0, -8.5, .5], fore: [6, 6, 10, 0, 1, -14], bands: [-15.5, -18.5], band: [8, 8, 1], holo: [7, -6], mag };
+    return { muzzle: [2, -38], grip: [4, 7, 5, 0, -8.5, .5], fore: [6, 6, 10, 0, 1, -18], bands: [-15.5, -18.5], band: [8, 8, 1], holo: [7, -6], mag };
   },
   blazesaber({ p, mat, glow }) {
     const metal = mat(0x8a8d94), dmetal = mat(0x45474e), red = mat(0xb8322a), blade = glow(0xff6a1a), core = glow(0xffd38a);
@@ -501,8 +503,8 @@ const GUN_MODELS = {
     p(4, 4, 18, shaft, 0, 0, -15); for (const z of [-10, -18]) p(4, 4, 1, dshaft, 0, 0, z); // the shaft and its rings
     p(6, 6, 4, ice, 0, 0, -26); p(4, 4, 4, ice, 0, 0, -30); p(2, 2, 2, core, 0, 0, -33); // an ice crystal on the tip
     for (const [x, y] of [[3, 2], [-3, -2], [-2, 3], [2, -3]]) p(2, 2, 3, ice, x, y, -25.5); // little shards round it
-    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 2, ice, 0, 0, 12); // a frost charge in the pommel, swapped on a reload
-    return { muzzle: [0, -35], grip: [4, 4, 12, 0, 0, 2], fore: null, bands: [-9, -12], band: [6, 6, 0], mag };
+    p(4, 4, 2, ice, 0, 0, 12); // a frost charge in the pommel
+    return { muzzle: [0, -35], grip: [6, 6, 18, 0, 0, 2.5], fore: null, bands: [-9, -12], band: [6, 6, 0] };
   },
   warhammer({ p, mat, glow }) {
     const steel = mat(0x8a8e98), dsteel = mat(0x5a5e68), wood = mat(0x6a4428), wrap = mat(0x3a2414), gold = mat(0xd8a838);
@@ -510,7 +512,7 @@ const GUN_MODELS = {
     p(6, 6, 3, dsteel, 0, 1, 13.5); // pommel
     p(6, 6, 3, gold, 0, 1, -11.5); // gold collar under the head
     p(8, 16, 10, steel, 0, 1, -18); p(8, 16, 2, dsteel, 0, 1, -18); // the head, a dark band round it
-    p(8, 4, 10, dsteel, 0, 11, -18); p(6, 2, 8, dsteel, 0, -8, -18); // a spike on top, a flat face below
+    p(4, 2, 4, dsteel, 0, 10, -18); p(6, 2, 8, dsteel, 0, -8, -18); // a stub on top, a flat face below
     p(4, 4, 6, steel, 0, 1, -26); // and a point out the front
     return { muzzle: [1, -29], grip: [6, 6, 18, 0, 1, 6], fore: null, bands: [-6.5, -9.5], band: [6, 6, 1] };
   },
@@ -710,7 +712,7 @@ function buildGun() {
   for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone();
   vmRl.rk = -1;
   if (WEAPONS[cur].melee) return;
-  flashMesh.position.set(0, my, mz - .06); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
+  flashMesh.position.set(0, my, mz - .015); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
 }
 function cycle(d) { let s = slotOf(cur); do s = (s + d + CATS.length) % CATS.length; while (slotGun[s] < 0); equip(slotGun[s]); }
 function selectSlot(s) {
@@ -736,7 +738,7 @@ const dry = () => sfx('dry');
 // reload sound speeds up with faster reloads
 let reloadSnd = null;
 function reload() {
-  const w = WEAPONS[cur]; if (w.melee || reloading > 0 || ammo[cur] === w.mag || swapOff > 0) return;
+  const w = WEAPONS[cur]; if (w.melee || w.pool || reloading > 0 || ammo[cur] === w.mag || swapOff > 0) return;
   if (!reserve[cur]) { dry(); return; }
   reloading = w.reload; reloadSnd = sfx('r_' + w.id, { rate: BASE[cur].reload / w.reload });
 }

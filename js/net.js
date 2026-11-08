@@ -496,17 +496,17 @@ net = (() => {
   function remoteFire(m) {
     const i = gi(m.g); if (i === undefined || !m.o || !m.d) return;
     const w = WEAPONS[i], by = bodyOf(m.pid), from = new THREE.Vector3(...m.o), dir = new THREE.Vector3(...m.d).normalize();
-    (w.rocket ? fireRocket : w.flare || w.bolt ? fireFlare : w.grenade ? fireGrenade : null)?.(w, from, dir, by, { ghost: true, id: m.pid * 100000 + m.id });
+    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : null)?.(w, from, dir, by, { ghost: true, id: m.pid * 100000 + m.id });
   }
   function remoteBoom(m) {
     const id = m.pid * 100000 + m.id, p = new THREE.Vector3(...m.p);
     let kind = 'rocket';
     for (const list of [rockets, flares, grenades]) {
       const k = list.findIndex(x => x.ghost && x.id === id);
-      if (k >= 0) { kind = list === flares ? (list[k].bolt ? 'bolt' : 'flare') : 'rocket'; scene.remove(list[k].m); list.splice(k, 1); break; }
+      if (k >= 0) { kind = list === flares ? 'flare' : 'rocket'; scene.remove(list[k].m); list.splice(k, 1); break; }
     }
     if (kind === 'rocket') blastFx(p, ROCKET_R);
-    else (kind === 'bolt' ? boltFx : flareFx)(p);
+    else flareFx(p);
   }
 
   // positions coming in, drawn a little in the past
@@ -588,8 +588,8 @@ net = (() => {
           flames.push({ m, v, life: .45 });
         }
       } else {
-        if (!(z.fireOn > 0)) sfx('heatStart', { at: pos, far: 50 });
-        z.fireOn = .2; z.fireEnd = 'heatEnd';
+        if (!(z.fireOn > 0)) sfx(W.frost ? 'frostStart' : 'heatStart', { at: pos, far: 50 });
+        z.fireOn = .2; z.fireEnd = W.frost ? 'frostEnd' : 'heatEnd';
         beamRay.set(eyeV, dirV); beamRay.far = W.range || 30;
         const hit = beamRay.intersectObjects(targetsFor(z), false)[0];
         showBeam(z, fv.clone(), hit ? hit.point : eyeV.clone().addScaledVector(dirV, beamRay.far), beamKind(W));

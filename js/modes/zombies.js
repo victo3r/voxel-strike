@@ -287,7 +287,7 @@ function pickOffers() {
   while (pool.length && out.length < OFFERS) { const [p] = pool.splice(draw(pool, x => x.w), 1); out.push(p.list[draw(p.list, i => GUN_DROP[rarOf(BASE[SHOP[i].gun])])]); }
   return out.sort((a, b) => a - b);
 }
-const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i));
+const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i) && (!BASE[i].pool || ammo[i] >= w.mag));
 let shopOpen = false, shopWave = 0, bonus = 0, armorBought = 0, waveReward = '';
 // shop prices go up each time you buy
 const rental = g => owned[g] && !hasGun(g); // rented this run, so it can be upgraded
@@ -334,7 +334,7 @@ function buy(i) {
   else if (it.perk) { perk[it.perk]++; if (it.perk === 'hp') { P.max += 25; P.hp = Math.min(P.max, P.hp + 25); } sfx('upgrade'); }
   if (it.heal) P.hp = Math.min(P.max, P.hp + it.heal);
   if (it.armor) { P.maxArmor = Math.min(ARMOR_CAP, P.maxArmor + it.armor); P.armor = P.maxArmor; armorBought++; }
-  if (it.refill) WEAPONS.forEach((w, g) => { if (owned[g]) reserve[g] = resMax(g); });
+  if (it.refill) WEAPONS.forEach((w, g) => { if (owned[g]) { reserve[g] = resMax(g); if (BASE[g].pool) ammo[g] = w.mag; } });
   sfx('buy'); renderShop();
 }
 function openShop() { shopOpen = true; shopOffer = pickOffers(); renderShop(); document.exitPointerLock(); }

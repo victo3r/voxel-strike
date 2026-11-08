@@ -265,7 +265,7 @@ function holdGun(b) {
   b.holdTurn = h.turn; // sideways stance so the gun points where it aims
   b.round = round;
   b.flashM ??= makeFlash(.1);
-  b.flashM.position.set(0, my, mz - .06); b.flashM.visible = false;
+  b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
   b.gunM = gunM; b.spin = spin; b.spinV = 0;
   // reload start pose
@@ -570,15 +570,15 @@ function botFire(b, W, dist) {
   if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto: about as fast as a person clicks
   if (W.scope) b.aimT = 0;
-  if (W.beam) { if (!(b.fireOn > 0)) sfx('heatStart', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = 'heatEnd'; }
+  if (W.beam) { if (!(b.fireOn > 0)) sfx(W.frost ? 'frostStart' : 'heatStart', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = W.frost ? 'frostEnd' : 'heatEnd'; }
   else if (!W.flame) sfx(W.id, { at: b.g.position, far: W.quiet ? 35 : 100 });
   if (b.ammo <= 0) {
-    b.reload = W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
+    b.reload = W.reload; if (!W.pool) sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
     b.pickT = Math.min(b.pickT, .15 + Math.random() * .25); // out of ammo: think about switching
   }
   if (W.flame) return botFlame(b, W);
   const S = skillOf(b), err = S.aimErr + S.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
-  if (W.rocket || W.flare || W.bolt || W.grenade) {
+  if (W.rocket || W.flare || W.grenade) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
     (W.rocket ? fireRocket : W.grenade ? fireGrenade : fireFlare)(W, eye.clone(), dirV, b);
@@ -603,11 +603,11 @@ function botFire(b, W, dist) {
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45;
-      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head, W.beam ? 2 : 0);
+      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? headMul(W) : 1))), false, b, head, W.beam ? 2 : 0);
       if (slows(W)) shockHit(P, W);
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
-      if (!zz.dead) { hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W); }
+      if (!zz.dead) { hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W); }
     } else burst(wall.point, 0x999999, 2);
   }
 }
@@ -658,7 +658,7 @@ function updateBot(b, dt) {
   }
   // reload when nothing is around
   if (!sees && (!t || b.lostT > 1)) {
-    if (!W.inf && b.reload <= 0 && b.swap <= 0 && b.ammo < W.mag) { b.reload = W.reload; sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); }
+    if (!W.inf && !W.pool && b.reload <= 0 && b.swap <= 0 && b.ammo < W.mag) { b.reload = W.reload; sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); }
     for (const g of b.rec.load) {
       const G = b.rec.W[g];
       if (g === b.gun || b.mags[g] >= G.mag) continue;
@@ -673,7 +673,7 @@ function updateBot(b, dt) {
     if (b.seeT <= dt) { b.lpx = tp.x; b.lpz = tp.z; }
     if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
     b.lpx = tp.x; b.lpz = tp.z;
-    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.bolt ? dist / BOLT_SPD : W.grenade ? dist / GREN_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.bolt ? BOLT_DROP : W.grenade ? GREN_GRAV : 0;
+    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
     const tx = dx + (fly ? b.pvx * fly * b.leadGuess : (b.pvx * S.lead - b.vx * S.self) * lag), tz = dz + (fly ? b.pvz * fly * b.leadGuess : (b.pvz * S.lead - b.vz * S.self) * lag), th = Math.hypot(tx, tz);
     wantYaw = Math.atan2(tx, tz);
     wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);

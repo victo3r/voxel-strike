@@ -1,5 +1,6 @@
 const ray = new THREE.Raycaster(), ray2 = new THREE.Raycaster(), ndc = new THREE.Vector2(), fwd = new THREE.Vector3(), tmp = new THREE.Vector3();
 // what bullets can hit
+const headMul = w => w.headMul ?? HEAD_MUL; // the crossbow hits heads harder
 function shotTargets() { const t = [ground, ...crateMeshes]; for (const zz of zombies) if (!zz.dead) t.push(...zz.parts); return t; }
 // recoil only moves the camera, your real aim stays put
 function recoilKick(w) {
@@ -50,7 +51,7 @@ function shoot() {
     if (w.starFx && !aiming) starPuff(flashMesh, scene, .6); // not while you aim: they'd fill the sight
     sfx(w.id);
     if (w.rocket) fireRocket(w);
-    else if (w.flare || w.bolt) fireFlare(w);
+    else if (w.flare) fireFlare(w);
     else if (w.grenade) fireGrenade(w);
     else {
       const targets = shotTargets();
@@ -64,7 +65,7 @@ function shoot() {
         if (tracerOk(w, i)) tracer(trFrom, hit ? hit.point : ray.ray.at(60, trTo), w.laser);
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
-        if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 0); }
+        if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? headMul(w) : 1), hit.point, head, false, null, 0); }
         else burst(hit.point, 0x999999, 2);
       }
     }
@@ -130,7 +131,8 @@ function flame(w) {
 }
 // heat ray beam
 function heatBeam(w) {
-  beamHeld = .12; crossKick(.4, 1.5); recoilKick(w); // keeps the hum going
+  if (w.frost) frostHeld = .12; else beamHeld = .12; // keeps the hum going
+  crossKick(.4, 1.5); recoilKick(w);
   camera.getWorldDirection(fwd);
   ray2.setFromCamera(ndc.set(0, 0), camera); ray2.far = w.range;
   const hit = ray2.intersectObjects(shotTargets(), false)[0];
@@ -179,7 +181,7 @@ function beamTick(dt) {
 }
 function clearBeams() { for (const b of beams.values()) scene.remove(b.g); beams.clear(); }
 
-// bot rockets, flares, bolts and grenades can hit you, yours can't
+// bot rockets, flares and grenades can hit you, yours can't
 const youBox = new THREE.Box3(), youHitP = new THREE.Vector3();
 function rayHitsYou(r, far) { // distance to your body along the ray, or Infinity
   if (respawnT > 0) return Infinity;
@@ -225,26 +227,19 @@ function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
 }
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, drop
 const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and damage
-const BOLT_SPD = 90, BOLT_DROP = 4; // crossbow bolts: fast, a little drop
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
-const boltMats = [lam({ color: 0xc9a46a }), lam({ color: 0x9a9aa2 }), lam({ color: 0xc8402a })];
-function boltMesh() {
-  const m = new THREE.Group(), tip = box(.04, .04, .1, boltMats[1]), fl = box(.08, .02, .08, boltMats[2]);
-  tip.position.z = .28; fl.position.z = -.24; m.add(box(.025, .025, .55, boltMats[0]), tip, fl); return m;
-}
 function fireFlare(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
-  const m = w.bolt ? boltMesh() : box(.14, .14, .14, flareMat);
-  m.position.copy(from).addScaledVector(dir, .6); if (w.bolt) m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
-  flares.push({ m, v: dir.clone().multiplyScalar(w.bolt ? BOLT_SPD : FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, bolt: !!w.bolt, hm: w.headMul ?? 1.5, trail: 0, by, ghost: !!opts.ghost, id });
+  const m = box(.14, .14, .14, flareMat);
+  m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
+  flares.push({ m, v: dir.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0, by, ghost: !!opts.ghost, id });
 }
 // flare landing effect
 function flareFx(p) { burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8); sfx('flareHit', { at: p }); }
-function boltFx(p) { burst(p, 0xc9a46a, 5); sfx('boltHit', { at: p, far: 25 }); }
 function updateFlares(dt) {
   for (let i = flares.length - 1; i >= 0; i--) {
-    const f = flares[i]; f.life -= dt; f.v.y -= (f.bolt ? BOLT_DROP : FLARE_DROP) * dt;
+    const f = flares[i]; f.life -= dt; f.v.y -= FLARE_DROP * dt;
     const step = f.v.length() * dt;
     ray2.set(f.m.position, tmp.copy(f.v).normalize()); ray2.far = step;
     let hit = ray2.intersectObjects(targetsFor(f.by), false)[0];
@@ -255,21 +250,20 @@ function updateFlares(dt) {
       if (f.ghost) continue; // the server says where it landed
       const p = onYou ? youHitP.clone() : hit ? hit.point : f.m.position;
       net.boom(f.id, p, f.by);
-      (f.bolt ? boltFx : flareFx)(p);
+      flareFx(p);
       if (onYou) {
         const head = p.y > P.pos.y + 1.45;
-        hurtPlayer(Math.round(f.dmg * (head ? f.hm : 1)), false, f.by, head, 5, f.id); if (f.burn) applyBurn(P, f.burnT, f.burn, f.by, 'flare');
-      } else if (f.by && !f.bolt && Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z) < FLARE_R + .3) {
+        hurtPlayer(Math.round(f.dmg * (head ? 1.5 : 1)), false, f.by, head, 5, f.id); applyBurn(P, f.burnT, f.burn, f.by, 'flare');
+      } else if (f.by && Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z) < FLARE_R + .3) {
         const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
         hurtPlayer(Math.round(FLARE_SPLASH * (1 - Math.min(1, pd / FLARE_R) * .6)), false, f.by, false, 6, f.id);
       }
       const zz = hit?.object.userData.zombie;
       if (zz && !zz.dead) {
         const head = !!hit.object.userData.head;
-        hurtZombie(zz, f.dmg * (head ? f.hm : 1), hit.point, head, false, f.by, 5, f.id);
-        if (f.burn && !zz.dead && !(zz.type === 'bot' && friendly(f.by, zz))) applyBurn(zz, f.burnT, f.burn, f.by, 'flare', true);
+        hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head, false, f.by, 5, f.id);
+        if (!zz.dead && !(zz.type === 'bot' && friendly(f.by, zz))) applyBurn(zz, f.burnT, f.burn, f.by, 'flare', true);
       }
-      if (f.bolt) continue;
       for (const o of zombies) {
         if (o === zz || o === f.by || o.dead) continue;
         const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
@@ -277,9 +271,7 @@ function updateFlares(dt) {
       }
       continue;
     }
-    f.m.position.addScaledVector(f.v, dt);
-    if (f.bolt) { f.m.lookAt(tmp.copy(f.m.position).add(f.v)); continue; }
-    f.m.rotation.x += dt * 9; f.m.rotation.y += dt * 7;
+    f.m.position.addScaledVector(f.v, dt); f.m.rotation.x += dt * 9; f.m.rotation.y += dt * 7;
     if ((f.trail -= dt) <= 0) { f.trail = .025; burst(f.m.position, Math.random() < .5 ? 0xffcc55 : 0xff6a1a, 1); }
   }
 }
@@ -356,7 +348,7 @@ function rerollPads() { for (const p of pads) if (p.item) { clearPad(p); spawnPi
 function canPickup(type) {
   if (type === 'health') return P.hp < P.max;
   if (type === 'armor') return P.armor < P.maxArmor;
-  return WEAPONS.some((w, i) => !BASE[i].inf && owned[i] && reserve[i] < resMax(i));
+  return WEAPONS.some((w, i) => !BASE[i].inf && owned[i] && (BASE[i].pool ? ammo[i] < w.mag : reserve[i] < resMax(i)));
 }
 // srv = the server already applied it
 function usePickup(type, srv) {
@@ -364,7 +356,7 @@ function usePickup(type, srv) {
   if (type === 'health') { P.hp = srv ? srv.hp : Math.min(P.max, P.hp + HEAL_PICK); toast('HEALTH FULL', '#ff5a5a'); }
   else if (type === 'armor') { P.armor = srv ? srv.armor : Math.min(P.maxArmor, P.armor + ARMOR_PICK); toast('ARMOR FULL', armorCss()); }
   else {
-    WEAPONS.forEach((w, i) => { if (!BASE[i].inf && owned[i] && reserve[i] < resMax(i)) reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); });
+    WEAPONS.forEach((w, i) => { if (!BASE[i].inf && owned[i] && reserve[i] < resMax(i)) reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); if (BASE[i].pool && owned[i]) ammo[i] = Math.min(w.mag, ammo[i] + Math.round(w.mag / 2)); });
     toast('+AMMO', '#ffffff');
   }
   sfx(type === 'health' ? 'pickHealth' : type === 'armor' ? 'pickArmor' : 'pickAmmo'); return true;
