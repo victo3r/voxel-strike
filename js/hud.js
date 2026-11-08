@@ -125,3 +125,17 @@ function killNotice(text, streak, head) {
   if (big) { sfx(big, { v: 1.5 }); musicDuck(BUF[big]?.buf.duration ?? 1.5); } // over the music, which is loud by then
   else sfx(head || st ? 'killSpecial' : 'kill');
 }
+
+// health and armor bars, top left; the armor bar takes the colour of the armor you wear
+const armorCss = () => { const T = armorOf(matchArmor()); return !T ? '#c9ced6' : T.champ ? '#c8a2ff' : `rgb(${T.hi.join()})`; };
+const armorFill = () => { const T = armorOf(matchArmor()); if (!T) return '#c9ced6'; if (T.champ) return `linear-gradient(90deg,${Object.values(GEMS).map(c => `rgb(${c.join()})`).join()})`; return `linear-gradient(180deg,rgb(${T.hi.join()}),rgb(${T.c.join()}) 60%,rgb(${T.dk.join()}))`; };
+function vitBar(id, v, max, icon) {
+  const el = $(id), k = max > 0 ? Math.max(0, Math.min(1, v / max)) : 0, key = `${Math.ceil(v)}/${max}/${id === 'arm' ? matchArmor() : ''}`;
+  if (el._k === key) return; el._k = key;
+  el.style.display = max > 0 ? '' : 'none'; if (!(max > 0)) return;
+  const [ic, bar] = el.children, [lag, fill, num] = bar.children;
+  if (!ic.innerHTML) ic.innerHTML = ico(icon);
+  lag.style.width = fill.style.width = k * 100 + '%';
+  num.textContent = Math.ceil(Math.max(0, v));
+  if (id === 'arm') { fill.style.background = armorFill(); ic.style.color = armorCss(); }
+}

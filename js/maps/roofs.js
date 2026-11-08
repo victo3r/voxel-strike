@@ -260,8 +260,24 @@ for (const [x, z, h] of [[18, -10.5, 3], [17.2, -10.8, 2]]) { const a = box(.08,
     for (const [w, d, x, z] of [[1.8, .15, u + .9, sg * RING], [.15, 1.8, sg * RING, u + .9]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), yel); m.rotation.x = -Math.PI / 2; m.position.set(x, .02, z); add(m); }
   }
   // city blocks between the roads: a raised sidewalk, buildings on lots, now and then a little park
-  const skyline = (rgb, litA) => tex(g => { noise(g, rgb, 8); for (let y = 2; y < 16; y += 4) for (let x = 1; x < 16; x += 4) { g.fillStyle = Math.random() < litA ? '#ffcf86' : 'rgba(30,36,50,.85)'; g.fillRect(x, y, 2, 2); } });
-  const mats = [[150, 90, 80], [190, 176, 150], [120, 128, 140], [96, 84, 96], [170, 120, 90], [140, 150, 130]].map(c => lam({ map: skyline(c, .35) }));
+  const mats = [brick([150, 90, 80]), plaster([190, 176, 150]), plaster([120, 128, 140]), plaster([96, 84, 96]), brick([170, 120, 90]), plaster([140, 150, 130])];
+  const LIT = [0xffc879, 0xffd9a0, 0xffb860, 0xffe6bf, 0xa8c8ff], DARK = [0x2a3a4c, 0x34424e, 0x243040, 0x3a4048], CURT = [0xb0483a, 0x5a7a4a, 0xd8c8a0, 0x4a5a8a, 0xc89040];
+  const wGlass = [], wLit = [], wCurt = [], pk = a => a[r2() * a.length | 0];
+  const windows = (cx, cz, w, d, h) => { // every building gets its own window shape
+    const ww = .7 + r2() * .7, wh = 1 + r2() * .7, gap = Math.max(ww + .7, 1.6 + r2() * 1.2), fh = 2.9 + r2() * .6, pair = r2() < .25;
+    for (const [ax, c, len, out] of [['x', cz - d / 2, w, -1], ['x', cz + d / 2, w, 1], ['z', cx - w / 2, d, -1], ['z', cx + w / 2, d, 1]]) {
+      const n = Math.floor((len - 1) / gap), mid = ax === 'x' ? cx : cz;
+      for (let fl = 0; fl * fh + wh + 1.4 < h; fl++) for (let i = 0; i < n; i++) {
+        if (r2() < .05) continue;
+        const u0 = mid + (i - (n - 1) / 2) * gap, y = fl * fh + 1.3 + wh / 2;
+        for (const u of pair ? [u0 - ww * .3, u0 + ww * .3] : [u0]) {
+          const ws = pair ? ww * .55 : ww, at = (off, wv, hv, yv) => [ax === 'x' ? u : c + out * off, yv, ax === 'x' ? c + out * off : u, ax === 'x' ? wv : .06, hv, ax === 'x' ? .06 : wv, 0];
+          if (r2() < .3) wLit.push([...at(.03, ws, wh, y), pk(LIT)]); else wGlass.push([...at(.03, ws, wh, y), pk(DARK)]);
+          if (r2() < .2) wCurt.push([...at(.05, ws * .96, wh * .5, y + wh * .25), pk(CURT)]);
+        }
+      }
+    }
+  };
   const roofM = lam({ color: 0x4a4648 }), grass = lam({ map: tex(g => noise(g, [86, 130, 60], 26)) }), r2 = seeded(31);
   const LINES = [-70, -RING, 0, RING, 70], edge = v => v === 0 ? 4.6 : 5;
   let parks = 0;
@@ -283,10 +299,12 @@ for (const [x, z, h] of [[18, -10.5, 3], [17.2, -10.8, 2]]) { const a = box(.08,
     const cut = (a, b) => { const m = a + (b - a) * (.35 + r2() * .3); return [[a, m - .6], [m + .6, b]]; };
     for (const [ax0, ax1] of cut(x0, x1)) for (const [az0, az1] of cut(z0, z1)) {
       const h = near ? 9 + r2() * 14 : 16 + r2() * 22, w = ax1 - ax0, d = az1 - az0;
-      const b = tbox(w, h, d, mats[r2() * mats.length | 0], 4); b.position.set((ax0 + ax1) / 2, h / 2, (az0 + az1) / 2); add(b);
+      const b = tbox(w, h, d, mats[r2() * mats.length | 0], 2); b.position.set((ax0 + ax1) / 2, h / 2, (az0 + az1) / 2); add(b);
+      windows((ax0 + ax1) / 2, (az0 + az1) / 2, w, d, h);
       const top = box(w + .3, .4, d + .3, roofM); top.position.set((ax0 + ax1) / 2, h + .2, (az0 + az1) / 2); add(top);
     }
   }
+  instanced(unit, lam({}), wGlass); instanced(unit, new THREE.MeshBasicMaterial({}), wLit); instanced(unit, lam({}), wCurt);
 }
 // sunset: a sky dome that fades from gold to purple, and the sun low over the roofs
 const dome = (() => {
@@ -378,6 +396,7 @@ function along(w, p, e) {
 }
 // where a target is (someone on the stairs counts as the nearer end)
 function placeOf(t) {
+  const B = roofAt(t.x, t.z); if (B && !onWay(t)) return [B.r, { x: t.x, y: B.h, z: t.z }]; // anywhere over a building means its roof
   const r = regionAt(t); if (r >= 0) return [r, t];
   const s = onWay(t), [ea, eb] = NODES.filter(n => n.w === s[0]);
   const n = hd(ea, t) < hd(eb, t) ? ea : eb;
@@ -401,5 +420,6 @@ M.nav = (p, t) => {
 };
 M.ways = CONNS;
 M.top = (x, z) => roofAt(x, z)?.h ?? 0;
+M.land = (x, z) => !!roofAt(x, z) || Math.random() < .35; // spawns: mostly up on the roofs
 M.surfAt = (x, z, y, base, s) => s ? base : 'stone';
 }

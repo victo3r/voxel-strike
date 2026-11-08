@@ -398,8 +398,7 @@ function update(dt) {
     if (p.life <= 0 || p.m.position.y < 0) { scene.remove(p.m); parts.splice(i, 1); }
   }
 
-  setHTML($('hp'), ico('heart') + Math.ceil(P.hp));
-  setHTML($('arm'), P.maxArmor ? ico('shield') + Math.ceil(P.armor) : '');
+  vitBar('hp', P.hp, P.max, 'heart'); vitBar('arm', P.armor, P.maxArmor, 'shield');
   const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
   setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : ammo[cur] + ' / ' + spare}`);
   if (!pvp()) $('top').innerHTML = `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead).length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`;

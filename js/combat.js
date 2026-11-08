@@ -253,7 +253,8 @@ const PICKUPS = {
   ammo: pickMat(tex(g => { noise(g, [85, 95, 45], 20); for (const x of [3, 7, 11]) { g.fillStyle = '#d8a830'; g.fillRect(x, 6, 2, 7); g.fillStyle = '#b87333'; g.fillRect(x, 4, 2, 2); } g.fillStyle = '#3a4020'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16); })),
   armor: pickMat(tex(g => { noise(g, [175, 180, 188], 22); g.fillStyle = '#f2f4f7'; g.fillRect(4, 3, 8, 6); g.fillRect(5, 9, 6, 2); g.fillRect(6, 11, 4, 2); g.fillRect(7, 13, 2, 1); g.fillStyle = '#5c6068'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16); })),
 };
-const HEAL_PICK = 30, ARMOR_PICK = 25, RESPAWN = 20, FIRST_SPAWN = 15; // first pickups show up 15-25s in
+const HEAL_PICK = 999, ARMOR_PICK = 999, // a pickup fills the bar
+  RESPAWN = 20, FIRST_SPAWN = 15; // first pickups show up 15-25s in
 const pads = [], pickGeo = new THREE.BoxGeometry(.45, .45, .45);
 let padsFor = null;
 function setupPads() {
@@ -284,8 +285,8 @@ function canPickup(type) {
 // srv = the server already applied it
 function usePickup(type, srv) {
   if (!srv && !canPickup(type)) return false;
-  if (type === 'health') { P.hp = srv ? srv.hp : Math.min(P.max, P.hp + HEAL_PICK); toast(`+${HEAL_PICK} HP`, '#ff5a5a'); }
-  else if (type === 'armor') { P.armor = srv ? srv.armor : Math.min(P.maxArmor, P.armor + ARMOR_PICK); toast(`+${ARMOR_PICK} ARMOR`, '#c9ced6'); }
+  if (type === 'health') { P.hp = srv ? srv.hp : Math.min(P.max, P.hp + HEAL_PICK); toast('HEALTH FULL', '#ff5a5a'); }
+  else if (type === 'armor') { P.armor = srv ? srv.armor : Math.min(P.maxArmor, P.armor + ARMOR_PICK); toast('ARMOR FULL', armorCss()); }
   else {
     WEAPONS.forEach((w, i) => { if (!BASE[i].inf && owned[i] && reserve[i] < resMax(i)) reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); });
     toast('+AMMO', '#ffffff');
