@@ -563,6 +563,19 @@ function slideTick(dt) {
 // --- tiki bar ---
 const wood = surf(lam({ map: tex(g => { noise(g, [140, 96, 58], 18); g.fillStyle = 'rgba(50,28,12,.4)'; for (const x of [0, 5, 10]) g.fillRect(x, 0, 1, 16); }) }), 'wood');
 const thatch = lam({ map: tex(g => { noise(g, [200, 164, 92], 26); g.fillStyle = 'rgba(120,85,40,.55)'; for (let i = 0; i < 12; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 4); }) });
+// a pyramid roof with its texture at the usual pixel size (a stretched cone looked blurry and low detail)
+function pyramid(w, d, h, m, k = 1) {
+  const c = [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]], pos = [], uv = [];
+  for (let i = 0; i < 4; i++) {
+    const [ax, az] = c[i], [bx, bz] = c[(i + 1) % 4], e = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / e, uz = (bz - az) / e;
+    const tu = -ax * ux - az * uz, sl = Math.hypot(Math.abs(ax * uz - az * ux), h); // apex along the edge, slope length
+    pos.push(bx, 0, bz, ax, 0, az, 0, h, 0); uv.push(e / k, 0, 0, 0, tu / k, sl / k);
+  }
+  pos.push(-w / 2, 0, -d / 2, w / 2, 0, -d / 2, w / 2, 0, d / 2, -w / 2, 0, -d / 2, w / 2, 0, d / 2, -w / 2, 0, d / 2); // underside
+  uv.push(0, 0, w / k, 0, w / k, d / k, 0, 0, w / k, d / k, 0, d / k);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+  return new THREE.Mesh(g, m);
+}
 const BX = 0, BZ = -18;
 addSlab(BX, BZ + 2, 6.4, .6, 0, 1.1, wood);
 for (const s of [-1, 1]) addSlab(BX + s * 2.9, BZ + .4, .6, 2.6, 0, 1.1, wood); // gaps so you can walk behind the bar
@@ -571,16 +584,15 @@ addSlab(BX, BZ - 2.2, 6.4, .5, 0, 1.6, wood);
 const bottleCols = [0x3a7a3a, 0x8a3a1a, 0xd8d0b0, 0x2a5a8a, 0xb04a2a, 0x5a3a7a];
 for (let i = 0; i < 11; i++) { const b = box(.12, .32 + (i % 3) * .06, .12, plain(bottleCols[i % bottleCols.length])); b.position.set(BX - 2.7 + i * .54, 1.76 + (i % 3) * .03, BZ - 2.2); add(b); }
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(BX + sx * 3.3, BZ + .1 + sz * 2.55, .3, .3, 0, 3, wood);
-const barRoof = box(8, .35, 6.6, thatch); barRoof.position.set(BX, 3.15, BZ); add(barRoof); building.cover.push(barRoof);
-const barCone = new THREE.Mesh(new THREE.ConeGeometry(5.6, 1.8, 4), thatch); barCone.rotation.y = Math.PI / 4; barCone.scale.set(1, 1, .82); barCone.position.set(BX, 4.2, BZ); add(barCone);
-standOn(BX, BZ, 4, 3.3, 2.975, 3.325, 3.325, false, 'wood'); // roof edge
-standOn(BX, BZ, 5.6 / Math.SQRT2, 5.6 / Math.SQRT2 * .82, 3.3, 3.3, 5.1, false, 'wood'); // thatch peak
+const barRoof = tbox(8, .25, 6.6, thatch); barRoof.position.set(BX, 3.125, BZ); add(barRoof); building.cover.push(barRoof);
+const barTop = pyramid(8.6, 7.2, 1.9, thatch); barTop.position.set(BX, 3.25, BZ); add(barTop);
+standOn(BX, BZ, 4.3, 3.6, 3, 3.25, 5.15, false, 'wood'); // the thatch, up to its peak
 for (const x of [-2.2, -.7, .8, 2.3]) { addSlab(BX + x, BZ + 3, .45, .45, 0, .6, wood); const seat = box(.55, .08, .55, plain(0xc0392b)); seat.position.set(BX + x, .64, BZ + 3); add(seat); }
 
 // --- beach huts ---
 function hut(x, z, face) { // face = door direction
   addSlab(x, z, 3.2, 3.2, 0, 2.6, wood);
-  const r = new THREE.Mesh(new THREE.ConeGeometry(2.9, 1.7, 4), thatch); r.rotation.y = Math.PI / 4; r.position.set(x, 3.45, z); add(r); building.cover.push(r);
+  const r = pyramid(4.1, 4.1, 1.7, thatch); r.position.set(x, 2.6, z); add(r); building.cover.push(r);
   standOn(x, z, 2.9 / Math.SQRT2, 2.9 / Math.SQRT2, 2.6, 2.6, 4.3, false, 'wood');
   const door = box(face[0] ? .04 : 1, 1.9, face[0] ? 1 : .04, plain(0x4a2e18)); door.position.set(x + face[0] * 1.61, .95, z + face[1] * 1.61); add(door);
   for (const s of [-1, 1]) { // windows

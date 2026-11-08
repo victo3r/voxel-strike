@@ -216,7 +216,7 @@ function scoreKill(killer, victim, head, helpers) {
     const pts = MR.kills ? 1 : KILL_PTS + (head ? HEAD_PTS : 0) + (st ? st[0] : killer.streak > STREAK_PTS_AFTER ? STREAK_PTS : 0);
     killer.score += pts;
     if (killer.you) {
-      toast(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#ffd23f');
+      toast(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#8ff0b6');
       sfx(head || st ? 'killSpecial' : 'kill');
     }
   }
@@ -839,10 +839,10 @@ function endMatch(results) {
   const key = !!results && !results.priv && place === 1; // keys come from public online wins
   if (key) prof.keys = (prof.keys | 0) + 1;
   const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp } = grant(xp, gold); // doubled with a booster
-  $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ${COIN}</span>${key ? `<span class="ky">+1 ${ico('key')}</span>` : ''}${boostTag()}</div>`
+  $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), key && [`+1 ${ico('key')}`, 'KEY', 'tk'], boostTile()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
-    + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ${COIN} · +${boostUp} ${ico('bolt')}</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
+    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';
   sfx(won ? 'win' : 'lose'); musicEnd();
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad

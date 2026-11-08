@@ -34,9 +34,9 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #hp{position:absolute;left:20px;bottom:20px;color:#ff5a5a}
 #ammo{position:absolute;right:20px;bottom:20px;text-align:right}
 #arm{position:absolute;left:20px;bottom:50px;color:#c9ced6}
-#toast{position:absolute;left:0;right:0;top:58%;text-align:center;font-size:20px;opacity:0;transition:opacity .3s}
-#top{position:absolute;left:0;right:0;top:12px;text-align:center;color:#ffd23f}
-#banner{position:absolute;left:0;right:0;top:30%;text-align:center;font-size:64px;color:#ffd23f;text-shadow:4px 4px 0 #b33;opacity:0;transition:opacity .4s;white-space:pre-line}
+#toast{position:absolute;left:0;right:0;top:58%;text-align:center;font-size:20px;text-shadow:2px 2px 0 rgba(0,0,0,.6);opacity:0;transition:opacity .3s}
+#top{position:absolute;left:0;right:0;top:12px;text-align:center;color:#fff;text-shadow:2px 2px 0 var(--acc-dk)}
+#banner{position:absolute;left:0;right:0;top:30%;text-align:center;font-size:64px;color:#fff;text-shadow:4px 4px 0 var(--acc-dk);opacity:0;transition:opacity .4s;white-space:pre-line}
 #hit{position:absolute;inset:0;background:red;opacity:0;transition:opacity .25s}
 #bossbar{position:absolute;left:30%;right:30%;top:44px;height:16px;border:3px solid #000;background:#400;display:none}
 #bossfill{height:100%;width:100%;background:#e33}
@@ -174,7 +174,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 .ic.px>i{background:var(--m) center/100% 100% no-repeat;-webkit-mask:none;mask:none}
 .ic.dim{opacity:.35}
 button .ic{pointer-events:none}
-.kf .ic-head{color:#ffd23f}.kf .ic-skull{color:#e8e8e8}
+.kf .ic-head{color:var(--acc-lt)}.kf .ic-skull{color:#e8e8e8}
 #hp .ic,#arm .ic{margin-right:.25em}
 #armAct button{font:bold 16px monospace;padding:9px 14px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
 #armAct button:hover:not(:disabled){background:var(--hov)}
@@ -250,7 +250,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #postSub{margin:auto 0 0;font-size:16px;letter-spacing:4px;color:var(--acc-lt)}
 #postPlace{font-size:56px;margin:4px 0 14px}
 #post .lb{width:min(560px,94vw);font-size:20px}
-#rewards{min-height:20px;margin:10px;width:min(360px,90vw)}
+#rewards{min-height:20px;margin:10px;width:min(480px,90vw)}
 #post button{font:bold 18px monospace;padding:10px 18px;margin:0 4px}
 #post>:last-child{margin-bottom:auto}
 @media (max-height:620px),(max-width:620px){#postPlace{font-size:34px}#post .lb{font-size:15px}.lb span{padding:2px 4px}#board{top:70px}}
@@ -321,7 +321,6 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #boostBox .bs{display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px}
 #boostBox .bs button{width:40px;height:40px;padding:0;font-size:22px}#boostBox .bs b{min-width:34px;text-align:center;font-size:26px;color:var(--muted)}#boostBox .bs b.on{color:#ffd75e}
 #boostBtn small{font-size:.6em;color:#ffd75e;margin-left:2px}
-#post .bx{color:#ffd75e;display:inline-flex;align-items:center;gap:6px;margin-left:14px}
 #lobbySet img{width:62%}
 
 /* mode and map picker */
@@ -356,9 +355,11 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 /* xp and rewards */
 .xpbar{height:10px;margin-top:6px;background:rgba(0,0,0,.45);border:2px solid var(--line-dim)}
 .xpbar>div{height:100%;background:var(--acc);box-shadow:inset 0 -3px 0 var(--acc-dk)}
-.rw{display:flex;justify-content:center;gap:28px;font-size:26px;font-weight:bold}
-.rw .rx{color:var(--acc-lt)}.rw .pc{margin-left:0}
-.lvup{text-align:center;font-size:22px;color:var(--acc-lt);margin-top:6px;animation:lvpop .5s ease-out}
+.rw{display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
+.rt{width:108px;box-sizing:border-box;padding:8px 4px 6px;background:rgba(0,0,0,.35);border:2px solid var(--line-dim);display:flex;flex-direction:column;align-items:center;gap:2px}
+.rt b{font-size:24px;white-space:nowrap;color:#ffd75e}.rt.tx b{color:var(--acc-lt)}
+.rt small{font-size:11px;letter-spacing:2px;color:var(--silver)}
+.lvup{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 14px;font-size:20px;color:var(--acc-lt);margin-top:8px;animation:lvpop .5s ease-out}.lvup span{white-space:nowrap}
 .rl{text-align:center;font-size:14px;color:var(--silver);margin-top:6px}
 @keyframes lvpop{from{transform:scale(1.6);opacity:0}to{transform:none;opacity:1}}
 
@@ -559,4 +560,4 @@ body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:
 #chestBox .reveal.open .loot{flex-basis:auto;width:200px;transform:scale(1.25);margin:24px 0;animation:lootPop .35s ease-out;box-shadow:0 0 30px var(--rc)}
 @keyframes chestShake{0%,100%{transform:none}20%{transform:rotate(-4deg)}40%{transform:rotate(4deg) scale(1.04)}60%{transform:rotate(-6deg) scale(1.08)}80%{transform:rotate(6deg) scale(1.12)}}
 @keyframes lootPop{from{transform:scale(.3);opacity:0}to{transform:scale(1.25);opacity:1}}
-#rewards .ky{color:#ffd75e}
+

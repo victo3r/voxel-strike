@@ -288,7 +288,7 @@ function usePickup(type, srv) {
   else if (type === 'armor') { P.armor = srv ? srv.armor : Math.min(P.maxArmor, P.armor + ARMOR_PICK); toast(`+${ARMOR_PICK} ARMOR`, '#c9ced6'); }
   else {
     WEAPONS.forEach((w, i) => { if (!BASE[i].inf && owned[i] && reserve[i] < resMax(i)) reserve[i] = Math.min(resMax(i), reserve[i] + w.mag * 2); });
-    toast('+AMMO', '#ffd23f');
+    toast('+AMMO', '#ffffff');
   }
   sfx(type === 'health' ? 'pickHealth' : type === 'armor' ? 'pickArmor' : 'pickAmmo'); return true;
 }

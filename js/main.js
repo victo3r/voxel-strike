@@ -153,23 +153,24 @@ function update(dt) {
   $('cross').style.display = scoped ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
-  if (w.melee) { // knife swing
+  const vw = WEAPONS[gunShown] ?? w, vhold = holdOf(vw); // pose the gun on screen: the old one while it lowers
+  if (vw.melee) { // knife swing
     const c = kick > 0 ? knifeChopFP(1 - kick) : 0;
-    const up = meleeUp(w), lo = w.tilt ? .12 : 0; // swords stand up, lower in the hand
+    const up = meleeUp(vw), lo = vw.tilt ? .12 : 0; // swords stand up, lower in the hand
     vm.rotation.set(up + c * .95, Math.abs(c) * .2, -c * .4);
     knifeRest.set(up, 0, 0); _kp.copy(KNIFE_PIV).applyEuler(knifeRest); _kq.copy(KNIFE_PIV).applyEuler(vm.rotation);
     vm.position.set(.3 + lo * .3 + Math.min(0, c) * .18, -.22 - lo + bob + Math.max(0, c) * .1, -.5 - lo).add(_kp).sub(_kq);
-  } else if (hold === 'heavy') { // low at the hip
+  } else if (vhold === 'heavy') { // low at the hip
     vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob, -.6 + kick * .06);
     vm.rotation.set(.04 + kick * .1, 0, 0);
-  } else if (hold === 'shoulder') { // on the shoulder
+  } else if (vhold === 'shoulder') { // on the shoulder
     vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob, -.62 + kick * .1);
     vm.rotation.set(kick * .2, 0, 0);
   } else {
     vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob, -.55 + kick * .08);
     vm.rotation.set(kick * .25 * (1 - adsT * .85), 0, 0); // less muzzle climb while aiming
-    if (hold === 'pistol') vm.position.y += .09 * (1 - adsT); // pistols sit higher
-    if (w.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // holo sight to the middle
+    if (vhold === 'pistol') vm.position.y += .09 * (1 - adsT); // pistols sit higher
+    if (vw.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // holo sight to the middle
   }
   // reload animation
   const ra = reloading > 0 && gunShown === cur ? reloadPose(w.id, 1 - reloading / w.reload) : null;

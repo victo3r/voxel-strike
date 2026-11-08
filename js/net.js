@@ -382,11 +382,11 @@ net = (() => {
     const killer = m.by && m.by !== m.v ? recOf(m.by) : null, victim = recOf(m.v);
     if (victim) {
       feed(killer ? `${nameTag(killer)} ${m.head ? ico('head') : ico('skull')} ${nameTag(victim)}` : `${nameTag(victim)} ${ico('skull')}`);
-      const st = killer && STREAKS[m.streak]; if (st) feed(`${nameTag(killer)} <b style="color:#ffd23f">${st[1]}!</b>`);
+      const st = killer && STREAKS[m.streak]; if (st) feed(`${nameTag(killer)} <b style="color:#8ff0b6">${st[1]}!</b>`);
     }
     if (m.by === pid && m.v !== pid) {
       const st = STREAKS[m.streak];
-      toast(`KILL${m.head ? ' · HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#ffd23f'); sfx(m.head || st ? 'killSpecial' : 'kill'); hitMarker('kill');
+      toast(`KILL${m.head ? ' · HEADSHOT' : ''}${st ? ' · ' + st[1] : ''}`, '#8ff0b6'); sfx(m.head || st ? 'killSpecial' : 'kill'); hitMarker('kill');
     } else if ((m.assists || []).includes(pid)) toast('+15 ASSIST', '#e8e8e8');
     if (m.v === pid) {
       alive = false; readySent = false; respawnAt = m.respawnAt || now() + 3000;
