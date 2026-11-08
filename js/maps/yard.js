@@ -88,6 +88,23 @@ const bushes = [...scatter(40, 1.4, 1.2, 40), ...scatter(60, 4, 1.2, 100)].map((
 });
 instanced(unit, leafMat, bushes);
 grassTufts(scatter(900, .7, .3, 70).map(([x, z]) => { const s = .8 + rnd() * .7; return [x, 0, z, 1.1 * s, 1 * s, 1, rnd() * Math.PI, LEAF_TINTS[rnd() * LEAF_TINTS.length | 0]]; }));
+// shipping containers with plank ramps, for some high ground
+const CH = 2.6, CW = 2.4, CL = 6;
+const corr = rgb => surf(lam({ map: tex(g => { noise(g, rgb, 10); g.fillStyle = 'rgba(0,0,0,.22)'; for (let x = 0; x < 16; x += 4) g.fillRect(x, 0, 2, 16); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); }) }), 'metal');
+const plankMat = surf(lam({ map: tex(g => { noise(g, [150, 112, 70], 18); g.fillStyle = 'rgba(60,35,15,.45)'; for (const y of [0, 4, 8, 12]) g.fillRect(0, y, 16, 1); }) }), 'wood');
+for (const [x, z, d, rgb] of [[-6.5, 3.6, 1, [178, 64, 48]], [6.5, -3.6, -1, [52, 102, 160]]]) { // d: the ramp runs off this way along x
+  addSlab(x, z, CL, CW, 0, CH, corr(rgb), true, 2.6);
+  const doorX = x - d * CL / 2;
+  for (const oz of [-.6, .6]) { const door = box(.06, CH - .3, CW / 2 - .1, corr(rgb.map(c => c * .82))); door.position.set(doorX - d * .03, CH / 2, z + oz); add(door); }
+  for (const oz of [-.35, -.15, .15, .35]) { const bar = box(.06, CH - .5, .05, darkMetal); bar.position.set(doorX - d * .07, CH / 2, z + oz * 1.8); add(bar); }
+  const x0 = x + d * CL / 2, run = 4, n = 8; // the ramp, in slices so you can walk under its high end
+  for (let k = 0; k < n; k++) {
+    const a = x0 + d * run * k / n, b = x0 + d * run * (k + 1) / n, ya = CH * (1 - k / n), yb = CH * (1 - (k + 1) / n);
+    building.solids.push({ mesh: null, minX: Math.min(a, b), maxX: Math.max(a, b), minZ: z - .7, maxZ: z + .7, bot: yb, top: ya, ramp: { ax: 'x', a: b, b: a }, surf: 'wood' });
+  }
+  const len = Math.hypot(run, CH), r = box(len, .12, 1.4, plankMat); r.position.set(x0 + d * run / 2, CH / 2 - .06, z); r.rotation.z = -d * Math.atan2(CH, run); add(r); building.cover.push(r);
+  for (const f of [.35, .7]) for (const oz of [-.6, .6]) { const h = CH * (1 - f) - .12, leg = box(.14, h, .14, plankMat); leg.position.set(x0 + d * run * f, h / 2, z + oz); add(leg); }
+}
 addCrates(MAPS.yard.crates);
 // tall grass
 const yardTufts = [];
