@@ -77,14 +77,14 @@ const BOT_PICKS = {
   backup: ['voxel', 'voxel', 'hitman', 'hitman', 'executioner'],
   melee: ['knife', 'knife', 'knife', 'herosword', 'herosword', 'warhammer', 'blazesaber', 'windsaber'],
   special: ['flame', 'flame', 'heatray', 'heatray', 'shockbeam', 'shockbeam', 'frostwand'],
-  sniper: ['sniper', 'sniper', 'semisniper', 'semisniper', 'tigerbite'],
-  premium: ['flare', 'flare', 'rocket'],
+  sniper: ['sniper', 'sniper', 'semisniper', 'semisniper', 'tigerbite', 'crossbow'],
+  premium: ['flare', 'flare', 'rocket', 'grenade'],
 };
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
-  herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20],
+  herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -110,6 +110,8 @@ const GUN_FIT = {
   sniper: d => d > 20 ? 1.1 : d > 14 ? .6 : d > 8 ? .25 : .1,
   semisniper: d => d > 18 ? 1.05 : d > 12 ? .7 : d > 7 ? .35 : .15,
   rocket: d => d < 5 ? 0 : d < 22 ? .72 : .4,
+  grenade: d => d < 5 ? 0 : d < 18 ? .75 : .2,
+  crossbow: d => d > 14 ? .95 : d > 8 ? .55 : .2,
   flare: d => d < 3 ? .1 : d < 20 ? .6 : .35,
 };
 const HUNT_D = 8;
@@ -576,10 +578,10 @@ function botFire(b, W, dist) {
   }
   if (W.flame) return botFlame(b, W);
   const S = skillOf(b), err = S.aimErr + S.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
-  if (W.rocket || W.flare) {
+  if (W.rocket || W.flare || W.bolt || W.grenade) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
-    (W.rocket ? fireRocket : fireFlare)(W, eye.clone(), dirV, b);
+    (W.rocket ? fireRocket : W.grenade ? fireGrenade : fireFlare)(W, eye.clone(), dirV, b);
     b.leadGuess = .6 + Math.random() * .6;
     return;
   }
@@ -671,10 +673,10 @@ function updateBot(b, dt) {
     if (b.seeT <= dt) { b.lpx = tp.x; b.lpz = tp.z; }
     if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
     b.lpx = tp.x; b.lpz = tp.z;
-    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : 0, lag = 1 / S.turn;
+    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.bolt ? dist / BOLT_SPD : W.grenade ? dist / GREN_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.bolt ? BOLT_DROP : W.grenade ? GREN_GRAV : 0;
     const tx = dx + (fly ? b.pvx * fly * b.leadGuess : (b.pvx * S.lead - b.vx * S.self) * lag), tz = dz + (fly ? b.pvz * fly * b.leadGuess : (b.pvz * S.lead - b.vz * S.self) * lag), th = Math.hypot(tx, tz);
     wantYaw = Math.atan2(tx, tz);
-    wantPitch = Math.atan2(tp.y + (W.rocket ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (W.flare ? Math.atan2(FLARE_DROP * fly * fly / 2, th) : 0);
+    wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);
   } else {
     // nobody around: look where it's going and glance about
     if ((b.gazeT -= dt) <= 0) {

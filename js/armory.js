@@ -44,7 +44,9 @@ function gunAttrs(w) {
   else if (autoFire(w)) a.push('RAPID FIRE');
   else if (w.mag > 1) a.push('SEMI-AUTO');
   if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : 'HOLO SIGHT');
-  if (w.quiet) a.push('SUPPRESSED');
+  if (w.quiet) a.push(w.bolt ? 'SILENT' : 'SUPPRESSED');
+  if (w.bolt) a.push('BOLTS', 'HEADSHOT X' + w.headMul);
+  if (w.grenade) a.push('BOUNCES', 'EXPLOSIVE');
   if (w.laser) a.push('LASER');
   if (w.wand) a.push('WAND');
   if (slows(w)) a.push('SLOW');
@@ -80,6 +82,8 @@ const DESC = {
   windsaber: 'A white blade as light as the wind, run faster and jump higher',
   frostwand: 'A wand tipped with ice that leaves whoever it touches slow and shivering',
   warhammer: 'A huge hammer that sends whoever it hits flying',
+  crossbow: 'Silent bolts that drop a little and hit a head really hard',
+  grenade: 'Grenades that bounce off walls and go boom on whoever they touch',
   executioner: 'Purple laser bolts that hit like a sniper, from a pistol',
 };
 // extra stats for the details view
@@ -87,7 +91,9 @@ function gunSpecs(i) {
   const w = BASE[i], out = [], rl = +statsAt(i, Math.max(0, gunUse(i) - 1)).reload.toFixed(1);
   if (!w.melee && w.start) out.push(['RELOAD', rl + 's']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
-  if (w.rocket) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
+  if (w.rocket || w.grenade) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
+  if (w.grenade) out.push(['FUSE', GREN_FUSE + 's']);
+  if (w.bolt) out.push(['HEADSHOT', 'X' + w.headMul]);
   if (w.burn) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`]);
   if (w.flare) out.push(['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);

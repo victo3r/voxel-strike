@@ -66,6 +66,8 @@ const CROSSES = {
   tigerbite: () => [...xDot(), ...xLines(9, 6, 2, 'lrd')],
   flare: () => [...xDot(), ...xCorners(8, 4)], // explosives: corners, bigger blast = bigger square
   rocket: () => [...xDot(), ...xCorners(13, 5)],
+  grenade: () => [...xDot(), ...xCorners(11, 4)],
+  crossbow: () => [...xDot(), ...xLines(7, 4, 2, 'lrd')],
 };
 const crossFor = w => (CROSSES[w.id] ?? (w.hold === 'pistol' || w.melee ? CROSSES.voxel : CROSSES.ar))();
 // shooting kicks the crosshair out, then it settles back
@@ -80,7 +82,7 @@ function crossOnEnemy(w) {
 }
 const CROSS_BACK = 26; // settle speed in pixels per second
 function crossKick(px, max = 6) { if (crossK < max) crossK = Math.min(max, crossK + px); }
-function kickFor(w) { return w.melee ? 2 : w.rocket || w.flare || w.scope || w.pellets > 1 ? 4 : 2.5; }
+function kickFor(w) { return w.melee ? 2 : w.rocket || w.flare || w.grenade || w.scope || w.pellets > 1 ? 4 : 2.5; }
 function tickCross(dt, w) { if (crossK > 0) crossK = Math.max(0, crossK - dt * CROSS_BACK); crossRed = crossOnEnemy(w); drawCross(w); }
 function drawCross(w) {
   const off = Math.round(crossK);

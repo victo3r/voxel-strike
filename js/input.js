@@ -547,7 +547,7 @@ function restart(spot) {
   booms.forEach(b => scene.remove(b.m)); booms.length = 0;
   rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;
   flames.forEach(f => scene.remove(f.m)); flames.length = 0;
-  flares.forEach(f => scene.remove(f.m)); flares.length = 0; clearBeams(); clearTracers(); recoilReset();
+  flares.forEach(f => scene.remove(f.m)); flares.length = 0; grenades.forEach(g => scene.remove(g.m)); grenades.length = 0; clearBeams(); clearTracers(); recoilReset();
   parts.forEach(p => scene.remove(p.m)); parts.length = 0; clearDrops(scene);
   useMap(mapId); setupPads();
   Object.assign(P, { drowned: false, burn: 0, slowT: 0, vy: 0, mvx: 0, mvz: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, groundAt(0, 0, .35, floorY(0, 0)), 0); P.pos.lag = 0;

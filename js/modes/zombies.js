@@ -210,7 +210,7 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
   blastFx(p, R);
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
   if (net.on) { // online the server works out who got hurt
-    const gun = rocket ? 'rocket' : 'flare', kind = rocket ? 4 : 6;
+    const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', kind = rocket ? 4 : 6;
     if (pd < R && !dead && respawnT <= 0) {
       if (pDmg) net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by });
       if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true);
@@ -258,6 +258,8 @@ const SHOP = [
   { gun: 'shockbeam', price: 180, desc: 'a beam that slows them down' },
   { gun: 'tigerbite', price: 240, desc: `${BASE[gi('tigerbite')].dmg} dmg, 6 shot sniper` },
   { gun: 'executioner', price: 260, desc: `laser pistol, ${BASE[gi('executioner')].dmg} dmg` },
+  { gun: 'crossbow', price: 160, desc: 'quiet bolts, huge headshots' },
+  { gun: 'grenade', price: 300, desc: 'bouncy grenades, big booms' },
   { gun: 'trex', price: 250, desc: 'six big pellets and a dino bite' },
   { gun: 'starsmasher', price: 380, desc: 'stars out of the muzzle, 3x sight' },
   { gun: 'blazesaber', price: 320, desc: 'a blade of fire that burns them' },

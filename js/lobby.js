@@ -242,12 +242,12 @@ function heroShot() {
   sfx(w.id, { v: .5 }); hf.flash = .05;
   if (w.starFx) starPuff(hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
-  const n = w.pellets > 1 ? 5 : 1, mat = w.rocket ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
+  const n = w.pellets > 1 ? 5 : 1, mat = w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
-    const len = w.rocket || w.flare ? .6 : 3, m = new THREE.Mesh(fxGeo, mat);
+    const len = w.rocket || w.flare || w.grenade ? .6 : 3, m = new THREE.Mesh(fxGeo, mat);
     m.scale.set(thick, thick, len); m.position.copy(_hm).addScaledVector(d, len / 2); m.lookAt(_hm.clone().addScaledVector(d, 10)); lobbyScene.add(m);
-    heroFx.push({ m, v: d.multiplyScalar(w.rocket ? 25 : w.flare ? 30 : 90), life: w.rocket || w.flare ? .8 : .12 });
+    heroFx.push({ m, v: d.multiplyScalar(w.rocket || w.grenade ? 25 : w.flare ? 30 : 90), life: w.rocket || w.flare || w.grenade ? .8 : .12 });
   }
 }
 function heroTick(dt) {

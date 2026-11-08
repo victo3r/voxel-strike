@@ -311,6 +311,19 @@ const SOUNDS = {
     s.hiss({ ft: 'highpass', f: 2500, f2: 6000, a: .02, d: .35, v: .45 });
     s.click({ f: 1200, v: .3 });
   }],
+  crossbow: [.35, .4, s => { // a twang
+    s.tone({ type: 'triangle', f: 230, f2: 150, d: .26, v: .8 });
+    s.tone({ f: 460, f2: 300, d: .12, v: .3 });
+    s.hiss({ ft: 'highpass', f: 3000, d: .05, v: .35 });
+    s.click({ f: 1800, v: .3 });
+  }],
+  boltHit: [.25, .4, s => { s.thud({ d: .05, f: 160, v: .8 }); s.click({ f: 900, v: .35 }); }],
+  grenade: [.45, .7, s => { // a bloop
+    s.tone({ f: 170, f2: 60, d: .16, v: 1 });
+    s.hiss({ ft: 'bandpass', f: 900, f2: 300, q: 1.2, d: .14, v: .7 });
+    s.click({ f: 1400, v: .35 });
+  }],
+  bounce: [.15, .35, s => { s.tone({ f: 620, f2: 480, d: .06, v: .5 }); s.click({ f: 2400, v: .25 }); }],
   flareHit: [.6, .6, s => {
     s.hiss({ ft: 'bandpass', f: 1500, f2: 400, d: .35, v: .9 });
     s.tone({ f: 180, f2: 60, d: .15, v: .7 });
@@ -436,6 +449,8 @@ const SOUNDS = {
   r_eradicator: [2.6, .45, s => { s.latch(.2); s.rattle(.9); s.rattle(1.4); s.latch(2.0); s.tone({ type: 'sawtooth', f: 60, f2: 180, t: 2.15, a: .2, d: .2, v: .15, lp: 900 }); }],
   r_flame: [2.2, .45, s => { s.latch(.15); s.hiss({ ft: 'highpass', f: 3000, t: .45, a: .05, d: .35, v: .5 }); s.thunk(1.2); s.latch(1.75); s.clack({ t: 1.95, f: 4000, d: .008, v: .5 }); s.hiss({ t: 1.98, f: 400, f2: 1200, d: .15, v: .5 }); }],
   r_rocket: [2.6, .45, s => { s.latch(.3); s.hiss({ ft: 'bandpass', f: 600, f2: 300, q: 2, t: 1.0, a: .1, d: .25, v: .5 }); s.thunk(1.35); s.latch(2.1); }],
+  r_crossbow: [2.2, .45, s => { s.latch(.2); for (const t of [.5, .75, 1, 1.25]) s.click({ t, f: 1500, v: .35 }); s.tone({ t: 1.55, type: 'triangle', f: 180, f2: 240, d: .2, v: .35 }); s.latch(1.9); }],
+  r_grenade: [2.4, .45, s => { for (const t of [.35, .7, 1.05, 1.4]) s.shell(t); s.latch(2.0); }],
   r_flare: [1.3, .45, s => { s.latch(.1); s.shell(.6); s.latch(1.0); }],
   r_hitman: [1.1, .45, s => { s.magOut(.08); s.magIn(.5); s.rack(.82); }],
   r_executioner: [1.4, .45, s => {

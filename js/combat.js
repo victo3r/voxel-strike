@@ -50,7 +50,8 @@ function shoot() {
     if (w.starFx && !aiming) starPuff(flashMesh, scene, .6); // not while you aim: they'd fill the sight
     sfx(w.id);
     if (w.rocket) fireRocket(w);
-    else if (w.flare) fireFlare(w);
+    else if (w.flare || w.bolt) fireFlare(w);
+    else if (w.grenade) fireGrenade(w);
     else {
       const targets = shotTargets();
       flashMesh.getWorldPosition(trFrom);
@@ -178,7 +179,7 @@ function beamTick(dt) {
 }
 function clearBeams() { for (const b of beams.values()) scene.remove(b.g); beams.clear(); }
 
-// bot rockets and flares can hit you, yours can't
+// bot rockets, flares, bolts and grenades can hit you, yours can't
 const youBox = new THREE.Box3(), youHitP = new THREE.Vector3();
 function rayHitsYou(r, far) { // distance to your body along the ray, or Infinity
   if (respawnT > 0) return Infinity;
@@ -224,19 +225,26 @@ function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
 }
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, drop
 const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and damage
+const BOLT_SPD = 90, BOLT_DROP = 4; // crossbow bolts: fast, a little drop
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
+const boltMats = [lam({ color: 0xc9a46a }), lam({ color: 0x9a9aa2 }), lam({ color: 0xc8402a })];
+function boltMesh() {
+  const m = new THREE.Group(), tip = box(.04, .04, .1, boltMats[1]), fl = box(.08, .02, .08, boltMats[2]);
+  tip.position.z = .28; fl.position.z = -.24; m.add(box(.025, .025, .55, boltMats[0]), tip, fl); return m;
+}
 function fireFlare(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
-  const m = box(.14, .14, .14, flareMat);
-  m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
-  flares.push({ m, v: dir.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0, by, ghost: !!opts.ghost, id });
+  const m = w.bolt ? boltMesh() : box(.14, .14, .14, flareMat);
+  m.position.copy(from).addScaledVector(dir, .6); if (w.bolt) m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
+  flares.push({ m, v: dir.clone().multiplyScalar(w.bolt ? BOLT_SPD : FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, bolt: !!w.bolt, hm: w.headMul ?? 1.5, trail: 0, by, ghost: !!opts.ghost, id });
 }
 // flare landing effect
 function flareFx(p) { burst(p, 0xffaa33, 14); burst(p, 0xff4a1a, 8); sfx('flareHit', { at: p }); }
+function boltFx(p) { burst(p, 0xc9a46a, 5); sfx('boltHit', { at: p, far: 25 }); }
 function updateFlares(dt) {
   for (let i = flares.length - 1; i >= 0; i--) {
-    const f = flares[i]; f.life -= dt; f.v.y -= FLARE_DROP * dt;
+    const f = flares[i]; f.life -= dt; f.v.y -= (f.bolt ? BOLT_DROP : FLARE_DROP) * dt;
     const step = f.v.length() * dt;
     ray2.set(f.m.position, tmp.copy(f.v).normalize()); ray2.far = step;
     let hit = ray2.intersectObjects(targetsFor(f.by), false)[0];
@@ -247,20 +255,21 @@ function updateFlares(dt) {
       if (f.ghost) continue; // the server says where it landed
       const p = onYou ? youHitP.clone() : hit ? hit.point : f.m.position;
       net.boom(f.id, p, f.by);
-      flareFx(p);
+      (f.bolt ? boltFx : flareFx)(p);
       if (onYou) {
         const head = p.y > P.pos.y + 1.45;
-        hurtPlayer(Math.round(f.dmg * (head ? 1.5 : 1)), false, f.by, head, 5, f.id); applyBurn(P, f.burnT, f.burn, f.by, 'flare');
-      } else if (f.by && Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z) < FLARE_R + .3) {
+        hurtPlayer(Math.round(f.dmg * (head ? f.hm : 1)), false, f.by, head, 5, f.id); if (f.burn) applyBurn(P, f.burnT, f.burn, f.by, 'flare');
+      } else if (f.by && !f.bolt && Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z) < FLARE_R + .3) {
         const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
         hurtPlayer(Math.round(FLARE_SPLASH * (1 - Math.min(1, pd / FLARE_R) * .6)), false, f.by, false, 6, f.id);
       }
       const zz = hit?.object.userData.zombie;
       if (zz && !zz.dead) {
         const head = !!hit.object.userData.head;
-        hurtZombie(zz, f.dmg * (head ? 1.5 : 1), hit.point, head, false, f.by, 5, f.id);
-        if (!zz.dead && !(zz.type === 'bot' && friendly(f.by, zz))) applyBurn(zz, f.burnT, f.burn, f.by, 'flare', true);
+        hurtZombie(zz, f.dmg * (head ? f.hm : 1), hit.point, head, false, f.by, 5, f.id);
+        if (f.burn && !zz.dead && !(zz.type === 'bot' && friendly(f.by, zz))) applyBurn(zz, f.burnT, f.burn, f.by, 'flare', true);
       }
+      if (f.bolt) continue;
       for (const o of zombies) {
         if (o === zz || o === f.by || o.dead) continue;
         const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
@@ -268,8 +277,48 @@ function updateFlares(dt) {
       }
       continue;
     }
-    f.m.position.addScaledVector(f.v, dt); f.m.rotation.x += dt * 9; f.m.rotation.y += dt * 7;
+    f.m.position.addScaledVector(f.v, dt);
+    if (f.bolt) { f.m.lookAt(tmp.copy(f.m.position).add(f.v)); continue; }
+    f.m.rotation.x += dt * 9; f.m.rotation.y += dt * 7;
     if ((f.trail -= dt) <= 0) { f.trail = .025; burst(f.m.position, Math.random() < .5 ? 0xffcc55 : 0xff6a1a, 1); }
+  }
+}
+// grenade bouncer: bounces off walls, goes off on a body or when the fuse runs out
+const GREN_SPD = 24, GREN_GRAV = 16, GREN_FUSE = 1.4, GREN_BOUNCE = .5; // speed, gravity, fuse, bounciness
+const grenades = [], grenMats = [lam({ color: 0x3f7a3a }), lam({ color: 0xffc933 })], grenN = new THREE.Vector3(), grenUp = new THREE.Vector3(0, 1, 0);
+function fireGrenade(w, from = null, dir = null, by = null, opts = {}) {
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
+  const m = new THREE.Group(); m.add(box(.16, .16, .16, grenMats[0]), box(.18, .05, .18, grenMats[1]));
+  m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
+  grenades.push({ m, v: dir.clone().multiplyScalar(GREN_SPD), life: GREN_FUSE, dmg: w.dmg, g: w.id, by, ghost: !!opts.ghost, id });
+}
+function updateGrenades(dt) {
+  for (let i = grenades.length - 1; i >= 0; i--) {
+    const g = grenades[i]; g.life -= dt; g.v.y -= GREN_GRAV * dt;
+    const step = g.v.length() * dt;
+    ray2.set(g.m.position, tmp.copy(g.v).normalize()); ray2.far = step + .08;
+    const hit = ray2.intersectObjects(targetsFor(g.by), false)[0];
+    const onYou = !g.ghost && g.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    const body = onYou || !!hit?.object.userData.zombie;
+    if (body || g.life <= 0) {
+      if (g.ghost && g.life > -.5) { if (!body) g.m.position.addScaledVector(g.v, dt); else g.v.set(0, 0, 0); continue; } // the server says where it went off
+      scene.remove(g.m); grenades.splice(i, 1);
+      if (g.ghost) continue;
+      const at = onYou ? youHitP.clone() : body ? hit.point.clone() : g.m.position.clone();
+      net.boom(g.id, at, g.by);
+      blast(at, ROCKET_R, g.dmg, g.by ? g.dmg : ROCKET_SELF, null, g.by, g.g, g.id);
+      continue;
+    }
+    if (hit) { // bounce
+      grenN.copy(hit.face?.normal ?? grenUp).transformDirection(hit.object.matrixWorld);
+      if (grenN.dot(g.v) > 0) grenN.negate();
+      g.m.position.copy(hit.point).addScaledVector(grenN, .1);
+      const hard = -g.v.dot(grenN);
+      g.v.addScaledVector(grenN, 2 * hard).multiplyScalar(GREN_BOUNCE);
+      if (hard > 3) sfx('bounce', { at: g.m.position, far: 30 });
+    } else g.m.position.addScaledVector(g.v, dt);
+    g.m.rotation.x += dt * 8; g.m.rotation.z += dt * 5;
   }
 }
 
