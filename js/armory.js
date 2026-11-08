@@ -46,7 +46,9 @@ function gunAttrs(w) {
   if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : 'HOLO SIGHT');
   if (w.quiet) a.push('SUPPRESSED');
   if (w.laser) a.push('LASER');
-  if (w.shock) a.push('SLOW');
+  if (w.wand) a.push('WAND');
+  if (slows(w)) a.push('SLOW');
+  if (w.knock) a.push('KNOCKBACK');
   if (w.rocket) a.push('ROCKET', 'EXPLOSIVE');
   if (w.flame || w.flare || w.burn) a.push('FIRE');
   if (w.jump) a.push('JUMP BOOST');
@@ -76,6 +78,8 @@ const DESC = {
   starsmasher: 'A battle rifle that throws stars out of the muzzle with every shot',
   blazesaber: 'A blade of fire that leaves whoever it hits burning',
   windsaber: 'A white blade as light as the wind, run faster and jump higher',
+  frostwand: 'A wand tipped with ice that leaves whoever it touches slow and shivering',
+  warhammer: 'A huge hammer that sends whoever it hits flying',
   executioner: 'Purple laser bolts that hit like a sniper, from a pistol',
 };
 // extra stats for the details view
@@ -87,7 +91,8 @@ function gunSpecs(i) {
   if (w.burn) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`]);
   if (w.flare) out.push(['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
-  if (w.shock) out.push(['SLOW', `${Math.round((1 - SLOW_K) * 100)}% FOR ${SLOW_T}s`]);
+  if (slows(w)) out.push(['SLOW', `${Math.round((1 - (w.frost ? FROST_K : SLOW_K)) * 100)}% FOR ${SLOW_T}s`]);
+  if (w.knock) out.push(['KNOCKBACK', 'BIG']);
   if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }

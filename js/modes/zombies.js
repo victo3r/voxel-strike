@@ -262,6 +262,8 @@ const SHOP = [
   { gun: 'starsmasher', price: 380, desc: 'stars out of the muzzle, 3x sight' },
   { gun: 'blazesaber', price: 320, desc: 'a blade of fire that burns them' },
   { gun: 'windsaber', price: 480, desc: 'run faster and jump higher' },
+  { gun: 'frostwand', price: 300, desc: 'an icy beam that slows them right down' },
+  { gun: 'warhammer', price: 320, desc: 'a heavy swing that knocks them flying' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
 // gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often (chest odds)

@@ -75,8 +75,8 @@ const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res
 const BOT_PICKS = {
   primary: ['shotgun', 'ar', 'ar', 'thrasher', 'eradicator', 'trex', 'starsmasher'],
   backup: ['voxel', 'voxel', 'hitman', 'hitman', 'executioner'],
-  melee: ['knife', 'knife', 'knife', 'herosword', 'herosword', 'blazesaber', 'windsaber'],
-  special: ['flame', 'heatray', 'shockbeam'],
+  melee: ['knife', 'knife', 'knife', 'herosword', 'herosword', 'warhammer', 'blazesaber', 'windsaber'],
+  special: ['flame', 'flame', 'heatray', 'heatray', 'shockbeam', 'shockbeam', 'frostwand'],
   sniper: ['sniper', 'sniper', 'semisniper', 'semisniper', 'tigerbite'],
   premium: ['flare', 'flare', 'rocket'],
 };
@@ -84,13 +84,15 @@ const BOT_PICKS = {
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
-  herosword: [1, 2], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20],
+  herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
   knife: d => d < 2.2 ? 1.25 : d < 4 ? .35 : 0,
   herosword: d => d < 2.8 ? 1.3 : d < 4.5 ? .4 : 0,
   blazesaber: d => d < 2.8 ? 1.32 : d < 4.5 ? .4 : 0,
+  warhammer: d => d < 2.6 ? 1.3 : d < 4.2 ? .35 : 0,
+  frostwand: d => d < 3 ? .55 : d < 22 ? .9 : .2,
   windsaber: d => d < 3 ? 1.35 : d < 4.8 ? .45 : 0,
   trex: d => d < 5.5 ? 1.05 : d < 10 ? .9 : d < 15 ? .32 : .05,
   starsmasher: d => d < 3 ? .6 : d < 28 ? .95 : .7,
@@ -528,7 +530,8 @@ function botStab(b, W, t, dist) {
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
   if (dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing) return;
   const at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
-  sfx('slash', { at, far: 20 });
+  sfx(W.hit || 'slash', { at, far: 20 });
+  if (W.knock && !net.on) launch(t.you ? P : t, t.you ? new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z) : t.g.position.clone().setY(t.g.position.y + 1), pos.clone().setY(pos.y + 1), W.knock, false);
   if (t.you) hurtPlayer(Math.round(W.dmg * BOT.dmgMul), false, b, false, 1);
   else hurtZombie(t, W.dmg * BOT.dmgMul, at, false, false, b, 1);
   if (W.burn && (t.you ? !dead : !t.dead)) applyBurn(t.you ? P : t, W.burnT, W.burn, b, W.id, true);
@@ -594,15 +597,15 @@ function botFire(b, W, dist) {
     const bot = others.length ? losRay.intersectObjects(others, false)[0] : null, botD = bot ? bot.distance : Infinity;
     const onYou = youUp && losRay.ray.intersectBox(pBox, hitV), youD = onYou ? eye.distanceTo(hitV) : Infinity;
     const near = Math.min(wallD, botD, youD);
-    if (W.beam) showBeam(b, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)), W.shock);
+    if (W.beam) showBeam(b, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)), beamKind(W));
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45;
       hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head, W.beam ? 2 : 0);
-      if (W.shock) shockHit(P);
+      if (slows(W)) shockHit(P, W);
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
-      if (!zz.dead) { hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (W.shock) shockHit(zz); }
+      if (!zz.dead) { hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W); }
     } else burst(wall.point, 0x999999, 2);
   }
 }

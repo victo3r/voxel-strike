@@ -73,11 +73,12 @@ function shoot() {
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {
   cd = w.rate; kick = 1; sfx(w.swing || 'swing'); crossKick(kickFor(w)); net.shot(w);
+  const knock = (o, from) => { if (w.knock && !net.on && !o.dead) launch(o, o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); }; // online the server sends the push
   const targets = shotTargets();
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
     const hit = ray2.intersectObjects(targets, false)[0], zz = hit?.object.userData.zombie;
-    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx('slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1); if (w.burn && !zz.dead) applyBurn(zz, w.burnT, w.burn, null, w.id, true); return; }
+    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx(w.hit || 'slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1); if (w.burn && !zz.dead) applyBurn(zz, w.burnT, w.burn, null, w.id, true); knock(zz, camera.position); return; }
     if (hit) return;
   }
 }
@@ -134,19 +135,23 @@ function heatBeam(w) {
   const hit = ray2.intersectObjects(shotTargets(), false)[0];
   const end = hit ? hit.point : tmp.copy(camera.position).addScaledVector(fwd, w.range);
   const zz = hit?.object.userData.zombie;
-  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (w.shock) shockHit(zz); }
+  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (slows(w)) shockHit(zz, w); }
   if (w.shock && Math.random() < .25) sfx('zap', { v: .6 });
-  if (hit && Math.random() < .35) burst(end, w.shock ? (Math.random() < .5 ? 0x8fe9ff : 0xffffff) : Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
-  showBeam(null, flashMesh.getWorldPosition(beamFrom), end, w.shock);
+  if (w.frost && Math.random() < .2) sfx('chill', { v: .6 });
+  if (hit && Math.random() < .35) burst(end, w.frost ? (Math.random() < .5 ? 0xcff4ff : 0xffffff) : w.shock ? (Math.random() < .5 ? 0x8fe9ff : 0xffffff) : Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
+  showBeam(null, flashMesh.getWorldPosition(beamFrom), end, beamKind(w));
 }
 // beams on screen, one per shooter (null = you)
 const beamGeo = new THREE.BoxGeometry(1, 1, 1), beamFrom = new THREE.Vector3(), beams = new Map();
 const beamMats = [new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xfff4d0 })];
+const beamKind = w => w.frost ? 'frost' : !!w.shock;
+const frostMats = [new THREE.MeshBasicMaterial({ color: 0xa8ecff, transparent: true, opacity: .6, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
 const shockMats = [new THREE.MeshBasicMaterial({ color: 0x4fc8ff, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xeefcff })];
 // shock beam: slows whoever it hits
-const SLOW_T = 2.5, SLOW_K = .85;
-const slowMul = o => (o?.slowT || 0) > 0 ? SLOW_K : 1;
-function shockHit(o) { o.slowT = SLOW_T; }
+const SLOW_T = 2.5, SLOW_K = .85, FROST_K = .65; // frost slows harder
+const slowMul = o => (o?.slowT || 0) > 0 ? o.slowK || SLOW_K : 1;
+const slows = w => !!(w?.shock || w?.frost);
+function shockHit(o, w) { const k = w?.frost ? FROST_K : SLOW_K; o.slowK = o.slowT > 0 ? Math.min(o.slowK || SLOW_K, k) : k; o.slowT = SLOW_T; }
 function showBeam(by, from, to, shock = false) {
   let b = beams.get(by);
   if (!b) {
@@ -154,7 +159,7 @@ function showBeam(by, from, to, shock = false) {
     for (const [mat, s] of [[beamMats[0], 1], [beamMats[1], .4]]) { const m = new THREE.Mesh(beamGeo, mat); m.scale.set(s, s, 1); g.add(m); }
     scene.add(g); beams.set(by, b = { g, life: 0 });
   }
-  const len = from.distanceTo(to), mats = shock ? shockMats : beamMats, w = shock ? .04 + Math.random() * .04 : .055; // electricity flickers
+  const len = from.distanceTo(to), mats = shock === 'frost' ? frostMats : shock ? shockMats : beamMats, w = shock === 'frost' ? .05 + Math.random() * .012 : shock ? .04 + Math.random() * .04 : .055; // electricity flickers
   b.g.children[0].material = mats[0]; b.g.children[1].material = mats[1];
   b.g.position.lerpVectors(from, to, .5); b.g.lookAt(to); b.g.scale.set(w, w, len);
   b.g.visible = true; b.life = .08;
