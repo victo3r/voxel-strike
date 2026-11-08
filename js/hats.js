@@ -62,7 +62,8 @@ function hatPieces(id, st) {
     if (st >= 2) B(-2, 2, 18, 20, -8, 8, st >= 3 ? hex([240, 196, 64]) : HI);
   }
   return out;
-}const HAT_PX = ARMOR_PX;
+}
+const HAT_PX = ARMOR_PX;
 const hatGeoCache = {};
 const hatGeo = (id, st, U) => hatGeoCache[id + ':' + st + ':' + U] ??= voxelGeos(hatPieces(id, st), U / HAT_PX).lit;
 // put a hat on a character (null takes it off)

@@ -156,7 +156,7 @@ function applyBurn(victim, t, dmgPerTick, by, gunId, max = false) {
 function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 14); }
 function drownYou() {
   if (respawnT > 0 || matchOver || dead || P.drowned) return;
-  sfx('splash'); splash(P.pos);
+  if (!MAP.void) { sfx('splash'); splash(P.pos); }
   P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0; P.drowned = true;
   if (net.on) { P.drownFlag = true; return; } // online the server calls it
   if (pvp()) { youDown(null); return; }
@@ -168,16 +168,17 @@ function drownTick(dt) {
   if (!underTint) { underTint = document.createElement('div'); underTint.style.cssText = 'position:fixed;inset:0;background:#1a6c9c;opacity:.5;pointer-events:none;display:none'; $('hit').before(underTint); }
   const show = !!P.drowned && !inLobby;
   if (show) {
-    P.pos.y = Math.max(MAP.floor?.(P.pos.x, P.pos.z) ?? 0, P.pos.y - 1.8 * dt);
+    P.pos.y = Math.max(MAP.floor?.(P.pos.x, P.pos.z) ?? 0, P.pos.y - (MAP.sink ?? 1.8) * dt);
     camera.position.y = P.pos.y + .35;
   }
-  const under = show && inWater(P.pos.x, P.pos.z, camera.position.y - .5) || !inLobby && MAP.wet?.(camera.position.x, camera.position.z, camera.position.y);
+  const under = show && !MAP.void && inWater(P.pos.x, P.pos.z, camera.position.y - .5) || !inLobby && MAP.wet?.(camera.position.x, camera.position.z, camera.position.y);
   underTint.style.display = under ? 'block' : 'none';
 }
 // a bot or zombie drowned (a zombie counts as your kill)
 function drownZombie(z) {
   if (z.dead || z.drownFlag) return;
-  sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position); z.drowned = true;
+  if (!MAP.void) { sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position); }
+  z.drowned = true;
   if (z.type === 'bot') {
     if (net.on && z.pid) { z.drownFlag = true; return; } // online the server calls it
     z.hp = 0; z.dead = .0001; botDown(z, null, false, true); return;

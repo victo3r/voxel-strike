@@ -220,7 +220,7 @@ function update(dt) {
       z.dead += dt;
       if (z.angel) angelTick(z, z.dead); // bots float up
       else z.g.rotation.x = -Math.min(z.dead * 4, Math.PI / 2); // zombies fall over
-      if (z.drowned) { const p = z.g.position; p.y = Math.max(MAP.floor?.(p.x, p.z) ?? 0, p.y - 1.8 * dt); }
+      if (z.drowned) { const p = z.g.position; p.y = Math.max(MAP.floor?.(p.x, p.z) ?? 0, p.y - (MAP.sink ?? 1.8) * dt); }
       if (z.dead > 1.5) { if (z.angel) angelGone(z); scene.remove(z.g); zombies.splice(i, 1); }
       continue;
     }
