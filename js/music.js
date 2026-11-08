@@ -35,8 +35,16 @@ const SONGS = {
     bass: [[0, 0, 3], [3, 0, 3], [6, 12, 1], [7, 0, 3], [10, 7, 2], [12, 0, 2], [14, 12, 2]],
     stab: true, hats: .8, reese: 1,
   },
+  sky: { // airy and floating, E major
+    bpm: 164,
+    chords: [[40, [56, 59, 63, 66]], [37, [52, 56, 59, 63]], [45, [56, 61, 63, 64]], [47, [54, 59, 61, 66]]],
+    pad: { cut: 2100, a: 1.8, v: .85 },
+    kit: { kickD: .12, snare: 214, drive: 1.1, bright: 1.25, room: .38, ride: 1 },
+    bass: [[0, 0, 6], [6, 7, 2], [8, 12, 4], [12, 7, 4]],
+    keys: true, lead: true, amb: 'wind', hats: .7, reese: .4,
+  },
 };
-const LOBBY_SONGS = ['forest', 'resort', 'yard'];
+const LOBBY_SONGS = ['forest', 'resort', 'yard', 'sky'];
 
 // what should be playing
 let muWant = { kind: 'lobby', id: 0, seed: 1 },muNow = null, muId = 0, muOld = [];
@@ -384,7 +392,7 @@ function muBar(S, t) {
 
 // lobby music: each map's chords in turn, no drums
 function muLobbyBar(S, t) {
-  const b = S.bar, song = SONGS[LOBBY_SONGS[(b >> 3) % 3]], ch = song.chords[(b & 7) >> 1], st = S.st, pr = rng(S.seed + (b >> 3) * 17);
+  const b = S.bar, song = SONGS[LOBBY_SONGS[(b >> 3) % LOBBY_SONGS.length]], ch = song.chords[(b & 7) >> 1], st = S.st, pr = rng(S.seed + (b >> 3) * 17);
   muLevel(S, .7, t, 1.2);
   if (!(b & 1)) { pad(S, t, ch[1], S.barDur * 2, song.pad); sub(S, t, ch[0], S.barDur * 2 - .15, .5, .4); }
   const up = b & 1 ? [...ch[1]].reverse() : ch[1];
