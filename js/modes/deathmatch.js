@@ -708,7 +708,7 @@ function updateBot(b, dt) {
   const pad = !sees && b.hp < b.maxHp ? nearPad(pos, b.hp <= PAD_LOW ? PAD_FAR : PAD_NEAR) : null;
   let gx = dx, gz = dz, gd = dist;
   // take the stairs or go round the pool
-  const way = pad ? MAP.nav?.(pos, { x: pad.x, y: 0, z: pad.z }) : !sees || MAP.trapped?.(pos) ? MAP.nav?.(pos, go) : radial > 0 ? MAP.around?.(pos, tp) : null;
+  const way = pad ? MAP.nav?.(pos, { x: pad.x, y: pad.y, z: pad.z }) : !sees || MAP.trapped?.(pos) ? MAP.nav?.(pos, go) : radial > 0 ? MAP.around?.(pos, tp) : null;
   const into = !pad && !!t && !!MAP.trapped?.(go); // only goes in the pool after a target
   if (way) { gx = way.x - pos.x; gz = way.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; side = 0; }
   else if (pad) { gx = pad.x - pos.x; gz = pad.z - pos.z; gd = Math.hypot(gx, gz) || .001; radial = 1; }

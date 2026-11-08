@@ -35,6 +35,14 @@ const SONGS = {
     bass: [[0, 0, 3], [3, 0, 3], [6, 12, 1], [7, 0, 3], [10, 7, 2], [12, 0, 2], [14, 12, 2]],
     stab: true, hats: .8, reese: 1,
   },
+  roofs: { // warm sunset over the city, C minor
+    bpm: 170,
+    chords: [[36, [55, 58, 62, 63]], [32, [55, 60, 63, 67]], [41, [56, 60, 63, 67]], [43, [53, 55, 60, 62]]],
+    pad: { cut: 1500, a: 1, v: .8 },
+    kit: { kickD: .12, snare: 198, drive: 1.3, bright: 1.05, room: .26, ride: 1 },
+    bass: [[0, 0, 3], [3, 0, 3], [6, 7, 2], [8, 0, 2], [10, 10, 2], [12, 12, 4]],
+    keys: true, lead: true, amb: 'city', hats: .85, reese: .6,
+  },
   sky: { // airy and floating, E major
     bpm: 164,
     chords: [[40, [56, 59, 63, 66]], [37, [52, 56, 59, 63]], [45, [56, 61, 63, 64]], [47, [54, 59, 61, 66]]],
@@ -44,7 +52,7 @@ const SONGS = {
     keys: true, lead: true, amb: 'wind', hats: .7, reese: .4,
   },
 };
-const LOBBY_SONGS = ['forest', 'resort', 'yard', 'sky'];
+const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky'];
 
 // what should be playing
 let muWant = { kind: 'lobby', id: 0, seed: 1 },muNow = null, muId = 0, muOld = [];
@@ -194,6 +202,7 @@ function muAmb(S, kind) {
   const src = ac.createBufferSource(); src.buffer = MU.noise; src.loop = true;
   const f = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
   if (kind === 'wind') { f.type = 'bandpass'; f.frequency.value = 650; f.Q.value = 1.2; lfo.frequency.value = .05; lg.gain.value = 300; lfo.connect(lg).connect(f.frequency); g.gain.value = .07; }
+  else if (kind === 'city') { f.type = 'lowpass'; f.frequency.value = 260; lfo.frequency.value = .03; lg.gain.value = 90; lfo.connect(lg).connect(f.frequency); g.gain.value = .06; } // traffic far below
   else { f.type = 'lowpass'; f.frequency.value = 500; lfo.frequency.value = .085; lg.gain.value = .035; g.gain.value = .045; lfo.connect(lg).connect(g.gain); }
   src.connect(f).connect(g).connect(S.out);
   src.start(); lfo.start(); S.nodes.push(src, lfo);
