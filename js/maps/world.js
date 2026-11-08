@@ -81,6 +81,7 @@ const grassMat = seeThru(tex(g => {
   }
 }));
 grassMat.alphaTest = .5;
+grassMat.map.wrapS = grassMat.map.wrapT = THREE.ClampToEdgeWrapping; // no lines where the edges would wrap
 const grassGeo = new THREE.PlaneGeometry(1, 1).translate(0, .5, 0);
 // decoration, hidden on low graphics
 const detailObjs = [];

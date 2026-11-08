@@ -462,6 +462,6 @@ M.debug = { kind, H, isle, N, O, bridgeSlabs, hard };
 M.tick = () => {
   const t = performance.now() / 1000;
   for (const w of waters) w.map.offset.set(t * .05, t * .02);
-  M.fall.map.offset.set(0, t * 1.6);
+  M.fall.map.offset.set(0, -t * 1.6);
 };
 }
