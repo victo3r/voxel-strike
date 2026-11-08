@@ -38,7 +38,7 @@ function lootCard(l, n = l.n) {
   if (l.k === 'coins') { pic = `<span class="lc">${COIN}</span>`; name = `${nText(n)} COINS`; }
   else if (l.k === 'boosts') { pic = `<span class="lc">${ico('bolt')}</span>`; name = `${n} BOOSTER${n === 1 ? '' : 'S'}`; }
   else if (l.k === 'xp') { pic = `<span class="lc lx">XP</span>`; name = `${nText(n)} XP`; }
-  else if (l.k === 'star') { pic = `<span class="lc ls">${ico('star').repeat(n)}</span>`; name = typeof l.gun === 'number' ? `${BASE[l.gun].name.toUpperCase()} +${n} ${ico('star')}` : `+${n} STAR${n > 1 ? 'S' : ''} ON A GUN`; }
+  else if (l.k === 'star') { pic = `<span class="lc ls">${ico('star').repeat(n)}</span>`; name = l.gave ? l.gave.map(([i, k]) => `${BASE[i].name.toUpperCase()} +${k} ${ico('star')}`).join('<br>') || '50 COINS A STAR' : n > 1 ? `+${n} STARS ON YOUR GUNS` : '+1 STAR ON A GUN'; }
   else if (l.k === 'gun') { pic = `<img src="${gunSprite(gi(l.id))}">`; name = BASE[gi(l.id)].name.toUpperCase(); }
   else { pic = `<img src="${l.k === 'boots' ? bootSprite(l.id, 1) : hatSprite(l.id, 1)}">`; name = gearOf(l).name.toUpperCase(); }
   return `<div class="loot" style="--rc:${rc}"><div class="pic">${pic}</div><b>${name}</b><small>${rn}</small>${l.p !== undefined ? `<i>${(l.p * 100).toFixed(l.p < .1 ? 1 : 0)}%</i>` : ''}</div>`;
@@ -53,8 +53,13 @@ function openChest(c) {
   const got = { ...l, n: rollN(l.n) };
   if (got.k === 'coins') { prof.coins += got.n; prof.earned = (prof.earned ?? 0) + got.n; }
   else if (got.k === 'boosts') prof.boosts = (prof.boosts | 0) + got.n;
-  else if (got.k === 'star') { // each star on a random gun that can take one; shown on the last
-    for (let i = 0; i < got.n; i++) { const g = starGuns(); if (!g.length) { prof.coins += 50; break; } got.gun = g[Math.floor(Math.random() * g.length)]; prof.guns[BASE[got.gun].id]++; }
+  else if (got.k === 'star') { // each star on a random gun that can take one (they can split); the card lists them all
+    const gave = new Map();
+    for (let i = 0; i < got.n; i++) {
+      const g = starGuns(); if (!g.length) { prof.coins += 50; continue; } // nowhere to go: 50 coins
+      const k = g[Math.floor(Math.random() * g.length)]; prof.guns[BASE[k].id]++; gave.set(k, (gave.get(k) || 0) + 1);
+    }
+    got.gave = [...gave];
   }
   else if (got.k === 'gun') prof.guns[got.id] = 1;
   else if (got.k === 'boots') prof.boots[got.id] = 1;
