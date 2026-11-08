@@ -2,7 +2,7 @@
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link id="css" rel="stylesheet" href="css/style.css?v=133">
+<link id="css" rel="stylesheet" href="css/style.css?v=134">
 </head>
 <body class="boot">
 <!-- touchscreen-only devices get this note instead of the game -->
@@ -23,9 +23,10 @@
   </div>
   <div id="drawPanel">
     <div id="drawHead"><input id="drawName" maxlength="16" spellcheck="false" autocomplete="off" title="Name your skin"><span id="drawMsg"></span></div>
+    <div id="drawParts" class="cv"></div>
     <canvas id="drawSheet" width="512" height="512"></canvas>
     <div id="drawTools" class="cv"></div>
-    <div id="drawPal" class="cv"></div>
+    <div id="drawCols" class="cv"><div id="drawPal"></div><button id="drawColor" class="cpb" title="Mix your own colour"></button></div>
     <div id="drawBtns"><button id="drawCancel">CANCEL</button><button id="drawSave">SAVE</button></div>
   </div>
   <div id="stage"></div>
@@ -205,9 +206,9 @@
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
 // bump V (and the css ?v=) on every update to skip old caches
-const V = 168;
+const V = 169;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js'];
+  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js'];
 if (!document.body.classList.contains('touchOnly')) { // touch-only devices stop here
 // crazy.js first, so CrazyGames saves are in place before the rest
 await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });

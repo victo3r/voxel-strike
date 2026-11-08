@@ -408,7 +408,17 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .cv button:disabled{opacity:.4;cursor:default}
 .cv .sw{width:24px;height:24px;padding:0}
 .cv .cyc{min-width:118px;text-align:center;font:bold 13px monospace}
-.cv input[type=color]{width:30px;height:30px;padding:0;border:3px solid var(--line-dim);background:none;cursor:pointer}
+.cv button.cpb,.cv button.cpb.sel,.cv button.cpb:hover:not(:disabled){width:30px;height:30px;padding:0;border:3px solid transparent;background:linear-gradient(var(--c,#fff),var(--c,#fff)) padding-box,conic-gradient(#f44,#fd3,#4e4,#3dd,#46f,#e4e,#f44) border-box;box-shadow:2px 2px 0 rgba(0,0,0,.45)}
+.cv .cpb:hover{filter:brightness(1.15)}.cv .cpb.sel{outline:3px solid var(--acc);outline-offset:1px}
+
+#colPick{display:none;position:fixed;z-index:60;flex-direction:column;gap:8px;padding:10px;background:rgba(20,24,28,.96);border:3px solid var(--line-dim);box-shadow:4px 4px 0 rgba(0,0,0,.5);color:#fff;font:bold 13px monospace;text-shadow:1px 1px 0 #000}
+#cpSV{width:200px!important;height:140px!important;border:2px solid #0b0e10;cursor:crosshair;touch-action:none}
+#cpHue{width:200px!important;height:16px!important;border:2px solid #0b0e10;cursor:pointer;touch-action:none}
+#cpRow{display:flex;gap:6px;align-items:center}
+#cpNow{width:26px;height:26px;border:3px solid var(--line-dim);flex:none}
+#cpHex{font:bold 14px monospace;width:7.5em;padding:4px 6px;background:rgba(10,14,16,.7);color:#fff;border:3px solid var(--line-dim);outline:none;text-transform:uppercase;min-width:0}
+#cpHex:focus{border-color:var(--line)}
+#cpOk{font:bold 13px monospace;padding:5px 10px;color:#fff;background:rgba(10,14,16,.6);border:3px solid var(--line-dim);cursor:pointer;box-shadow:2px 2px 0 rgba(0,0,0,.45)}#cpOk:hover{background:var(--hov)}
 #custBtns{display:flex;gap:8px;margin:16px 0 auto}
 #custBtns button{font:bold 16px monospace;padding:9px 14px;box-shadow:4px 4px 0 rgba(0,0,0,.45)}
 #custBtns #custDone{flex:1}
@@ -420,7 +430,8 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #drawName:focus{border-color:var(--line)}
 #drawMsg{font:bold 12px monospace;letter-spacing:1px;color:var(--acc-lt)}
 #drawSheet{width:min(440px,100%,56vh)!important;height:auto!important;image-rendering:pixelated;border:3px solid #0b0e10;box-shadow:4px 4px 0 rgba(0,0,0,.45);cursor:crosshair;touch-action:none;align-self:center}
-#drawPal{gap:4px}#drawPal .sw{width:22px;height:22px}
+#drawCols{flex-wrap:nowrap;gap:10px}#drawPal{display:grid;grid-template-columns:repeat(16,minmax(0,22px));gap:4px;min-width:0}#drawPal .sw{width:100%;height:auto;aspect-ratio:1}
+#drawParts .gap{flex:1}#drawParts button svg{width:14px;height:14px;vertical-align:middle}
 #drawBtns{display:flex;gap:8px;margin-bottom:auto}
 #drawBtns button{font:bold 16px monospace;padding:9px 14px;box-shadow:4px 4px 0 rgba(0,0,0,.45)}
 #drawBtns #drawSave{flex:1}

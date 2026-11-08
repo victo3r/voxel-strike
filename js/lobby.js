@@ -362,7 +362,7 @@ function renderCust() {
     else {
       const list = r.swatch ?? CLOTH.map(c => [c, hexCss(c)]), mine = list.some(([o]) => o === v);
       ctl = list.map(([o, css]) => `<button class="sw${o === v ? ' sel' : ''}" data-r="${i}" data-v="${enc(o)}" style="background:${css}"></button>`).join('')
-        + (r.swatch ? '' : `<input type="color" data-r="${i}" value="${hexCss(v)}" class="${mine ? '' : 'sel'}" title="Any color">`);
+        + (r.swatch ? '' : `<button class="cpb${mine ? '' : ' sel'}" data-r="${i}" data-cp="1" style="--c:${hexCss(v)}" title="Any color"></button>`);
     }
     return `<span class="ck">${r.label}</span><div class="cv">${ctl}</div>`;
   }).join('');
@@ -376,14 +376,12 @@ function setLook(row, v, redraw = true) {
 $('custRows').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   const row = C_ROWS[+b.dataset.r];
-  if (b.dataset.step) {
+  if (b.dataset.cp) colorPick(b, custVal(row, prof.look), c => { setLook(row, c, false); b.style.setProperty('--c', hexCss(c)); }, renderCust);
+  else if (b.dataset.step) {
     const k = row.cycle.findIndex(([o]) => o === custVal(row, prof.look)), n = row.cycle.length;
     setLook(row, row.cycle[(Math.max(0, k) + +b.dataset.step + n) % n][0]);
   } else setLook(row, JSON.parse(decodeURIComponent(b.dataset.v)));
 });
-// color picker updates live, rows redraw on release
-$('custRows').addEventListener('input', e => { if (e.target.type === 'color') setLook(C_ROWS[+e.target.dataset.r], parseInt(e.target.value.slice(1), 16), false); });
-$('custRows').addEventListener('change', e => { if (e.target.type === 'color') renderCust(); });
 $('custRand').onclick = () => {
   const L = randomLook(String(Math.random()), CLOTH[Math.random() * CLOTH.length | 0]);
   prof.look = L; prof.myLook = { ...L }; saveProf(); dressHero(); renderCust(); sfx('ui');
@@ -419,6 +417,7 @@ addEventListener('pointermove', e => {
 
 // keep the character centered in the stage area
 let frameCur = null;
+const _fc = new THREE.Vector3(), _fs = new THREE.Vector3();
 function frameLobby(dt = 0) {
   const W = innerWidth, H = innerHeight, r = stage.getBoundingClientRect();
   let left = r.left, sw = r.width || W;
@@ -429,12 +428,14 @@ function frameLobby(dt = 0) {
   }
   const tan = Math.tan(THREE.MathUtils.degToRad(lobbyCam.fov / 2));
   const visH = Math.max(3.6 / (sh / H * .9), 2.2 / (sw / W * .9) / (W / H));
-  const want = { cx: left + sw / 2, cy: r.top + sh * .5, dist: Math.max(5, Math.min(20, visH / 2 / tan)) };
+  const want = { cx: left + sw / 2, cy: r.top + sh * .5, dist: Math.max(5, Math.min(20, visH / 2 / tan)), lx: 0, ly: 1.4, lz: 0 };
+  const fb = drawFocus(); // drawing: zoom on the part
+  if (fb) { fb.getCenter(_fc); fb.getSize(_fs); want.dist = Math.max(2, Math.max(_fs.y * 3 / (sh / H), _fs.x * 1.7 / (sw / W) / (W / H)) / 2 / tan); want.lx = _fc.x; want.ly = _fc.y; want.lz = _fc.z; }
   if (!frameCur || !dt) frameCur = want;
   else { const k = 1 - Math.exp(-dt * 7); for (const key in want) frameCur[key] += (want[key] - frameCur[key]) * k; }
-  const { cx, cy, dist } = frameCur;
+  const { cx, cy, dist, lx, ly, lz } = frameCur;
   lobbyCam.aspect = W / H;
-  lobbyCam.position.set(0, 1.5 + dist * .14, dist); lobbyCam.lookAt(0, 1.4, 0);
+  lobbyCam.position.set(lx, ly + .1 + dist * .14, lz + dist); lobbyCam.lookAt(lx, ly, lz);
   lobbyCam.setViewOffset(W, H, W / 2 - cx, H / 2 - cy, W, H);
   heroScreen.x = cx; heroScreen.y = cy;
 }
@@ -449,9 +450,11 @@ function updateLobby(dt) {
       spin += (rest - spin) * Math.min(1, dt * (armOpen ? 3 : 1.5));
     }
   }
+  if (drawOpen() && dr.turn !== null && dragX === null) spin += (dr.turn - spin) * Math.min(1, dt * 10);
   hero.rotation.y = spin;
-  armL.rotation.set(Math.sin(t * 1.1) * .05, 0, -.05 - Math.sin(t * 1.6) * .03);
-  armR.rotation.set(-Math.sin(t * 1.1) * .05, 0, .05 + Math.sin(t * 1.6) * .03);
+  const idle = drawOpen() ? 0 : 1; // arms hold still while you paint
+  armL.rotation.set(idle * Math.sin(t * 1.1) * .05, 0, -.05 - idle * Math.sin(t * 1.6) * .03);
+  armR.rotation.set(-idle * Math.sin(t * 1.1) * .05, 0, .05 + idle * Math.sin(t * 1.6) * .03);
   // armory: arms up holding the gun
   holdK += ((armOpen && holdKey ? 1 : 0) - holdK) * Math.min(1, dt * 9);
   const e = holdK * holdK * (3 - 2 * holdK);
