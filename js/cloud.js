@@ -1,7 +1,8 @@
 // cloud saves: newest save wins, or the one with more progress if both changed
 const CLOUD = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || 'https://sync.gemforge.org'; // ?srv= points at another server
 let auth = null, sync = { user: null, rev: 0, dirty: false };
-try { auth = JSON.parse(localStorage.getItem('voxelstrike-auth')); } catch {}
+try { auth = DEV_ALL ? null : JSON.parse(localStorage.getItem('voxelstrike-auth')); } catch {}
+devAll();
 try { sync = { ...sync, ...JSON.parse(localStorage.getItem('voxelstrike-sync')) }; } catch {}
 const saveSync = () => { try { localStorage.setItem('voxelstrike-sync', JSON.stringify(sync)); } catch {} };
 let changes = 0, busy = false, pushTimer = 0, cloudState = '', applying = false;
@@ -15,7 +16,7 @@ if (prof.earned == null) {
     if (!w.start && s) { spent += w.price; for (let k = 1; k < s; k++) spent += Math.round(w.price * UPG[k - 1]); }
   }
   prof.earned = prof.coins + spent;
-  try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {}
+  try { localStorage.setItem(PROF_KEY, JSON.stringify(prof)); } catch {}
 }
 function progress(p) {
   if (!p) return -1;
@@ -34,7 +35,7 @@ function applySave(s) {
   Object.assign(prof, { v: 1, lv: 1, xp: 0, coins: 0, earned: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '' }, s.prof);
   prof.guns = { ...prof.guns }; prof.loadout = { ...prof.loadout }; prof.use = { ...prof.use }; prof.boots = { ...prof.boots }; prof.bootUse = { ...prof.bootUse }; prof.hats = { ...prof.hats }; prof.hatUse = { ...prof.hatUse };
   if (!prof.look) prof.look = { ...PRESETS[0].look };
-  try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {}
+  try { localStorage.setItem(PROF_KEY, JSON.stringify(prof)); } catch {}
   const n = cleanName(auth?.cg ? auth.user : s.name); // on CrazyGames your name is your CrazyGames username
   if (n) { myName = n; $('nameIn').value = n; try { localStorage.setItem('voxelstrike-name', n); } catch {} }
   if (!keepBest && s.best) { best = { wave: s.best.wave | 0, kills: s.best.kills | 0 }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
@@ -141,6 +142,7 @@ $('cloudBtn').addEventListener('click', () => {
 $('acctNew').addEventListener('click', () => acctGo('signup'));
 
 async function acctGo(how) {
+  if (DEV_ALL) { $('acctErr').textContent = 'No signing in on the dev profile'; return; }
   const user = $('acctUser').value.trim(), pass = $('acctPass').value;
   if (!user || !pass) { $('acctErr').textContent = 'Enter a username and password'; return; }
   $('acctErr').textContent = how === 'signup' ? 'Creating account…' : 'Signing in…';
@@ -155,6 +157,7 @@ async function acctGo(how) {
 const acctKey = a => a.cg ? '#' + a.id : a.user.toLowerCase();
 // after signing in: start syncing
 async function signedIn(r, fresh) {
+  if (DEV_ALL) return;
   auth = { user: r.user, token: r.token, id: r.id, ...(r.cg ? { cg: true, cgId: r.cgId } : {}) };
   try { localStorage.setItem('voxelstrike-auth', JSON.stringify(auth)); } catch {}
   const otherAccount = sync.user && sync.user.toLowerCase() !== acctKey(auth);

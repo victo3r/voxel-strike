@@ -54,13 +54,13 @@ function drawScope(kind) {
   g.putImageData(img, 0, 0);
 }
 // holo reticle
-let holoZoom = 0;
-function drawHolo(zoom) {
-  holoZoom = zoom;
+let holoZoom = 0, holoCol = '';
+function drawHolo(zoom, col = '255,60,60') {
+  holoZoom = zoom; holoCol = col; $('holo').style.filter = `drop-shadow(0 0 3px rgba(${col},.75))`;
   const c = $('holo'), px = RPX(), N = 41, m = 20;
   c.width = c.height = N; c.style.setProperty('width', N * px + 'px', 'important'); c.style.setProperty('height', N * px + 'px', 'important');
   const g = c.getContext('2d'); g.clearRect(0, 0, N, N);
-  const dot = (x, y, a = .9) => { g.fillStyle = `rgba(255,60,60,${a})`; g.fillRect(m + x, m + y, 1, 1); };
+  const dot = (x, y, a = .9) => { g.fillStyle = `rgba(${col},${a})`; g.fillRect(m + x, m + y, 1, 1); };
   const far = zoom >= 3 ? 15 : 12;
   const arm = (fx, fy) => { // one arm of the cross
     for (let r = 7; r <= far; r++) dot(fx * r, fy * r);
@@ -70,7 +70,7 @@ function drawHolo(zoom) {
   dot(0, 0, 1);
 }
 drawScope('scope'); drawHolo(2);
-addEventListener('resize', () => { drawScope(scopeKind); drawHolo(holoZoom); });
+addEventListener('resize', () => { drawScope(scopeKind); drawHolo(holoZoom, holoCol); });
 function update(dt) {
   if (P.slowT > 0) P.slowT -= dt;
   const down = pvp() && dmDown(dt);
@@ -148,16 +148,17 @@ function update(dt) {
   const holo = !!(w.zoom && gunHolo) && adsT > .8, scoped = holo || w.scope && adsT > .8;
   if (scoped && scopeKind !== (holo ? 'holo' : 'scope')) drawScope(holo ? 'holo' : 'scope');
   $('scope').style.display = scoped ? 'block' : 'none';
-  if (holo && w.zoom !== holoZoom) drawHolo(w.zoom);
+  if (holo && (w.zoom !== holoZoom || (w.reticle || '255,60,60') !== holoCol)) drawHolo(w.zoom, w.reticle);
   $('holo').style.display = holo ? 'block' : 'none';
   $('cross').style.display = scoped ? 'none' : '';
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
   if (w.melee) { // knife swing
     const c = kick > 0 ? knifeChopFP(1 - kick) : 0;
-    vm.rotation.set(.22 + c * .95, Math.abs(c) * .2, -c * .4);
-    knifeRest.set(.22, 0, 0); _kp.copy(KNIFE_PIV).applyEuler(knifeRest); _kq.copy(KNIFE_PIV).applyEuler(vm.rotation);
-    vm.position.set(.3 + Math.min(0, c) * .18, -.22 + bob + Math.max(0, c) * .1, -.5).add(_kp).sub(_kq);
+    const up = w.tilt ? .8 : .22, lo = w.tilt ? .12 : 0; // swords stand up, lower in the hand
+    vm.rotation.set(up + c * .95, Math.abs(c) * .2, -c * .4);
+    knifeRest.set(up, 0, 0); _kp.copy(KNIFE_PIV).applyEuler(knifeRest); _kq.copy(KNIFE_PIV).applyEuler(vm.rotation);
+    vm.position.set(.3 + lo * .3 + Math.min(0, c) * .18, -.22 - lo + bob + Math.max(0, c) * .1, -.5 - lo).add(_kp).sub(_kq);
   } else if (hold === 'heavy') { // low at the hip
     vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob, -.6 + kick * .06);
     vm.rotation.set(.04 + kick * .1, 0, 0);

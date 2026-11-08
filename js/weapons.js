@@ -16,10 +16,10 @@ const BASE = [
   { id: 'flare', hold: 'pistol', name: 'Flare Gun', cat: 'premium', start: true, mob: 65, flare: true, dmg: 65, burn: 3, burnT: 3, rate: .4, mag: 1, reload: 1.3, pellets: 1, spread: 0, auto: false, color: 0xc8402a, len: .4, model: 'flare' },
   { id: 'thrasher', rar: 'rare', hold: 'rifle', name: 'Thrasher', cat: 'primary', unlock: 2, price: 50, mob: 60, zoom: 3, dmg: 12, rate: .08, mag: 35, reload: 1.5, pellets: 1, spread: .006, auto: true, color: 0x3c3c44, len: .6 },
   { id: 'semisniper', rar: 'rare', hold: 'rifle', name: 'Semi Auto Sniper Rifle', cat: 'sniper', unlock: 4, price: 100, mob: 55, zoom: 4, dmg: 60, rate: 1 / 1.8, mag: 10, reload: 1.8, pellets: 1, spread: 0, auto: false, color: 0x3e3f44, len: .9, scope: true },
-  { id: 'herosword', rar: 'rare', hold: 'melee', name: 'Hero Sword', cat: 'melee', unlock: 5, price: 110, inf: true, melee: true, mob: 75, dmg: 55, rate: .6, range: 3.2, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xc8873a, len: .4, model: 'herosword' },
+  { id: 'herosword', rar: 'rare', hold: 'melee', name: 'Hero Sword', cat: 'melee', unlock: 5, price: 110, inf: true, melee: true, tilt: 1.1, mob: 75, dmg: 65, rate: .6, range: 3.2, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xc8873a, len: .4, model: 'herosword' },
   { id: 'shockbeam', rar: 'rare', hold: 'rifle', name: 'Shock Beam', cat: 'special', unlock: 8, price: 180, mob: 60, beam: true, shock: true, dmg: 9, rate: 1 / 15, range: 28, mag: 100, reload: 2.0, pellets: 1, spread: 0, auto: true, color: 0x2f4a66, len: .7 },
   { id: 'tigerbite', rar: 'epic', hold: 'rifle', name: 'Tigerbite', cat: 'sniper', unlock: 10, price: 300, mob: 55, zoom: 5, dmg: 110, rate: 1, mag: 6, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0xe07a1f, len: .9, scope: true },
-  { id: 'executioner', rar: 'epic', hold: 'pistol', name: 'Executioner', cat: 'backup', unlock: 14, price: 400, mob: 70, laser: true, dmg: 85, rate: 1 / 1.8, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0x5b3b8a, len: .4 },
+  { id: 'executioner', rar: 'epic', hold: 'pistol', name: 'Executioner', cat: 'backup', unlock: 14, price: 400, mob: 70, zoom: 4, reticle: '212,123,255', laser: true, dmg: 85, rate: 1 / 1.8, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0x5b3b8a, len: .4 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -382,14 +382,14 @@ const GUN_MODELS = {
   // a magnifying glass on top focuses sunlight into the beam
   herosword({ p, mat, glow }) {
     const bronze = mat(0xc8873a), dbronze = mat(0x8a5a24), lbronze = mat(0xeab36a), wrap = mat(0x4a2c18), gem = glow(0x38d8ff);
-    p(4, 4, 10, wrap, 0, 1, 1); for (const z of [-2.5, 1, 4.5]) p(4, 4, 1, mat(0x2e1a0e), 0, 1, z); // grip and its wraps
-    p(6, 6, 4, dbronze, 0, 1, 8); p(8, 2, 2, gem, 0, 1, 8); // pommel, a gem showing on both sides
+    p(4, 4, 16, wrap, 0, 1, 4); for (const z of [-1.5, 2.5, 6.5, 10.5]) p(4, 4, 1, mat(0x2e1a0e), 0, 1, z); // long grip and its wraps
+    p(6, 6, 4, dbronze, 0, 1, 14); p(8, 2, 2, gem, 0, 1, 14); // pommel, a gem showing on both sides
     p(4, 18, 3, bronze, 0, 1, -5.5); p(4, 2, 3, lbronze, 0, 11, -5.5); p(4, 2, 3, lbronze, 0, -9, -5.5); // crossguard and its bright tips
     p(6, 4, 4, dbronze, 0, 1, -5.5); p(8, 2, 2, gem, 0, 1, -5.5); // the setting in the middle, and its gem
     p(2, 6, 28, bronze, 0, 1, -21); p(2, 1, 28, lbronze, 0, 4.5, -21); p(2, 1, 28, lbronze, 0, -2.5, -21); // blade and its bright edges
     p(2, 2, 22, dbronze, 0, 1, -19); // fuller
     p(2, 4, 2, bronze, 0, 1, -36); p(2, 2, 2, lbronze, 0, 1, -38); // tip
-    return { muzzle: [1, -39], grip: [6, 6, 10, 0, 1, 1], fore: null, bands: [-1.5, 1.5], band: [6, 6, 1] };
+    return { muzzle: [1, -39], grip: [6, 6, 18, 0, 1, 5], fore: null, bands: [-1.5, 1.5], band: [6, 6, 1] };
   },
   shockbeam({ p, mat, dark, glow, sub, at }) {
     const body = mat(0x2f4a66), dbody = mat(0x1f3044), coil = mat(0xd9a62a), zap = glow(0x8fe9ff), steel = mat(0x6e6e74);
@@ -425,13 +425,17 @@ const GUN_MODELS = {
     const body = mat(0x2a2233), plate = mat(0x5b3b8a), lplate = mat(0x9a6be0), las = glow(0xd47bff);
     p(4, 4, 18, body, 0, 2, -9); p(6, 3, 10, plate, 0, 2.5, -9); p(4, 1, 18, lplate, 0, 4.5, -9); // slide, purple side plates, bright top
     for (const z of [-6, -9, -12]) p(6, 1, 1, las, 0, 2, z); // glowing slits in the plates
-    p(2, 2, 8, plate, 0, 6, -10); // blade-like fin along the top
+    p(2, 1, 6, plate, 0, 5.5, -15); // low fin ahead of the sight
+    p(6, 1, 4, plate, 0, 5.5, -7); // purple holo sight: mount, posts, hood
+    for (const x of [-2.5, 2.5]) p(1, 4, 2, plate, x, 8, -7);
+    p(6, 1, 2, plate, 0, 10.5, -7);
+    p(1, 1, 1, las, .5, 6.5, -5.5); // the emitter
     p(6, 6, 4, plate, 0, 2, -20); p(2, 2, 1, las, 0, 2, -22.5); // emitter and its lens
     p(4, 2, 13, dark, 0, -1, -6.5); // frame
     p(1, 1, 4, dark, 0, -4.5, -7); p(1, 2, 1, dark, 0, -3, -9.5); p(1, 2, 1, mat(0x777777), 0, -3, -6.5); // trigger guard and trigger
     p(4, 3, 4, body, 0, -3.5, -3); p(4, 3, 4, body, 0, -6.5, -2); // grip
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -8.5, -2); mg(2, 6, 2, las, 0, -5, -2); // power cell glowing up inside the grip
-    return { muzzle: [2, -23], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -14], band: [6, 8, 1], mag };
+    return { muzzle: [2, -23], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -14], band: [6, 8, 1], holo: [8, -7], mag };
   },
   heatray({ p, mat, dark, glow, sub, at }) {
     const cop = mat(0xb5652b), dcop = mat(0x7e4220), brass = mat(0xc9a43a), steel = mat(0x6e6e74), wood = mat(0x5a3a22);

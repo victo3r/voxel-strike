@@ -4,11 +4,24 @@ const xpNeed = lv => XP_BASE + XP_STEP * (lv - 1);
 const lvBonus = lv => 5 * (lv - 1); // coins for reaching a level
 // boosters for reaching a level, one more every 10 levels
 const lvBoosts = lv => 1 + Math.floor(lv / 10);
+// dev profile (?all=1 on this computer): everything owned, saved apart from your real one and never synced
+const DEV_ALL = /[?&]all=1\b/.test(location.search) && /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+const PROF_KEY = DEV_ALL ? 'voxelstrike-profile-dev' : 'voxelstrike-profile';
 // saved profile (v = save format version)
 let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '' };
-try { const s = JSON.parse(localStorage.getItem('voxelstrike-profile')); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, boots: { ...s.boots }, bootUse: { ...s.bootUse }, hats: { ...s.hats }, hatUse: { ...s.hatUse } }; } catch {}
+try { const s = JSON.parse(localStorage.getItem(PROF_KEY)); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, boots: { ...s.boots }, bootUse: { ...s.bootUse }, hats: { ...s.hats }, hatUse: { ...s.hatUse } }; } catch {}
 let onSave = () => {}; // cloud.js uploads changes when signed in
-const saveProf = () => { try { localStorage.setItem('voxelstrike-profile', JSON.stringify(prof)); } catch {} onSave(); };
+const saveProf = () => { try { localStorage.setItem(PROF_KEY, JSON.stringify(prof)); } catch {} onSave(); };
+// tops the dev profile up, so anything new shows up owned
+function devAll() {
+  if (!DEV_ALL) return;
+  prof.lv = LV_MAX; prof.xp = 0; prof.coins = Math.max(prof.coins, 99999); prof.keys = Math.max(prof.keys | 0, 99); prof.boosts = Math.max(prof.boosts | 0, 50);
+  for (const w of BASE) if (!w.start && !prof.guns[w.id]) prof.guns[w.id] = 1;
+  prof.armor = ARMOR_MAX;
+  for (const b of BOOTS) prof.boots[b.id] ||= 1;
+  for (const h of HATS) prof.hats[h.id] ||= 1;
+  saveProf(); showProf(); renderChests();
+}
 
 // add XP and coins, leveling up as many times as needed
 function grant(xp, coins) {

@@ -11,6 +11,8 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 - Serve the folder and open it: `python -m http.server 8010 --bind 127.0.0.1`, then http://127.0.0.1:8010/?dev=1.
   **Never use port 8000** (another service on this PC owns it) and never kill processes by port; stop stray
   `http.server`/`wrangler`/`workerd` processes by command line.
+- `?all=1` on 127.0.0.1/localhost uses a separate dev profile with everything owned (max level, coins, keys, every gun, armor,
+  boots and hat, topped up each load); it never signs in or syncs. The tests don't use it.
 - `?dev=1` (or a localhost page) points online play at `ws://127.0.0.1:8787`; `?srv=http://host:port` points saves, friends and
   play at another server (the tests use `?srv=http://127.0.0.1:9` to force offline).
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
@@ -54,9 +56,8 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   sprites are rendered from the same models.
 - **Baked hold poses (gotcha).** How bots and the armory character hold each gun is solved once and baked into `HOLD_BAKED` in
   `js/hold.js`, keyed by each `GUN_MODELS` entry's source length. Editing a gun model invalidates its pose and every player's
-  browser re-solves it (seconds of stutter). Re-bake by evaluating
-  `Object.fromEntries(BASE.map((w, i) => [w.id, holdFor(i)]))` in the page and pasting the result in; `test/anim.mjs` fails
-  while any pose is stale.
+  browser re-solves it (seconds of stutter). Re-bake with `node ../voxel-strike-server/scripts/bake-holds.mjs` (8010 server
+  running); `test/anim.mjs` fails while any pose is stale.
 
 - **CrazyGames** (`js/crazy.js`, loaded before everything else): their SDK loads only on their domains or with `?cg=1`, and every
   `cg*` call is a no-op elsewhere. It reports loading and gameplay start/stop, follows their mute and chat settings, asks for a

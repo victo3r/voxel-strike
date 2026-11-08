@@ -136,8 +136,19 @@ function showBeam(by, from, to, shock = false) {
   b.g.children[0].material = mats[0]; b.g.children[1].material = mats[1];
   b.g.position.lerpVectors(from, to, .5); b.g.lookAt(to); b.g.scale.set(w, w, len);
   b.g.visible = true; b.life = .08;
+  if (by === null) b.dist = camera.position.distanceTo(to);
 }
-function beamTick(dt) { for (const b of beams.values()) if (b.g.visible && (b.life -= dt) <= 0) b.g.visible = false; }
+// your own beam stays on the muzzle and the crosshair between shots
+const beamA = new THREE.Vector3(), beamB = new THREE.Vector3();
+function beamTick(dt) {
+  for (const [by, b] of beams) {
+    if (!b.g.visible) continue;
+    if ((b.life -= dt) <= 0) { b.g.visible = false; continue; }
+    if (by !== null) continue;
+    flashMesh.getWorldPosition(beamA); camera.getWorldDirection(beamB).multiplyScalar(b.dist).add(camera.position);
+    b.g.position.lerpVectors(beamA, beamB, .5); b.g.lookAt(beamB); b.g.scale.z = beamA.distanceTo(beamB);
+  }
+}
 function clearBeams() { for (const b of beams.values()) scene.remove(b.g); beams.clear(); }
 
 // bot rockets and flares can hit you, yours can't
