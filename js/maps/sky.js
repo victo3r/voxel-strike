@@ -337,7 +337,7 @@ for (const [x, z, w, d, h] of [[-22, -2, 4, .8, 1.5], [-34, 10, .8, 3, 1.4], [20
 const boulders = [[-27, 9, 1.4], [16, -9, 1.5], [33, -1, 1.6], [-9, -37, 1.2], [42, 27, 1.1], [-41, -30, 1.1]];
 for (const [x, z, s] of boulders) { const y = gy(x, z), b = addSlab(x, z, s, s * .9, y, y + s * .9, rock); b.rotation.y = rnd(); }
 for (const [x, z, tall] of M.crates) { const y = gy(x, z); addSlab(x, z, 1.2, 1.2, y, y + (tall ? 2.4 : 1.2), tall ? crate2 : crate1); }
-// trees: solid trunks, leaves you can shoot through
+// trees: solid trunks, leaves you can stand on but shoot through
 const flat = (x, z, r = 1) => { const h = gy(x, z); for (let b = -r; b <= r; b++) for (let a = -r; a <= r; a++) { const c = cellAt(x + a, z + b); if (c < 0 || kind[c] !== GRASS || H[c] !== h) return false; } return true; };
 {
   const leaves = [];
@@ -346,7 +346,9 @@ const flat = (x, z, r = 1) => { const h = gy(x, z); for (let b = -r; b <= r; b++
     if (!flat(x, z) || KEEP.some(([px, pz, r]) => r < 3 && Math.hypot(px - x, pz - z) < 2.2)) continue;
     const s = .85 + rnd() * .5, h = 2.8 * s, y = gy(x, z), c = LEAF_TINTS[rnd() * LEAF_TINTS.length | 0];
     addSlab(x, z, .7 * s, .7 * s, y, y + h, barkMat);
-    leaves.push([x, y + h + 1 * s, z, 3.2 * s, 2.4 * s, 3.2 * s, rnd() * Math.PI, c], [x, y + h + 2.6 * s, z, 1.9 * s, 1.3 * s, 1.9 * s, rnd() * Math.PI, c]);
+    const L = [[x, y + h + 1 * s, z, 3.2 * s, 2.4 * s, 3.2 * s, 0, c], [x, y + h + 2.6 * s, z, 1.9 * s, 1.3 * s, 1.9 * s, 0, c]];
+    for (const [lx, ly, lz, w, t, d] of L) building.solids.push({ mesh: null, minX: lx - w / 2, maxX: lx + w / 2, minZ: lz - d / 2, maxZ: lz + d / 2, bot: ly - t / 2, top: ly + t / 2, surf: 'grass' });
+    leaves.push(...L); rnd(); rnd(); // keeps the random layout after this the same
   }
   instanced(unit, leafMat, leaves);
 }

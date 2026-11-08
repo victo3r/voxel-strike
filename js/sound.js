@@ -362,6 +362,15 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 2200, f2: 1500, a: .003, d: .03, v: .1, lp: 3000, glide: .025 });
     s.hiss({ ft: 'bandpass', f: 2000, f2: 800, q: 1.6, a: .01, d: .05, v: .4, sweep: .06 });
   }],
+  zin_executioner: [.24, .34, s => { // the holo powers up with a rising chirp
+    s.hiss({ ft: 'bandpass', f: 1200, f2: 3000, q: 2, a: .012, d: .04, v: .35, sweep: .05 });
+    s.tone({ type: 'sine', f: 900, f2: 2600, t: .01, a: .004, d: .06, v: .16, glide: .05 });
+    s.tone({ type: 'square', f: 2600, f2: 3100, t: .055, a: .002, d: .03, v: .06, lp: 4000, glide: .02 });
+  }],
+  zout_executioner: [.2, .3, s => {
+    s.tone({ type: 'sine', f: 2400, f2: 800, a: .003, d: .05, v: .14, glide: .045 });
+    s.hiss({ ft: 'bandpass', f: 2600, f2: 900, q: 2, a: .01, d: .045, v: .3, sweep: .05 });
+  }],
   zin_tigerbite: [.4, .42, s => {
     s.hiss({ ft: 'bandpass', f: 450, f2: 1300, q: 1.5, a: .03, d: .07, v: .6, sweep: .09 });
     s.thud({ t: .07, d: .03, f: 120, v: .9 });
