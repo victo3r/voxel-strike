@@ -441,7 +441,7 @@ function fpsTick(raw) {
   if (live) for (let k = 0; k < steps && (k === 0 || isLive()); k++) update(sdt);
   if ((dead || respawnT > 0 || matchOver || inLobby) && $('rl').style.display !== 'none') $('rl').style.display = 'none'; // reload ring only while playing
   else if (mode === 'zombies' && dead && !matchOver && (deadT += dt) >= DEAD_T) zombiesOver(); // zombie waves game over
-  soundTick(dt, live);
+  soundTick(dt, live && respawnT <= 0); // nothing keeps whirring while you're down
   // smooth ledge climbing
   const lagged = zombies.filter(z => z.g.position.lag), realY = lagged.map(z => z.g.position.y);
   for (const z of lagged) z.g.position.y -= z.g.position.lag;

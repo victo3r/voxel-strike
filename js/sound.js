@@ -608,7 +608,7 @@ function hurtSfx(who, name, at, opts = {}) {
 }
 
 // looping sounds: flamethrower, eradicator motor, heat ray
-let flameHeld = 0, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null;
+let flameHeld = 0, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null, spinBp = null, spinLfo = null;
 let beamHeld = 0, beamOn = false, beamGain = null;
 function flameBuffer() { // fire loop
   const n = SR * 2, x = SR / 10, r = rng(99), raw = new Float32Array(n + x);
@@ -637,13 +637,20 @@ function soundTick(dt, live) {
   if (fOn !== flameOn) { flameOn = fOn; sfx(fOn ? 'flameStart' : 'flameEnd'); flameGain?.gain.setTargetAtTime(fOn ? .45 : 0, t, fOn ? .04 : .08); }
   // eradicator motor
   const spin = live && gunSpin ? gunSpinV / 30 : 0;
-  if (spin > 0 && !spinOsc) {
-    spinOsc = ac.createOscillator(); spinOsc.type = 'sawtooth';
-    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+  if (spin > 0 && !spinOsc) { // a whine plus rushing air, pulsing as the barrels go round
+    spinOsc = ac.createOscillator(); spinOsc.type = 'triangle';
+    const air = ac.createBufferSource(), nb = ac.createBuffer(1, SR, SR), nd = nb.getChannelData(0); for (let i = 0; i < SR; i++) nd[i] = Math.random() * 2 - 1; air.buffer = nb; air.loop = true;
+    spinBp = ac.createBiquadFilter(); spinBp.type = 'bandpass'; spinBp.Q.value = 3;
+    const og = ac.createGain(); og.gain.value = .5; const am = ac.createGain(); am.gain.value = .6;
+    spinLfo = ac.createOscillator(); const depth = ac.createGain(); depth.gain.value = .4; spinLfo.connect(depth).connect(am.gain);
     spinGain = ac.createGain(); spinGain.gain.value = 0;
-    spinOsc.connect(lp).connect(spinGain).connect(bus); spinOsc.start();
+    spinOsc.connect(og).connect(am); air.connect(spinBp).connect(am); am.connect(spinGain).connect(bus);
+    spinOsc.start(); air.start(); spinLfo.start();
   }
-  if (spinOsc) { spinOsc.frequency.setTargetAtTime(50 + spin * 130, t, .05); spinGain.gain.setTargetAtTime(spin * .07, t, .05); }
+  if (spinOsc) {
+    spinOsc.frequency.setTargetAtTime(160 + spin * 560, t, .06); spinBp.frequency.setTargetAtTime(500 + spin * 2200, t, .06);
+    spinLfo.frequency.setTargetAtTime(3 + spin * 34, t, .06); spinGain.gain.setTargetAtTime(spin * .11, t, .05);
+  }
   // heat ray hum
   beamHeld = live || inLobby ? beamHeld - dt : 0;
   const bOn = beamHeld > 0;

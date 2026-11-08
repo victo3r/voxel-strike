@@ -1024,7 +1024,7 @@ M.surfAt = (x, z, y, base, s) => {
 M.tick = dt => {
   const t = performance.now() / 1000;
   slideTick(dt);
-  slideFilm.material.map.offset.set(-t * 1.2, 0);
+  slideFilm.material.map.offset.set(t * 1.2, 0); // flows down the slide
   for (const w of waters) w.material.map.offset.set(t * .03, t * .015);
   poolWater.material.map.offset.set(t * .04, t * .025);
   foam.material[0].opacity = .55 + Math.sin(t * .7 + 1.2) * .25;
