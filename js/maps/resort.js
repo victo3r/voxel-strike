@@ -507,6 +507,59 @@ for (const [x, z] of [[22, -7], [27, -7], [22, -1.5], [27, -1.5]]) {
   umbrella(x - 1.6, z, 0, umbCols[uc++ % umbCols.length]);
 }
 
+// open steps on two side boards, from the ground up to an edge
+function openSteps(x, z, ax, dir, y, n, m, side) {
+  const run = n * .5, len = Math.hypot(run, y);
+  for (let k = 0; k < n; k++) { const o = dir * (n - k - .5) * .5, t = y * (k + 1) / n; addSlab(x + (ax ? o : 0), z + (ax ? 0 : o), ax ? .5 : 1.4, ax ? 1.4 : .5, t - .12, t, m); }
+  for (const s of [-.76, .76]) {
+    const r = box(ax ? len : .12, .3, ax ? .12 : len, side); r.position.set(x + (ax ? dir * run / 2 : s), y / 2 - .12, z + (ax ? s : dir * run / 2));
+    if (ax) r.rotation.z = -dir * Math.atan2(y, run); else r.rotation.x = dir * Math.atan2(y, run); add(r);
+  }
+}
+// --- water slide ---
+let slideFilm = null, slideAt = null;
+const SL = { x0: -12, x1: -4.4, z0: 3, z1: 4.2, y0: 1, y1: 4.2 }, slideH = x => SL.y0 + (SL.y1 - SL.y0) * (x - SL.x0) / (SL.x1 - SL.x0);
+{
+  const TX = -3.2, TZ = 3.6, TY = SL.y1, R = 1.2, teal = surf(plain(0x2fb5b0), 'metal'), slideMat = surf(plain(0x3a8fe0), 'metal'), rim = plain(0xf2c230);
+  addSlab(TX, TZ, R * 2, R * 2, TY - .2, TY, tile, true, 2);
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) addSlab(TX + a * (R - .1), TZ + b * (R - .1), .2, .2, 0, TY - .2, teal);
+  for (const [x0, x1, z0, z1] of [[-R, R, -R, -R + .1], [-R, R, R - .1, R], [-R, -R + .1, -R, -.6], [-R, -R + .1, .6, R], [R - .1, R, -R, -.7], [R - .1, R, .7, R]]) // rails, open for the slide and the steps
+    addSlab(TX + (x0 + x1) / 2, TZ + (z0 + z1) / 2, x1 - x0, z1 - z0, TY, TY + 1, rim);
+  umbrella(TX, TZ - .6, TY, umbCols[0]);
+  openSteps(TX + R, TZ, true, 1, TY, 10, plank, teal);
+  const n = 10, w = (SL.x1 - SL.x0) / n; // the chute, in pieces so you can walk under its high end
+  for (let k = 0; k < n; k++) {
+    const a = SL.x0 + k * w, b = a + w, ya = slideH(a), yb = slideH(b);
+    for (const [z0, z1, up] of [[SL.z0, SL.z1, 0], [SL.z0 - .15, SL.z0, .6], [SL.z1, SL.z1 + .15, .6]]) building.solids.push({ mesh: null, minX: a, maxX: b, minZ: z0, maxZ: z1, bot: ya + up, top: yb + up, ramp: { ax: 'x', a, b }, surf: 'metal' });
+  }
+  const len = Math.hypot(SL.x1 - SL.x0, SL.y1 - SL.y0), tilt = Math.atan2(SL.y1 - SL.y0, SL.x1 - SL.x0), mx = (SL.x0 + SL.x1) / 2, my = (SL.y0 + SL.y1) / 2;
+  for (const [d, h, z, y, m] of [[SL.z1 - SL.z0, .1, (SL.z0 + SL.z1) / 2, -.05, slideMat], [.15, .7, SL.z0 - .075, .25, rim], [.15, .7, SL.z1 + .075, .25, rim]]) {
+    const c = box(len, h, d, m); c.position.set(mx, my + y, z); c.rotation.z = tilt; add(c); building.cover.push(c);
+  }
+  const film = box(len, .02, SL.z1 - SL.z0 - .1, waterMat([150, 225, 245], .55, len / 2, 1)); film.position.set(mx, my + .01, (SL.z0 + SL.z1) / 2); film.rotation.z = tilt; add(film); slideFilm = film;
+  for (const x of [-7, -9.8]) addSlab(x, (SL.z0 + SL.z1) / 2, .2, .2, x < -9 ? POOL_F : DECK_Y, slideH(x) - .12, teal); // legs
+}
+// sliding: pushes you down the chute, up to a speed the server allows
+function slideTick(dt) {
+  const p = P.pos, on = !dead && P.onGround && p.x > SL.x0 - .4 && p.x < SL.x1 && p.z > SL.z0 && p.z < SL.z1 && Math.abs(p.y - slideH(Math.max(p.x, SL.x0))) < .4; // till you're off the end
+  if (!on || !dt) { slideAt = null; return; }
+  const walk = slideAt === null ? 0 : (slideAt - p.x) / dt, push = Math.max(0, Math.min(8.5, 8.5 - walk));
+  walkTo(p, p.x - push * dt, p.z, .35, true);
+  if (p.x > SL.x0) p.y = slideH(Math.min(p.x + .35, SL.x1)); // ramps hold you at your uphill edge
+  slideAt = p.x;
+}
+// --- lifeguard tower ---
+{
+  const GX = 27.5, GZ = -13, GY = 2.6, R = 1.3, rim = surf(paint([240, 238, 232]), 'wood');
+  addSlab(GX, GZ, R * 2, R * 2, GY - .2, GY, plank);
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) addSlab(GX + a * (R - .15), GZ + b * (R - .15), .22, .22, 0, GY - .2, red);
+  for (const [x0, x1, z0, z1] of [[-R, R, -R, -R + .1], [-R, R, R - .1, R], [R - .1, R, -R, R], [-R, -R + .1, -R, -.7], [-R, -R + .1, .7, R]])
+    addSlab(GX + (x0 + x1) / 2, GZ + (z0 + z1) / 2, x1 - x0, z1 - z0, GY, GY + .9, rim);
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) addSlab(GX + a * (R - .05), GZ + b * (R - .05), .1, .1, GY + .9, GY + 2.3, rim, false);
+  addSlab(GX, GZ, R * 2 + .4, R * 2 + .4, GY + 2.3, GY + 2.5, red); // flat roof
+  openSteps(GX - R, GZ, true, -1, GY, 6, plank, red);
+}
+
 // --- tiki bar ---
 const wood = surf(lam({ map: tex(g => { noise(g, [140, 96, 58], 18); g.fillStyle = 'rgba(50,28,12,.4)'; for (const x of [0, 5, 10]) g.fillRect(x, 0, 1, 16); }) }), 'wood');
 const thatch = lam({ map: tex(g => { noise(g, [200, 164, 92], 26); g.fillStyle = 'rgba(120,85,40,.55)'; for (let i = 0; i < 12; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 4); }) });
@@ -956,8 +1009,10 @@ M.surfAt = (x, z, y, base, s) => {
   if (onPath(x, z)) return 'stone';
   return kindAt(x, z) === GRASS ? 'grass' : 'sand';
 };
-M.tick = () => {
+M.tick = dt => {
   const t = performance.now() / 1000;
+  slideTick(dt);
+  slideFilm.material.map.offset.set(-t * 1.2, 0);
   for (const w of waters) w.material.map.offset.set(t * .03, t * .015);
   poolWater.material.map.offset.set(t * .04, t * .025);
   foam.material[0].opacity = .55 + Math.sin(t * .7 + 1.2) * .25;
