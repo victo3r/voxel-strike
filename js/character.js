@@ -51,16 +51,51 @@ const PARTS = {
   legR: [0, 16, 4, 12, 4], legL: [16, 48, 4, 12, 4], armR: [40, 16, 4, 12, 4], armL: [32, 48, 4, 12, 4],
 };
 
+// drawn skins (look.px, base64): 32 colours, then 6 bits for each pixel the model uses (0 empty, 1-32 a colour)
+const DRAW_MAX = 10, PX_MAX = 3800, DRAW_PRICE = 20;
+let pxMask = null, pxList = null; // which of the 64x64 pixels are on the model
+function pxCells() {
+  if (pxList) return pxList;
+  pxMask = new Uint8Array(4096);
+  for (const [u, v, w, h, d] of Object.values(PARTS)) for (const [fx, fy, fw, fh] of Object.values(regions(u, v, w, h, d))) for (let y = fy; y < fy + fh; y++) for (let x = fx; x < fx + fw; x++) pxMask[y * 64 + x] = 1;
+  pxList = []; pxMask.forEach((m, i) => { if (m) pxList.push(i); });
+  return pxList;
+}
+function encodePx(pal, idx) { // pal: 32 colours, idx: 4096 values
+  const cells = pxCells(), b = [33]; for (const c of pal) b.push(c >> 16 & 255, c >> 8 & 255, c & 255);
+  let acc = 0, n = 0;
+  for (const i of cells) { acc = acc << 6 | Math.min(32, idx[i]); n += 6; while (n >= 8) { n -= 8; b.push(acc >> n & 255); } acc &= (1 << n) - 1; }
+  if (n) b.push(acc << (8 - n) & 255);
+  let bin = ''; for (const v of b) bin += String.fromCharCode(v); return btoa(bin);
+}
+function decodePx(px) {
+  try {
+    const bin = atob(px), cells = pxCells(), pal = [], idx = new Uint8Array(4096);
+    if (bin.charCodeAt(0) !== 33 || bin.length < 97 + Math.ceil(cells.length * 6 / 8)) return null;
+    for (let k = 0; k < 32; k++) pal.push(bin.charCodeAt(1 + k * 3) << 16 | bin.charCodeAt(2 + k * 3) << 8 | bin.charCodeAt(3 + k * 3));
+    let j = 97, acc = 0, n = 0;
+    for (const i of cells) { while (n < 6) { acc = acc << 8 | bin.charCodeAt(j++); n += 8; } n -= 6; const v = acc >> n & 63; acc &= (1 << n) - 1; if (v > 32) return null; idx[i] = v; }
+    return { pal, idx };
+  } catch { return null; }
+}
+function drawPx(g, d) {
+  const im = g.createImageData(64, 64);
+  d.idx.forEach((v, i) => { if (!v) return; const c = d.pal[v - 1]; im.data.set([c >> 16 & 255, c >> 8 & 255, c & 255, 255], i * 4); });
+  g.putImageData(im, 0, 0);
+}
+// on CrazyGames you only ever see your own drawn skin; everyone else shows their normal look there
+const pxShown = L => typeof L.px === 'string' && (!CG_ON || L.px === prof.look?.px);
 function makeSkin(look) {
   const c = document.createElement('canvas'); c.width = c.height = 64;
-  paintSkin(c.getContext('2d'), look, charRng(strSeed(JSON.stringify(look))));
+  const d = pxShown(look) && decodePx(look.px);
+  if (d) drawPx(c.getContext('2d'), d); else paintSkin(c.getContext('2d'), look, charRng(strSeed(JSON.stringify(look))));
   const t = new THREE.CanvasTexture(c);
   t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter; t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 const skinCache = new Map();
 function skinTexture(look) {
-  const key = JSON.stringify(look);
+  const key = (pxShown(look) ? 'd' : '') + JSON.stringify(look);
   if (!skinCache.has(key)) skinCache.set(key, makeSkin(look));
   return skinCache.get(key);
 }

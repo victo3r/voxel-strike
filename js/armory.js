@@ -212,11 +212,11 @@ function wearStar(s) {
   prof.armorUse = s === n ? 0 : s; saveProf(); armorSync(false); sfx('equip');
 }
 // ---- WEAR page: skins
-const SKINS_DESC = 'Pick a look, or make your own with CUSTOMIZE in the lobby';
+const SKINS_DESC = 'Pick a look, make your own with CUSTOMIZE, or paint one from scratch with DRAW';
 // skin icon, front view
 const lookSpriteCache = new Map();
 function skinSprite(look, head) {
-  const key = (head ? 'h' : 'b') + lookKey(look);
+  const key = (head ? 'h' : 'b') + (pxShown(look) ? 'd' : '') + lookKey(look);
   if (lookSpriteCache.has(key)) return lookSpriteCache.get(key);
   const src = skinTexture(look).image, W = head ? 8 : 16, H = head ? 8 : 33, K = 4;
   const c = document.createElement('canvas'); c.width = W + 2; c.height = H + 2;
@@ -244,16 +244,20 @@ function renderSkins() {
   $('armList').innerHTML = `<p class="wd">${SKINS_DESC}</p>` + list.map((p, i) =>
     `<div class="card${i === on ? ' sel on' : ''}" data-skin="${i}">${i === on ? '<span class="tag">WEARING</span>' : ''}` +
     `<img class="sk" src="${lookSprite(p.look)}"><div class="cn">${p.name}</div></div>`).join('') +
-    (inLobby ? '<div class="card" data-cust="1"><span class="plus">' + ico('pencil') + '</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '');
+    (inLobby ? '<div class="card" data-cust="1"><span class="plus">' + ico('pencil') + '</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '') +
+    (!prof.draw ? `<div class="card" data-dbuy="1"><span class="plus">${ico('pencil')}</span><div class="cn">DRAW</div><small>PAINT YOUR OWN SKINS · ${COIN}${DRAW_PRICE}</small></div>`
+      : inLobby && (prof.draws?.length || 0) < DRAW_MAX ? `<div class="card" data-dnew="1"><span class="plus">${ico('pencil')}</span><div class="cn">DRAW NEW</div><small>${prof.draws?.length || 0} / ${DRAW_MAX} SKINS</small></div>` : '');
   heroArmor(wornArmor()); wearGear();
   renderAct();
   if (inLobby) heroGun(-1);
 }
 function renderSkinAct() {
-  const p = lookChoices()[lookIndex()];
-  $('armAct').innerHTML = actCard(p?.name ?? 'CUSTOM', '', '<div class="tn">WEARING</div>', '', inLobby ? '<button data-cust="1">' + ico('pencil') + ' CUSTOMIZE</button>' : '');
+  const p = lookChoices()[lookIndex()], drawn = p?.drawn !== undefined;
+  const btns = !inLobby ? '' : drawn ? `<button data-dedit="${p.drawn}">${ico('pencil')} EDIT</button><button data-ddel="${p.drawn}">${drawSure === p.drawn ? 'SURE?' : 'DELETE'}</button>` : '<button data-cust="1">' + ico('pencil') + ' CUSTOMIZE</button>';
+  $('armAct').innerHTML = actCard(p?.name ?? 'CUSTOM', '', `<div class="tn">WEARING${drawn && CG_ON ? ' · ONLY YOU SEE DRAWN SKINS HERE' : ''}</div>`, '', btns);
   placeAct();
 }
+let drawSure = -1; // delete needs a second click
 // open the customizer
 function openCust() { closeArmory(); showCust(true); }
 
@@ -434,7 +438,9 @@ function armSync(i, how) {
 $('armList').addEventListener('click', e => {
   const c = e.target.closest('.card'); if (!c) return;
   if (c.dataset.cust) { openCust(); return; }
-  if (c.dataset.skin) { wearLook(+c.dataset.skin); renderArmory(); return; }
+  if (c.dataset.dbuy) { drawBuy(); return; }
+  if (c.dataset.dnew) { openDraw(-1); return; }
+  if (c.dataset.skin) { drawSure = -1; wearLook(+c.dataset.skin); renderArmory(); return; }
   if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = wornArmor() || 1; } else armorCard = true; sfx('ui'); renderArmory(); return; }
   if (c.dataset.gear) { const i = +c.dataset.gear; if (i === gearSel) armDet = true; else gearSel = i; sfx('ui'); renderArmory(); return; }
   const i = +c.dataset.i;
@@ -444,6 +450,8 @@ $('armList').addEventListener('click', e => {
 function armClick(e) {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (b.dataset.cust) { openCust(); return; }
+  if (b.dataset.dedit) { openDraw(+b.dataset.dedit); return; }
+  if (b.dataset.ddel) { const i = +b.dataset.ddel; if (drawSure === i) { drawSure = -1; drawDelete(i); } else { drawSure = i; sfx('ui'); renderAct(); } return; }
   if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; armSel = -1; gearSel = -1; sfx('ui'); } }
   else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; armorPrev = 0; gearSel = -1; sfx('ui'); } }
   else if (b.dataset.gbuy || b.dataset.gup || b.dataset.gwear || b.dataset.goff || b.dataset.gu) gearClick(b.dataset);

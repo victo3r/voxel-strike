@@ -79,7 +79,7 @@ net = (() => {
     return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load };
   }
   function hello(rejoin = null) {
-    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: prof.look, gear: myGear() };
+    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookBase(), gear: myGear() }; // a drawn skin follows in its own message
     if (auth?.token) m.token = auth.token; else m.guest = guestId;
     if (rejoin) m.rejoin = rejoin;
     send(m);
@@ -210,6 +210,7 @@ net = (() => {
       case 'fire': return remoteFire(m);
       case 'boom': return remoteBoom(m);
       case 'gear': return gearMsg(m);
+      case 'look': return lookMsg(m);
       case 'pad': return padMsg(m);
       case 'picked': return m.by ? botPicked(m) : usePickup(m.type, { hp: m.hp, armor: m.armor });
       case 'warp': return warped(m);
@@ -230,6 +231,7 @@ net = (() => {
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     mode = w.mode; mapId = w.map;
     api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads);
+    if (prof.look.px) send({ t: 'skin', px: prof.look.px }); // older servers just ignore it
     if (last && !code && !rejoining) last.room = room; // PLAY AGAIN keeps a group together
     // the roster, as bot-shaped records
     for (const r of remotes.values()) dropBody(r);
@@ -288,12 +290,19 @@ net = (() => {
     if (m.pid === undefined) { P.maxArmor = m.maxArmor; P.armor = m.armor; return; } // the server's answer to your own change
     const r = remotes.get(m.pid); if (r) Object.assign(r.rec, gearFields(m.gear));
   }
+  function lookMsg(m) { // someone's drawn skin arrived
+    const r = remotes.get(m.pid); if (!r || r.rec.team !== undefined || (typeof m.px !== 'string' && m.px !== null)) return; // teams keep their shirts
+    const L = { ...r.rec.look }; if (m.px) L.px = m.px; else delete L.px;
+    r.rec.look = L;
+    if (r.body?.mats?.[0]) { r.body.mats[0].map = skinTexture(L); r.body.mats[0].needsUpdate = true; }
+  }
   function makeRemoteRec(p) {
     const name = cleanName(p.name) || 'Player';
     const team = teamMode() ? (p.team === myTeamRaw ? 0 : 1) : undefined;
     const css = team !== undefined ? TEAMS[team].css : safeCss(p.css);
     let look = p.look && typeof p.look === 'object' ? { ...p.look } : null;
     if (!look || typeof look.hair !== 'string' || typeof look.top !== 'string') look = randomLook(name, 0x6a6a72);
+    if (team !== undefined) delete look.px;
     if (team !== undefined) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team shirt colour
     const tag = tagMat(name, css);
     if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; } // teammates' tags show through walls

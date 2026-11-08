@@ -160,7 +160,10 @@ for (let i = 0; i < 45; i++) {
 if (!prof.look) prof.look = { ...PRESETS[0].look };
 const lookKey = l => JSON.stringify(Object.keys(l).sort().filter(k => l[k] != null && l[k] !== false).map(k => [k, l[k]]));
 const isPreset = l => PRESETS.some(p => lookKey(p.look) === lookKey(l));
-const lookChoices = () => prof.myLook && !isPreset(prof.myLook) ? [...PRESETS, { name: 'CUSTOM', look: prof.myLook }] : PRESETS;
+// your look without a drawn skin (what CrazyGames players see you in)
+const lookBase = () => { const { px, ...b } = prof.look; return b; };
+const lookChoices = () => [...PRESETS, ...(prof.myLook && !isPreset(prof.myLook) ? [{ name: 'CUSTOM', look: prof.myLook }] : []),
+  ...(prof.draws || []).map((d, i) => ({ name: d.n, look: { ...lookBase(), px: d.px }, drawn: i }))];
 const lookIndex = () => { const k = lookKey(prof.look); return lookChoices().findIndex(p => lookKey(p.look) === k); };
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
 let heroCh, torso, headPiv, armL, armR; // armL is on the left of the screen
@@ -387,6 +390,7 @@ $('custRand').onclick = () => {
 };
 const custOpen = () => $('custPanel').style.display === 'flex';
 function showCust(on) {
+  if (on && prof.look.px) { prof.look = lookBase(); saveProf(); dressHero(); }
   $('custPanel').style.display = on ? 'flex' : 'none';
   $('lobbyUI').style.display = on ? 'none' : '';
   $('lobby').classList.toggle('cust', on);
@@ -440,7 +444,7 @@ function updateLobby(dt) {
   if (armOpen !== wasArm) { wasArm = armOpen; lastDrag = -1e9; }
   if (dragX === null) {
     spin += spinV * dt; spinV *= Math.exp(-4 * dt);
-    if (performance.now() - lastDrag > 2500) {
+    if (performance.now() - lastDrag > 2500 && !drawOpen()) { // stays where you turned it while drawing
       const base = armOpen && holdKey ? ARM_REST - hTurn : REST, rest = base + Math.round((spin - base) / (Math.PI * 2)) * Math.PI * 2;
       spin += (rest - spin) * Math.min(1, dt * (armOpen ? 3 : 1.5));
     }
@@ -500,7 +504,7 @@ function updateLobby(dt) {
   heroCh.legL.rotation.set(-rock - (left ? lift : 0), 0, LEG_SPREAD + shift);
   let rel = mNX * .9 - spin; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   // head follows the cursor without flipping
-  const away = Math.abs(rel), look = away < 1.2 ? 1 : Math.max(0, 1 - (away - 1.2) / 1.4);
+  const away = Math.abs(rel), look = drawOpen() ? 0 : away < 1.2 ? 1 : Math.max(0, 1 - (away - 1.2) / 1.4);
   headPiv.rotation.y += (Math.sign(rel) * Math.min(.9, away) * look - headPiv.rotation.y) * Math.min(1, dt * 6);
   headPiv.rotation.x += (-mNY * .45 * look - headPiv.rotation.x) * Math.min(1, dt * 6);
   for (const f of flies) {
