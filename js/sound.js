@@ -256,6 +256,20 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 360, f2: 90, d: .09, v: .28, lp: 1100 });
     s.clack({ t: .07, f: 2300, d: .012, v: .5, body: .3 }); s.clack({ t: .1, f: 3000, d: .01, v: .35 });
   }],
+  tigerbite: [1, 1, s => {
+    s.hiss({ ft: 'highpass', f: 2800, d: .035, v: 1 });
+    s.hiss({ f: 3800, f2: 140, d: .55, v: .95 });
+    s.tone({ f: 90, f2: 28, d: .5, v: 1 });
+    s.tone({ type: 'sawtooth', f: 160, f2: 70, d: .22, v: .3, lp: 700 }); // a growl under the crack
+    s.clack({ t: .12, f: 2000, d: .014, v: .5, body: .4 });
+  }],
+  executioner: [.4, .5, s => {
+    s.tone({ type: 'square', f: 2600, f2: 380, d: .16, v: .32, lp: 5000 });
+    s.tone({ type: 'sawtooth', f: 1300, f2: 180, d: .2, v: .28, lp: 3000 });
+    s.tone({ f: 4200, f2: 900, d: .08, v: .3 });
+    s.hiss({ ft: 'bandpass', f: 5000, q: 2, d: .04, v: .35 });
+  }],
+  zap: [.12, .22, s => { for (let k = 0; k < 4; k++) s.clack({ t: k * .018, f: 3000 + Math.random() * 3000, d: .008, v: .5 }); s.hiss({ ft: 'highpass', f: 5000, d: .05, v: .4 }); }], // shock beam crackle
   eradicator: [.12, .32, s => { // the motor whir is in soundTick
     s.hiss({ ft: 'bandpass', f: 1500, f2: 700, d: .045, v: .9 });
     s.tone({ f: 150, f2: 70, d: .05, v: .8 });
@@ -348,6 +362,15 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 2200, f2: 1500, a: .003, d: .03, v: .1, lp: 3000, glide: .025 });
     s.hiss({ ft: 'bandpass', f: 2000, f2: 800, q: 1.6, a: .01, d: .05, v: .4, sweep: .06 });
   }],
+  zin_tigerbite: [.4, .42, s => {
+    s.hiss({ ft: 'bandpass', f: 450, f2: 1300, q: 1.5, a: .03, d: .07, v: .6, sweep: .09 });
+    s.thud({ t: .07, d: .03, f: 120, v: .9 });
+    s.clack({ t: .08, f: 1400, d: .014, v: .5, body: .5 });
+  }],
+  zout_tigerbite: [.3, .36, s => {
+    s.hiss({ ft: 'bandpass', f: 1200, f2: 420, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
+    s.clack({ t: .1, f: 1200, d: .012, v: .3, body: .3 });
+  }],
   dry: [.1, .5, s => { s.clack({ f: 2800, d: .01, v: .8 }); }],
   equip: [.25, .4, s => { s.scrape({ d: .07, f: 1500, v: .4 }); s.clack({ t: .07, f: 2200, d: .015, v: .8, body: .3 }); }],
 
@@ -368,6 +391,16 @@ const SOUNDS = {
   r_rocket: [2.6, .45, s => { s.latch(.3); s.hiss({ ft: 'bandpass', f: 600, f2: 300, q: 2, t: 1.0, a: .1, d: .25, v: .5 }); s.thunk(1.35); s.latch(2.1); }],
   r_flare: [1.3, .45, s => { s.latch(.1); s.shell(.6); s.latch(1.0); }],
   r_hitman: [1.1, .45, s => { s.magOut(.08); s.magIn(.5); s.rack(.82); }],
+  r_executioner: [1.4, .45, s => {
+    s.magOut(.1); s.magIn(.55);
+    s.tone({ type: 'square', f: 250, f2: 1400, t: .8, a: .25, d: .1, v: .2, lp: 2600, glide: .3 }); s.tone({ f: 1900, t: 1.15, d: .15, v: .28 });
+  }],
+  r_tigerbite: [2, .45, s => { s.magOut(.2); s.magIn(1.0); s.clack({ t: 1.1, f: 1500, d: .015, v: .5, body: .3 }); s.rack(1.55); }],
+  r_shockbeam: [2, .45, s => {
+    s.latch(.12); s.magOut(.7); s.magIn(1.15);
+    for (let k = 0; k < 5; k++) s.clack({ t: 1.5 + k * .04, f: 2500 + k * 400, d: .008, v: .35 });
+    s.tone({ f: 300, f2: 2600, t: 1.55, a: .2, d: .1, v: .25, glide: .3 });
+  }],
   r_heatray: [2, .45, s => {
     s.latch(.12); s.hiss({ ft: 'highpass', f: 3500, f2: 1500, t: .18, a: .03, d: .45, v: .5 });
     s.magOut(.8); s.magIn(1.2);

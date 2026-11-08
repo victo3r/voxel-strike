@@ -1,7 +1,7 @@
 // hats, stats per star (ids are used in saves, don't rename them)
 const HATS = [
-  { id: 'warrior', name: 'Warrior Helmet', unlock: 6, price: 90, dr: [.04, .06, .08], hs: [.20, .27, .33] },
-  { id: 'raider', name: 'Raider Hood', unlock: 8, price: 130, half: [.05, .07, .10], stealth: [30, 22, 15] },
+  { id: 'warrior', rar: 'rare', name: 'Warrior Helmet', unlock: 6, price: 90, dr: [.04, .06, .08], hs: [.20, .27, .33] },
+  { id: 'raider', rar: 'rare', name: 'Raider Hood', unlock: 8, price: 130, half: [.05, .07, .10], stealth: [30, 22, 15] },
 ];
 const HAT_I = Object.fromEntries(HATS.map((H, i) => [H.id, i]));
 const hatOf = id => HATS[HAT_I[id]] ?? null;

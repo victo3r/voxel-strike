@@ -362,6 +362,7 @@ net = (() => {
       P.hp = m.hp; P.armor = m.armor;
       if (!alive) return;
       youHitFx(!!m.head, armorOnly);
+      if (BASE[gi(m.gun)]?.shock) shockHit(P);
       if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false); // someone else's blast throws you
       return;
     }
@@ -369,6 +370,7 @@ net = (() => {
     r.rec.alive = true;
     const b = r.body; if (!b) return;
     b.hp = Math.max(m.hp, b.dead ? 0 : .01); b.armor = m.armor;
+    if (BASE[gi(m.gun)]?.shock) shockHit(b); // host bots run slower
     if (r.rec.hostBot && m.by && m.by !== m.v) { // my bot remembers who's hurting it
       const who = m.by === pid ? YOU_T : bodyOf(m.by);
       if (who) { if (b.hitBy !== who || b.hitByT <= 0) b.hitDmg = 0; b.hitBy = who; b.hitByT = 2; b.hitDmg += m.d; }
@@ -581,7 +583,7 @@ net = (() => {
         z.fireOn = .2; z.fireEnd = 'heatEnd';
         beamRay.set(eyeV, dirV); beamRay.far = W.range || 30;
         const hit = beamRay.intersectObjects(targetsFor(z), false)[0];
-        showBeam(z, fv.clone(), hit ? hit.point : eyeV.clone().addScaledVector(dirV, beamRay.far));
+        showBeam(z, fv.clone(), hit ? hit.point : eyeV.clone().addScaledVector(dirV, beamRay.far), W.shock);
       }
     }
     if (z.fireOn > 0 && (z.fireOn -= dt) <= 0) sfx(z.fireEnd, { at: pos, far: 50 });

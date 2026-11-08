@@ -26,6 +26,9 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.3); sun.position.set(10, 20, 
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 const allTex = []; // so a quality change can update every texture
+// item rarity: name and colour
+const RARITY = { common: ['COMMON', '#c9ced6'], rare: ['RARE', '#4fa3ff'], epic: ['EPIC', '#c06bff'], legend: ['LEGENDARY', '#ff4a4a'], mythic: ['MYTHIC', '#ffc531'] };
+const rarOf = o => o?.rar || 'common';
 function tex(draw, rx = 1, ry = 1) {
   const c = document.createElement('canvas'); c.width = c.height = 16;
   draw(c.getContext('2d'));

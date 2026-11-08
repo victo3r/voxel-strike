@@ -74,20 +74,25 @@ const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res
 // bot loadouts: one gun per category (listed twice = twice as likely)
 const BOT_PICKS = {
   primary: ['shotgun', 'ar', 'ar', 'thrasher', 'eradicator'],
-  backup: ['voxel', 'voxel', 'hitman'],
-  melee: ['knife'],
-  special: ['flame', 'heatray'],
-  sniper: ['sniper', 'sniper', 'semisniper'],
+  backup: ['voxel', 'voxel', 'hitman', 'hitman', 'executioner'],
+  melee: ['knife', 'knife', 'herosword'],
+  special: ['flame', 'heatray', 'shockbeam'],
+  sniper: ['sniper', 'sniper', 'semisniper', 'semisniper', 'tigerbite'],
   premium: ['flare', 'flare', 'rocket'],
 };
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
+  herosword: [1, 2], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
   knife: d => d < 2.2 ? 1.25 : d < 4 ? .35 : 0,
+  herosword: d => d < 2.8 ? 1.3 : d < 4.5 ? .4 : 0,
+  executioner: d => d < 24 ? .75 : .55,
+  shockbeam: d => d < 3 ? .55 : d < 24 ? .88 : .2,
+  tigerbite: d => d > 20 ? 1.15 : d > 14 ? .65 : d > 8 ? .25 : .1,
   shotgun: d => d < 5 ? 1 : d < 9 ? .85 : d < 14 ? .3 : .05,
   flame: d => d < 5 ? 1.05 : d < 6.5 ? .5 : 0,
   voxel: d => d < 14 ? .5 : .3,
@@ -402,7 +407,7 @@ function youDown(by) {
 // respawn you
 function respawnYou(x, z, yaw) {
   if (x == null) [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, slowT: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   youHelpers.clear(); killCam = null;
   cancelReload(); recoilReset(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
@@ -584,19 +589,21 @@ function botFire(b, W, dist) {
     const bot = others.length ? losRay.intersectObjects(others, false)[0] : null, botD = bot ? bot.distance : Infinity;
     const onYou = youUp && losRay.ray.intersectBox(pBox, hitV), youD = onYou ? eye.distanceTo(hitV) : Infinity;
     const near = Math.min(wallD, botD, youD);
-    if (W.beam) showBeam(b, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)));
+    if (W.beam) showBeam(b, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)), W.shock);
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45;
       hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? 1.5 : 1))), false, b, head, W.beam ? 2 : 0);
+      if (W.shock) shockHit(P);
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
-      if (!zz.dead) hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, W.beam ? 2 : 0);
+      if (!zz.dead) { hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? 1.5 : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (W.shock) shockHit(zz); }
     } else burst(wall.point, 0x999999, 2);
   }
 }
 
 function updateBot(b, dt) {
+  if (b.slowT > 0) b.slowT -= dt;
   let W = b.rec.W[b.gun];
   const pos = b.g.position;
   if (b.gazeT === undefined) botMind(b);
@@ -731,7 +738,7 @@ function updateBot(b, dt) {
   if (b.leap) { if (!b.vy || (b.leap.t -= dt) <= 0) b.leap = null; else { mx = b.leap.x; mz = b.leap.z; } } // mid-jump over a gap
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
-    const s = (b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd)) * dt / ml; mx *= s; mz *= s;
+    const s = (b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd) * slowMul(b)) * dt / ml; mx *= s; mz *= s;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
     const walk = b.leap ? (x, z) => walkTo(pos, x, z, b.r, false) : (x, z) => walkDry(pos, x, z, b.r, grounded, into);
     if (!walk(pos.x + mx, pos.z)) bump = true;
@@ -770,7 +777,7 @@ function updateBot(b, dt) {
   }
 
   b.flash -= dt;
-  const e = b.flash > 0 ? 0x880000 : b.burn > 0 ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : 0;
+  const e = b.flash > 0 ? 0x880000 : b.burn > 0 ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : b.slowT > 0 ? (Math.sin(performance.now() * .05) > 0 ? 0x1a4a66 : 0x0a1a2a) : 0;
   b.mats.forEach(m => m.emissive.setHex(e));
 }
 

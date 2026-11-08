@@ -23,12 +23,15 @@ function starTable(i) {
   const w = BASE[i], S = [0, 1, 2].map(L => statsAt(i, L)), rows = [];
   rows.push(['DAMAGE', ...S.map(s => w.beam ? Math.round(s.dmg / s.rate) + '/s' : s.dmg * w.pellets)]);
   if (!w.beam && S[2].rate !== S[0].rate) rows.push(['FIRE RATE', ...S.map(s => +(1 / s.rate).toFixed(1) + '/s')]);
-  if (!w.beam && w.mag > 1) rows.push(['DMG / SEC', ...S.map(s => Math.round(s.dmg * w.pellets / s.rate))]);
+  if (!w.beam && (w.mag > 1 || w.melee)) rows.push(['DMG / SEC', ...S.map(s => Math.round(s.dmg * w.pellets / s.rate))]);
   if (w.mag > 1) rows.push(['CAPACITY', ...S.map(s => s.mag)]);
-  rows.push(['RELOAD', ...S.map(s => s.reload.toFixed(2) + 's')]);
+  if (!w.melee) rows.push(['RELOAD', ...S.map(s => s.reload.toFixed(2) + 's')]);
   return rows;
 }
 const statBoxes = rows => `<div class="ms" style="grid-template-columns:repeat(${rows.length},1fr)">${rows.map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>`;
+// rarity: a coloured badge by names, a stripe along the bottom of cards
+const rarTag = o => { const [n, c] = RARITY[rarOf(o)]; return `<span class="rt" style="--rc:${c}">${n}</span>`; };
+const rarCls = o => `" style="--rc:${RARITY[rarOf(o)][1]}`;
 const attrTags = list => list.length ? `<div class="at">${list.map(a => `<span>${a}</span>`).join('')}</div>` : '';
 // gun tags
 function gunAttrs(w) {
@@ -41,6 +44,8 @@ function gunAttrs(w) {
   else if (w.mag > 1) a.push('SEMI-AUTO');
   if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : 'HOLO SIGHT');
   if (w.quiet) a.push('SUPPRESSED');
+  if (w.laser) a.push('LASER');
+  if (w.shock) a.push('SLOW');
   if (w.rocket) a.push('ROCKET', 'EXPLOSIVE');
   if (w.flame || w.flare) a.push('FIRE');
   if (w.flare) a.push('SPLASH');
@@ -61,6 +66,10 @@ const DESC = {
   flame: 'Sprays fire up close and leaves everything burning',
   rocket: 'One rocket, one big boom, and anyone near it feels it',
   flare: 'One burning flare that sets whoever it hits on fire',
+  herosword: 'A bronze blade with a gem in the guard and the pommel, made for heroes',
+  shockbeam: 'A crackling bolt of electricity that leaves whoever it touches slow and twitchy',
+  tigerbite: 'A striped sniper with a bite worse than its growl',
+  executioner: 'Purple laser bolts that hit like a sniper, from a pistol',
 };
 // extra stats for the details view
 function gunSpecs(i) {
@@ -69,6 +78,7 @@ function gunSpecs(i) {
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
   if (w.rocket) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
   if (w.flare) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`], ['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
+  if (w.shock) out.push(['SLOW', `${Math.round((1 - SLOW_K) * 100)}% FOR ${SLOW_T}s`]);
   if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }
@@ -98,9 +108,9 @@ function renderArmory() {
   if (armDet) renderDetail();
   else $('armList').innerHTML = catList().map(i => {
     const w = BASE[i], tag = isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
-    return `<div class="card${isLocked(i) ? ' locked' : ''}${i === armSel ? ' sel' : ''}${i === eq ? ' on' : ''}" data-i="${i}">` +
+    return `<div class="card rr${isLocked(i) ? ' locked' : ''}${i === armSel ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img src="${SPRITES[i]}">` +
-      `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
+      `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div>${rarTag(w)}</div>`;
   }).join('');
   renderAct();
   if (inLobby) heroGun(armSel);
@@ -120,7 +130,7 @@ function renderAct() {
     if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${upgPrice(i)}</button>`;
   }
   const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  $('armAct').innerHTML = actCard(w.name, starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns);
+  $('armAct').innerHTML = actCard(w.name + ' ' + rarTag(w), starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns);
   placeAct();
 }
 // SHOOT and RELOAD buttons
@@ -136,7 +146,7 @@ function renderDetail() {
   const table = rows.length ? `<div class="sk"><span></span>${[1, 2, 3].map(s => `<b class="h${s === u ? ' on' : ''}">${starRow(s)}</b>`).join('')}` +
     rows.map(([k, ...v]) => `<span>${k}</span>${v.map((x, s) => `<b${s + 1 === u ? ' class="on"' : ''}>${x}</b>`).join('')}`).join('') + '</div>' : '';
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
-    `<div class="dn">${w.name} <span class="st">${starTxt(i)}</span></div><p>${DESC[w.id] ?? ''}</p>` +
+    `<div class="dn">${w.name} ${rarTag(w)} <span class="st">${starTxt(i)}</span></div><p>${DESC[w.id] ?? ''}</p>` +
     (table ? `<div class="sh">WHAT EACH STAR DOES</div>${table}` : '') +
     `<div class="ds">${gunSpecs(i).map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
   pvShow(i + ':' + u, g => makeGun(i, g, Math.max(0, u - 1), false), -Math.PI / 2);
@@ -173,7 +183,7 @@ function renderArmorDetail() {
   const desc = T.dr ? 'Soaks up hits before your health does and shrugs off part of every hit' : 'Soaks up hits before your health does';
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button>` +
     `<div id="detView"><button class="arw l" data-av="-1" ${s <= 1 ? 'disabled' : ''}>${ico('left')}</button><button class="arw r" data-av="1" ${s >= ARMOR_MAX ? 'disabled' : ''}>${ico('right')}</button></div>` +
-    `<div class="dn">${T.name} <span class="st">${armorStars(s)}</span></div><p>${desc}</p><div class="ds">` +
+    `<div class="dn">${T.name} ${rarTag(T)} <span class="st">${armorStars(s)}</span></div><p>${desc}</p><div class="ds">` +
     [['ARMOR BAR', '+' + T.hp], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE'], ['UNLOCKS AT', 'LVL ' + T.unlock],
       ['PRICE', COIN + T.price], ['STATUS', state]].map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('') + '</div>';
   pvShow('armor' + s, g => armorModel(s, g), .5);
@@ -192,7 +202,7 @@ function renderArmorAct() {
   else btns += `<button data-arm="1" ${prof.coins < next.price ? 'disabled' : ''}>${n ? starRow(n + 1) + ' ' + next.name.toUpperCase() : 'BUY'} ${COIN}${next.price}</button>`;
   const pick = !armDet && n > 1 ? lvPick('wa', 'WEARING ' + armorOf(w).name.toUpperCase(), w <= 1, w >= n) : '';
   const T = armorOf(armDet ? armorPrev : w || 1);
-  const body = `<div class="tn">${T.name.toUpperCase()}${armDet ? '' : n ? ' · WEARING' : ' · NOT OWNED'}</div>` +
+  const body = `<div class="tn">${T.name.toUpperCase()} ${rarTag(T)}${armDet ? '' : n ? ' · WEARING' : ' · NOT OWNED'}</div>` +
     statBoxes([['ARMOR BAR', '+' + T.hp, ''], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE', '']]);
   $('armAct').innerHTML = actCard(ARMOR_ITEM, n ? armorStarTxt() : '', body, pick, btns);
   placeAct();
@@ -299,9 +309,9 @@ function renderGear() {
   else $('armList').innerHTML = `<p class="wd">${G.desc}</p>` + gearList(G).map(i => {
     const K = G.list[i], st = G.stars(K.id), worn = prof[G.on] === K.id && st, s = gearShown(G, K);
     const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
-    return `<div class="card${gearLocked(G, K) ? ' locked' : ''}${i === gearSel ? ' sel' : ''}${worn ? ' on' : ''}" data-gear="${i}">` +
+    return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel ? ' sel' : ''}${worn ? ' on' : ''}${rarCls(K)}" data-gear="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${G.sprite(K.id, s)}">` +
-      `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div></div>`;
+      `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div>${rarTag(K)}</div>`;
   }).join('');
   gearDress();
   renderAct();
@@ -313,7 +323,7 @@ function renderGearDetail() {
   specs.push(['UNLOCKS AT', 'LVL ' + B.unlock], ['PRICE', COIN + B.price],
     ['STATUS', prof[G.on] === B.id && have ? 'WEARING' : have ? 'OWNED' : gearLocked(G, B) ? ico('lock') + ' LOCKED' : 'NOT OWNED']);
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
-    `<div class="dn">${B.name} <span class="st">${gearStarTxt(G, B.id)}</span></div>` +
+    `<div class="dn">${B.name} ${rarTag(B)} <span class="st">${gearStarTxt(G, B.id)}</span></div>` +
     `<p>${G.about[B.id] ?? ''}</p><div class="ds">${specs.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
   pvShow(wearCat + ':' + B.id + st, g => G.model(B.id, st, g), G.face);
 }
@@ -328,7 +338,7 @@ function renderGearAct() {
   }
   const u = G.using(B.id), pick = st > 1 ? lvPick('gu', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
-  $('armAct').innerHTML = actCard(B.name, gearStarTxt(G, B.id), body, pick, btns);
+  $('armAct').innerHTML = actCard(B.name + ' ' + rarTag(B), gearStarTxt(G, B.id), body, pick, btns);
   placeAct();
 }
 // boots and hats buttons

@@ -51,11 +51,15 @@ const CROSSES = {
   voxel: () => [...xDot(), ...xLines(4, 6)],
   hitman: () => [...xDot(), ...xLines(4, 6)],
   knife: () => [...xDot(), ...xLines(4, 6)],
+  herosword: () => [...xDot(), ...xLines(5, 7)],
+  executioner: () => [...xDot(), ...xLines(5, 6), ...xTicks(8, 10)],
   shotgun: () => [...xDot(), ...xArcs(15, DIAG, 50)],
   flame: () => [...xDot(), ...xArcs(18, DIAG, 40)],
   heatray: () => [...xDot(), ...xLines(3, 3), ...xArcs(10, DIAG, 44)],
+  shockbeam: () => [...xDot(), ...xLines(3, 4), ...xTicks(9, 12)],
   sniper: () => [...xDot(), ...xLines(10, 5, 2, 'lrd')],
   semisniper: () => [...xDot(), ...xLines(8, 5, 2, 'lrd')],
+  tigerbite: () => [...xDot(), ...xLines(9, 6, 2, 'lrd')],
   flare: () => [...xDot(), ...xCorners(8, 4)], // explosives: corners, bigger blast = bigger square
   rocket: () => [...xDot(), ...xCorners(13, 5)],
 };

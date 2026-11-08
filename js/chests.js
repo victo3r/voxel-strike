@@ -1,7 +1,7 @@
 // chests: keys from online wins, the daily reward and ads open them
 const keyCount = () => prof.keys | 0;
-const RARITY = { common: ['COMMON', '#c9ced6'], rare: ['RARE', '#4fa3ff'], epic: ['EPIC', '#c06bff'], legend: ['LEGENDARY', '#ffc531'] };
 // loot: k = kind, n = amount or [min, max], w = weight, r = rarity. Things you can only have one of drop out once you own them
+const GUN_DROP = { common: 2, rare: 1.6, epic: 1, legend: .5, mythic: .2 }; // the rarer the gun, the rarer the drop
 const CHESTS = [
   { id: 'wood', name: 'WOODEN CHEST', cost: 1, pal: { m: '#9a6634', w: '#c48a4e', b: '#5d5d66', g: '#d8d8e0' }, loot: [
     { k: 'coins', n: [10, 16], w: 40 }, { k: 'boosts', n: 1, w: 30 }, { k: 'xp', n: [100, 160], w: 20 },
@@ -10,14 +10,14 @@ const CHESTS = [
   { id: 'iron', name: 'IRON CHEST', cost: 3, pal: { m: '#7f8a99', w: '#b5bfcc', b: '#3c4450', g: '#4fa3ff' }, loot: [
     { k: 'coins', n: [30, 45], w: 34 }, { k: 'boosts', n: 3, w: 24 }, { k: 'xp', n: [300, 450], w: 18 },
     { k: 'star', n: 1, w: 5, r: 'rare' }, { k: 'coins', n: 100, w: 6, r: 'rare' },
-    ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 1.5, r: 'epic' })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 1.5, r: 'epic' })),
+    ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 1.5, r: rarOf(b) })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 1.5, r: rarOf(h) })),
     { k: 'boosts', n: 6, w: 2, r: 'epic' },
   ] },
   { id: 'gold', name: 'GOLDEN CHEST', cost: 10, pal: { m: '#e0b234', w: '#ffe07a', b: '#8a5a12', g: '#d23cff' }, loot: [
     { k: 'coins', n: [120, 180], w: 24 }, { k: 'boosts', n: 12, w: 16 }, { k: 'star', n: 2, w: 14, r: 'rare' },
-    ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 3, r: 'rare' })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 3, r: 'rare' })),
+    ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 3, r: rarOf(b) })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 3, r: rarOf(h) })),
     { k: 'coins', n: 300, w: 12, r: 'epic' },
-    ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: 12 / BASE.filter(w => w.price).length, r: w.price >= 300 ? 'legend' : 'epic' })),
+    ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: GUN_DROP[rarOf(w)], r: rarOf(w) })),
     { k: 'coins', n: 500, w: 3, r: 'legend' },
   ] },
 ];

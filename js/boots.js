@@ -1,7 +1,7 @@
 // boots, stats per star (ids are used in saves, don't rename them)
 const BOOTS = [
-  { id: 'warrior', name: 'Warrior Boots', unlock: 5, price: 80, dmg: [.06, .10, .14], dr: [.04, .06, .08] },
-  { id: 'raider', name: 'Raider Boots', unlock: 7, price: 120, spd: [.08, .11, .14], dj: true },
+  { id: 'warrior', rar: 'rare', name: 'Warrior Boots', unlock: 5, price: 80, dmg: [.06, .10, .14], dr: [.04, .06, .08] },
+  { id: 'raider', rar: 'rare', name: 'Raider Boots', unlock: 7, price: 120, spd: [.08, .11, .14], dj: true },
 ];
 const BOOT_I = Object.fromEntries(BOOTS.map((B, i) => [B.id, i]));
 const bootOf = id => BOOTS[BOOT_I[id]] ?? null;

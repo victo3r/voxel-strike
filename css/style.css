@@ -145,6 +145,9 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armList .card.sel{border-color:var(--acc);background:rgba(47,191,113,.3)}
 #armList .card.locked{opacity:.5}#armList .card.locked.sel{opacity:.75}
 #armList .tag{position:absolute;top:4px;right:6px;font:bold 11px monospace;color:var(--silver)}
+#armList .card.rr{border-bottom-color:var(--rc)}
+.rt{display:inline-block;font:bold 11px monospace;color:var(--rc);border:2px solid var(--rc);padding:0 4px;vertical-align:middle;white-space:nowrap}
+#armList .card .rt{border:0;padding:0}
 #armList .card.on .tag{color:var(--acc-lt)}
 /* armory item card */
 #armAct{position:fixed;right:20px;bottom:20px;width:clamp(270px,27vw,340px);box-sizing:border-box;display:none;flex-direction:column;align-items:stretch;gap:9px;padding:12px 14px 14px;z-index:9;color:#fff;text-shadow:2px 2px 0 #000;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:3px solid var(--line);box-shadow:4px 4px 0 rgba(0,0,0,.4);animation:armIn .25s ease-out}

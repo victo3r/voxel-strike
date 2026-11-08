@@ -550,7 +550,7 @@ function restart(spot) {
   flares.forEach(f => scene.remove(f.m)); flares.length = 0; clearBeams(); clearTracers(); recoilReset();
   parts.forEach(p => scene.remove(p.m)); parts.length = 0; clearDrops(scene);
   useMap(mapId); setupPads();
-  Object.assign(P, { drowned: false, burn: 0, vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, groundAt(0, 0, .35, floorY(0, 0)), 0); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, burn: 0, slowT: 0, vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, groundAt(0, 0, .35, floorY(0, 0)), 0); P.pos.lag = 0;
   if (spot) { P.pos.set(spot.x, spot.y ?? 0, spot.z); P.yaw = spot.yaw ?? 0; }
   wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = ''; resetRun();
   WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); cancelReload(); soundsOff(); newBest = false;

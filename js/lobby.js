@@ -196,7 +196,8 @@ const hf = { i: -1, rs: { rk: -1 } };
 const heroFx = [], fxGeo = new THREE.BoxGeometry(1, 1, 1);
 const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: .9, depthWrite: false });
 const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), flare: new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
-  beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }) };
+  beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }),
+  shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
 const heroCan = () => armOpen && inLobby && armPage === 'weapons' && hf.i >= 0 && holdK > .9;
 function heroFireStop() {
   hf.held = false; if (hf.beamM) hf.beamM.visible = false;
@@ -231,12 +232,13 @@ function heroShot() {
   }
   if (w.beam) {
     beamHeld = .12;
-    hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); lobbyScene.add(hf.beamM);
+    hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
+    if (w.shock && Math.random() < .25) sfx('zap', { v: .4 });
     hf.beamOn = .08; return;
   }
   sfx(w.id, { v: .5 }); hf.flash = .05;
   if (hf.spin) hf.spinV = 30;
-  const n = w.pellets > 1 ? 5 : 1, mat = w.rocket ? FX_MATS.rocket : w.flare ? FX_MATS.flare : TRACER_MAT, thick = w.rocket ? .09 : w.flare ? .06 : .02;
+  const n = w.pellets > 1 ? 5 : 1, mat = w.rocket ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
     const len = w.rocket || w.flare ? .6 : 3, m = new THREE.Mesh(fxGeo, mat);

@@ -1,7 +1,7 @@
 let stepT = 0, stepAlt = false; // footsteps
 let jumpWas = false; // double jump needs a fresh press
 const RL_C = 2 * Math.PI * 34; // reload ring length
-const runMul = w => mobMul(w) + youFx().spd + perk.spd * .1; // run speed: gun, boots and perks
+const runMul = w => (mobMul(w) + youFx().spd + perk.spd * .1) * slowMul(P); // run speed: gun, boots and perks, slowed by shocks
 
 // scope and holo sight overlay
 const RPX = () => Math.max(2, Math.round(innerHeight / 240));
@@ -72,6 +72,7 @@ function drawHolo(zoom) {
 drawScope('scope'); drawHolo(2);
 addEventListener('resize', () => { drawScope(scopeKind); drawHolo(holoZoom); });
 function update(dt) {
+  if (P.slowT > 0) P.slowT -= dt;
   const down = pvp() && dmDown(dt);
   const w = WEAPONS[cur];
   if (down) aimOn = false;
@@ -254,7 +255,8 @@ function update(dt) {
       continue;
     }
     // boss charge, dazed if it hits a wall
-    let spd = z.speed, hold = false;
+    if (z.slowT > 0) z.slowT -= dt;
+    let spd = z.speed * slowMul(z), hold = false;
     z.glow = 0;
     if (z.type === 'boss') {
       if (z.stun > 0) {

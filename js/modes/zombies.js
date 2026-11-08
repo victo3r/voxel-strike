@@ -254,6 +254,10 @@ const SHOP = [
   { gun: 'flare', price: 120, desc: 'one fiery shot that sets them on fire' },
   { gun: 'eradicator', price: 280, desc: '120 round bullet hose' },
   { gun: 'rocket', price: 450, desc: 'big splash damage' },
+  { gun: 'herosword', price: 110, desc: 'a bronze blade with a long reach' },
+  { gun: 'shockbeam', price: 180, desc: 'a beam that slows them down' },
+  { gun: 'tigerbite', price: 240, desc: `${BASE[gi('tigerbite')].dmg} dmg, 6 shot sniper` },
+  { gun: 'executioner', price: 260, desc: `laser pistol, ${BASE[gi('executioner')].dmg} dmg` },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
 // gun offers: one gun from each of a few categories, upgrades more likely

@@ -17,13 +17,15 @@ function recoilReset() { rec.tp = rec.ty = rec.p = rec.y = 0; }
 // tracers for your own shots
 const TRACER_SPD = 140, TRACER_LEN = 1.5, tracers = [], tracerPool = [];
 const tracerGeo = new THREE.BoxGeometry(1, 1, 1), tracerMat = new THREE.MeshBasicMaterial({ color: 0xffeab0, transparent: true, opacity: .4, depthWrite: false });
+const laserMat = new THREE.MeshBasicMaterial({ color: 0xd47bff, transparent: true, opacity: .9, depthWrite: false }); // Executioner bolts
 const trFrom = new THREE.Vector3(), trTo = new THREE.Vector3();
 let tracerN = 0;
-function tracerOk(w, k) { return !w.scope && (w.pellets > 1 ? k % 3 === 0 : w.id !== 'eradicator' || (tracerN++ & 1) === 0); }
-function tracer(from, to) {
+function tracerOk(w, k) { return w.laser || !w.scope && (w.pellets > 1 ? k % 3 === 0 : w.id !== 'eradicator' || (tracerN++ & 1) === 0); }
+function tracer(from, to, laser = false) {
   const len = from.distanceTo(to); if (len < TRACER_LEN + .5) return; // point blank: nothing to see
   const m = tracerPool.pop() || new THREE.Mesh(tracerGeo, tracerMat);
-  m.position.copy(from); m.lookAt(to); m.scale.set(.04, .04, TRACER_LEN);
+  m.material = laser ? laserMat : tracerMat;
+  m.position.copy(from); m.lookAt(to); m.scale.set(laser ? .07 : .04, laser ? .07 : .04, TRACER_LEN);
   scene.add(m); tracers.push({ m, from: from.clone(), dir: to.clone().sub(from).divideScalar(len), d: TRACER_LEN / 2, len });
 }
 function tracerTick(dt) {
@@ -57,7 +59,7 @@ function shoot() {
         ndc.set((Math.random() - .5) * spread * 2, (Math.random() - .5) * spread * 2);
         ray.setFromCamera(ndc, camera);
         const hit = ray.intersectObjects(targets, false)[0];
-        if (tracerOk(w, i)) tracer(trFrom, hit ? hit.point : ray.ray.at(60, trTo));
+        if (tracerOk(w, i)) tracer(trFrom, hit ? hit.point : ray.ray.at(60, trTo), w.laser);
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
         if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 0); }
@@ -110,22 +112,29 @@ function heatBeam(w) {
   const hit = ray2.intersectObjects(shotTargets(), false)[0];
   const end = hit ? hit.point : tmp.copy(camera.position).addScaledVector(fwd, w.range);
   const zz = hit?.object.userData.zombie;
-  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); }
-  if (hit && Math.random() < .35) burst(end, Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
-  showBeam(null, flashMesh.getWorldPosition(beamFrom), end);
+  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (w.shock) shockHit(zz); }
+  if (w.shock && Math.random() < .25) sfx('zap', { v: .6 });
+  if (hit && Math.random() < .35) burst(end, w.shock ? (Math.random() < .5 ? 0x8fe9ff : 0xffffff) : Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
+  showBeam(null, flashMesh.getWorldPosition(beamFrom), end, w.shock);
 }
 // beams on screen, one per shooter (null = you)
 const beamGeo = new THREE.BoxGeometry(1, 1, 1), beamFrom = new THREE.Vector3(), beams = new Map();
 const beamMats = [new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xfff4d0 })];
-function showBeam(by, from, to) {
+const shockMats = [new THREE.MeshBasicMaterial({ color: 0x4fc8ff, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xeefcff })];
+// shock beam: slows whoever it hits
+const SLOW_T = 2.5, SLOW_K = .85;
+const slowMul = o => (o?.slowT || 0) > 0 ? SLOW_K : 1;
+function shockHit(o) { o.slowT = SLOW_T; }
+function showBeam(by, from, to, shock = false) {
   let b = beams.get(by);
   if (!b) {
     const g = new THREE.Group();
     for (const [mat, s] of [[beamMats[0], 1], [beamMats[1], .4]]) { const m = new THREE.Mesh(beamGeo, mat); m.scale.set(s, s, 1); g.add(m); }
     scene.add(g); beams.set(by, b = { g, life: 0 });
   }
-  const len = from.distanceTo(to);
-  b.g.position.lerpVectors(from, to, .5); b.g.lookAt(to); b.g.scale.set(.055, .055, len);
+  const len = from.distanceTo(to), mats = shock ? shockMats : beamMats, w = shock ? .04 + Math.random() * .04 : .055; // electricity flickers
+  b.g.children[0].material = mats[0]; b.g.children[1].material = mats[1];
+  b.g.position.lerpVectors(from, to, .5); b.g.lookAt(to); b.g.scale.set(w, w, len);
   b.g.visible = true; b.life = .08;
 }
 function beamTick(dt) { for (const b of beams.values()) if (b.g.visible && (b.life -= dt) <= 0) b.g.visible = false; }
