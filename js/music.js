@@ -50,6 +50,8 @@ const LOBBY_SONGS = ['forest', 'resort', 'yard', 'sky'];
 let muWant = { kind: 'lobby', id: 0, seed: 1 },muNow = null, muId = 0, muOld = [];
 function musicLobby() { if (muWant.kind !== 'lobby') muWant = { kind: 'lobby', id: ++muId, seed: Math.random() * 1e9 | 0 }; }
 function musicMatch(map, kind) { muWant = { kind, song: SONGS[map] ? map : 'yard', id: ++muId, seed: Math.random() * 1e9 | 0 }; }
+// dip the music under a big sound for d seconds
+function musicDuck(d) { if (!MU || mutes.music) return; const t = ac.currentTime, g = MU.master.gain; g.cancelScheduledValues(t); g.setTargetAtTime(musicVol * .3, t, .04); g.setTargetAtTime(musicVol, t + d * .8, .35); }
 function musicEnd() { if (muNow && muNow.kind === 'dm') muNow.ended = true; }
 
 // drum kit

@@ -85,12 +85,17 @@ function update(dt) {
     const [ay, ap] = aaLook(-lx * ls, ly * ls, dt);
     P.yaw += ay; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch + ap));
   }
+  let tx = 0, tz = 0; // the speed you want, which your actual speed eases to (quick, but not an instant flip)
   if (mx || mz) {
-    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) * dt / len;
-    const dx = (mx * c + mz * s) * sp, dz = (-mx * s + mz * c) * sp;
-    walkTo(P.pos, P.pos.x + dx, P.pos.z, .35, P.onGround);
-    walkTo(P.pos, P.pos.x, P.pos.z + dz, .35, P.onGround);
+    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) / len;
+    tx = (mx * c + mz * s) * sp; tz = (-mx * s + mz * c) * sp;
   }
+  const ease = 1 - Math.exp(-MOVE_EASE * dt);
+  P.mvx += (tx - P.mvx) * ease; P.mvz += (tz - P.mvz) * ease;
+  if (Math.abs(P.mvx) + Math.abs(P.mvz) > .02) {
+    if (!walkTo(P.pos, P.pos.x + P.mvx * dt, P.pos.z, .35, P.onGround)) P.mvx = 0; // a wall stops you
+    if (!walkTo(P.pos, P.pos.x, P.pos.z + P.mvz * dt, .35, P.onGround)) P.mvz = 0;
+  } else P.mvx = P.mvz = 0;
   if (P.kx || P.kz) { // boss knockback
     const kx = P.kx * dt, kz = P.kz * dt;
     walkTo(P.pos, P.pos.x + kx, P.pos.z, .35, false);

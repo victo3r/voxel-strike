@@ -65,10 +65,13 @@ ICON_PIX.xp = outlined(['..lllgggddd..', '.llllgggdddd.', 'lllllgggddddd', 'gggg
   const bone = { b: '#eeeae0', s: '#b9b3a6', e: '#1a1a1a', k: '#1a1a1a' };
   ICON_PIX.s_k2 = outlined(side(SK, SK), bone);
   ICON_PIX.s_k3 = outlined([...pad(SK, 5), ...side(SK, SK)], bone);
-  ICON_PIX.s_k4 = outlined(['.g.........g.', '.gg.......gg.', '..ggggggggg..', '.ggggggggggg.', 'ggyykgggyykgg', 'ggyykgggyykgg', 'ggggggggggggg', 'gkkkkkkkkkkkg', 'gkwkkwkwkkwkg', 'gkkkkkkkkkkkg', '.ggggggggggg.', '..ggggggggg..'],
-    { g: '#5fc94a', y: '#ffe14a', k: '#1a1a1a', w: '#ffffff' });
-  ICON_PIX.s_ace = outlined(['yyyyyyyyyyy', 'yrwwwwwwwwy', 'ywwwwwwwwwy', 'ywwwwrwwwwy', 'ywwwrwrwwwy', 'ywwwrwrwwwy', 'ywwrwwwrwwy', 'ywwrrrrrwwy', 'ywrwwwwwrwy', 'ywrwwwwwrwy', 'ywwwwwwwwwy', 'ywwwwwwwwry', 'yyyyyyyyyyy'],
-    { y: '#ffc933', w: '#fbf7ee', r: '#d8433b' });
+  ICON_PIX.s_k4 = outlined(['h...........h', 'hh.........hh', '.hhggggggghh.', '.ggggggggggg.', 'ggkkgggggkkgg', 'ggggkkgkkgggg', 'gggeegggeeggg', 'ggggggggggggg', 'gkwkwkwkwkwkg', 'gkkkkkkkkkkkg', 'gkkwkwkwkwkkg', '.gkkkkkkkkkg.', '..ggggggggg..'],
+    { g: '#3f8f2e', h: '#e8dfc8', k: '#140a0a', e: '#ff2a2a', w: '#ffffff' }); // horns, angry brows, red eyes, fangs
+  { // ace: pilot's wings round a target
+    const L = ['.........', 'ddd......', 'yyyyd....', '.lyyyyd..', '..lyyyyyd', '...lyyyyy', '....llyyy', '......lly', '.........'];
+    const C = ['..d..', '.dyd.', 'dyryd', 'yrwry', 'dyryd', '.dyd.', '..d..', '.....', '.....'];
+    ICON_PIX.s_ace = outlined(L.map((l, i) => l + C[i] + [...l].reverse().join('')), { y: '#ffc933', l: '#fff0a0', d: '#e09a12', r: '#d8433b', w: '#ffffff' });
+  }
   const FL = ['.....r.....', '....rr.....', '....rrr..r.', '...rrnr..rr', '..rrnnrr.rr', '..rnnnnrrrr', '.rrnnynnnrr', '.rnnyyynnr.', 'rrnyylyynrr', 'rnnyllllynr', 'rnyylllyynr', '.rnyyyyynr.', '..rrnnnrr..'];
   ICON_PIX.s_fury = outlined(FL, { r: '#d8331b', n: '#ff8a1e', y: '#ffd23f', l: '#fff6c8' });
   ICON_PIX.s_rampage = outlined(['h...........h', 'hh.........hh', '.hh.bbbbbbbhh', '..hbbbbbbbbs.', '..bbbbbbbbbs.', '..bbeebeebbs.', '..bbeebeebbs.', '..bbbbkbbbbs.', '...bbbbbbbs..', '....bkbkbs...', '....bbbbss...'].map(r => r.slice(0, 13)),

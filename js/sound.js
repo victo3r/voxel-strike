@@ -444,24 +444,24 @@ const SOUNDS = {
   }],
 
   // big kill streaks
-  streak_ace: [1.2, .7, s => { // a brass fanfare
+  streak_ace: [1.2, 1, s => { // a brass fanfare
     s.tone({ f: 110, f2: 45, d: .2, v: .9 });
     for (const [t, fs, d] of [[0, [392, 494], .12], [.12, [523, 659], .12], [.24, [523, 659, 784, 1046], .75]]) for (const f of fs) s.tone({ type: 'sawtooth', f, t, a: .01, d, v: .22, lp: 2600 });
     s.hiss({ ft: 'highpass', f: 6000, t: .24, a: .05, d: .6, v: .25 });
   }],
-  streak_fury: [1.5, .75, s => { // fire whoosh and a power chord
+  streak_fury: [1.5, 1, s => { // fire whoosh and a power chord
     s.hiss({ ft: 'bandpass', f: 300, f2: 3000, q: 1.2, a: .25, d: .5, v: .8 });
     s.tone({ f: 90, f2: 40, t: .22, d: .3, v: 1 });
     for (const f of [165, 247, 330, 494]) s.tone({ type: 'sawtooth', f, t: .22, a: .01, d: 1, v: .2, lp: 1800 });
     s.arp(.3, [659, 880, 1318], { type: 'square', gap: .07, d: .3, v: .12 });
   }],
-  streak_rampage: [1.7, .8, s => { // a heavy double hit, a gritty riff and a growl
+  streak_rampage: [1.7, 1, s => { // a heavy double hit, a gritty riff and a growl
     for (const t of [0, .14]) { s.tone({ f: 120, f2: 35, t, d: .28, v: 1 }); s.hiss({ f: 900, t, d: .12, v: .7 }); }
     [110, 110, 131, 147, 165].forEach((f, i) => { s.tone({ type: 'square', f, t: .3 + i * .1, a: .005, d: .12, v: .25, lp: 1400 }); s.tone({ type: 'sawtooth', f: f * 2, t: .3 + i * .1, a: .005, d: .12, v: .12, lp: 2400 }); });
     s.tone({ type: 'sawtooth', f: 70, f2: 150, t: .8, a: .05, d: .7, v: .35, lp: 900 });
     s.hiss({ ft: 'highpass', f: 4000, t: .8, a: .01, d: .8, v: .35 });
   }],
-  streak_violence: [2.4, .85, s => { // a huge boom, a dark choir chord and a scream of noise
+  streak_violence: [2.4, 1, s => { // a huge boom, a dark choir chord and a scream of noise
     s.tone({ f: 70, f2: 28, d: .9, v: 1 }); s.hiss({ f: 500, d: .5, v: .9 });
     s.ring({ f: 95, t: .02, d: 1.6, v: .5 });
     for (const f of [147, 175, 220, 294, 349]) { s.tone({ type: 'sawtooth', f, t: .1, a: .3, d: 1.6, v: .14, lp: 1500 }); s.tone({ type: 'sawtooth', f: f * 1.006, t: .1, a: .3, d: 1.6, v: .1, lp: 1500 }); }

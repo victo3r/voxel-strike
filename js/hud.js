@@ -118,8 +118,10 @@ const STREAK_SND = { 5: 'streak_ace', 10: 'streak_fury', 20: 'streak_rampage', 5
 let killNoteT;
 function killNotice(text, streak, head) {
   const el = $('killNote'), st = STREAKS[streak], k = st && STREAK_ICON[streak];
-  el.innerHTML = (st ? `<div class="ki">${ico('s_' + k)}</div><div class="kn">${st[1]}!</div>` : '') + `<div class="kt">${text}</div>`;
+  el.innerHTML = (st ? `<div class="ki">${ico('s_' + k)}</div><div class="kn">${st[1]}</div>` : '') + `<div class="kt">${text}</div>`;
   el.className = ''; void el.offsetWidth; el.className = 'show' + (k ? ' k-' + k : '');
   clearTimeout(killNoteT); killNoteT = setTimeout(() => el.className = el.className.replace('show', 'gone'), streak >= 10 && st ? 2600 : 1500);
-  sfx(STREAK_SND[streak] && st ? STREAK_SND[streak] : head || st ? 'killSpecial' : 'kill');
+  const big = st && STREAK_SND[streak];
+  if (big) { sfx(big, { v: 1.5 }); musicDuck(BUF[big]?.buf.duration ?? 1.5); } // over the music, which is loud by then
+  else sfx(head || st ? 'killSpecial' : 'kill');
 }

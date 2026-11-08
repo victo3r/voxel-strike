@@ -441,7 +441,7 @@ net = (() => {
   function warped(m) {
     if (m.by) { const b = remotes.get(m.by)?.body; if (b && !b.dead) { b.g.position.set(m.x, m.y, m.z); b.g.position.lag = 0; b.vy = 0; b.lx = b.lz = 0; } return; }
     if (!alive) return;
-    P.pos.set(m.x, m.y, m.z); P.pos.lag = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0;
+    P.pos.set(m.x, m.y, m.z); P.pos.lag = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = P.mvx = P.mvz = 0;
   }
   // room bots: one player hosts their AI, the server owns their health
   const hostedOf = by => { const r = by && by.pid ? remotes.get(by.pid) : null; return r && r.rec.hostBot && r.body ? r : null; };
