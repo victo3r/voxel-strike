@@ -567,7 +567,7 @@ function vmArm(left, box, dir, low = 0, at = null) { // at: fist this far out al
   return piv;
 }
 // arm directions per hold
-const X_V = new THREE.Vector3(1, 0, 0), meleeUp = w => w.tilt ? .8 : .22; // how far first person tips a melee weapon up
+const X_V = new THREE.Vector3(1, 0, 0), meleeUp = w => w.tilt ? 1.2 : .22; // how far first person tips a melee weapon up
 const VM_ARMS = {
   pistol: [[.15, -.2, 1, .3]], rifle: [[.2, -.25, 1, .5], [-.35, -.3, 1, .6]], heavy: [[.25, -.25, 1, .4], [-.4, -.3, 1, .3]],
   shoulder: [[.2, -.25, 1, .5], [-.35, -.3, 1, .5]], melee: [[.15, -.15, 1, 0]],
@@ -577,8 +577,8 @@ function buildGun() {
   vm.clear(); flashMesh.visible = false;
   const { muzzle: [my, mz], grip, fore, spin, round, mag, holo } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
   gunSpin = spin; gunRound = round; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
-  const hand = WEAPONS[cur].tilt ? { ...grip, c: new THREE.Vector3(.01, 0, .05).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])).add(new THREE.Vector3(grip.c[0], grip.c[1], grip.c[2] - 7 * gunPx(cur))).toArray() } : grip; // a sword's fist goes up under the guard, where you can see it
-  if (WEAPONS[cur].tilt) vmArm(false, hand, new THREE.Vector3(.25, -1, .15).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])), 0, 0); // a sword: fist over the handle, forearm almost straight down
+  const hand = WEAPONS[cur].tilt ? { ...grip, c: [grip.c[0], grip.c[1], grip.c[2] - 5 * gunPx(cur)] } : grip; // a sword's fist goes up under the guard
+  if (WEAPONS[cur].tilt) vmArm(false, hand, new THREE.Vector3(.7, -.35, .6).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])), 0, 0); // a sword stands up, the handle across the fist, forearm to the bottom right
   else vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
   gunArmL = fore && arms[1] ? vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]) : null;
   // one-handed guns: the left hand only shows up to reload

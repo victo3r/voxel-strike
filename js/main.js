@@ -155,7 +155,7 @@ function update(dt) {
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
   if (w.melee) { // knife swing
     const c = kick > 0 ? knifeChopFP(1 - kick) : 0;
-    const up = meleeUp(w), lo = w.tilt ? .06 : 0; // swords stand up, lower in the hand
+    const up = meleeUp(w), lo = w.tilt ? .12 : 0; // swords stand up, lower in the hand
     vm.rotation.set(up + c * .95, Math.abs(c) * .2, -c * .4);
     knifeRest.set(up, 0, 0); _kp.copy(KNIFE_PIV).applyEuler(knifeRest); _kq.copy(KNIFE_PIV).applyEuler(vm.rotation);
     vm.position.set(.3 + lo * .3 + Math.min(0, c) * .18, -.22 - lo + bob + Math.max(0, c) * .1, -.5 - lo).add(_kp).sub(_kq);

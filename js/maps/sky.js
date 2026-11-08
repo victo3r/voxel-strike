@@ -320,14 +320,25 @@ const waters = [];
 }
 // things standing on the ground
 const gy = (x, z) => hAt(x, z);
-// the ruin on the west island: pillars, broken walls, a roof you can climb on
+// the ruin on the west island: snapped pillars, broken walls, what's left of the roof (climb the steps, jump the gaps)
 {
-  const RX = -21, RZ = 10, y = gy(RX, RZ);
-  for (const [x, z, h] of [[-4, -3, 4.2], [4, -3, 4.2], [-4, 3, 3.1], [4, 3, 4.2], [0, -3, 2.2]]) addSlab(RX + x, RZ + z, 1, 1, y, y + h, stone);
-  addSlab(RX - 1, RZ - 3, 4, .8, y, y + 1.6, stone); addSlab(RX + 2.4, RZ + 3, 2.2, .8, y, y + 1.2, stone); addSlab(RX + 4, RZ, .8, 3, y, y + 1.1, stone);
-  addSlab(RX, RZ - 1.5, 9, 4, y + 4.2, y + 4.7, stone); // the roof
+  const RX = -21, RZ = 10, y = gy(RX, RZ), R = y + 4.2;
+  const moss = lam({ map: tex(g => { noise(g, [86, 140, 64], 22); }) });
+  const mossOn = (x, z, w, d, top) => { const m = box(w, .05, d, moss); m.position.set(RX + x, top + .025, RZ + z); detail(m); add(m); };
+  for (const [x, z, h] of [[-4, -3, 4.2], [4, -3, 4.2], [4, 3, 4.2], [-4, 3, 2.3], [0, -3, 1.4], [0, 3, .9]]) {
+    addSlab(RX + x, RZ + z, 1, 1, y, y + h, stone);
+    if (h > 4) addSlab(RX + x, RZ + z, 1.4, 1.4, R - .35, R, stone); // capstone
+    else addSlab(RX + x + .1, RZ + z - .1, .7, .7, y + h, y + h + .3, rock); // jagged break
+  }
+  addSlab(RX - 2.6, RZ - 2.6, 4, 2, R, R + .5, stone); mossOn(-3, -2.4, 1.6, 1.2, R + .5); // roof left on the west pillar
+  addSlab(RX + 1.6, RZ - 3, 1.6, 1.2, R, R + .4, stone); // a chunk of beam, a jump either side
+  addSlab(RX + 4, RZ, 1.6, 7.6, R, R + .5, stone); addSlab(RX + 4, RZ + 2.6, 1.2, 1.4, R + .5, R + .9, rock); mossOn(4, -1.5, 1, 2.4, R + .5); // the east beam, some rubble on it
+  // broken walls, stepping down where they crumbled
+  for (const [x, z, w, d, h] of [[-2.6, -3, 1.6, .8, 1.8], [-1.1, -3, 1.4, .8, 1.1], [2.6, 3, 1.4, .8, 1.5], [1.6, 3, .8, .8, .7], [4, -.6, .8, 1.6, 1.2], [4, .9, .8, 1.4, .6]]) addSlab(RX + x, RZ + z, w, d, y, y + h, stone);
+  // fallen roof slabs and rubble
+  for (const [x, z, w, d, h, r] of [[.6, .4, 2.6, 1.8, .45, .3], [-1.8, 1.6, 1.4, 1, .35, -.5], [2.2, -1.2, 1, .8, .5, .8]]) addSlab(RX + x, RZ + z, w, d, y, y + h, stone).rotation.y = r;
   for (let k = 0; k < 9; k++) addSlab(RX - 5.5, RZ + 3 - k * .75, 1, .75, y, y + .5 + k * .5, stone); // steps up to it
-  for (const [x, z, s] of [[-6.5, 5, .9], [6, -4.5, .8], [-2, 6, .7]]) addSlab(RX + x, RZ + z, s, s, y, y + s, stone);
+  for (const [x, z, s] of [[-6.5, 5, .9], [6, -4.5, .8], [-2, 6, .7]]) addSlab(RX + x, RZ + z, s, s, y, y + s, rock);
 }
 // standing stones on the middle island, a broken arch on the north one
 for (const [x, z, h] of [[-3, -1, 2.6], [4, 4, 2], [-3, 5, 2.4]]) { const y = gy(x, z); addSlab(x, z, 1, 1.2, y, y + h, stone); }
