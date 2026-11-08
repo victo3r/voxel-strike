@@ -28,6 +28,8 @@ const ICON_PIX = {
     '...oooooooooooo', '..ollllpplllloo', '.olllllllllloso', 'oooooooooooosso', 'owwwwwwwwwwosso', 'owppwwwwppwosso',
     'owppwwwwppwosqo', 'owwwwwwwwwwosso', 'owwwwppwwwwosso', 'owwwwppwwwwosso', 'owwwwwwwwwwosqo', 'owppwwwwppwosso',
     'owppwwwwppwoso.', 'owwwwwwwwwwoo..', 'oooooooooooo...'] },
+  key: { pal: { o: '#1a1408', y: '#ffc933', l: '#fff0a0', d: '#e09a12' }, rows: [
+    '.oooo.........', 'ollllo........', 'oyooyooooooooo', 'oyooylllllllyo', 'oddddooooddodo', '.oooo...oddodo', '........oooooo'] },
 };
 // hollow star for ones you don't own yet
 ICON_ART.starO = ICON_ART.star.map((row, y, a) => [...row].map((ch, x) => ch === '#' && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dy]) => a[y + dy]?.[x + dx] !== '#') ? '#' : '.').join(''));

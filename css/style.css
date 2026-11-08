@@ -309,7 +309,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #dailyBox button:hover:not(:disabled){background:var(--hov)}#dailyBox button:disabled{opacity:.5;cursor:default}
 #dailyBox button.go{background:rgba(36,170,98,.85);font-size:18px}
 #boostBtn.on{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.6),4px 4px 0 rgba(0,0,0,.4)}
-#boost,#daily,#lb,#card{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
+#boost,#daily,#chests,#lb,#card{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
 #boostBox{display:flex;flex-direction:column;gap:10px;width:min(360px,90vw);padding:20px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #boostBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}#boostBox p{margin:0;color:var(--muted);font-size:15px}
 #boostBox .bn{font-size:17px}#boostBox p.be{text-align:center;color:#ffd75e;font-size:14px}#boostBox .bn b{color:#ffd75e;font-size:22px}
@@ -522,3 +522,38 @@ body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:
 #privacy p{margin:0;max-width:560px;font-size:14px;line-height:1.5;color:var(--silver)}
 #privacy p b{color:#fff}
 #privacy .when{color:var(--muted);font-size:12px}
+/* chests */
+#keyBtn{height:clamp(48px,7vmin,64px);box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 14px;font:bold clamp(17px,2.6vmin,22px) monospace;color:#fff;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);text-shadow:2px 2px 0 #000}
+#keyBtn:hover{background:var(--hov)}#keyBtn.ready{border-color:#ffd75e}
+#chestBox{display:flex;flex-direction:column;gap:12px;width:min(820px,96vw);max-height:94vh;box-sizing:border-box;padding:20px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
+#chestBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000;display:flex;align-items:center;gap:10px}
+#chestBox h1 .kn{margin-left:auto;color:#fff;font-size:22px}
+#chestBox p{margin:0;color:var(--muted);font-size:15px}
+#chestBox .row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#chestBox .chest{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 8px;border:3px solid var(--line-dim);background:rgba(0,0,0,.25);cursor:pointer}
+#chestBox .chest:hover{background:rgba(255,255,255,.06)}
+#chestBox .chest.sel{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.45)}
+#chestBox .chest img{width:96px;image-rendering:pixelated;filter:drop-shadow(4px 4px 0 rgba(0,0,0,.45))}
+#chestBox .chest b{font-size:15px}
+#chestBox button{font:bold 16px monospace;padding:10px;color:#fff;background:var(--glass);border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
+#chestBox button:hover:not(:disabled){background:var(--hov)}#chestBox button:disabled{opacity:.5;cursor:default}
+#chestBox button.go{background:rgba(36,170,98,.85)}
+#chestBox .chest button{width:100%}
+#chestBox .lootHead{font-size:14px;color:var(--muted)}
+#chestBox .lootRow{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px}
+#chestBox .btns{display:flex;gap:10px}#chestBox .btns button{flex:1}
+.loot{position:relative;flex:0 0 118px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;border:3px solid var(--rc);background:linear-gradient(180deg,rgba(0,0,0,.15),color-mix(in srgb,var(--rc) 22%,transparent));text-align:center}
+.loot .pic{height:52px;display:flex;align-items:center;justify-content:center}
+.loot .pic img{width:100px;height:50px;object-fit:contain;image-rendering:pixelated}
+#chestBox .reveal.open .loot .pic{height:84px}#chestBox .reveal.open .loot .pic img{width:170px;height:80px}
+.loot .lc{font-size:36px;font-weight:bold}.loot .lx{color:#7fd7ff;font-size:30px}.loot .ls{color:#ffd75e;font-size:26px}
+.loot b{font-size:12px;line-height:1.2}.loot small{font-size:10px;color:var(--rc)}
+.loot>i{font-style:normal;font-size:13px;color:#fff}
+#chestBox .reveal{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0}
+#chestBox .reveal .big{width:180px;image-rendering:pixelated;filter:drop-shadow(6px 6px 0 rgba(0,0,0,.45))}
+#chestBox .reveal.shake .big{animation:chestShake .9s ease-in}
+#chestBox .reveal.open .big{display:none}
+#chestBox .reveal.open .loot{flex-basis:auto;width:200px;transform:scale(1.25);margin:24px 0;animation:lootPop .35s ease-out;box-shadow:0 0 30px var(--rc)}
+@keyframes chestShake{0%,100%{transform:none}20%{transform:rotate(-4deg)}40%{transform:rotate(4deg) scale(1.04)}60%{transform:rotate(-6deg) scale(1.08)}80%{transform:rotate(6deg) scale(1.12)}}
+@keyframes lootPop{from{transform:scale(.3);opacity:0}to{transform:scale(1.25);opacity:1}}
+#rewards .ky{color:#ffd75e}

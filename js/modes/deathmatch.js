@@ -824,8 +824,11 @@ function endMatch(results) {
   $('postPlace').textContent = MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
   $('postBoard').innerHTML = boardHTML();
   const won = results ? results.won : MR.team ? lead > 0 : place === 1;
+  const key = !!results && !results.priv && place === 1; // keys come from public online wins
+  if (key) prof.keys = (prof.keys | 0) + 1;
   const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp } = grant(xp, gold); // doubled with a booster
-  $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ${COIN}</span>${boostTag()}</div>`
+  $('rewards').innerHTML = `<div class="rw"><span class="rx">+${xp} XP</span><span class="pc">+${gold} ${COIN}</span>${key ? `<span class="ky">+1 ${ico('key')}</span>` : ''}${boostTag()}</div>`
+    + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
     + (ups ? `<div class="lvup">LEVEL UP! LVL ${prof.lv} · +${bonus} ${COIN} · +${boostUp} ${ico('bolt')}</div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex';

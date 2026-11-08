@@ -1,5 +1,5 @@
 // daily reward: a 7 day streak, miss a day and it starts over
-const DAILY = [{ c: 10 }, { b: 1 }, { c: 20 }, { b: 2 }, { c: 30 }, { b: 2 }, { c: 50, b: 3 }];
+const DAILY = [{ c: 10 }, { b: 1 }, { c: 20, k: 1 }, { b: 2 }, { c: 30 }, { b: 2, k: 1 }, { c: 50, b: 3, k: 2 }];
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dayBefore = () => { const d = new Date(); d.setDate(d.getDate() - 1); return dayKey(d); };
 // today's streak day, and whether the streak was lost
@@ -9,11 +9,11 @@ function dailyNow() {
   const goesOn = d.last === dayBefore() && (d.streak | 0) < DAILY.length;
   return { claimed: false, day: goesOn ? (d.streak | 0) + 1 : 1, lost: !!d.last && d.last !== dayBefore() && (d.streak | 0) > 1 };
 }
-const dailyGift = r => [r.c ? `<span class="pc">${COIN}${r.c}</span>` : '', r.b ? `<span class="bz">${ico('bolt')}${r.b}</span>` : ''].join('');
+const dailyGift = r => [r.c ? `<span class="pc">${COIN}${r.c}</span>` : '', r.b ? `<span class="bz">${ico('bolt')}${r.b}</span>` : '', r.k ? `<span class="bz">${ico('key')}${r.k}</span>` : ''].join('');
 function claimDaily() {
   const s = dailyNow(); if (s.claimed) return;
   const r = DAILY[s.day - 1];
-  prof.coins += r.c || 0; prof.earned = (prof.earned ?? 0) + (r.c || 0); prof.boosts = (prof.boosts | 0) + (r.b || 0);
+  prof.coins += r.c || 0; prof.earned = (prof.earned ?? 0) + (r.c || 0); prof.boosts = (prof.boosts | 0) + (r.b || 0); prof.keys = (prof.keys | 0) + (r.k || 0);
   prof.daily = { last: dayKey(), streak: s.day };
   saveProf(); showProf(); sfx('buy');
 }

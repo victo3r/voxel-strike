@@ -29,5 +29,6 @@ function showProf() { // lobby level badge and coins
   $('prof').innerHTML = `<div class="lv"><b>LVL ${prof.lv}</b>${xpBar()}<small>${xpText()}</small></div>`;
   $('lobbyCoins').innerHTML = COIN + prof.coins;
   if (typeof renderBoost === 'function') renderBoost();
+  if (typeof renderChests === 'function') renderChests();
 }
 showProf();

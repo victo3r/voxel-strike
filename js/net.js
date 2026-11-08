@@ -1,5 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
+const GEN_MSG = "That room's on a different version of the game";
+const NET_GEN = 2; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -77,7 +79,7 @@ net = (() => {
     return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load };
   }
   function hello(rejoin = null) {
-    const m = { t: 'hello', v: NET_V, build: NET_BUILD, name: myName, look: prof.look, gear: myGear() };
+    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: prof.look, gear: myGear() };
     if (auth?.token) m.token = auth.token; else m.guest = guestId;
     if (rejoin) m.rejoin = rejoin;
     send(m);
@@ -108,15 +110,16 @@ net = (() => {
       r = await fetchJson('/play/code/' + o.code);
       if (r.status === 404 || r.status === 422) throw new Error('No room with that code');
       if (!r.room) throw new Error('Could not look up that code');
+      if ((r.gen || 1) !== NET_GEN) throw new Error(GEN_MSG);
       o.mode = r.mode; o.map = r.map;
     } else if (o.create) {
-      r = await fetchJson('/play/private', { method: 'POST', body: JSON.stringify({ mode: o.mode, map: o.map }) });
+      r = await fetchJson('/play/private', { method: 'POST', body: JSON.stringify({ mode: o.mode, map: o.map, gen: NET_GEN }) });
       if (!r.room) throw new Error(r.error || 'Could not make a room');
       o.code = r.code;
     } else if (o.room) { // a public room by name (a friend's, or PLAY AGAIN)
       r = { room: o.room };
     } else {
-      r = await fetchJson(`/play/find?mode=${encodeURIComponent(o.mode)}&map=${encodeURIComponent(o.map)}&not=${job.not.join(',')}`);
+      r = await fetchJson(`/play/find?mode=${encodeURIComponent(o.mode)}&map=${encodeURIComponent(o.map)}&not=${job.not.join(',')}&gen=${NET_GEN}`);
       if (!r.room) throw new Error(r.error || 'No room found');
     }
     if (job.dead) return;
@@ -161,7 +164,7 @@ net = (() => {
         if (job.o.room) { job.o.room = null; netToast('That room is full, finding another', 3000); } else job.not.push(room);
         findRoom(job).catch(e => fail(job, e?.message || 'No room found')); return;
       }
-      const why = { 4000: 'The game was updated, reload the page to play online', 4001: 'That room is full', 4002: 'The server did not like that request', 4003: 'You were removed from that room', 4005: 'You joined from another tab' }[codeNum];
+      const why = { 4000: 'The game was updated, reload the page to play online', 4001: 'That room is full', 4002: 'The server did not like that request', 4003: 'You were removed from that room', 4005: 'You joined from another tab', 4006: GEN_MSG }[codeNum];
       fail(job, why || 'Could not connect');
       return;
     }
