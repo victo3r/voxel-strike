@@ -97,7 +97,7 @@ function settle(o, dt) {
 // player state
 const ARMOR_CAP = 150; // max armor with zombie shop plates
 const P = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, onGround: true, kx: 0, kz: 0, mvx: 0, mvz: 0 };
-const MOVE_EASE = 14; // how fast your speed catches up with the keys
+const MOVE_EASE = 11; // how fast your speed catches up with the keys
 // offline stand-in for online play (net.js replaces it)
 let net = { on: false, host: false, serverPads: false, claim() {}, burn() {}, shot() {}, launch() { return 0; }, boom() {}, ev() {}, matchTick() {}, banner: '', again() {}, leave() {}, roster() {}, applyRemote() {}, pick() {} };
 const keys = {};

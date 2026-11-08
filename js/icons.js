@@ -76,7 +76,7 @@ ICON_PIX.xp = outlined(['..lllgggddd..', '.llllgggdddd.', 'lllllgggddddd', 'gggg
   ICON_PIX.s_fury = outlined(FL, { r: '#d8331b', n: '#ff8a1e', y: '#ffd23f', l: '#fff6c8' });
   ICON_PIX.s_rampage = outlined(['h...........h', 'hh.........hh', '.hh.bbbbbbbhh', '..hbbbbbbbbs.', '..bbbbbbbbbs.', '..bbeebeebbs.', '..bbeebeebbs.', '..bbbbkbbbbs.', '...bbbbbbbs..', '....bkbkbs...', '....bbbbss...'].map(r => r.slice(0, 13)),
     { h: '#efe6cf', b: '#c9302c', s: '#8a1c1a', e: '#ffd23f', k: '#1a1a1a' });
-  ICON_PIX.s_violence = outlined([...pad(['..r...r...r', '.rnr.rnr.rn', 'rnynrnynrny'], 1, 1), ...pad(SK, 2)].map(r => r.padEnd(13, '.').slice(0, 13)),
+  ICON_PIX.s_violence = outlined([...pad(['.r...r...r.', 'rnr.rnr.rnr', 'nynnnynnnyn'], 1, 1), ...pad(SK, 2)].map(r => r.padEnd(13, '.').slice(0, 13)),
     { r: '#c4122f', n: '#ff4a8a', y: '#ffd0e8', b: '#3a1840', s: '#24102a', e: '#ff2a4a', k: '#ff2a4a' });
 }
 {

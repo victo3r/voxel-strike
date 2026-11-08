@@ -48,7 +48,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 @keyframes knShake{0%{transform:translate(0,0)}25%{transform:translate(-3px,1px) rotate(-3deg)}50%{transform:translate(2px,-2px) rotate(2deg)}75%{transform:translate(-1px,2px) rotate(-1deg)}100%{transform:translate(0,0)}}
 #killNote.k-violence .ki{font-size:60px}#killNote .ki .ic{position:relative;z-index:1}#killNote.k-violence .ki .ic{animation:knPulse .5s ease-in-out infinite}
 @keyframes knPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 6px #ff2a4a)}50%{transform:scale(1.15);filter:drop-shadow(0 0 22px #ff3bd0)}}
-#killNote.k-violence .ki::before,#killNote.k-violence .ki::after{content:'';position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border:4px solid #ff3bd0;box-shadow:0 0 12px #ff2a4a;animation:knRing .9s ease-out infinite}
+#killNote.k-violence .ki::before,#killNote.k-violence .ki::after{content:'';position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;box-sizing:border-box;border:4px solid #ff3bd0;box-shadow:0 0 12px #ff2a4a;animation:knRing .9s ease-out infinite}
 #killNote.k-violence .ki::after{animation-delay:.45s}
 @keyframes knRing{from{transform:scale(.4) rotate(45deg);opacity:1}to{transform:scale(3.2) rotate(45deg);opacity:0}}
 #killNote.k-violence .kn{font-size:30px;color:#ff3bd0;animation:knText .6s ease-in-out infinite}

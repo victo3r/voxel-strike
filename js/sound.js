@@ -455,11 +455,11 @@ const SOUNDS = {
     for (const f of [165, 247, 330, 494]) s.tone({ type: 'sawtooth', f, t: .22, a: .01, d: 1, v: .2, lp: 1800 });
     s.arp(.3, [659, 880, 1318], { type: 'square', gap: .07, d: .3, v: .12 });
   }],
-  streak_rampage: [1.7, 1, s => { // a heavy double hit, a gritty riff and a growl
-    for (const t of [0, .14]) { s.tone({ f: 120, f2: 35, t, d: .28, v: 1 }); s.hiss({ f: 900, t, d: .12, v: .7 }); }
-    [110, 110, 131, 147, 165].forEach((f, i) => { s.tone({ type: 'square', f, t: .3 + i * .1, a: .005, d: .12, v: .25, lp: 1400 }); s.tone({ type: 'sawtooth', f: f * 2, t: .3 + i * .1, a: .005, d: .12, v: .12, lp: 2400 }); });
-    s.tone({ type: 'sawtooth', f: 70, f2: 150, t: .8, a: .05, d: .7, v: .35, lp: 900 });
-    s.hiss({ ft: 'highpass', f: 4000, t: .8, a: .01, d: .8, v: .35 });
+  streak_rampage: [1.7, 1, s => { // three war drums, then a power chord with a roar under it
+    for (const t of [0, .16, .32]) { s.tone({ f: 150, f2: 55, t, d: .3, v: 1 }); s.clack({ t, f: 900, d: .02, v: .6, body: 1.2 }); }
+    for (const f of [110, 165, 220]) { s.tone({ type: 'sawtooth', f, t: .5, a: .01, d: 1, v: .22, lp: 1400 }); s.tone({ type: 'square', f: f * 1.004, t: .5, a: .01, d: 1, v: .1, lp: 1000 }); }
+    s.tone({ f: 110, f2: 40, t: .5, d: .4, v: 1 });
+    s.voice({ t: .52, h: .02, d: .55, f0: 95, fpk: 135, pk: .25, f1: 70, rough: .6, rough2: .85, breath: .5, tail: .15, v: .8 });
   }],
   streak_violence: [2.4, 1, s => { // a huge boom, a dark choir chord and a scream of noise
     s.tone({ f: 70, f2: 28, d: .9, v: 1 }); s.hiss({ f: 500, d: .5, v: .9 });

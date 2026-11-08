@@ -493,7 +493,7 @@ function botAlert(b, x, z, err) { b.alertYaw = Math.atan2(x - b.g.position.x, z 
 function botMind(b) {
   Object.assign(b, { noSeeT: 0, gazeT: 0, gazeYaw: 0, gazePitch: 0, alertT: 0, alertYaw: 0, idle: 0, idleNext: 20 + Math.random() * 70, roam: null,
     lk: { x: 0, y: 0, z: 0 }, mvYaw: b.aimYaw, wob: 0, wobWant: 0, wobT: 0, turnSpd: 0, lookWas: b.aimYaw, heardAt: performance.now(), t0: Math.random() * 100,
-    rest: 0, restNext: 3 + Math.random() * 8, vx: 0, vz: 0 });
+    rest: 0, restNext: 3 + Math.random() * 8, vx: 0, vz: 0, mvx: 0, mvz: 0 });
 }
 
 function nearPad(pos, range) {
@@ -735,9 +735,13 @@ function updateBot(b, dt) {
     mx = Math.sin(b.mvYaw) * m0; mz = Math.cos(b.mvYaw) * m0;
   } else if (Math.hypot(mx, mz) > .05) b.mvYaw = Math.atan2(mx, mz);
   if (b.leap) { if (!b.vy || (b.leap.t -= dt) <= 0) b.leap = null; else { mx = b.leap.x; mz = b.leap.z; } } // mid-jump over a gap
-  const ml = Math.hypot(mx, mz);
-  if (ml > .05) {
-    const s = (b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd) * slowMul(b)) * dt / ml; mx *= s; mz *= s;
+  const ml = Math.hypot(mx, mz), spd = b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd) * slowMul(b);
+  const tx = ml > .05 ? mx / ml * spd : 0, tz = ml > .05 ? mz / ml * spd : 0;
+  if (b.leap) { b.mvx = tx; b.mvz = tz; } // a jump keeps its line
+  else { const e = 1 - Math.exp(-MOVE_EASE * dt); b.mvx += (tx - b.mvx) * e; b.mvz += (tz - b.mvz) * e; } // eases into a new direction like a player
+  const mv = Math.hypot(b.mvx, b.mvz);
+  if (mv > .05) {
+    mx = b.mvx * dt; mz = b.mvz * dt;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
     const walk = b.leap ? (x, z) => walkTo(pos, x, z, b.r, false) : (x, z) => walkDry(pos, x, z, b.r, grounded, into);
     if (!walk(pos.x + mx, pos.z)) bump = true;
@@ -746,7 +750,7 @@ function updateBot(b, dt) {
     if (lp) { b.vy = 9; b.leap = { x: lp.x, z: lp.z, s: lp.s, t: 1.2 }; }
     if (bump && sees) b.strafe = -b.strafe;
     if (dt > 0) { b.vx = (pos.x - ox) / dt; b.vz = (pos.z - oz) / dt; }
-    if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) {
+    if (mv > spd * .6 && Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) { // not while still speeding up
       b.detour = .5 + Math.random() * .4; b.detourDir = Math.random() < .5 ? -1 : 1;
       if (!b.vy && Math.random() < .4) b.jumpT = 0; // stuck: try a hop
     }
@@ -758,7 +762,7 @@ function updateBot(b, dt) {
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // footsteps
     if (ph !== b.stepPh) { b.stepPh = ph; if (!b.vy) sfx('step_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)) + (ph ? '' : '2'), { at: pos, far: 22, v: .8 }); }
-  } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; b.vx = b.vz = 0; }
+  } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; b.vx = b.vz = b.mvx = b.mvz = 0; }
   const air = b.vy < -6;
   settle(b, dt);
   if (inWater(pos.x, pos.z, pos.y)) { drownZombie(b); return; }
