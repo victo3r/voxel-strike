@@ -46,11 +46,24 @@ function pathDist(x, z) {
 const CLEARINGS = [[0, 0, 8.5], [19, 18.5, 5.5], [-19, -19, 5], ...M.pads.map(([x, z]) => [x, z, 2.6])];
 const inClearing = (x, z, r) => CLEARINGS.some(([cx, cz, cr]) => Math.hypot(x - cx, z - cz) < cr + r);
 // fallen logs and mossy rocks
-const LOGS = [[-12, 13, 5, 1], [13, -12, 4.5, 0], [-26, -9, 5, 0], [25, 10, 4.4, 1], [-11, -27, 4.6, 1], [11, 28, 4.2, 0]];
-const ROCKS = [[-9, 21, 1.8, 1.5, 1.3], [-7.8, 22.2, 1.1, 1, .7], [21, -19, 2, 1.6, 1.5], [10, 12, 1.4, 1.3, 1], [-23, 18, 1.6, 1.8, 1.2],
-  [28, 24, 1.5, 1.3, 1.1], [-29, -26, 1.8, 1.5, 1.3], [-12, -3.5, 1.3, 1.2, .9], [14, -30, 1.6, 1.4, 1.2], [31, -14, 1.4, 1.6, 1]];
+const LOGS = [[-9, 11, 5, 1], [13, -12, 4.5, 0], [-26, -9, 5, 0], [25, 10, 4.4, 1], [-11, -27, 4.6, 1], [11, 28, 4.2, 0]];
+const ROCKS = [[-9, 21, 1.8, 1.5, 1.3], [-7.8, 22.2, 1.1, 1, .7], [21, -19, 2, 1.6, 1.5], [10, 12, 1.4, 1.3, 1], [28, 24, 1.5, 1.3, 1.1], [-29, -26, 1.8, 1.5, 1.3], [-12, -3.5, 1.3, 1.2, .9], [14, -30, 1.6, 1.4, 1.2], [31, -14, 1.4, 1.6, 1]];
 const FIXED = [...LOGS.map(([x, z, len]) => [x, z, len / 2 + .5]), ...ROCKS.map(([x, z, w, d]) => [x, z, Math.max(w, d) / 2 + .3]), ...M.crates.map(([x, z]) => [x, z, 1])];
 const hitsFixed = (x, z, r) => FIXED.some(([fx, fz, fr]) => Math.hypot(fx - x, fz - z) < fr + r);
+const rockMat = surf(lam({ map: tex(g => { noise(g, [112, 116, 108], 34); g.fillStyle = 'rgba(70,120,50,.7)'; for (let i = 0; i < 10; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 6 | 0, 2, 1); }) }), 'stone');
+// height: a rock hill (north west) and two treehouses joined by a bridge (south east)
+const hr = seeded(77), HILL = [];
+for (const [x, z, hx, hz] of [[-21, 18, 7.5, 6.5], [-15, 13.5, 3.6, 3], [-26, 12.8, 3, 2.6], [-16.5, 23, 3, 2.4]]) { // overlapping mounds make a lumpy outcrop
+  let x0 = x - hx, x1 = x + hx, z0 = z - hz, z1 = z + hz;
+  for (let k = 0; x1 - x0 > 2 && z1 - z0 > 2; k++) { // each layer sits inside the last, with room to stand on every step
+    HILL.push({ x0, x1, z0, z1, top: .45 * (k + 1) });
+    const sh = () => .55 + hr() * .4;
+    x0 += sh(); x1 -= sh(); z0 += sh(); z1 -= hr() < .4 ? 0 : sh(); // the north face now and then goes straight up two layers
+  }
+}
+const hillTop = (x, z) => HILL.reduce((t, L) => x > L.x0 && x < L.x1 && z > L.z0 && z < L.z1 ? L.top : t, 0);
+const TH = [{ x: 15, z: -17, y: 3.2, wall: [[0, 1], [-1, 0]] }, { x: 27, z: -17, y: 3.8, wall: [[0, -1], [1, 0]] }], TH_R = 3; // treehouse platforms (centre, height), half size
+FIXED.push([-20, 17, 10.5], ...TH.map(t => [t.x, t.z, TH_R + 1]), [15, -22, 2.2], [15, -25, 1.5], [27, -12, 2.2], [27, -8.5, 1.5], [21, -17, 2]);
 
 const glowTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64;
@@ -129,6 +142,36 @@ function bigTree(x, z, inside) {
   }
   spots.push([x, z]);
 }
+{
+  const mossTop = lam({ map: tex(g => { noise(g, [62, 92, 44], 26); }) });
+  for (const L of HILL) {
+    addBlock((L.x0 + L.x1) / 2, (L.z0 + L.z1) / 2, L.x1 - L.x0, L.z1 - L.z0, L.top, rockMat);
+    const cap = box(L.x1 - L.x0, .04, L.z1 - L.z0, mossTop); cap.position.set((L.x0 + L.x1) / 2, L.top + .015, (L.z0 + L.z1) / 2); add(cap);
+  }
+  const T = HILL.reduce((a, L) => L.top > a.top ? L : a), tx = (T.x0 + T.x1) / 2, tz = (T.z0 + T.z1) / 2;
+  addBlock(tx, tz, Math.min(1.1, T.x1 - T.x0 - .2), Math.min(.9, T.z1 - T.z0 - .2), T.top + .7, rockMat); // a boulder on top
+  for (const [x, z, w, d, h] of [[-27.6, 15, 1.2, 1, .8], [-13, 18.5, 1, 1.3, .7], [-19, 10, 1.4, 1, .6], [-23.5, 23.6, 1.1, 1, .9], [-12.6, 11.2, .9, .9, .5]]) addBlock(x, z, w, d, Math.max(h, hillTop(x, z) + h * .6), rockMat); // and loose ones round the bottom
+  // treehouses: a big tree through each platform, stairs up, a plank bridge between
+  const planks = surf(lam({ map: tex(g => { noise(g, [128, 92, 56], 18); g.fillStyle = 'rgba(50,30,15,.55)'; for (const y of [0, 5, 10, 15]) g.fillRect(0, y, 16, 1); }) }), 'wood');
+  const deck = (x, z, w, d, top, th = .3) => addSlab(x, z, w, d, top - th, top, planks);
+  for (const t of TH) {
+    bigTree(t.x, t.z, true);
+    deck(t.x, t.z, TH_R * 2, TH_R * 2, t.y);
+    for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) addSlab(t.x + ox * (TH_R - .2), t.z + oz * (TH_R - .2), .3, .3, 0, t.y - .3, postMat); // corner posts
+    for (const [ox, oz] of t.wall) addSlab(t.x + ox * (TH_R - .1), t.z + oz * (TH_R - .1), ox ? .2 : TH_R * 2, ox ? 2.4 : .2, t.y, t.y + .7, planks); // low walls to duck behind, away from the stairs and bridge
+  }
+  const [A, B] = TH, steps = 7;
+  for (let k = 0; k < steps; k++) addSlab(A.x, A.z - TH_R - 3.25 + k * .5, 1.4, .5, 0, A.y * (k + 1) / steps, planks); // stairs up the south side of the first
+  for (let k = 0; k < steps + 1; k++) addSlab(B.x, B.z + TH_R + 3.75 - k * .5, 1.4, .5, 0, B.y * (k + 1) / (steps + 1), planks); // and the north side of the second
+  for (let k = 0; k < 6; k++) deck(A.x + TH_R + .5 + k, A.z, 1.05, 1.3, A.y + (B.y - A.y) * (k + .5) / 6, .15); // the bridge
+  for (const x of [A.x + TH_R + .2, B.x - TH_R - .2]) for (const oz of [-.75, .75]) { const p = box(.12, 1, .12, postMat); p.position.set(x, A.y + .5 + (x > 21 ? B.y - A.y : 0), A.z + oz); add(p); }
+  const rope = lam({ color: 0xc8b48a });
+  for (const oz of [-.75, .75]) { const len = B.x - A.x - TH_R * 2 + .4, r = box(len, .05, .05, rope); r.position.set((A.x + B.x) / 2, (A.y + B.y) / 2 + .95, A.z + oz); r.rotation.z = Math.atan2(B.y - A.y, len); add(r); }
+  // grass on the hill
+  const ht = [];
+  for (let k = 0; k < 110; k++) { const x = -29 + hr() * 18, z = 9 + hr() * 17, y = hillTop(x, z); if (y) { const s = .6 + hr() * .5; ht.push([x, y, z, 1.1 * s, .9 * s, 1, hr() * Math.PI, pick([0x8fb07a, 0x7a9c6a, 0xa0bf86])]); } }
+  grassTufts(ht);
+}
 for (let tries = 0, k = 0; k < 60 && tries < 4000; tries++) {
   const x = (rnd() * 2 - 1) * (FA - 1.5), z = (rnd() * 2 - 1) * (FA - 1.5);
   if (pathDist(x, z) < PW / 2 + 2.2 || inClearing(x, z, 1.4) || hitsFixed(x, z, 2.2) || !roomFor(x, z, 6.2)) continue;
@@ -154,7 +197,6 @@ for (const [x, z, len, alongX] of LOGS) {
   addBlock(x, z, logW, logD, .85, barkMat);
   const stub = box(.4, .4, .4, barkMat); stub.position.set(x + (alongX ? len * .2 : .5), .9, z + (alongX ? .5 : len * .2)); add(stub);
 }
-const rockMat = surf(lam({ map: tex(g => { noise(g, [112, 116, 108], 34); g.fillStyle = 'rgba(70,120,50,.7)'; for (let i = 0; i < 10; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 6 | 0, 2, 1); }) }), 'stone');
 for (const [x, z, w, d, h] of ROCKS) addBlock(x, z, w, d, h, rockMat);
 addCrates(M.crates);
 
