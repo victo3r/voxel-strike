@@ -22,7 +22,7 @@ const BASE = [
   { id: 'trex', rar: 'epic', hold: 'rifle', name: 'T. REX', cat: 'primary', unlock: 14, price: 400, mob: 60, action: 'PUMP ACTION', dmg: 20, rate: 1 / 1.6, mag: 6, reload: 1.6, pellets: 6, spread: .06, auto: false, color: 0x4f6b34, len: .6 },
   { id: 'starsmasher', rar: 'legend', hold: 'rifle', name: 'Starsmasher', cat: 'primary', unlock: 30, price: 1150, mob: 60, zoom: 3, reticle: '255,215,90', starFx: true, dmg: 20, rate: .1, mag: 30, reload: 1.6, pellets: 1, spread: .005, auto: true, color: 0x24305a, len: .6 },
   { id: 'blazesaber', rar: 'legend', hold: 'melee', name: 'Blazesaber', cat: 'melee', unlock: 20, price: 750, inf: true, melee: true, tilt: 1.1, swing: 'saber', mob: 85, dmg: 60, rate: .55, range: 3.2, burn: 3, burnT: 2.5, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xff6a1a, len: .4, model: 'blazesaber' },
-  { id: 'windsaber', rar: 'mythic', hold: 'melee', name: 'Windsaber', cat: 'melee', unlock: 40, price: 2000, inf: true, melee: true, tilt: 1.1, swing: 'saber', mob: 100, jump: [.1, .15, .2], dmg: 70, rate: .5, range: 3.4, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xe8f6ff, len: .4, model: 'windsaber' },
+  { id: 'windsaber', rar: 'mythic', hold: 'melee', name: 'Windsaber', cat: 'melee', unlock: 40, price: 2000, inf: true, melee: true, tilt: 1.1, swing: 'saber', mob: 100, jump: [.25, .35, .45], dmg: 70, rate: .5, range: 3.4, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xe8f6ff, len: .4, model: 'windsaber' },
   { id: 'executioner', rar: 'epic', hold: 'pistol', name: 'Executioner', cat: 'backup', unlock: 14, price: 400, mob: 70, zoom: 4, reticle: '212,123,255', laser: true, dmg: 85, rate: 1 / 1.8, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0x5b3b8a, len: .4 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
@@ -77,7 +77,22 @@ function renderHotbar() {
 }
 
 const vm = new THREE.Group(); camera.add(vm); vm.position.set(.32, -.3, -.55);
-const flashMesh = box(.14, .14, .14, new THREE.MeshBasicMaterial({ color: 0xffdd55 }));
+const FLASH_SPR = new THREE.SpriteMaterial({ depthWrite: false, fog: false, blending: THREE.AdditiveBlending, map: (() => { // muzzle flash: a hot core and four spikes
+  const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d');
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const dx = Math.abs(x - 7.5), dy = Math.abs(y - 7.5), r = Math.max(dx, dy), spike = Math.min(dx, dy) < 1 ? 8 : Math.abs(dx - dy) < 1 ? 4.5 : 2.5;
+    if (r > spike) continue;
+    g.fillStyle = r < 2 ? '#fffbe0' : r < 4 ? '#ffd24a' : '#ff8a1a'; g.fillRect(x, y, 1, 1);
+  }
+  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
+})() });
+function makeFlash(size = .1, mat = FLASH_SPR) {
+  const s = new THREE.Sprite(mat); s.scale.setScalar(size);
+  s.onBeforeRender = () => { mat.rotation = Math.random() * Math.PI * 2; s.scale.setScalar(size * (.75 + Math.random() * .5)); };
+  return s;
+}
+const flashMesh = makeFlash(.12, Object.assign(FLASH_SPR.clone(), { depthTest: false })); // yours draws over the barrel, which would hide it
+flashMesh.renderOrder = 5;
 const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
 let gunSpin = null, gunSpinV = 0;
 let gunRound = null;
@@ -420,12 +435,12 @@ const GUN_MODELS = {
     p(4, 1, 22, dark, 0, 4.5, -10); // top rail
     p(6, 1, 4, dark, 0, 5.5, -6); for (const x of [-2.5, 2.5]) p(1, 4, 2, dark, x, 8, -6); p(6, 1, 2, dark, 0, 10.5, -6); // holo sight
     p(1, 1, 1, glow(0xffd24a), .5, 6.5, -4.5); // its emitter
-    p(4, 4, 8, mat(GUN_STEEL), 0, 2, -23); // barrel
-    p(6, 6, 4, dnavy, 0, 2, -29); p(6, 6, 1, gold, 0, 2, -28.5); // flash hider and its gold ring
+    p(4, 4, 14, mat(GUN_STEEL), 0, 2, -26); // barrel
+    p(6, 6, 4, dnavy, 0, 2, -35); p(6, 6, 1, gold, 0, 2, -34.5); // flash hider and its gold ring
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 8, 5, dark, 0, -8, -8); mg(4, 1, 5, gold, 0, -10.5, -8); // mag with a gold band
     p(4, 4, 4, dnavy, 0, -7, 0); p(4, 3, 4, dnavy, 0, -10.5, 1); // pistol grip
     p(1, 1, 4, dark, 0, -8.5, -4); p(1, 2, 1, mat(0x666666), 0, -6, -3.5); // guard and trigger
-    return { muzzle: [2, -32], grip: [4, 7, 5, 0, -8.5, .5], fore: [6, 6, 10, 0, 1, -14], bands: [-15.5, -18.5], band: [8, 8, 1], holo: [7, -6], mag };
+    return { muzzle: [2, -38], grip: [4, 7, 5, 0, -8.5, .5], fore: [6, 6, 10, 0, 1, -14], bands: [-15.5, -18.5], band: [8, 8, 1], holo: [7, -6], mag };
   },
   blazesaber({ p, mat, glow }) {
     const metal = mat(0x8a8d94), dmetal = mat(0x45474e), red = mat(0xb8322a), blade = glow(0xff6a1a), core = glow(0xffd38a);
@@ -641,7 +656,7 @@ function buildGun() {
   for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone();
   vmRl.rk = -1;
   if (WEAPONS[cur].melee) return;
-  flashMesh.position.set(0, my, mz - .04); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight);
+  flashMesh.position.set(0, my, mz - .06); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
 }
 function cycle(d) { let s = slotOf(cur); do s = (s + d + CATS.length) % CATS.length; while (slotGun[s] < 0); equip(slotGun[s]); }
 function selectSlot(s) {

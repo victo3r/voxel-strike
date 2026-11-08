@@ -47,7 +47,7 @@ function shoot() {
   else if (w.flame) flame(w);
   else {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w)); recoilKick(w);
-    if (w.starFx) starPuff(flashMesh, scene, .6);
+    if (w.starFx && !aiming) starPuff(flashMesh, scene, .6); // not while you aim: they'd fill the sight
     sfx(w.id);
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);

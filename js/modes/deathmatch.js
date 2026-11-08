@@ -247,7 +247,6 @@ function spawnSpots(who, n = 1) {
   return out.length ? out : [[0, 0]];
 }
 function spawnSpot(who) { return spawnSpots(who)[0]; }
-const FLASH_MAT = new THREE.MeshBasicMaterial({ color: 0xffdd55 });
 const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 // put a gun in the bot's hands
 function holdGun(b) {
@@ -261,8 +260,8 @@ function holdGun(b) {
   b.armL.quaternion.setFromUnitVectors(ARM_DOWN, h.dL ? _hv.fromArray(h.dL) : _hv.set(.08, -.95, .3).normalize());
   b.holdTurn = h.turn; // sideways stance so the gun points where it aims
   b.round = round;
-  b.flashM ??= box(.14, .14, .14, FLASH_MAT);
-  b.flashM.position.set(0, my, mz - .04); b.flashM.visible = false;
+  b.flashM ??= makeFlash(.1);
+  b.flashM.position.set(0, my, mz - .06); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
   b.gunM = gunM; b.spin = spin; b.spinV = 0;
   // reload start pose

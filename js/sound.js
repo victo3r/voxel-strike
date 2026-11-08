@@ -242,12 +242,13 @@ const SOUNDS = {
     s.tone({ type: 'sawtooth', f: 115, f2: 70, d: .04, v: .2, lp: 1400 });
     s.click({ f: 4800, v: .4 });
   }],
-  trex: [.75, .95, s => {
-    s.hiss({ f: 2800, f2: 180, d: .4, v: 1 });
-    s.tone({ f: 110, f2: 32, d: .32, v: 1 });
-    s.tone({ type: 'sawtooth', f: 90, f2: 55, d: .22, v: .25, lp: 700 }); // a little roar under the boom
-    s.hiss({ ft: 'highpass', f: 4000, d: .02, v: .5 });
-    s.pump(.4);
+  trex: [.9, 1, s => {
+    s.hiss({ f: 3800, f2: 150, d: .55, v: 1 }); // the blast
+    s.hiss({ ft: 'bandpass', f: 1100, f2: 260, q: .7, d: .35, v: .85 }); // its body
+    s.tone({ f: 125, f2: 28, d: .42, v: 1 }); s.thud({ d: .09, f: 85, v: 1 }); // a deep thump
+    s.hiss({ ft: 'highpass', f: 4500, d: .03, v: .65 }); // the crack
+    s.tone({ type: 'sawtooth', t: .04, f: 78, f2: 48, d: .32, v: .2, lp: 520 }); // a low growl in the tail
+    s.pump(.46);
   }],
   starsmasher: [.2, .45, s => {
     s.hiss({ ft: 'bandpass', f: 2300, f2: 1000, q: .8, d: .07, v: .9 });
@@ -328,10 +329,12 @@ const SOUNDS = {
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
   djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // double jump
   swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife
-  saber: [.35, .5, s => { // a humming blade
-    s.tone({ type: 'sawtooth', f: 95, f2: 140, d: .3, v: .35, lp: 900 });
-    s.tone({ f: 190, f2: 260, d: .28, v: .3 });
-    s.hiss({ ft: 'bandpass', f: 700, f2: 2400, q: 3, a: .05, d: .2, v: .7, sweep: .2 });
+  saber: [.85, .55, s => { // a humming blade: a buzz that swells and falls as it swings
+    s.tone({ type: 'sawtooth', f: 90, f2: 116, d: .8, v: .42, lp: 820 });
+    s.tone({ type: 'sawtooth', f: 93, f2: 120, d: .8, v: .32, lp: 700 }); // a little off, so they beat
+    s.tone({ f: 180, f2: 310, d: .38, v: .36 });
+    s.tone({ t: .3, f: 310, f2: 165, d: .5, v: .26 });
+    s.hiss({ ft: 'bandpass', f: 600, f2: 2600, q: 3, a: .06, d: .38, v: .6, sweep: .26 });
   }],
   slash: [.25, .6, s => {
     s.hiss({ ft: 'bandpass', f: 2200, f2: 7500, q: 4, a: .008, d: .2, v: 1, sweep: .18 });

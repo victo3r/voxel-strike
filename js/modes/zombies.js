@@ -258,9 +258,13 @@ const SHOP = [
   { gun: 'shockbeam', price: 180, desc: 'a beam that slows them down' },
   { gun: 'tigerbite', price: 240, desc: `${BASE[gi('tigerbite')].dmg} dmg, 6 shot sniper` },
   { gun: 'executioner', price: 260, desc: `laser pistol, ${BASE[gi('executioner')].dmg} dmg` },
+  { gun: 'trex', price: 250, desc: 'six big pellets and a dino bite' },
+  { gun: 'starsmasher', price: 380, desc: 'stars out of the muzzle, 3x sight' },
+  { gun: 'blazesaber', price: 320, desc: 'a blade of fire that burns them' },
+  { gun: 'windsaber', price: 480, desc: 'run faster and jump higher' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
-// gun offers: one gun from each of a few categories, upgrades more likely
+// gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often (chest odds)
 const OFFERS = 3, tierOf = g => BASE[g].start ? 0 : BASE[g].unlock || 1;
 let shopOffer = [];
 function pickOffers() {
@@ -276,7 +280,7 @@ function pickOffers() {
   const pool = Object.entries(cats).map(([cat, list]) => ({ list, w: list.some(i => tierOf(SHOP[i].gun) > (held[cat] ?? -1)) ? 3 : 1 }));
   const draw = (items, w) => { let r = Math.random() * items.reduce((s, x) => s + w(x), 0), k = 0; while (k < items.length - 1 && (r -= w(items[k])) >= 0) k++; return k; };
   const out = [];
-  while (pool.length && out.length < OFFERS) { const [p] = pool.splice(draw(pool, x => x.w), 1); out.push(p.list[draw(p.list, i => 1 + tierOf(SHOP[i].gun) / 4)]); }
+  while (pool.length && out.length < OFFERS) { const [p] = pool.splice(draw(pool, x => x.w), 1); out.push(p.list[draw(p.list, i => GUN_DROP[rarOf(BASE[SHOP[i].gun])])]); }
   return out.sort((a, b) => a - b);
 }
 const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i));

@@ -187,7 +187,7 @@ function heroGun(i) {
   g.scale.setScalar(GUN_S);
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
   Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rs: { rk: -1 } });
-  hf.flashM = box(.14, .14, .14, FLASH_MAT); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .04); hf.flashM.visible = false; g.add(hf.flashM);
+  hf.flashM = makeFlash(.1); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .06); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   const kind = holdOf(BASE[i]);
   pose = { pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, sh: kind === 'shoulder', hv: kind === 'heavy' };
