@@ -339,8 +339,8 @@ function update(dt) {
   const now = performance.now();
   for (const p of pads) {
     if (!p.item) { if ((p.t -= dt) <= 0) spawnPickup(p); continue; }
-    p.item.rotation.y += dt * 2; p.item.position.y = .6 + Math.sin(now * .003 + p.x) * .1;
-    if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 1 && P.pos.y < 1.5 && !down) {
+    p.item.rotation.y += dt * 2; p.item.position.y = p.y + .6 + Math.sin(now * .003 + p.x) * .1;
+    if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 1 && P.pos.y < p.y + 1.5 && !down) {
       if (net.on) net.pick(p); // online the server decides
       else if (usePickup(p.type)) { clearPad(p); p.t = RESPAWN + Math.random() * 10; }
     }

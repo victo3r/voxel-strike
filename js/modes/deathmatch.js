@@ -228,7 +228,8 @@ function spawnSpots(who, n = 1) {
   const found = [];
   for (let tries = 0; tries < 60; tries++) {
     const x = (Math.random() * 2 - 1) * (A - 2), z = (Math.random() * 2 - 1) * (A - 2);
-    if (blocked(x, z, .45, 0) || MAP.land && !MAP.land(x, z) || overWater(x, z, 0) || poolAt(x, z)) continue; // not in the water
+    const fy = floorY(x, z);
+    if (blocked(x, z, .45, fy) || MAP.land && !MAP.land(x, z) || overWater(x, z, fy) || poolAt(x, z)) continue; // not in the water
     const d = others.length ? Math.min(...others.map(o => Math.hypot(x - o.x, z - o.z))) : 99;
     found.push([d, x, z]);
   }
@@ -317,7 +318,7 @@ function makeBot(rec, spot) {
   const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(rec.armor);
   if (arm) dressArmor(ch, rec.armor, teamMode() ? TEAMS[rec.team].shirts[0] : null);
   dressBoots(ch, rec.boots); dressHat(ch, rec.hat);
-  g.rotation.order = 'YXZ'; g.position.set(x, 0, z);
+  g.rotation.order = 'YXZ'; g.position.set(x, groundAt(x, z, .35, floorY(x, z)), z);
   // arms forward holding the gun
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
   for (const a of [ch.armR, ch.armL]) { aim.add(a); a.position.y = 0; }
@@ -401,7 +402,7 @@ function youDown(by) {
 // respawn you
 function respawnYou(x, z, yaw) {
   if (x == null) [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, 0), z); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, vy: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   youHelpers.clear(); killCam = null;
   cancelReload(); recoilReset(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
@@ -727,12 +728,16 @@ function updateBot(b, dt) {
     b.mvYaw += Math.sign(turn) * Math.min(Math.abs(turn), TURN_WALK * dt);
     mx = Math.sin(b.mvYaw) * m0; mz = Math.cos(b.mvYaw) * m0;
   } else if (Math.hypot(mx, mz) > .05) b.mvYaw = Math.atan2(mx, mz);
+  if (b.leap) { if (!b.vy || (b.leap.t -= dt) <= 0) b.leap = null; else { mx = b.leap.x; mz = b.leap.z; } } // mid-jump over a gap
   const ml = Math.hypot(mx, mz);
   if (ml > .05) {
-    const s = BOT.speed * (mobMul(W) + b.rec.fx.spd) * dt / ml; mx *= s; mz *= s;
+    const s = (b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd)) * dt / ml; mx *= s; mz *= s;
     const ox = pos.x, oz = pos.z, grounded = !b.vy; let bump = false;
-    if (!walkDry(pos, pos.x + mx, pos.z, b.r, grounded, into)) bump = true;
-    if (!walkDry(pos, pos.x, pos.z + mz, b.r, grounded, into)) bump = true;
+    const walk = b.leap ? (x, z) => walkTo(pos, x, z, b.r, false) : (x, z) => walkDry(pos, x, z, b.r, grounded, into);
+    if (!walk(pos.x + mx, pos.z)) bump = true;
+    if (!walk(pos.x, pos.z + mz)) bump = true;
+    const lp = bump && grounded && MAP.leap?.(pos, mx, mz); // a gap you can jump
+    if (lp) { b.vy = 9; b.leap = { x: lp.x, z: lp.z, s: lp.s, t: 1.2 }; }
     if (bump && sees) b.strafe = -b.strafe;
     if (dt > 0) { b.vx = (pos.x - ox) / dt; b.vz = (pos.z - oz) / dt; }
     if (Math.hypot(pos.x - ox, pos.z - oz) < BOT.speed * dt * .3 && b.detour <= 0) {
@@ -754,7 +759,7 @@ function updateBot(b, dt) {
   if (air && !b.vy) sfx('land_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)), { at: pos, far: 22, v: .7 });
 
   for (const p of pads) {
-    if (!p.item || Math.hypot(pos.x - p.x, pos.z - p.z) >= 1 || pos.y >= 1.5) continue;
+    if (!p.item || Math.hypot(pos.x - p.x, pos.z - p.z) >= 1 || pos.y >= p.y + 1.5) continue;
     if (!(p.type === 'health' && b.hp < b.maxHp || p.type === 'armor' && b.armor < b.maxArmor)) continue;
     if (net.on) { net.pick(p, b); break; } // online the server hands it over
     if (p.type === 'health') b.hp = Math.min(b.maxHp, b.hp + HEAL_PICK);

@@ -30,6 +30,8 @@ function groundAt(x, z, r, feet) {
   }
   return g;
 }
+// the terrain height where spawns look for ground (maps with raised land)
+const floorY = (x, z) => MAP.top?.(x, z) ?? 0;
 // stay on your feet down stairs, fall off other edges
 const sticks = (drop, wasRamp) => drop <= STEP && (groundRamp || wasRamp || drop < .06);
 // smooth out the camera when stepping up a ledge
@@ -63,9 +65,9 @@ function slideOut(pos, nx, nz, r, h) {
 // water
 const inWater = (x, z, feet) => !!MAP.water?.(x, z, feet);
 const inSea = (x, z, feet) => !!(MAP.sea ?? MAP.water)?.(x, z, feet);
-const overWater = (x, z, feet) => MAP.water && inSea(x, z, groundAt(x, z, 0, feet));
-const overDeep = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, 0, feet));
-const poolAt = (x, z) => !!MAP.wet?.(x, z, groundAt(x, z, 0, 0));
+const overWater = (x, z, feet) => MAP.water && inSea(x, z, groundAt(x, z, MAP.edgeR ?? 0, feet));
+const overDeep = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, MAP.edgeR ?? 0, feet));
+const poolAt = (x, z) => !!MAP.wet?.(x, z, groundAt(x, z, 0, floorY(x, z)));
 // splash when going into water, at most every half second
 function wetCheck(o, p) {
   const wet = !!MAP.wet?.(p.x, p.z, p.y), now = performance.now();

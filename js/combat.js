@@ -240,7 +240,7 @@ function setupPads() {
   if (padsFor === MAP) return;
   for (const p of pads) clearPad(p);
   pads.length = 0; padsFor = MAP;
-  for (const [x, z] of MAP.pads) pads.push({ x, z, item: null, type: '', t: 0 });
+  for (const [x, z, y = 0] of MAP.pads) pads.push({ x, y, z, item: null, type: '', t: 0 });
 }
 function pickupType() {
   const opts = ['health', 'health'];
@@ -250,7 +250,7 @@ function pickupType() {
 }
 function spawnPickup(p, type) { // online the server picks the type
   p.type = type || pickupType(); p.item = new THREE.Mesh(pickGeo, PICKUPS[p.type]);
-  p.item.position.set(p.x, .6, p.z); scene.add(p.item);
+  p.item.position.set(p.x, p.y + .6, p.z); scene.add(p.item);
 }
 function clearPad(p) { if (p.item) { scene.remove(p.item); p.item = null; } }
 function emptyPads() { for (const p of pads) { clearPad(p); p.claimAt = 0; p.t = net.serverPads ? Infinity : FIRST_SPAWN + Math.random() * 10; } } // online the server restocks the pads

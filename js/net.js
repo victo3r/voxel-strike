@@ -477,7 +477,7 @@ net = (() => {
       if (!r.rec.hostBot || r.body) continue;
       if (r.respawnAt && t < r.respawnAt - 150 || r.readyAt && lt - r.readyAt < 3000) continue;
       r.readyAt = lt;
-      const spots = spawnSpots(r.rec, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, 0))]);
+      const spots = spawnSpots(r.rec, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, floorY(x, z)))]);
       send({ t: 'ready', by: r.rec.pid, spots });
     }
   }
@@ -654,7 +654,7 @@ net = (() => {
     if (!api.on || alive || readySent && localNow() - readyT < 3000 || !welcomed) return;
     if (respawnAt && now() < respawnAt - 150) return;
     // a few free spots, the server picks the farthest from enemies
-    const spots = spawnSpots(YOU_T, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, 0))]);
+    const spots = spawnSpots(YOU_T, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, floorY(x, z)))]);
     send({ t: 'ready', spots, x: spots[0][0], z: spots[0][1], yaw: spots[0][2], y: spots[0][3] });
     readySent = true; readyT = localNow(); api.banner = 'SPAWNING…';
   }
