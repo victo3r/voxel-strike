@@ -106,7 +106,7 @@ function flame(w) {
 }
 // heat ray beam
 function heatBeam(w) {
-  kick = .12; beamHeld = .12; crossKick(.4, 1.5); recoilKick(w); // keeps the hum going
+  beamHeld = .12; crossKick(.4, 1.5); recoilKick(w); // keeps the hum going
   camera.getWorldDirection(fwd);
   ray2.setFromCamera(ndc.set(0, 0), camera); ray2.far = w.range;
   const hit = ray2.intersectObjects(shotTargets(), false)[0];

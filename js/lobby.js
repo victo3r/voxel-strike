@@ -219,7 +219,7 @@ function heroShot() {
   if (hf.rl > 0 || hf.cd > 0) return;
   if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 }); hf.auto = .25; return; }
   hf.cd = w.rate; if (!w.inf) hf.ammo--;
-  hf.kick = w.beam || w.flame ? .06 : 1; // beams and flames barely kick
+  hf.kick = w.beam ? 0 : w.flame ? .06 : 1; // a beam can't kick: its far end would jump
   if (w.melee) { sfx('swing', { v: .7 }); return; }
   hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
   if (w.flame) {

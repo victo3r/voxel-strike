@@ -435,7 +435,7 @@ const GUN_MODELS = {
     p(1, 1, 4, dark, 0, -4.5, -7); p(1, 2, 1, dark, 0, -3, -9.5); p(1, 2, 1, mat(0x777777), 0, -3, -6.5); // trigger guard and trigger
     p(4, 3, 4, body, 0, -3.5, -3); p(4, 3, 4, body, 0, -6.5, -2); // grip
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -8.5, -2); mg(2, 6, 2, las, 0, -5, -2); // power cell glowing up inside the grip
-    return { muzzle: [2, -23], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-11, -14], band: [6, 8, 1], holo: [8, -7], mag };
+    return { muzzle: [2, -23], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-15, -17], band: [6, 6, 2], holo: [8, -7], mag };
   },
   heatray({ p, mat, dark, glow, sub, at }) {
     const cop = mat(0xb5652b), dcop = mat(0x7e4220), brass = mat(0xc9a43a), steel = mat(0x6e6e74), wood = mat(0x5a3a22);
@@ -567,6 +567,7 @@ function vmArm(left, box, dir, low = 0) {
   return piv;
 }
 // arm directions per hold
+const X_V = new THREE.Vector3(1, 0, 0), meleeUp = w => w.tilt ? .8 : .22; // how far first person tips a melee weapon up
 const VM_ARMS = {
   pistol: [[.15, -.2, 1, .3]], rifle: [[.2, -.25, 1, .5], [-.35, -.3, 1, .6]], heavy: [[.25, -.25, 1, .4], [-.4, -.3, 1, .3]],
   shoulder: [[.2, -.25, 1, .5], [-.35, -.3, 1, .5]], melee: [[.15, -.15, 1, 0]],
@@ -576,7 +577,8 @@ function buildGun() {
   vm.clear(); flashMesh.visible = false;
   const { muzzle: [my, mz], grip, fore, spin, round, mag, holo } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
   gunSpin = spin; gunRound = round; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
-  vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
+  const hand = WEAPONS[cur].tilt ? { ...grip, c: [grip.c[0], grip.c[1], grip.c[2] - 7 * gunPx(cur)] } : grip; // a sword's fist goes up under the guard, where you can see it
+  vmArm(false, hand, WEAPONS[cur].tilt ? new THREE.Vector3(.8, -.5, -.1).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])) : new THREE.Vector3(...arms[0]), arms[0][3]); // a sword's arm comes in from the right, across the handle
   gunArmL = fore && arms[1] ? vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]) : null;
   // one-handed guns: the left hand only shows up to reload
   gunHand = !gunArmL && mag && !WEAPONS[cur].melee ? vmArm(true, partBounds(mag),new THREE.Vector3(-.3, -1, .45), 1) : null;
