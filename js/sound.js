@@ -211,6 +211,18 @@ function kit(c, seed) {
     thunk(t) { s.clack({ t, f: 750, d: .03, v: 1, body: 1.4 }); },
     rattle(t) { for (let k = 0; k < 6; k++) s.clack({ t: t + k * .035, f: 2400 + r() * 1200, d: .006, v: .3 }); },
     arp(t, notes, { type = 'triangle', gap = .055, d = .3, v = .4 } = {}) { notes.forEach((f, i) => s.tone({ type, f, t: t + i * gap, d, v })); },
+    // a lance beam's buzz: two detuned saws sliding down, with a fast shimmer
+    beam({ t = 0, f, f2 = f, d = .5, v = .5, wob = 30, lp = .3 }) {
+      s.draw(t, d, o => {
+        let p1 = 0, p2 = r(), y = 0;
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR, k = x / d, fr = f * (f2 / f) ** Math.min(1, k * 1.6);
+          p1 = (p1 + fr / SR) % 1; p2 = (p2 + fr * 1.013 / SR) % 1;
+          y += (p1 + p2 - 1 - y) * lp;
+          o[i] = y * Math.min(1, x / .004) * (1 - k) ** 2 * (.7 + .3 * Math.sin(6.2832 * wob * x));
+        }
+      }, v);
+    },
   };
   return s;
 }
@@ -283,19 +295,20 @@ const SOUNDS = {
     s.tone({ f: 4200, f2: 900, d: .08, v: .3 });
     s.hiss({ ft: 'bandpass', f: 5000, q: 2, d: .04, v: .35 });
   }],
-  rubypierce: [.9, .9, s => { // a heavy zap with a glassy ring after it
-    s.tone({ f: 150, f2: 40, d: .35, v: .9 });
-    s.tone({ type: 'sawtooth', f: 1900, f2: 140, d: .32, v: .32, lp: 4200 });
-    s.tone({ type: 'square', f: 3800, f2: 700, d: .16, v: .2, lp: 6000 });
-    s.hiss({ ft: 'bandpass', f: 4200, f2: 900, q: 1.5, d: .45, v: .45 });
-    s.ring({ f: 1760, t: .03, d: .55, v: .09 });
+  rubypierce: [.9, .9, s => { // a quick pew, then the beam buzzing out with a lower hum under it
+    s.tone({ f: 150, f2: 45, d: .3, v: .8 });
+    s.tone({ f: 2400, f2: 520, d: .07, v: .25 });
+    s.beam({ f: 980, f2: 430, d: .55, v: .5, wob: 38, lp: .35 });
+    s.beam({ f: 245, f2: 150, d: .5, v: .38, wob: 19, lp: .12 });
+    s.hiss({ ft: 'bandpass', f: 4200, f2: 900, q: 1.5, d: .45, v: .32 });
   }],
-  paragon: [1.2, 1, s => { // a crack, a long electric tear and a low ring
-    s.hiss({ ft: 'highpass', f: 3200, d: .03, v: .9 });
-    s.tone({ f: 105, f2: 26, d: .55, v: 1 });
-    s.tone({ type: 'sawtooth', f: 1500, f2: 85, d: .5, v: .34, lp: 3600 });
-    s.hiss({ ft: 'bandpass', f: 3400, f2: 450, q: 1.2, d: .8, v: .55 });
-    s.ring({ f: 1175, t: .05, d: .8, v: .08 });
+  paragon: [1.2, 1, s => { // a crack, then a long heavy beam with a low hum under it
+    s.hiss({ ft: 'highpass', f: 3200, d: .03, v: .8 });
+    s.tone({ f: 105, f2: 28, d: .5, v: .9 });
+    s.tone({ f: 1800, f2: 380, d: .09, v: .22 });
+    s.beam({ f: 760, f2: 330, d: .8, v: .5, wob: 30, lp: .3 });
+    s.beam({ f: 190, f2: 105, d: .75, v: .45, wob: 15, lp: .1 });
+    s.hiss({ ft: 'bandpass', f: 3400, f2: 450, q: 1.2, d: .7, v: .4 });
   }],
   zap: [.12, .22, s => { for (let k = 0; k < 4; k++) s.clack({ t: k * .018, f: 3000 + Math.random() * 3000, d: .008, v: .5 }); s.hiss({ ft: 'highpass', f: 5000, d: .05, v: .4 }); }], // shock beam crackle
   eradicator: [.12, .32, s => { // the motor whir is in soundTick
