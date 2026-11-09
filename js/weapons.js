@@ -47,7 +47,7 @@ const statsAt = (i, L) => {
 function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, rate: s.rate, mag: s.mag, reload: s.reload }); }
 const upgradable = i => !BASE[i].start;
 const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
-let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0;
+let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0, wandOn = 0, wandK = 0;
 // camera recoil per gun
 const RECOIL = {
   voxel: { up: 1.4, side: .3, back: 1 }, hitman: { up: 1.1, side: .25, back: 1 }, executioner: { up: 1.8, side: .3, back: .9 }, flare: { up: 2, side: .35, back: .8 },
@@ -692,7 +692,7 @@ function vmArm(left, box, dir, low = 0, at = null) { // at: fist this far out al
   return piv;
 }
 // arm directions per hold
-const X_V = new THREE.Vector3(1, 0, 0), meleeUp = w => w.tilt ? 1.2 : .22; // how far first person tips a melee weapon up
+const X_V = new THREE.Vector3(1, 0, 0), meleeUp = w => w.tilt ? 1.2 : .22, WAND_UP = .3; // how far first person tips a melee weapon (or a wand) up
 const VM_ARMS = {
   pistol: [[.15, -.2, 1, .3]], rifle: [[.2, -.25, 1, .5], [-.35, -.3, 1, .6]], heavy: [[.25, -.25, 1, .4], [-.4, -.3, 1, .3]],
   shoulder: [[.2, -.25, 1, .5], [-.35, -.3, 1, .5]], melee: [[.15, -.15, 1, 0]],

@@ -563,7 +563,7 @@ net = (() => {
     if (r.q & 2) { if (!W.inf) sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); z.rlLeft = W.inf || W.melee ? 0 : rlT; }
     if (!r.reloadWas) z.rlLeft = 0;
     if (z.rlLeft > 0) z.rlLeft = Math.max(0, z.rlLeft - dt);
-    holdReload(z, z.rlLeft, rlT);
+    holdReload(z, z.rlLeft, rlT); wandHold(z, dt);
     if (r.q & 64) { sfx('djump', { at: pos, far: 20, v: .7 }); burst(fv.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     r.q = 0;
     if (r.fired) {

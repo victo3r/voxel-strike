@@ -1,6 +1,6 @@
 // upgrade prices, as a share of the gun price
 const UPG = [.75, .9];
-let armCat = 'primary', armOpen = false, armSel = -1, armDet = false;
+let armCat = 'primary', armOpen = false, armSel = -1, armDet = false, armPick = false, gearPick = false, skinPick = -1; // picks: clicked, not just shown
 const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought
 // stars you use in a match (bots never get more)
 const gunUse = i => { const st = gunStars(i), u = prof.use?.[BASE[i].id]; return u ? Math.max(1, Math.min(st, u)) : st; };
@@ -125,13 +125,13 @@ function renderArmory() {
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img src="${SPRITES[loadoutGun(c)]}"><span>${label}</span></button>`).join('');
   const eq = loadoutGun(armCat);
-  if (BASE[armSel]?.cat !== armCat) armSel = eq;
+  if (BASE[armSel]?.cat !== armCat) { armSel = eq; armPick = false; }
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
   else $('armList').innerHTML = catList().map(i => {
     const w = BASE[i], tag = isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
-    return `<div class="card rr${isLocked(i) ? ' locked' : ''}${i === armSel ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
+    return `<div class="card rr${isLocked(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img src="${SPRITES[i]}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
   }).join('');
@@ -333,7 +333,7 @@ const lookSprite = L => skinSprite(L, false), headSprite = L => skinSprite(L, tr
 function renderSkins() {
   const list = lookChoices(), on = lookIndex();
   $('armList').innerHTML = `<p class="wd">${SKINS_DESC}</p>` + list.map((p, i) =>
-    `<div class="card${i === on ? ' sel on' : ''}" data-skin="${i}">${i === on ? '<span class="tag">WEARING</span>' : ''}` +
+    `<div class="card${i === skinPick ? ' sel' : ''}${i === on ? ' on' : ''}" data-skin="${i}">${i === on ? '<span class="tag">WEARING</span>' : ''}` +
     `<img class="sk" src="${lookSprite(p.look)}"><div class="cn">${p.name}</div></div>`).join('') +
     (inLobby ? '<div class="card" data-cust="1"><span class="plus">' + ico('pencil') + '</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '') +
     (!prof.draw ? `<div class="card" data-dbuy="1"><span class="plus">${ico('pencil')}</span><div class="cn">DRAW</div><small>PAINT YOUR OWN SKINS · ${COIN}${DRAW_PRICE}</small></div>`
@@ -389,7 +389,7 @@ const gearStarTxt = (G, id) => starRow(G.using(id), G.stars(id), 3);
 const gearShown = (G, B) => Math.max(1, G.using(B.id));
 function gearNow() {
   const G = GEAR[wearCat];
-  if (!G.list[gearSel]) { const on = G.worn(); gearSel = on ? G.I[on.id] : gearList(G)[0]; }
+  if (!G.list[gearSel]) { const on = G.worn(); gearSel = on ? G.I[on.id] : gearList(G)[0]; gearPick = false; }
   return G;
 }
 // he tries on the item you picked
@@ -404,7 +404,7 @@ function renderGear() {
   else $('armList').innerHTML = `<p class="wd">${G.desc}</p>` + gearList(G).map(i => {
     const K = G.list[i], st = G.stars(K.id), worn = prof[G.on] === K.id && st, s = gearShown(G, K), [sa, set] = setTag(K.id, worn);
     const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
-    return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(K)}" data-gear="${i}">` +
+    return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel && gearPick ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(K)}" data-gear="${i}">` +
       sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${G.sprite(K.id, s)}">` +
       `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div></div>`;
   }).join('');
@@ -532,12 +532,12 @@ $('armList').addEventListener('click', e => {
   if (c.dataset.cust) { openCust(); return; }
   if (c.dataset.dbuy) { drawBuy(); return; }
   if (c.dataset.dnew) { openDraw(-1); return; }
-  if (c.dataset.skin) { drawSure = -1; wearLook(+c.dataset.skin); renderArmory(); return; }
+  if (c.dataset.skin) { drawSure = -1; skinPick = +c.dataset.skin; wearLook(skinPick); renderArmory(); return; }
   if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = basicWorn() || 1; } else { armorCard = true; suitSel = ''; } sfx('ui'); renderArmory(); return; }
   if (c.dataset.suit) { const id = c.dataset.suit; if (suitSel === id) armDet = true; else { suitSel = id; armorCard = false; } sfx('ui'); renderArmory(); return; }
-  if (c.dataset.gear) { const i = +c.dataset.gear; if (i === gearSel) armDet = true; else gearSel = i; sfx('ui'); renderArmory(); return; }
+  if (c.dataset.gear) { const i = +c.dataset.gear; if (i === gearSel && gearPick) armDet = true; else { gearSel = i; gearPick = true; } sfx('ui'); renderArmory(); return; }
   const i = +c.dataset.i;
-  if (i === armSel) armDet = true; else armSel = i;
+  if (i === armSel && armPick) armDet = true; else { armSel = i; armPick = true; }
   sfx('ui'); renderArmory();
 });
 function armClick(e) {
@@ -545,8 +545,8 @@ function armClick(e) {
   if (b.dataset.cust) { openCust(); return; }
   if (b.dataset.dedit) { openDraw(+b.dataset.dedit); return; }
   if (b.dataset.ddel) { const i = +b.dataset.ddel; if (drawSure === i) { drawSure = -1; drawDelete(i); } else { drawSure = i; sfx('ui'); renderAct(); } return; }
-  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; suitSel = ''; armSel = -1; gearSel = -1; sfx('ui'); } }
-  else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; suitSel = ''; armorPrev = 0; gearSel = -1; sfx('ui'); } }
+  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; suitSel = ''; armSel = -1; gearSel = -1; skinPick = -1; sfx('ui'); } }
+  else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; suitSel = ''; armorPrev = 0; gearSel = -1; skinPick = -1; sfx('ui'); } }
   else if (b.dataset.gbuy || b.dataset.gup || b.dataset.gwear || b.dataset.goff || b.dataset.gu) gearClick(b.dataset);
   else if (b.dataset.av) { armorStep(+b.dataset.av); return; }
   else if (b.dataset.sbuy || b.dataset.sup || b.dataset.swear || b.dataset.soff || b.dataset.su) suitClick(b.dataset);
@@ -592,7 +592,7 @@ function armShow(on) {
   if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; }
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
-function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; suitSel = ''; armShow(true); renderArmory(); }
+function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; suitSel = ''; skinPick = -1; armShow(true); renderArmory(); }
 function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; gearSel = -1; suitSel = ''; heroArmor(wornArmor()); wearGear(); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // don't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);

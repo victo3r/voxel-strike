@@ -269,11 +269,20 @@ function holdGun(b) {
   b.flashM ??= makeFlash(.1);
   b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
-  b.gunM = gunM; b.spin = spin; b.spinV = 0;
+  b.gunM = gunM; b.spin = spin; b.spinV = 0; b.wf = 0;
   // reload start pose
   b.mag = mag; b.rl = { rk: -1, on: false, p: gunM.position.clone(), q: gunM.quaternion.clone(), qR: b.armR.quaternion.clone(), qL: b.armL.quaternion.clone(), magAt: mag && mag.position.clone(), oneHand: !h.dL };
   gunM.updateMatrix(); const inv = gunM.matrix.clone().invert(), fist = (a, d) => a.position.clone().addScaledVector(_hv.fromArray(d), ARM_LEN * u).applyMatrix4(inv);
   b.rl.fR = fist(b.armR, h.dR); b.rl.fL = h.dL ? fist(b.armL, h.dL) : null;
+  b.rl.fA = b.armR.position.clone().addScaledVector(_hv.fromArray(h.dR), ARM_LEN * u);
+}
+// a wand tips down to point straight while it fires (k = how far), turning round the fist
+const _wfq = new THREE.Quaternion(), _wfI = new THREE.Quaternion(), _wfd = new THREE.Vector3(), _wfl = new THREE.Vector3();
+function wandFlick(q, k) { _wfd.set(0, 0, -1).applyQuaternion(q); _wfl.set(_wfd.x, 0, _wfd.z).normalize(); return _wfq.setFromUnitVectors(_wfd, _wfl).slerp(_wfI, 1 - k); }
+function wandHold(b, dt) {
+  const R = b.rl, g = b.gunM; if (!R || !g || R.on || !BASE[b.gun].wand) return;
+  b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 ? 14 : -4)));
+  const r = wandFlick(R.q, b.wf); g.quaternion.copy(R.q).premultiply(r); g.position.copy(R.p).sub(R.fA).applyQuaternion(r).add(R.fA);
 }
 // knife swing for bots and other players
 function knifeChop(b) { const s = b.stab > 0 ? swingAt(1 - b.stab / KNIFE_SWING) : 0; b.aim.rotation.x += s * .9; b.aim.position.z = Math.max(0, s) * .12; }
@@ -701,7 +710,7 @@ function updateBot(b, dt) {
   if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
-  holdReload(b, b.reload, W.reload);
+  holdReload(b, b.reload, W.reload); wandHold(b, dt);
   // in range for this gun
   const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : true;
   const ready = sees && b.seeT >= S.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;

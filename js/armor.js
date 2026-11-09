@@ -184,7 +184,8 @@ function suitPieces(T, team) {
     B(-2, 2, yb, 13, 5, zf, 0); B(-2, 2, yb, 13, 4, 5, DK); // the opening
     for (const x of [-3, 2]) B(x, x + 1, yb, 13, 4, zf, TRIM);
     B(-8, 8, yb, 13, -zf - 2, -zf, C); // the cape
-    FB(-8, 8, -6, -4, team ? hex(team) : LEATHER, 1); // belt
+    M(8, 9, yb, 13, -zf, zf, C); // the sides, under the arms
+    const BELT = team ? hex(team) : LEATHER; FB(-8, 8, -6, -4, BELT, 1); M(8, 9, -6, -4, -zf - 1, zf + 1, BELT); // belt
     B(-3, 3, 6, 8, zf, zf + 1, TRIM); // clasp
     if (st >= 2) for (let k = 0; k < 7; k++) B(-7 + 2 * k, -5 + 2 * k, 8 - 2 * k, 10 - 2 * k, zf - 1, zf + 1, LEATHER); // a strap across the chest
     if (st >= 4) { B(-8, 8, 9, 13, -zf - 3, -zf - 2, C); M(4, 8, 10, 13, zf, zf + 1, C); M(4, 8, 10, 11, zf, zf + 1, TRIM); } // a mantle over the shoulders
@@ -205,9 +206,10 @@ function suitPadPieces(T, s) {
     ring(9, 10, HI); // two plates
     if (st >= 3) { B(10, x1 - 1, y1, y1 + 2, -4, 4, C); B(10, x1 - 1, y1 + 1, y1 + 2, -4, 4, HI); } // a second plate on top
     if (st >= 4) B(10, x1 - 1, y1 + 1, y1 + 2, -1, 1, TRIM);
-  } else { // long sleeves with a cuff
+  } else { // long sleeves with a cuff, closed on the inside
     ring(ylo + 1, ylo + 2, TRIM);
     if (st >= 4) ring(9, 10, TRIM);
+    B(7, 8, ylo, 12, -zp, zp, C); B(7, 8, ylo, ylo + 2, -zp, zp, TRIM); if (st >= 4) B(7, 8, 9, 10, -zp, zp, TRIM);
   }
   if (s < 0) for (const p of out) p[4] = -p[4];
   return out;

@@ -186,7 +186,7 @@ function heroGun(i) {
   const parts = makeGun(i, g, Math.max(0, gunUse(i) - 1));
   g.scale.setScalar(GUN_S);
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
-  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rs: { rk: -1 } });
+  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rs: { rk: -1 } });
   hf.flashM = makeFlash(.1); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   const kind = holdOf(BASE[i]);
@@ -268,6 +268,7 @@ function heroTick(dt) {
   if (hf.spin) { hf.spin.rotation.z += hf.spinV * dt; hf.spinV = Math.max(0, hf.spinV - dt * 25); }
   if (hf.round) hf.round.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .4);
   if (w.flare && hf.mag) hf.mag.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .6);
+  if (w.wand) hf.wf = Math.max(0, Math.min(1, hf.wf + dt * (hf.held && can ? 14 : -4)));
   if (hf.beamM) {
     hf.beamOn -= dt; hf.beamM.visible = hf.held && hf.beamOn > 0;
     if (hf.beamM.visible) { hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
@@ -498,6 +499,7 @@ function updateLobby(dt) {
         if (pose.fL) _l.lerp(_hv2, toPart); else { _l.copy(_hv2); leftK = Math.max(hLK, toPart); }
       }
     }
+    if (w && w.wand && hf.wf > 0) { const r = wandFlick(q0, hf.wf); q0.premultiply(r); gp.sub(_fr).applyQuaternion(r).add(_fr); } // points straight while it fires
     armL.quaternion.slerp(armTo(SHR, _fr, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * leftK);
     holdG.quaternion.copy(LOW_Q).slerp(q0, e);
     holdG.position.copy(LOW_P).lerp(gp, e);

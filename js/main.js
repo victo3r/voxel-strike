@@ -134,6 +134,7 @@ function update(dt) {
   aiming = opts.toggleAim ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); // gun settles after a shot
+  wandOn -= dt; wandK = Math.max(0, Math.min(1, wandK + dt * (wandOn > 0 && gunShown === cur ? 14 : -4)));
   tickCross(dt, BASE[cur]);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // barrels wind down
   if (kick < .6) { flashMesh.visible = false; flashLight.intensity = 0; }
@@ -178,6 +179,7 @@ function update(dt) {
     vm.rotation.set(kick * .25 * (1 - adsT * .85), 0, 0); // less muzzle climb while aiming
     if (vhold === 'pistol') vm.position.y += .09 * (1 - adsT); // pistols sit higher
     if (vw.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // holo sight to the middle
+    if (vw.wand) vm.rotation.x += WAND_UP * (1 - wandK) * (1 - adsT); // a wand rests tipped up, points straight while it fires
   }
   // reload animation
   const ra = reloading > 0 && gunShown === cur ? reloadPose(w.id, 1 - reloading / w.reload) : null;

@@ -132,6 +132,7 @@ function flame(w) {
 // heat ray beam
 function heatBeam(w) {
   if (w.frost) frostHeld = .12; else beamHeld = .12; // keeps the hum going
+  if (w.wand) wandOn = .15;
   crossKick(.4, 1.5); recoilKick(w);
   camera.getWorldDirection(fwd);
   ray2.setFromCamera(ndc.set(0, 0), camera); ray2.far = w.range;
