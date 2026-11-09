@@ -51,8 +51,16 @@ const SONGS = {
     bass: [[0, 0, 6], [6, 7, 2], [8, 12, 4], [12, 7, 4]],
     keys: true, lead: true, amb: 'wind', hats: .7, reese: .4,
   },
+  cove: { // salty and swaggering, G minor
+    bpm: 166,
+    chords: [[43, [55, 58, 62, 65]], [39, [55, 58, 62, 63]], [41, [53, 57, 60, 65]], [38, [54, 57, 62, 66]]],
+    pad: { cut: 1300, a: 1, v: .8 },
+    kit: { kickD: .12, snare: 188, drive: 1.35, bright: 1, room: .3, ride: .95 },
+    bass: [[0, 0, 3], [3, 7, 1], [4, 12, 2], [6, 7, 2], [8, 0, 3], [11, 7, 1], [12, 12, 2], [14, 7, 2]],
+    keys: true, lead: true, amb: 'waves', hats: .75, reese: .55,
+  },
 };
-const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky'];
+const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky', 'cove'];
 
 // what should be playing
 let muWant = { kind: 'lobby', id: 0, seed: 1 },muNow = null, muId = 0, muOld = [];
