@@ -338,17 +338,30 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 150, f2: 420, d: .14, v: .2, lp: 2000, glide: .1 });
     s.hiss({ ft: 'highpass', f: 4000, d: .08, v: .35 });
   }],
-  frostStart: [.4, .45, s => { // ice chimes in
-    for (const [t, f] of [[0, 2100], [.04, 2800], [.08, 3500]]) s.tone({ t, f, f2: f * 1.02, d: .3, v: .18 });
-    s.hiss({ ft: 'highpass', f: 5000, f2: 7000, a: .03, d: .25, v: .35 });
+  frostStart: [.45, .45, s => { // ice forming
+    s.crunch({ a: .01, d: .2, dens: .06, lo: 700, hi: 4000, v: .7 });
+    for (const [t, f] of [[0, 660], [.03, 880], [.06, 1175]]) s.tone({ t, f, f2: f * 1.01, d: .22, v: .2 });
+    s.tone({ type: 'triangle', f: 220, f2: 330, d: .2, v: .25 });
   }],
-  frostEnd: [.35, .3, s => { for (const [t, f] of [[0, 3200], [.05, 2500]]) s.tone({ t, f, f2: f * .9, d: .25, v: .14 }); s.hiss({ ft: 'highpass', f: 6000, f2: 3000, d: .2, v: .25 }); }],
+  frostEnd: [.4, .3, s => { s.crunch({ a: .005, d: .15, dens: .05, lo: 600, hi: 3200, v: .7 }); s.tone({ f: 880, f2: 660, d: .2, v: .18 }); }],
+  iceLoop: [2, .3, s => s.draw(0, 2, o => { // the wand's beam: crackling ice and glassy pings, made to loop
+    const N = o.length, kh = 1 - Math.exp(-6.2832 * 3800 / SR), kl = 1 - Math.exp(-6.2832 * 600 / SR);
+    let g = 0, p = 0, q = 0;
+    for (let k = 0; k < 2 * N; k++) { // twice round so the filters are settled where it loops
+      if (s.r() < .003) g += (s.r() * 2 - 1) * (.3 + s.r());
+      g *= .7; p += (g - p) * kh; q += (p - q) * kl;
+      if (k >= N) o[k - N] = (p - q) * 1.4;
+    }
+    const ping = (f, tau, v) => { const at = s.r() * N | 0; for (let k = 0; k < tau * 6 * SR; k++) o[(at + k) % N] += Math.sin(6.2832 * f * k / SR) * Math.exp(-k / SR / tau) * v; };
+    for (let k = 0; k < 26; k++) ping(900 + s.r() * 1500, .025 + s.r() * .035, .12 + s.r() * .18); // glassy tinkles
+    for (let k = 0; k < 5; k++) ping(260 + s.r() * 200, .09 + s.r() * .06, .2); // low cracks in the ice
+  })],
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
   djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // double jump
   swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife
-  saber: [.85, .55, s => { // a humming blade: a buzz that swells and falls as it swings
-    s.tone({ type: 'sawtooth', f: 90, f2: 116, d: .8, v: .42, lp: 820 });
-    s.tone({ type: 'sawtooth', f: 93, f2: 120, d: .8, v: .32, lp: 700 }); // a little off, so they beat
+  saber: [.85, .75, s => { // a humming blade: a buzz that swells and falls as it swings
+    s.tone({ type: 'sawtooth', f: 90, f2: 116, d: .8, v: .46, lp: 1050 });
+    s.tone({ type: 'sawtooth', f: 93, f2: 120, d: .8, v: .36, lp: 880 }); // a little off, so they beat
     s.tone({ f: 180, f2: 310, d: .38, v: .36 });
     s.hiss({ ft: 'bandpass', f: 600, f2: 2600, q: 3, a: .06, d: .38, v: .6, sweep: .26 });
   }],
@@ -717,18 +730,14 @@ function soundTick(dt, live) {
     bp.connect(beamGain).connect(bus); lfo.start();
   }
   if (bOn !== beamOn) { beamOn = bOn; sfx(bOn ? 'heatStart' : 'heatEnd'); beamGain?.gain.setTargetAtTime(bOn ? .1 : 0, t, bOn ? .03 : .06); }
-  // frost wand: icy wind and a shimmer
+  // frost wand: crackling ice
   frostHeld = live || inLobby ? frostHeld - dt : 0;
   const fzOn = frostHeld > 0;
-  if (fzOn && !frostGain) {
+  if (fzOn && !frostGain && BUF.iceLoop) {
     frostGain = ac.createGain(); frostGain.gain.value = 0;
-    const air = ac.createBufferSource(), nb = ac.createBuffer(1, SR, SR), nd = nb.getChannelData(0); for (let i = 0; i < SR; i++) nd[i] = Math.random() * 2 - 1; air.buffer = nb; air.loop = true;
-    const hp = ac.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 5200; hp.Q.value = .8;
-    const ag = ac.createGain(); ag.gain.value = .9; air.connect(hp).connect(ag).connect(frostGain);
-    const lfo = ac.createOscillator(), depth = ac.createGain(); lfo.frequency.value = 6; depth.gain.value = 25;
-    for (const f of [1760, 2637]) { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = .12; lfo.connect(depth).connect(o.frequency); o.connect(g).connect(frostGain); o.start(); }
-    frostGain.connect(bus); air.start(); lfo.start();
+    const ice = ac.createBufferSource(); ice.buffer = BUF.iceLoop.buf; ice.loop = true;
+    ice.connect(frostGain).connect(bus); ice.start();
   }
-  if (fzOn !== frostOn) { frostOn = fzOn; sfx(fzOn ? 'frostStart' : 'frostEnd'); frostGain?.gain.setTargetAtTime(fzOn ? .1 : 0, t, fzOn ? .03 : .06); }
+  if (fzOn !== frostOn) { frostOn = fzOn; sfx(fzOn ? 'frostStart' : 'frostEnd'); frostGain?.gain.setTargetAtTime(fzOn ? BUF.iceLoop.v : 0, t, fzOn ? .03 : .06); }
 }
 function soundsOff() { flameHeld = 0; if (flameGain) flameGain.gain.value = 0; flameOn = false; if (spinGain) spinGain.gain.value = 0; beamHeld = 0; beamOn = false; if (beamGain) beamGain.gain.value = 0; frostHeld = 0; frostOn = false; if (frostGain) frostGain.gain.value = 0; }

@@ -26,7 +26,7 @@ const BASE = [
   { id: 'frostwand', rar: 'epic', hold: 'melee', name: 'Frost Wand', cat: 'special', unlock: 16, price: 460, mob: 65, beam: true, frost: true, wand: true, pool: true, dmg: 9, rate: 1 / 15, range: 26, mag: 240, reload: 3, pellets: 1, spread: 0, auto: true, color: 0x9fe8ff, len: .5 },
   { id: 'warhammer', rar: 'epic', hold: 'melee', name: 'War Hammer', cat: 'melee', unlock: 17, price: 490, inf: true, melee: true, tilt: 1.1, swing: 'hammer', hit: 'smash', knock: 1.5, mob: 65, dmg: 95, rate: .95, range: 3, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0x6a6e78, len: .4, model: 'warhammer' },
   { id: 'executioner', rar: 'epic', hold: 'pistol', name: 'Executioner', cat: 'backup', unlock: 14, price: 400, mob: 70, zoom: 4, reticle: '212,123,255', laser: true, dmg: 85, rate: 1 / 1.8, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0x5b3b8a, len: .4 },
-  { id: 'crossbow', rar: 'rare', hold: 'rifle', name: 'Crossbow', cat: 'sniper', unlock: 7, price: 175, mob: 60, zoom: 3, scope: true, quiet: true, bow: true, headMul: 2.4, dmg: 85, rate: 1, mag: 1, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x6b4a2b, len: .8 },
+  { id: 'crossbow', rar: 'rare', hold: 'rifle', name: 'Crossbow', cat: 'sniper', unlock: 7, price: 175, mob: 60, zoom: 2.5, reticle: '255,190,80', spare: 12, quiet: true, bow: true, headMul: 2.4, dmg: 85, rate: 1, mag: 1, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x6b4a2b, len: .8 },
   { id: 'grenade', rar: 'epic', hold: 'rifle', name: 'Grenade Bouncer', cat: 'premium', unlock: 12, price: 350, mob: 60, grenade: true, dmg: 90, rate: .75, mag: 4, reload: 2.4, pellets: 1, spread: 0, auto: false, color: 0x3f7a3a, len: .7 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
@@ -59,7 +59,7 @@ const RECOIL = {
 const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4;
 const rec = { tp: 0, ty: 0, p: 0, y: 0 };
 const ammo = WEAPONS.map(w => w.mag);
-const resMax = i => BASE[i].inf ? Infinity : BASE[i].pool ? 0 : WEAPONS[i].mag * 4; // pool guns: no spare, the mag is all you get
+const resMax = i => BASE[i].inf ? Infinity : BASE[i].pool ? 0 : WEAPONS[i].mag * (BASE[i].spare ?? 4); // spare mags (pool guns: none, the mag is all you get)
 const reserve = WEAPONS.map(w => w.inf ? Infinity : 0);
 const owned = WEAPONS.map(w => !!w.free);
 const slotOf = i => CAT_I[BASE[i].cat];
@@ -353,12 +353,12 @@ const GUN_MODELS = {
     p(20, 2, 2, limb, 0, 1, -27); for (const s of [-1, 1]) { p(2, 2, 4, limb, s * 11, 1, -25); p(2, 2, 2, limb, s * 13, 1, -22); } // bow, its tips swept back
     for (let k = 0; k < 12; k++) for (const s of [-1, 1]) p(1, 1, 2, str, s * (12.5 - k), 2.5, Math.round(-21 + k * 1.45)); // string
     p(6, 2, 2, dark, 0, -3, -27); // stirrup
-    p(2, 2, 10, mat(0x2a2a2e), 0, 7, -12); p(2, 2, 1, glow(0x66ccff), 0, 7, -17.5); p(1, 5, 2, dark, 1.5, 4.5, -10); // little scope on a mount
+    for (const x of [-1.5, 1.5]) p(1, 4, 1, dark, x, 4, .5); p(4, 1, 1, dark, 0, 6.5, .5); // a little ring sight at the back
     const round = sub(0, 0, 0), r = at(round); // the loaded bolt
     r(2, 1, 20, mat(0xc9a46a), 0, 3.5, -14); r(2, 2, 2, mat(GUN_STEEL), 0, 4, -25); r(4, 1, 2, mat(0xc8402a), 0, 4.5, -5);
     p(4, 6, 4, wood, 0, -5, 0); p(4, 3, 4, wood, 0, -9.5, 1); // grip
     p(1, 1, 4, dark, .5, -6.5, -4); p(1, 3, 1, mat(0x888888), .5, -3.5, -3.5); // guard and trigger
-    return { muzzle: [4, -27], grip: [4, 8, 5, 0, -6, 0], fore: [4, 4, 10, 0, -1, -17], bands: [-6, -12], band: [6, 6, 0], round };
+    return { muzzle: [4, -27], grip: [4, 8, 5, 0, -6, 0], fore: [4, 4, 10, 0, -1, -17], bands: [-6, -12], band: [6, 6, 0], holo: [4.5, .5], round };
   },
 
   grenade({ p, mat, dark, glow, sub, at }) {
@@ -512,9 +512,9 @@ const GUN_MODELS = {
     p(6, 6, 3, dsteel, 0, 1, 13.5); // pommel
     p(6, 6, 3, gold, 0, 1, -11.5); // gold collar under the head
     p(8, 16, 10, steel, 0, 1, -18); p(8, 16, 2, dsteel, 0, 1, -18); // the head, a dark band round it
-    p(4, 2, 4, dsteel, 0, 10, -18); p(6, 2, 8, dsteel, 0, -8, -18); // a stub on top, a flat face below
-    p(4, 4, 6, steel, 0, 1, -26); // and a point out the front
-    return { muzzle: [1, -29], grip: [6, 6, 18, 0, 1, 6], fore: null, bands: [-6.5, -9.5], band: [6, 6, 1] };
+    p(8, 4, 10, dsteel, 0, 11, -18); p(6, 2, 8, dsteel, 0, -8, -18); // a spike on the back, a flat face on the front
+    p(6, 6, 2, steel, 0, 1, -24); // a short cap on the end
+    return { muzzle: [1, -26], grip: [6, 6, 18, 0, 1, 6], fore: null, bands: [-6.5, -9.5], band: [6, 6, 1] };
   },
   shockbeam({ p, mat, dark, glow, sub, at }) {
     const body = mat(0x2f4a66), dbody = mat(0x1f3044), coil = mat(0xd9a62a), zap = glow(0x8fe9ff), steel = mat(0x6e6e74);

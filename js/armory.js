@@ -43,7 +43,7 @@ function gunAttrs(w) {
   else if (w.auto) a.push('AUTOMATIC');
   else if (autoFire(w)) a.push('RAPID FIRE');
   else if (w.mag > 1) a.push('SEMI-AUTO');
-  if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : 'HOLO SIGHT');
+  if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : w.bow ? 'BOW SIGHT' : 'HOLO SIGHT');
   if (w.quiet) a.push(w.bow ? 'SILENT' : 'SUPPRESSED');
   if (w.headMul) a.push('HEADSHOT X' + w.headMul);
   if (w.pool) a.push('NO RELOADS');
@@ -95,6 +95,7 @@ function gunSpecs(i) {
   if (w.rocket || w.grenade) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
   if (w.grenade) out.push(['FUSE', GREN_FUSE + 's']);
   if (w.headMul) out.push(['HEADSHOT', 'X' + w.headMul]);
+  if (w.spare) out.push([w.bow ? 'SPARE BOLTS' : 'SPARE AMMO', w.mag * w.spare]);
   if (w.burn) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`]);
   if (w.flare) out.push(['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
