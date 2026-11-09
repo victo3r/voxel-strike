@@ -19,7 +19,7 @@ const BASE = [
   { id: 'herosword', rar: 'rare', hold: 'melee', name: 'Hero Sword', cat: 'melee', unlock: 5, price: 110, inf: true, melee: true, tilt: 1.1, mob: 75, dmg: 65, rate: .6, range: 3.2, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xc8873a, len: .4, model: 'herosword' },
   { id: 'shockbeam', rar: 'rare', hold: 'rifle', name: 'Shock Beam', cat: 'special', unlock: 8, price: 180, mob: 60, beam: true, shock: true, dmg: 9, rate: 1 / 15, range: 28, mag: 100, reload: 2.0, pellets: 1, spread: 0, auto: true, color: 0x2f4a66, len: .7 },
   { id: 'tigerbite', rar: 'epic', hold: 'rifle', name: 'Tigerbite', cat: 'sniper', unlock: 10, price: 300, mob: 55, zoom: 5, dmg: 110, rate: 1, mag: 6, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0xe07a1f, len: .9, scope: true },
-  { id: 'trex', rar: 'epic', hold: 'rifle', name: 'T. REX', cat: 'primary', unlock: 14, price: 400, mob: 60, action: 'PUMP ACTION', dmg: 20, rate: 1 / 1.6, mag: 6, reload: 1.6, pellets: 6, spread: .06, auto: false, color: 0x4f6b34, len: .6 },
+  { id: 'trex', rar: 'epic', hold: 'rifle', name: '"T. REX"', cat: 'primary', unlock: 14, price: 400, mob: 60, action: 'PUMP ACTION', dmg: 20, rate: 1 / 1.6, mag: 6, reload: 1.6, pellets: 6, spread: .06, auto: false, color: 0x4f6b34, len: .6 },
   { id: 'starsmasher', rar: 'legend', hold: 'rifle', name: 'Starsmasher', cat: 'primary', unlock: 30, price: 1150, mob: 60, zoom: 3, reticle: '255,215,90', starFx: true, dmg: 20, rate: .1, mag: 30, reload: 1.6, pellets: 1, spread: .005, auto: true, color: 0x24305a, len: .6 },
   { id: 'blazesaber', rar: 'legend', hold: 'melee', name: 'Blazesaber', cat: 'melee', unlock: 20, price: 750, inf: true, melee: true, tilt: 1.1, swing: 'saber', mob: 85, dmg: 60, rate: .55, range: 3.2, burn: 3, burnT: 2.5, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xff6a1a, len: .4, model: 'blazesaber' },
   { id: 'windsaber', rar: 'mythic', hold: 'melee', name: 'Windsaber', cat: 'melee', unlock: 40, price: 2000, inf: true, melee: true, tilt: 1.1, swing: 'saber', mob: 100, jump: [.25, .35, .45], dmg: 70, rate: .5, range: 3.4, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xe8f6ff, len: .4, model: 'windsaber' },
@@ -29,6 +29,8 @@ const BASE = [
   { id: 'crossbow', rar: 'rare', hold: 'rifle', name: 'Crossbow', cat: 'sniper', unlock: 7, price: 175, mob: 60, zoom: 2.5, reticle: '255,190,80', spare: 12, quiet: true, bow: true, headMul: 2.4, dmg: 85, rate: 1, mag: 1, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x6b4a2b, len: .8 },
   { id: 'grenade', rar: 'epic', hold: 'rifle', name: 'Grenade Bouncer', cat: 'premium', unlock: 12, price: 350, mob: 60, grenade: true, dmg: 90, rate: .75, mag: 4, reload: 2.4, pellets: 1, spread: 0, auto: false, color: 0x3f7a3a, len: .7 },
   { id: 'aerial', rar: 'epic', hold: 'rifle', name: 'Aerial Blast', cat: 'premium', unlock: 15, price: 435, mob: 60, rocket: true, gust: true, launch: 1.1, dmg: 95, rate: 1, mag: 6, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x8fd0f5, len: .8 },
+  { id: 'rubypierce', rar: 'legend', hold: 'pistol', name: 'Ruby Pierce', cat: 'backup', unlock: 22, price: 835, mob: 60, zoom: 4, reticle: '255,70,90', lance: 0xff2e48, pierce: true, wallBreak: true, dmg: 120, rate: 1 / .9, mag: 6, reload: 1.6, pellets: 1, spread: 0, auto: false, color: 0xb3162e, len: .45 },
+  { id: 'paragon', rar: 'legend', hold: 'rifle', name: 'Paragon', cat: 'sniper', unlock: 20, price: 760, mob: 55, zoom: 8, scope: true, lance: 0x3d9bff, pierce: true, wallBreak: true, dmg: 130, rate: 1 / .7, mag: 5, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x2a5bd8, len: .95 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -55,6 +57,7 @@ const RECOIL = {
   ar: { up: .55, side: .25, back: 1 }, thrasher: { up: .5, side: .22, back: 1 }, eradicator: { up: .25, side: .2, back: 1.2 },
   shotgun: { up: 2.8, side: .5, back: .6 }, trex: { up: 3.2, side: .55, back: .55 }, starsmasher: { up: .6, side: .22, back: 1 }, rocket: { up: 2.6, side: .35, back: .5 },
   sniper: { up: 1.8, side: .2, back: .28 }, semisniper: { up: 1.3, side: .18, back: .4 }, tigerbite: { up: 1.9, side: .2, back: .32 }, crossbow: { up: 1.2, side: .15, back: .5 }, grenade: { up: 2.2, side: .35, back: .6 }, aerial: { up: 2.4, side: .35, back: .55 },
+  rubypierce: { up: 2.3, side: .3, back: .75 }, paragon: { up: 2, side: .2, back: .3 },
   heatray: { up: .05, side: .06, back: 2 }, shockbeam: { up: .06, side: .08, back: 2 }, frostwand: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 },
 };
 const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4;
@@ -113,12 +116,13 @@ const POSE_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz', 'ay', 'az'
 const magSwap = (roll, drop, lift = .2) => { const h = { rz: roll, rx: lift, y: .06, x: -.07 }; return [[0, {}], [.14, h], [.3, { ...h, my: -drop * .4, ay: -.15 }], [.42, { ...h, my: -drop, ay: -.42 }], [.56, { ...h, my: -drop * .35, ay: -.18 }], [.7, { ...h, y: .07 }], [.74, { ...h, y: .085 }], [.86, { rx: .05, z: .035 }], [.93, { z: -.01 }], [1, {}]]; };
 // rounds pushed in one at a time
 const dips = (h, n, t0, t1, d = .025) => Array.from({ length: n }, (_, i) => { const t = t0 + (t1 - t0) * i / n, w = (t1 - t0) / n; return [[t + w * .45, { ...h, y: (h.y || 0) - d, ay: -.05 }], [t + w * .9, h]]; }).flat();
-const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], aerial: [.3, .42] };
+const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], aerial: [.3, .42], rubypierce: [.3, .36], paragon: [.3, .42] };
 const RELOAD_ANIM = (() => {
   const pistol = roll => { const h = { rx: .45, rz: roll, y: .07, x: -.06 }; return [[0, {}], [.16, h], [.3, { ...h, my: -.26 }], [.31, { ...h, my: -.45 }], [.46, { ...h, my: -.11, hand: 1 }], [.58, { ...h, my: -.09, hand: 1 }], [.66, { ...h, y: .03, hand: 1 }], [.72, { ...h, y: .045, hand: .7 }], [.8, { ...h, y: .02 }], [.86, { rx: .08, z: .04 }], [.93, { z: -.012 }], [1, {}]]; };
   const sg = { rz: -.5, rx: .28, y: -.04 }, bolt = { rz: .3, rx: .1, y: -.03, mz: .09, my: .02 }, box = { rz: -.4, ry: -.22, y: -.05 }, cell = { rx: .38, rz: -.25, y: .02 }, tank = { rz: -.5, rx: .18, y: -.02 };
   return {
     voxel: pistol(-.3), hitman: pistol(-.4), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16), aerial: magSwap(-.4, .36, .2),
+    rubypierce: pistol(-.35), paragon: magSwap(-.35, .38, .16),
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     trex: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
@@ -581,6 +585,36 @@ const GUN_MODELS = {
     p(4, 3, 4, body, 0, -3.5, -3); p(4, 3, 4, body, 0, -6.5, -2); // grip
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -8.5, -2); mg(2, 6, 2, las, 0, -5, -2); // power cell glowing up inside the grip
     return { muzzle: [2, -23], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-15, -17], band: [6, 6, 2], holo: [8, -7], mag };
+  },
+  rubypierce({ p, mat, dark, glow, sub, at }) {
+    const ruby = mat(0xb3162e), lruby = mat(0xe8445e), druby = mat(0x6a0c1c), wine = mat(0x2a161c), core = glow(0xff4a64), hot = glow(0xffc2cc);
+    p(6, 6, 20, ruby, 0, 2, -10); p(4, 1, 20, lruby, 0, 5.5, -10); // housing and its bright top
+    p(6, 2, 10, 0, 0, 2, -10); p(4, 2, 10, core, 0, 2, -10); p(4, 2, 2, hot, 0, 2, -10); // a window each side onto the glowing core
+    p(6, 1, 4, druby, 0, 6.5, -8); for (const x of [-2.5, 2.5]) p(1, 4, 2, druby, x, 9, -8); p(6, 1, 2, druby, 0, 11.5, -8); // holo sight
+    p(6, 6, 4, druby, 0, 2, -22); p(2, 2, 1, core, 0, 2, -24.5); // emitter and its lens
+    for (const y of [-.5, 4.5]) p(4, 1, 3, druby, 0, y, -25.5); // prongs above and below the lens
+    p(4, 2, 2, druby, 0, 4, 1); // hammer
+    p(4, 2, 14, wine, 0, -2, -7); // frame
+    p(1, 1, 4, dark, 0, -5.5, -8); p(1, 2, 1, dark, 0, -4, -10.5); p(1, 2, 1, mat(0x777777), 0, -4, -7.5); // trigger guard and trigger
+    p(4, 3, 4, wine, 0, -4.5, -3); p(4, 3, 4, wine, 0, -7.5, -2); // grip
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -9.5, -2); mg(2, 6, 2, core, 0, -6, -2); // power cell up inside the grip
+    return { muzzle: [2, -26], grip: [4, 7, 5, 0, -6, -2.5], fore: null, bands: [-17, -19], band: [6, 6, 2], holo: [9, -8], mag };
+  },
+  paragon({ p, mat, dark, glow, sub, at }) {
+    const navy = mat(0x1d2a58), blue = mat(0x2f62d6), white = mat(0xe6edf8), cell = glow(0x4aa8ff), hot = glow(0xd2ecff);
+    p(4, 6, 10, navy, 0, -1, 5); p(4, 9, 2, blue, 0, -1.5, 11); p(4, 2, 6, white, 0, 3, 4); // stock, butt plate, cheek rest
+    p(6, 6, 18, blue, 0, 0, -9); p(4, 1, 18, white, 0, 3.5, -9); // receiver and its white top
+    p(4, 4, 28, navy, 0, .5, -32); p(6, 2, 22, cell, 0, .5, -33); // barrel, glowing rails down both sides
+    for (const z of [-31, -36, -41]) p(6, 6, 2, blue, 0, .5, z); // coils
+    p(6, 5, 10, blue, 0, -.5, -23); for (const z of [-20.5, -23.5, -26.5]) p(6, 1, 1, cell, 0, -1, z); // handguard and its glowing vents
+    p(6, 6, 4, navy, 0, .5, -47); p(2, 2, 1, hot, 0, .5, -49.5); // muzzle and its lens
+    p(4, 4, 18, navy, 0, 7, -10); p(6, 6, 2, blue, 0, 7, -1); p(6, 6, 2, blue, 0, 7, -19); // scope tube and bells
+    p(4, 4, 1, glow(0x8fd0ff), 0, 7, -19.5); // lens
+    p(2, 2, 2, dark, 0, 4, -5); p(2, 2, 2, dark, 0, 4, -15); // scope mounts
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 7, 5, navy, 0, -6.5, -13); mg(4, 3, 3, cell, 0, -6.5, -13); // energy cell with a glowing window
+    p(4, 5, 4, navy, 0, -5.5, -2); p(4, 3, 4, navy, 0, -9.5, -1); // pistol grip
+    p(1, 1, 4, dark, 0, -6.5, -6); p(1, 3, 1, dark, 0, -4.5, -8.5); p(1, 2, 1, mat(0xaaaaaa), 0, -4, -5.5); // guard and trigger
+    return { muzzle: [.5, -50], grip: [4, 8, 5, 0, -7, -1.5], fore: [6, 5, 10, 0, -.5, -23], bands: [-6, -10], band: [8, 7, .5], mag };
   },
   heatray({ p, mat, dark, glow, sub, at }) {
     const cop = mat(0xb5652b), dcop = mat(0x7e4220), brass = mat(0xc9a43a), steel = mat(0x6e6e74), wood = mat(0x5a3a22);

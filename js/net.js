@@ -570,6 +570,7 @@ net = (() => {
       const n = Math.min(r.fired, 3); r.fired = 0;
       if (W.melee) { sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING; }
       else if (!W.flame && !W.beam) { z.muzzle = .05; for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (W.starFx && z.flashM) starPuff(z.flashM); }
+      if (W.lance) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); showLance(z.flashM.getWorldPosition(fv).clone(), lanceLine(eyeV, dirV, W, [ground, ...crateMeshes]), W.lance); } // their beam, just for show
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0;
     z.stab = Math.max(0, z.stab - dt); knifeChop(z);
@@ -646,7 +647,7 @@ net = (() => {
     }
     // where the victim was when you saw it
     const r = remotes.get(vp), seen = r && r.body === victim && r.seenT ? r.seenT : now();
-    const c = [vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(seen), o.pj | 0];
+    const c = [vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(seen), o.pj | 0, o.thru | 0]; // thru: how a lance got there
     c.s = shotN; list.push(c);
   }
   const burn = (victim, gunId, by) => claim(victim, { kind: 7, gun: gunId, pellets: 1, by });

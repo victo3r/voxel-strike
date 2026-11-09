@@ -78,6 +78,7 @@ const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
+  rubypierce: [10, 24], paragon: [18, 36],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -90,6 +91,8 @@ const GUN_FIT = {
   trex: d => d < 5.5 ? 1.05 : d < 10 ? .9 : d < 15 ? .32 : .05,
   starsmasher: d => d < 3 ? .6 : d < 28 ? .95 : .7,
   executioner: d => d < 24 ? .75 : .55,
+  rubypierce: d => d < 4 ? .5 : d < 30 ? .85 : .7,
+  paragon: d => d > 20 ? 1.2 : d > 14 ? .7 : d > 8 ? .3 : .1,
   shockbeam: d => d < 3 ? .55 : d < 24 ? .88 : .2,
   tigerbite: d => d > 20 ? 1.15 : d > 14 ? .65 : d > 8 ? .25 : .1,
   shotgun: d => d < 5 ? 1 : d < 9 ? .85 : d < 14 ? .3 : .05,
@@ -597,6 +600,11 @@ function botFire(b, W, dist) {
     b.leadGuess = .6 + Math.random() * .6;
     return;
   }
+  if (W.lance) {
+    const wob = () => (Math.random() + Math.random() - 1) * err;
+    aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
+    return botLance(b, W);
+  }
   const youUp = respawnT <= 0 && !friendly(b, YOU_T);
   pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25); // as wide as a bot
   // shots hit any enemy in the way
@@ -622,6 +630,23 @@ function botFire(b, W, dist) {
       if (!zz.dead) { hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W); }
     } else burst(wall.point, 0x999999, 2);
   }
+}
+// a bot's lance: through anyone in the way (not its team), you included
+function botLance(b, W) {
+  let you = null;
+  if (respawnT <= 0 && !friendly(b, YOU_T)) {
+    pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25);
+    losRay.set(eye, dirV);
+    if (losRay.ray.intersectBox(pBox, hitV)) you = { you: true, distance: eye.distanceTo(hitV), point: hitV.clone() };
+  }
+  const parts = [ground, ...crateMeshes]; for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) parts.push(...z.parts);
+  const L = lanceLine(eye, dirV, W, parts, you);
+  for (const h of L.hits) {
+    const d = W.dmg * BOT.dmgMul * h.mul * (h.head ? headMul(W) : 1);
+    if (h.zz === YOU_T) hurtPlayer(Math.max(1, Math.round(d)), false, b, h.head, 0, 0, h.thru);
+    else hurtZombie(h.zz, d, h.point, h.head, false, b, 0, 0, h.thru);
+  }
+  showLance(b.flashM.getWorldPosition(beamFrom).clone(), L, W.lance);
 }
 
 function updateBot(b, dt) {

@@ -60,7 +60,9 @@ function gunAttrs(w) {
   if (w.headMul) a.push('HEADSHOT X' + w.headMul);
   if (w.pool) a.push('NO RELOADS');
   if (w.grenade) a.push('BOUNCES', 'EXPLOSIVE');
-  if (w.laser) a.push('LASER');
+  if (w.laser || w.lance) a.push('LASER');
+  if (w.pierce) a.push('PIERCING');
+  if (w.wallBreak) a.push('WALL BREAK');
   if (w.wand) a.push('WAND');
   if (slows(w)) a.push('SLOW');
   if (w.knock) a.push('KNOCKBACK');
@@ -97,8 +99,10 @@ const DESC = {
   warhammer: 'A huge hammer that sends whoever it hits flying',
   crossbow: 'Silent bolts that hit a head really hard',
   grenade: 'Grenades that bounce off walls and go boom on whoever they touch',
-  executioner: 'Purple laser bolts that hit like a sniper, from a pistol',
+  executioner: 'Quick purple laser bolts that hit hard, shot after shot',
   aerial: 'A cannon full of wind that blows foes away and throws you sky high',
+  rubypierce: 'One red beam from a glowing ruby core, through walls and anyone behind them',
+  paragon: 'Line them up and one blue beam goes through the lot, walls included',
 };
 // extra stats for the details view
 function gunSpecs(i) {
@@ -115,6 +119,8 @@ function gunSpecs(i) {
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
   if (slows(w)) out.push(['SLOW', `${Math.round((1 - (w.frost ? FROST_K : SLOW_K)) * 100)}% FOR ${SLOW_T}s`]);
   if (w.knock) out.push(['KNOCKBACK', 'BIG']);
+  if (w.pierce) out.push(['PIERCE', `-${Math.round((1 - PIERCE_FALL) * 100)}% A BODY`]);
+  if (w.wallBreak) out.push(['THROUGH WALLS', `${Math.round(WALL_MUL * 100)}% DAMAGE`]);
   if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }

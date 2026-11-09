@@ -46,6 +46,7 @@ function shoot() {
   if (gunSpin) gunSpinV = 30;
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);
+  else if (w.lance) fireLance(w);
   else {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w)); recoilKick(w);
     if (w.starFx && !aiming) starPuff(flashMesh, scene, .6); // not while you aim: they'd fill the sight
@@ -71,6 +72,66 @@ function shoot() {
     }
   }
   if (ammo[cur] === 0 && reserve[cur]) reload();
+}
+// lance guns: one beam through bodies and walls that hangs in the air for a moment
+const LANCE_FAR = 120, LANCE_T = .5, PIERCE_FALL = .75, WALL_MUL = .5;
+const lanceRay = new THREE.Raycaster(), lances = [], lanceGeo = new THREE.BoxGeometry(1, 1, 1), _lf = new THREE.Vector3(), _lc = new THREE.Color();
+// everything a lance passes, in order, and how hard it still hits each body
+function lanceLine(eye, dir, w, parts, you = null, skip = null) {
+  lanceRay.set(eye, dir); lanceRay.far = LANCE_FAR;
+  const hs = lanceRay.intersectObjects(parts, false), hits = [], walls = [], seen = new Set();
+  if (you) { let k = 0; while (k < hs.length && hs[k].distance < you.distance) k++; hs.splice(k, 0, you); }
+  let wall = false, n = 0, end = null;
+  for (const h of hs) {
+    const zz = h.you ? YOU_T : h.object.userData.zombie;
+    if (zz) {
+      if (zz.dead || seen.has(zz) || skip?.(zz)) continue;
+      seen.add(zz);
+      hits.push({ zz, head: h.you ? h.point.y > P.pos.y + 1.45 : !!h.object.userData.head, point: h.point, mul: PIERCE_FALL ** n * (wall ? WALL_MUL : 1), thru: n * 2 + (wall ? 1 : 0) });
+      n++;
+      if (!w.pierce) { end = h.point; break; }
+      continue;
+    }
+    if (h.object === ground || !w.wallBreak) { end = h.point; break; }
+    if (walls.length < 4) walls.push(h.point);
+    wall = true;
+  }
+  return { hits, walls, end: end ? end.clone() : eye.clone().addScaledVector(dir, LANCE_FAR), stop: !!end };
+}
+// the beam: a glow and a hot core, k = thickness
+function showLance(from, L, col, k = 1, sc = scene) {
+  for (const p of L.walls) burst(p, col, 3); // punched through here
+  if (L.stop) burst(L.end, col, 4);
+  const len = from.distanceTo(L.end); if (len < .3) return;
+  const g = new THREE.Group(), mats = [
+    new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .5, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
+    new THREE.MeshBasicMaterial({ color: _lc.set(col).lerp(new THREE.Color(0xffffff), .65), transparent: true, depthWrite: false, fog: false }), // it glows, fog doesn't hide it
+  ];
+  for (const [m, s] of [[mats[0], .17], [mats[1], .06]]) { const b = new THREE.Mesh(lanceGeo, m); b.scale.set(s * k, s * k, 1); g.add(b); }
+  g.position.lerpVectors(from, L.end, .5); g.lookAt(L.end); g.scale.z = len;
+  sc.add(g); lances.push({ g, mats, sc, t: LANCE_T });
+}
+function lanceTick(dt) {
+  for (let i = lances.length - 1; i >= 0; i--) {
+    const l = lances[i];
+    if ((l.t -= dt) <= 0) { l.sc.remove(l.g); l.mats.forEach(m => m.dispose()); lances.splice(i, 1); continue; }
+    const f = l.t / LANCE_T;
+    l.mats[0].opacity = .5 * f; l.mats[1].opacity = Math.min(1, f * 1.6);
+    l.g.scale.x = l.g.scale.y = .5 + .5 * f; // thins out as it fades
+  }
+}
+function clearLances() { for (const l of lances) { l.sc.remove(l.g); l.mats.forEach(m => m.dispose()); } lances.length = 0; }
+function fireLance(w) {
+  kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w)); recoilKick(w);
+  sfx(w.id);
+  ray.setFromCamera(ndc.set(0, 0), camera);
+  const L = lanceLine(ray.ray.origin, ray.ray.direction, w, shotTargets(), null, zz => zz.type === 'bot' && friendly(null, zz));
+  for (const h of L.hits) hurtZombie(h.zz, w.dmg * h.mul * (h.head ? headMul(w) : 1), h.point, h.head, false, null, 0, 0, h.thru);
+  // through a sight it starts further out, or it would cover the view
+  if (adsT > .5 && (w.scope || gunHolo)) {
+    const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), D = Math.min(.5 / t, .4 * camera.position.distanceTo(L.end));
+    showLance(camera.localToWorld(_lf.set(0, -.7 * D * t, -D)), L, w.lance, .3);
+  } else showLance(flashMesh.getWorldPosition(_lf), L, w.lance);
 }
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {

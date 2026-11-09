@@ -283,6 +283,20 @@ const SOUNDS = {
     s.tone({ f: 4200, f2: 900, d: .08, v: .3 });
     s.hiss({ ft: 'bandpass', f: 5000, q: 2, d: .04, v: .35 });
   }],
+  rubypierce: [.9, .9, s => { // a heavy zap with a glassy ring after it
+    s.tone({ f: 150, f2: 40, d: .35, v: .9 });
+    s.tone({ type: 'sawtooth', f: 1900, f2: 140, d: .32, v: .32, lp: 4200 });
+    s.tone({ type: 'square', f: 3800, f2: 700, d: .16, v: .2, lp: 6000 });
+    s.hiss({ ft: 'bandpass', f: 4200, f2: 900, q: 1.5, d: .45, v: .45 });
+    s.ring({ f: 1760, t: .03, d: .55, v: .09 });
+  }],
+  paragon: [1.2, 1, s => { // a crack, a long electric tear and a low ring
+    s.hiss({ ft: 'highpass', f: 3200, d: .03, v: .9 });
+    s.tone({ f: 105, f2: 26, d: .55, v: 1 });
+    s.tone({ type: 'sawtooth', f: 1500, f2: 85, d: .5, v: .34, lp: 3600 });
+    s.hiss({ ft: 'bandpass', f: 3400, f2: 450, q: 1.2, d: .8, v: .55 });
+    s.ring({ f: 1175, t: .05, d: .8, v: .08 });
+  }],
   zap: [.12, .22, s => { for (let k = 0; k < 4; k++) s.clack({ t: k * .018, f: 3000 + Math.random() * 3000, d: .008, v: .5 }); s.hiss({ ft: 'highpass', f: 5000, d: .05, v: .4 }); }], // shock beam crackle
   eradicator: [.12, .32, s => { // the motor whir is in soundTick
     s.hiss({ ft: 'bandpass', f: 1500, f2: 700, d: .045, v: .9 });
@@ -441,6 +455,23 @@ const SOUNDS = {
     s.tone({ type: 'sine', f: 2400, f2: 800, a: .003, d: .05, v: .14, glide: .045 });
     s.hiss({ ft: 'bandpass', f: 2600, f2: 900, q: 2, a: .01, d: .045, v: .3, sweep: .05 });
   }],
+  zin_rubypierce: [.24, .34, s => {
+    s.hiss({ ft: 'bandpass', f: 1000, f2: 2600, q: 2, a: .012, d: .04, v: .35, sweep: .05 });
+    s.tone({ type: 'sine', f: 700, f2: 2100, t: .01, a: .004, d: .07, v: .16, glide: .06 });
+  }],
+  zout_rubypierce: [.2, .3, s => {
+    s.tone({ type: 'sine', f: 2000, f2: 650, a: .003, d: .05, v: .14, glide: .045 });
+    s.hiss({ ft: 'bandpass', f: 2400, f2: 800, q: 2, a: .01, d: .045, v: .3, sweep: .05 });
+  }],
+  zin_paragon: [.45, .42, s => { // the scope hums up
+    s.hiss({ ft: 'bandpass', f: 450, f2: 1300, q: 1.5, a: .03, d: .07, v: .55, sweep: .09 });
+    s.clack({ t: .08, f: 1600, d: .012, v: .45, body: .4 });
+    s.tone({ type: 'sine', f: 220, f2: 880, t: .05, a: .02, d: .18, v: .12, glide: .15 });
+  }],
+  zout_paragon: [.3, .36, s => {
+    s.hiss({ ft: 'bandpass', f: 1200, f2: 420, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
+    s.tone({ type: 'sine', f: 800, f2: 240, a: .01, d: .1, v: .1, glide: .1 });
+  }],
   zin_tigerbite: [.4, .42, s => {
     s.hiss({ ft: 'bandpass', f: 450, f2: 1300, q: 1.5, a: .03, d: .07, v: .6, sweep: .09 });
     s.thud({ t: .07, d: .03, f: 120, v: .9 });
@@ -478,6 +509,14 @@ const SOUNDS = {
   r_executioner: [1.4, .45, s => {
     s.magOut(.1); s.magIn(.55);
     s.tone({ type: 'square', f: 250, f2: 1400, t: .8, a: .25, d: .1, v: .2, lp: 2600, glide: .3 }); s.tone({ f: 1900, t: 1.15, d: .15, v: .28 });
+  }],
+  r_rubypierce: [1.6, .45, s => {
+    s.magOut(.1); s.magIn(.65);
+    s.tone({ type: 'square', f: 220, f2: 1300, t: .9, a: .3, d: .1, v: .2, lp: 2400, glide: .35 }); s.ring({ f: 1760, t: 1.3, d: .25, v: .12 });
+  }],
+  r_paragon: [2.2, .45, s => {
+    s.magOut(.2); s.magIn(1.05);
+    s.tone({ type: 'sine', f: 200, f2: 1600, t: 1.25, a: .3, d: .15, v: .22, glide: .4 }); s.clack({ t: 1.8, f: 1700, d: .015, v: .5, body: .3 });
   }],
   r_tigerbite: [2, .45, s => { s.magOut(.2); s.magIn(1.0); s.clack({ t: 1.1, f: 1500, d: .015, v: .5, body: .3 }); s.rack(1.55); }],
   r_shockbeam: [2, .45, s => {

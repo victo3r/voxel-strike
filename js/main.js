@@ -384,7 +384,7 @@ function update(dt) {
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, r.gust ? 0xe8f7ff : 0x888888, 1); }
   }
 
-  updateFlares(dt); updateGrenades(dt); beamTick(dt); tracerTick(dt); globTick(dt);
+  updateFlares(dt); updateGrenades(dt); beamTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;

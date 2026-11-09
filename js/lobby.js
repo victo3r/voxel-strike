@@ -245,6 +245,7 @@ function heroShot() {
   sfx(w.id, { v: .5 * hv() }); hf.flash = .05;
   if (w.starFx) starPuff(hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
+  if (w.lance) { showLance(_hm.clone(), { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, w.lance, .6, lobbyScene); return; }
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
@@ -254,6 +255,7 @@ function heroShot() {
   }
 }
 function heroTick(dt) {
+  lanceTick(dt);
   for (let k = heroFx.length - 1; k >= 0; k--) {
     const f = heroFx[k]; f.life -= dt; f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt);
     if (f.life <= 0) { lobbyScene.remove(f.m); heroFx.splice(k, 1); }

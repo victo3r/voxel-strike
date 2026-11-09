@@ -82,12 +82,12 @@ function hitFx(zz, point, head, quiet) {
 }
 // quiet = burn tick, by = the bot that did it (null = you)
 // kind and pj say what hit it, for online play
-function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0) {
+function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0, thru = 0) {
   if (!Number.isFinite(dmg)) return; // a bad number would make it unkillable
   if (zz.type === 'bot' && friendly(by, zz)) return; // no friendly fire
   if (net.on && (zz.remote || zz.pid)) { // online the server owns its health
     if (!quiet) { hitFx(zz, point, head, false); if (!by) hitMarker(head ? 'head' : 'body'); }
-    net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by });
+    net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
   }
   if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // hats can block or soften headshots
@@ -128,10 +128,10 @@ function youHitFx(head, armorOnly, silver = armorOnly) {
   $('hit').style.opacity = .4; setTimeout(() => $('hit').style.opacity = 0, 80);
 }
 // pierce skips armor, by = the bot that shot you
-function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0) {
+function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0, thru = 0) {
   if (respawnT > 0 || matchOver || !pvp() && dead || by && friendly(by, YOU_T)) return; // your own rocket still hurts
   if (net.on) { // online the server decides the damage
-    net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by });
+    net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
   }
   if (by?.rec) d *= 1 + by.rec.fx.dmg;
@@ -263,6 +263,8 @@ const SHOP = [
   { gun: 'crossbow', price: 160, desc: 'quiet bolts, huge headshots' },
   { gun: 'grenade', price: 300, desc: 'bouncy grenades, big booms' },
   { gun: 'aerial', price: 360, desc: 'blasts of wind that throw you sky high' },
+  { gun: 'rubypierce', price: 420, desc: 'a red beam through walls and whole rows of them' },
+  { gun: 'paragon', price: 400, desc: `${BASE[gi('paragon')].dmg} dmg beam that goes through the lot` },
   { gun: 'trex', price: 250, desc: 'six big pellets and a dino bite' },
   { gun: 'starsmasher', price: 380, desc: 'stars out of the muzzle, 3x sight' },
   { gun: 'blazesaber', price: 320, desc: 'a blade of fire that burns them' },
