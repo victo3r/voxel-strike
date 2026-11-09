@@ -213,7 +213,7 @@ function heroTrigger(down) {
   if (heroCan()) { hf.pend = false; if (!autoFire(hf.st)) heroShot(); }
 }
 function heroReload() {
-  const w = hf.st; if (!heroCan() || !w || w.melee || hf.rl > 0) return;
+  const w = hf.st; if (!heroCan() || !w || w.melee || w.pool || hf.rl > 0) return;
   heroFireStop(); hf.rl = w.reload;
   sfx('r_' + w.id, { v: .7, rate: BASE[hf.i].reload / w.reload });
 }
@@ -222,7 +222,7 @@ function heroShot() {
   const w = hf.st;
   if (hf.rl > 0 || hf.cd > 0) return;
   if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 }); hf.auto = .25; return; }
-  hf.cd = w.rate; if (!w.inf) hf.ammo--;
+  hf.cd = w.rate; if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
   hf.kick = w.beam ? 0 : w.flame ? .06 : 1; // a beam can't kick: its far end would jump
   if (w.melee) { sfx(w.swing || 'swing', { v: .7 }); return; }
   hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
