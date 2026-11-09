@@ -122,6 +122,14 @@ const caveK = new Float64Array(N * N); // light reaching in from the openings
   for (let c = 0; c < N * N; c++) if (cave[c]) { const i = c % N, j = c / N | 0; if (D4.some(([a, b]) => !inGrid(i + a, j + b) || !cave[at(i + a, j + b)])) { dd[c] = 1; q.push(c); } }
   for (let k = 0; k < q.length; k++) { const i = q[k] % N, j = q[k] / N | 0; for (const [a, b] of D4) { const n = at(i + a, j + b); if (inGrid(i + a, j + b) && cave[n] && !dd[n]) { dd[n] = dd[q[k]] + 1; q.push(n); } } }
   for (let c = 0; c < N * N; c++) if (cave[c]) CC[c] = part[c] === 3 ? r2(CF[c] + 2.25) : part[c] === 2 ? 2.7 : dd[c] >= 3 ? 3.6 : dd[c] === 2 ? 3.15 : 2.7;
+  for (let c = 0; c < N * N; c++) if (cave[c]) { // head room over the floor next door too, so steps up and down never scrape the roof
+    const i = c % N, j = c / N | 0;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+      if (!inGrid(i + a, j + b)) continue;
+      const n = at(i + a, j + b), f = cave[n] ? CF[n] : H[n];
+      if (f < CC[c]) CC[c] = Math.max(CC[c], r2(f + 2.25)); // a body (1.8) and half a block
+    }
+  }
   const dl = new Int16Array(N * N).fill(-1), ql = [];
   for (let c = 0; c < N * N; c++) if (cave[c]) { const i = c % N, j = c / N | 0; if (D4.some(([a, b]) => { const n = inGrid(i + a, j + b) ? at(i + a, j + b) : -1; return n >= 0 && !cave[n] && hAt(i + a - O + .5, j + b - O + .5) < CC[c] - .3; })) { dl[c] = 0; ql.push(c); } }
   for (let k = 0; k < ql.length; k++) { const i = ql[k] % N, j = ql[k] / N | 0; for (const [a, b] of D4) { const n = at(i + a, j + b); if (inGrid(i + a, j + b) && cave[n] && dl[n] < 0) { dl[n] = dl[ql[k]] + 1; ql.push(n); } } }
