@@ -645,6 +645,7 @@ soundsReady.catch(e => console.warn('sound setup failed', e));
 
 // play a sound, optionally out in the world at a position
 function sfx(name, { at = null, v = 1, rate = 1, far = 60 } = {}) {
+  if (self.event) tapN++; // played by a click or key handler
   if (!ac || ac.state !== 'running' || !BUF[name]) return null;
   let gain = BUF[name].v * v, pan = 0, cut = 20000, send = .1;
   if (at) {
@@ -673,6 +674,23 @@ function sfx(name, { at = null, v = 1, rate = 1, far = 60 } = {}) {
   return src;
 }
 function stopSfx(src) { try { src?.stop(); } catch {} }
+
+// every click on something clickable makes the ui sound, unless its own handler played one
+let tapN = 0, tapDown = 0, tapAt = 0;
+function tappable(t) {
+  for (let e = t; e && e.nodeType === 1 && e !== document.body; e = e.parentElement) {
+    if (e.matches('input:not([type=checkbox]):not([type=radio]), textarea, select, canvas, .quiet')) return null;
+    if (e.matches('button, a[href], [role=button], input') || getComputedStyle(e).cursor === 'pointer') return e.disabled ? null : e;
+  }
+  return null;
+}
+function uiTap(el) { sfx('ui'); }
+addEventListener('pointerdown', () => { tapDown = tapN; }, true);
+addEventListener('click', e => {
+  const el = tappable(e.target); if (!el) return;
+  const n = e.detail ? tapDown : tapN; // a keyboard click has no pointerdown
+  setTimeout(() => { if (tapN === n && performance.now() - tapAt > 60) { tapAt = performance.now(); uiTap(el); } });
+}, true);
 
 // one hurt sound per hit, not one per shotgun pellet
 function hurtSfx(who, name, at, opts = {}) {

@@ -17,7 +17,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   play at another server (the tests use `?srv=http://127.0.0.1:9` to force offline).
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
   under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
-  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `mobile.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/measure-bots.mjs ladder` measures bot hit rates per
+  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `mobile.mjs`, `clicks.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/measure-bots.mjs ladder` measures bot hit rates per
   skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
 - `node ../voxel-strike-server/scripts/check-tables.mjs` must pass after changing any number the server also uses (weapon stats,
@@ -52,8 +52,8 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 - **Maps** (`js/maps/*.js`) register with `startMap`, build meshes plus collision `solids` (`addBlock`/`addSlab`/`addSolid` in
   `world.js`) and `cover` (what stops bullets). Decorative detail goes through `detail()` so the low graphics setting can hide it.
 - **Voxel models.** Guns (`GUN_MODELS` in weapons.js), armor, boots and hats are pixel boxes turned into geometry by `voxelGeos`,
-  which also draws the black outline. A model's moving parts are `sub()` groups (`spin`, `round`, `mag`). Hotbar and armory
-  sprites are rendered from the same models.
+  which also draws the black outline. A model's moving parts are `sub()` groups (`spin`, `round`, `mag`). Pictures of guns, armor, boots,
+  hats and skins in the UI are 3D renders of the same models (`modelPic` in core.js).
 - **Baked hold poses (gotcha).** How bots and the armory character hold each gun is solved once and baked into `HOLD_BAKED` in
   `js/hold.js`, keyed by each `GUN_MODELS` entry's source length. Editing a gun model invalidates its pose and every player's
   browser re-solves it (seconds of stutter). Re-bake with `node ../voxel-strike-server/scripts/bake-holds.mjs` (8010 server

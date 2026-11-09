@@ -28,7 +28,7 @@ const BASE = [
   { id: 'executioner', rar: 'epic', hold: 'pistol', name: 'Executioner', cat: 'backup', unlock: 14, price: 400, mob: 70, zoom: 4, reticle: '212,123,255', laser: true, dmg: 85, rate: 1 / 1.8, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0x5b3b8a, len: .4 },
   { id: 'crossbow', rar: 'rare', hold: 'rifle', name: 'Crossbow', cat: 'sniper', unlock: 7, price: 175, mob: 60, zoom: 2.5, reticle: '255,190,80', spare: 12, quiet: true, bow: true, headMul: 2.4, dmg: 85, rate: 1, mag: 1, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x6b4a2b, len: .8 },
   { id: 'grenade', rar: 'epic', hold: 'rifle', name: 'Grenade Bouncer', cat: 'premium', unlock: 12, price: 350, mob: 60, grenade: true, dmg: 90, rate: .75, mag: 4, reload: 2.4, pellets: 1, spread: 0, auto: false, color: 0x3f7a3a, len: .7 },
-  { id: 'aerial', rar: 'epic', hold: 'rifle', name: 'Aerial Blast', cat: 'premium', unlock: 15, price: 435, mob: 60, rocket: true, gust: true, launch: 1.1, dmg: 110, rate: 1, mag: 6, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x8fd0f5, len: .8 },
+  { id: 'aerial', rar: 'epic', hold: 'rifle', name: 'Aerial Blast', cat: 'premium', unlock: 15, price: 435, mob: 60, rocket: true, gust: true, launch: 1.1, dmg: 95, rate: 1, mag: 6, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x8fd0f5, len: .8 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -77,7 +77,7 @@ function renderHotbar() {
   $('hotbar').innerHTML = CATS.map(([, label], s) => {
     const i = slotGun[s], key = nice(binds['slot' + (s + 1)][0] || binds['slot' + (s + 1)][1]);
     return `<div class="slot ${i === cur ? 'on' : ''} ${i < 0 ? 'empty' : ''}"><span class="k">${key === '-' ? '' : key}</span>` +
-      `<span class="s">${i >= 0 ? stars(i) : ''}</span><img src="${i >= 0 ? SPRITES[i] : SPRITES[0]}"><span class="c">${label}</span></div>`;
+      `<span class="s">${i >= 0 ? stars(i) : ''}</span><img class="ai" src="${gunPic(Math.max(0, i))}"><span class="c">${label}</span></div>`;
   }).join('');
 }
 
@@ -388,8 +388,9 @@ const GUN_MODELS = {
     p(8, 8, 1, dsky, 0, 1, -28.5); p(4, 4, 1, glow(0xd8f6ff), 0, 1, -28.5); // inside it, the wind glowing
     p(6, 6, 1, dsky, 0, 1, 7.5); // the intake behind the fan
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 6, 6, gold, 0, -5, -11); mg(4, 1, 6, white, 0, -8.5, -11); // the air tank
+    p(4, 2, 8, white, 0, -3, -3); // under the barrel, holding the grip and trigger
     p(4, 4, 4, white, 0, -6, -1); p(4, 3, 4, white, 0, -9.5, 0); // grip
-    p(1, 1, 4, dark, 0, -7.5, -5); p(1, 2, 1, mat(0x888888), 0, -5, -4.5); // guard and trigger
+    p(1, 1, 4, dark, 0, -7.5, -5); p(1, 3, 1, dark, 0, -5.5, -6.5); p(1, 2, 1, mat(0x888888), 0, -5, -4.5); // guard and trigger
     p(4, 6, 4, dsky, 0, -4, -19); // front grip
     return { muzzle: [1, -32], grip: [4, 7, 5, 0, -7.5, -.5], fore: [4, 6, 4, 0, -4, -19], bands: [-6, -16], band: [8, 8, 1], spin, mag };
   },
@@ -618,33 +619,6 @@ function gunPieces(i, stars) {
   for (let s = 0; s < stars; s++) c.p(bw, bh, 2, gold, 0, by, m.bands[s]); // one gold band per upgrade
   return { m, main, subs };
 }
-// hotbar and armory sprites, drawn from the 3D model
-const spriteCol = new THREE.Color();
-function gunSprite(i) {
-  const { main, subs } = gunPieces(i, 0);
-  for (const s of subs) for (const [w, h, d, m, x, y, z] of s.list) main.push([w, h, d, m, x + s.at[0], y + s.at[1], z + s.at[2]]);
-  const { lo, NX, NY, NZ, at } = voxelGrid(main), px = [];
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = NX - 1; x >= 0; x--) {
-    const m = at(x, y, z); if (!m) continue;
-    const P = gunPal[m];
-    let col = '#000';
-    if (P.glow || (at(x, y + 1, z) && at(x, y - 1, z) && at(x, y, z + 1) && at(x, y, z - 1))) {
-      const h = Math.imul(x * 73856093 ^ y * 19349663 ^ z * 83492791 ^ 2654435761, 1597334677) >>> 0;
-      col = spriteCol.copy(P.c).multiplyScalar(P.glow ? 1 : .82 + (h % 1000) / 1000 * .18).getStyle();
-    }
-    const sx = NZ - 1 - z, sy = NY - 1 - y;
-    px.push(sx, sy, col);
-    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
-    break;
-  }
-  const w = x1 - x0 + 1, h = y1 - y0 + 1, W = Math.max(w, 2 * h), H = Math.max(h, Math.ceil(W / 2));
-  const ox = ((W - w) >> 1) - x0, oy = ((H - h) >> 1) - y0;
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
-  for (let k = 0; k < px.length; k += 3) { g.fillStyle = px[k + 2]; g.fillRect(px[k] + ox, px[k + 1] + oy, 1, 1); }
-  return c.toDataURL();
-}
 function gunGeos(i, stars) {
   const { m, main } = gunPieces(i, stars), px = gunPx(i);
   const part = s => {
@@ -655,7 +629,9 @@ function gunGeos(i, stars) {
   };
   return { m, main: voxelGeos(main, px), spin: part(m.spin), round: part(m.round), mag: part(m.mag) };
 }
-const SPRITES = BASE.map((w, i) => gunSprite(i));
+// gun pictures (hotbar, armory, chests): muzzle turned away a little, seen from above
+const gunPicAt = (i, yaw = .4, tilt = .36, w = 320, h = 160) => modelPic(null, g => makeGun(i, g, 0), { yaw: yaw - Math.PI / 2, tilt, w, h });
+const gunPic = i => modelPic('gun:' + i, g => makeGun(i, g, 0), { yaw: .4 - Math.PI / 2, tilt: .36 });
 const gunBox = (b, px) => b && { c: [b[3] * px, b[4] * px, b[5] * px], h: [b[0] / 2 * px, b[1] / 2 * px, b[2] / 2 * px] };
 function makeGun(i, g, stars) {
   const b = gunGeoCache[BASE[i].id + ':' + stars] ??= gunGeos(i, stars), px = gunPx(i);
@@ -763,11 +739,11 @@ function reload() {
 }
 function cancelReload() { reloading = 0; stopSfx(reloadSnd); reloadSnd = null; }
 buildGun();
-// build gun models in idle time so nothing stalls later
+// build gun models and pictures in idle time so nothing stalls later
 {
   const later = window.requestIdleCallback || (f => setTimeout(f, 50));
   let k = 0;
-  const next = () => { if (k >= BASE.length) return; gunGeoCache[BASE[k].id + ':0'] ??= gunGeos(k, 0); k++; later(next); };
+  const next = () => { if (k >= BASE.length) return; gunPic(k); k++; later(next); }; // a picture builds its model too
   later(next);
 }
 

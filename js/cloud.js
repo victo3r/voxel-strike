@@ -126,9 +126,10 @@ function renderAcct() {
 }
 $('acct').addEventListener('click', async e => {
   if (e.target.id === 'acctOut') {
+    sfx('ui');
     if (sync.dirty) await push();
     api('POST', '/logout').catch(() => {});
-    signedOut(); sfx('ui');
+    signedOut();
   }
 });
 $('acctForm').addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'NumpadEnter') acctGo('login'); });

@@ -173,7 +173,7 @@ function assign(code) {
 $('bindList').addEventListener('mousedown', e => {
   const b = e.target.closest('button'); if (!b || rebinding) return;
   e.stopPropagation(); e.preventDefault();
-  rebinding = { a: b.dataset.a, s: +b.dataset.s }; renderBinds();
+  rebinding = { a: b.dataset.a, s: +b.dataset.s }; renderBinds(); sfx('ui');
 });
 // settings tabs
 let setTab = 'controls';

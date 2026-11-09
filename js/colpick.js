@@ -29,7 +29,7 @@ function cpkBuild() {
   });
   $('cpHex').addEventListener('keydown', e => { if (e.code === 'Enter') cpkClose(); });
   $('cpOk').onclick = () => cpkClose();
-  document.addEventListener('pointerdown', e => { if (cpk.on && !el.contains(e.target) && !cpk.anchor?.contains(e.target)) cpkClose(); }, true);
+  document.addEventListener('pointerdown', e => { if (cpk.on && !el.contains(e.target) && !cpk.anchor?.contains(e.target)) cpkClose(true); }, true);
 }
 addEventListener('keydown', e => { if (cpk.on && e.code === 'Escape') { e.stopImmediatePropagation(); cpkClose(); } }, true); // before the menus' own Escape
 function cpkDraw() {
@@ -63,8 +63,10 @@ function colorPick(anchor, c, onInput, onDone) {
   cpk.el.style.left = Math.max(8, x) + 'px'; cpk.el.style.top = Math.max(8, Math.min(innerHeight - h - 8, y)) + 'px';
   cpk.on = onInput; sfx('ui');
 }
-function cpkClose() {
+function cpkClose(outside = false) {
   if (!cpk.el) return;
   cpk.el.style.display = 'none'; cpk.on = null; cpk.anchor = null;
-  const d = cpk.done; cpk.done = null; d?.();
+  const d = cpk.done; cpk.done = null;
+  if (outside && d) addEventListener('pointerup', () => setTimeout(d), { once: true, capture: true }); // after the click, so redrawing doesn't swallow it
+  else d?.();
 }

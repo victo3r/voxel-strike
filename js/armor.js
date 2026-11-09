@@ -261,32 +261,5 @@ function dressArmor(ch, n, team = null) {
 // armory preview
 function armorModel(n, g) { g.add(new THREE.Mesh(armorGeo(n, null, 1 / 16, 'all'), gunLit)); }
 
-// ---- armor icons, all tiers in the same frame
-const armorSpriteCache = [];
-function armorSprite(k) { // k = tier index (0 = Wooden)
-  if (armorSpriteCache[k]) return armorSpriteCache[k];
-  const { lo, NX, NY, NZ, at } = voxelGrid(armorAllPieces(k + 1, -15));
-  const W = 42, H = 38, X0 = -21, YT = 21, K = 4; // Champion just fits
-  const dep = new Float32Array(W * H).fill(-99), col = new Array(W * H);
-  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-    const x = X0 + c - lo[0], y = YT - r - lo[1];
-    for (let z = NZ - 1; z >= 0; z--) { const m = at(x, y, z); if (m) { dep[r * W + c] = z; col[r * W + c] = gunPal[m].c; break; } }
-  }
-  const cv = document.createElement('canvas'); cv.width = W * K; cv.height = H * K;
-  const g = cv.getContext('2d'), filled = (r, c) => r >= 0 && c >= 0 && r < H && c < W && dep[r * W + c] > -99;
-  let zmax = 0; dep.forEach(d => zmax = Math.max(zmax, d));
-  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-    const i = r * W + c, d = dep[i];
-    let black;
-    if (d === -99) black = filled(r - 1, c) || filled(r + 1, c) || filled(r, c - 1) || filled(r, c + 1);
-    else black = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].some(([a, b]) => filled(a, b) && dep[a * W + b] > d);
-    if (d === -99 && !black) continue;
-    if (black) g.fillStyle = '#000';
-    else {
-      const sh = Math.max(.6, 1 - (zmax - d) * .06), h = col[i].getHex();
-      g.fillStyle = `rgb(${(h >> 16 & 255) * sh | 0},${(h >> 8 & 255) * sh | 0},${(h & 255) * sh | 0})`;
-    }
-    g.fillRect(c * K, r * K, K, K);
-  }
-  return armorSpriteCache[k] = cv.toDataURL();
-}
+// armor pictures, all at the top basic tier's scale so better armor looks bigger; k = tier index (0 = Wooden)
+const armorPic = k => modelPic('armor:' + k, g => armorModel(k + 1, g), { yaw: .55, tilt: .25, w: 220, h: 200, ref: ['armor', g => armorModel(ARMOR_MAX, g)] });

@@ -128,15 +128,15 @@ const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
 const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS']];
 let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1, suitSel = '';
 const myArmor = () => Math.min(ARMOR_MAX, prof.armor | 0);
-const pageIcon = p => p === 'weapons' ? SPRITES[loadoutGun('primary')] : armorSprite(Math.max(0, wornArmor() - 1));
+const pageIcon = p => p === 'weapons' ? gunPic(loadoutGun('primary')) : armorPic(Math.max(0, wornArmor() - 1));
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
   $('armPages').innerHTML = PAGES.map(([p, label]) =>
-    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}"><img${p === 'wear' ? ' class="ai"' : ''} src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
+    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}"><img class="ai" src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
   if (armPage === 'wear') { renderWear(); return; }
   heroArmor(wornArmor()); wearGear();
   $('armTabs').innerHTML = CATS.map(([c, label], s) =>
-    `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img src="${SPRITES[loadoutGun(c)]}"><span>${label}</span></button>`).join('');
+    `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img class="ai" src="${gunPic(loadoutGun(c))}"><span>${label}</span></button>`).join('');
   const eq = loadoutGun(armCat);
   if (BASE[armSel]?.cat !== armCat) { armSel = eq; armPick = false; }
   $('armList').style.display = armDet ? 'none' : '';
@@ -145,7 +145,7 @@ function renderArmory() {
   else $('armList').innerHTML = catList().map(i => {
     const w = BASE[i], tag = isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
     return `<div class="card rr${isLocked(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
-      (tag ? `<span class="tag">${tag}</span>` : '') + `<img src="${SPRITES[i]}">` +
+      (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${gunPic(i)}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
   }).join('');
   renderAct();
@@ -192,9 +192,9 @@ function renderDetail() {
 const ARMOR_DESC = 'Armor soaks up hits before your health does';
 function renderWear() {
   const n = myArmor(), w = basicWorn(), T = armorOf(w || 1), sid = shownSuit();
-  const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, wornArmor() - 1)) : (G => { const on = G.worn(); return on ? G.sprite(on.id, on.st) : G.sprite(G.list[0].id, 1); })(GEAR[c]);
+  const tabIcon = c => c === 'skins' ? headPic(prof.look) : c === 'armor' ? armorPic(Math.max(0, wornArmor() - 1)) : (G => { const on = G.worn(); return on ? G.pic(on.id, on.st) : G.pic(G.list[0].id, 1); })(GEAR[c]);
   $('armTabs').innerHTML = WEAR_CATS.map(([c, label]) =>
-    `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="${c === 'skins' ? 'hd' : 'ai'}" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
+    `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="${c === 'skins' ? 'hd ai' : 'ai'}" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
   if (wearCat === 'skins') armDet = false;
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
@@ -206,7 +206,7 @@ function renderWear() {
     const locked = !n && prof.lv < T.unlock, on = n && !wornSuit(), tag = on ? 'WEARING' : n ? '' : locked ? `${ico('lock')} LVL ${T.unlock}` : COIN + T.price;
     $('armList').innerHTML = `<p class="wd">${ARMOR_DESC}</p>` +
       `<div class="card rr${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${on ? ' on' : ''}${rarCls(T)}" data-armor="1">${tag ? `<span class="tag">${tag}</span>` : ''}` +
-      `<img class="ai" src="${armorSprite((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div></div>` +
+      `<img class="ai wr" src="${armorPic((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div></div>` +
       SUITS.map(suitCard).join('');
   }
   heroArmor(sid ? suitN(sid, suitShown(sid)) : armDet ? armorPrev : w || 1);
@@ -267,7 +267,7 @@ function suitCard(S) {
   const st = suitStars(S.id), worn = wornSuit()?.id === S.id, locked = suitLocked(S), [sa, set] = setTag(S.id, worn);
   const tag = locked ? `${ico('lock')} LVL ${S.unlock[0]}` : !st ? COIN + S.price[0] : worn ? 'WEARING' : '';
   return `<div class="card rr${locked ? ' locked' : ''}${suitSel === S.id ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(S)}" data-suit="${S.id}">` +
-    sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${armorSprite(suitN(S.id, suitShown(S.id)) - 1)}">` +
+    sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${armorPic(suitN(S.id, suitShown(S.id)) - 1)}">` +
     `<div class="cn">${S.name} <span class="st">${suitStarTxt(S.id)}</span></div></div>`;
 }
 function renderSuitDetail() {
@@ -318,36 +318,20 @@ function suitClick(d) {
 // ---- WEAR page: skins
 const SKINS_DESC = 'Pick a look, make your own with CUSTOMIZE, or paint one from scratch with DRAW';
 // skin icon, front view
-const lookSpriteCache = new Map();
-function skinSprite(look, head) {
-  const key = (head ? 'h' : 'b') + (pxShown(look) ? 'd' : '') + lookKey(look);
-  if (lookSpriteCache.has(key)) return lookSpriteCache.get(key);
-  const src = skinTexture(look).image, W = head ? 8 : 16, H = head ? 8 : 33, K = 4;
-  const c = document.createElement('canvas'); c.width = W + 2; c.height = H + 2;
-  const g = c.getContext('2d'), cut = (sx, sy, w, h, x, y) => g.drawImage(src, sx, sy, w, h, x + 1, y + 1, w, h);
-  if (head) cut(8, 8, 8, 8, 0, 0);
-  else {
-    cut(8, 8, 8, 8, 4, 0); cut(36, 4, 4, 1, 6, 8); cut(20, 20, 8, 12, 4, 9);
-    cut(44, 20, 4, 12, 0, 9); cut(36, 52, 4, 12, 12, 9); cut(4, 20, 4, 12, 4, 21); cut(20, 52, 4, 12, 8, 21);
-  }
-  const d = g.getImageData(0, 0, W + 2, H + 2), a = (x, y) => x >= 0 && y >= 0 && x < W + 2 && y < H + 2 && d.data[(y * (W + 2) + x) * 4 + 3] > 0;
-  const out = document.createElement('canvas'); out.width = (W + 2) * K; out.height = (H + 2) * K;
-  const o = out.getContext('2d');
-  for (let y = 0; y < H + 2; y++) for (let x = 0; x < W + 2; x++) {
-    const i = (y * (W + 2) + x) * 4;
-    if (a(x, y)) o.fillStyle = `rgb(${d.data[i]},${d.data[i + 1]},${d.data[i + 2]})`;
-    else if (a(x - 1, y) || a(x + 1, y) || a(x, y - 1) || a(x, y + 1)) o.fillStyle = '#000';
-    else continue;
-    o.fillRect(x * K, y * K, K, K);
-  }
-  const url = out.toDataURL(); lookSpriteCache.set(key, url); return url;
+// skin pictures: the character in 3D, or just the head
+function skinPic(look, head) {
+  let ch = null;
+  return modelPic((head ? 'head:' : 'skin:') + (pxShown(look) ? 'd' : '') + lookKey(look), g => {
+    ch = buildChar(look, 1 / 16);
+    if (head) { ch.headPiv.position.set(0, 0, 0); g.add(ch.headPiv); } else g.add(ch.g);
+  }, head ? { yaw: .5, tilt: .22, w: 128, h: 128, done: () => ch.dispose() } : { yaw: .45, tilt: .12, w: 160, h: 320, done: () => ch.dispose() });
 }
-const lookSprite = L => skinSprite(L, false), headSprite = L => skinSprite(L, true);
+const lookPic = L => skinPic(L, false), headPic = L => skinPic(L, true);
 function renderSkins() {
   const list = lookChoices(), on = lookIndex();
   $('armList').innerHTML = `<p class="wd">${SKINS_DESC}</p>` + list.map((p, i) =>
     `<div class="card${i === skinPick ? ' sel' : ''}${i === on ? ' on' : ''}" data-skin="${i}">${i === on ? '<span class="tag">WEARING</span>' : ''}` +
-    `<img class="sk" src="${lookSprite(p.look)}"><div class="cn">${p.name}</div></div>`).join('') +
+    `<img class="sk ai" src="${lookPic(p.look)}"><div class="cn">${p.name}</div></div>`).join('') +
     (inLobby ? '<div class="card" data-cust="1"><span class="plus">' + ico('pencil') + '</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '') +
     (!prof.draw ? `<div class="card" data-dbuy="1"><span class="plus">${ico('pencil')}</span><div class="cn">DRAW</div><small>PAINT YOUR OWN SKINS · ${COIN}${DRAW_PRICE}</small></div>`
       : inLobby && (prof.draws?.length || 0) < DRAW_MAX ? `<div class="card" data-dnew="1"><span class="plus">${ico('pencil')}</span><div class="cn">DRAW NEW</div><small>${prof.draws?.length || 0} / ${DRAW_MAX} SKINS</small></div>` : '');
@@ -368,14 +352,14 @@ function openCust() { closeArmory(); showCust(true); }
 // ---- WEAR page: boots and hats
 const GEAR = {
   boots: { list: BOOTS, I: BOOT_I, own: 'boots', use: 'bootUse', on: 'bootOn', stars: bootStars, using: bootUse, worn: wornBoots,
-    sprite: bootSprite, model: bootsModel, face: .6, put: b => heroBoots(b),
+    pic: bootPic, model: bootsModel, face: .6, put: b => heroBoots(b),
     desc: 'Boots give you special stat boosts',
     about: {
       warrior: 'Steel greaves for brawlers, so you hit harder and take a little less',
       raider: 'Winged runners that make you faster and let you jump again in midair',
     } },
   hats: { list: HATS, I: HAT_I, own: 'hats', use: 'hatUse', on: 'hatOn', stars: hatStars, using: hatUse, worn: wornHat,
-    sprite: hatSprite, model: hatModel, face: .5, put: h => heroHat(h),
+    pic: hatPic, model: hatModel, face: .5, put: h => heroHat(h),
     desc: 'Hats give you special stat boosts',
     about: {
       warrior: 'A steel helmet that takes the edge off hits and sometimes turns a headshot into a body shot',
@@ -418,7 +402,7 @@ function renderGear() {
     const K = G.list[i], st = G.stars(K.id), worn = prof[G.on] === K.id && st, s = gearShown(G, K), [sa, set] = setTag(K.id, worn);
     const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
     return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel && gearPick ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(K)}" data-gear="${i}">` +
-      sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${G.sprite(K.id, s)}">` +
+      sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${G.pic(K.id, s)}">` +
       `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div></div>`;
   }).join('');
   gearDress();
@@ -596,7 +580,7 @@ $('armory').addEventListener('click', armClick);
 $('armAct').addEventListener('click', armClick);
 $('armAct').addEventListener('pointerdown', e => e.stopPropagation());
 $('heroAct').addEventListener('pointerdown', e => e.stopPropagation());
-const armIcon = () => $('armIcon').src = SPRITES[loadoutGun('primary')]; // ARMORY button shows your primary
+const armIcon = () => $('armIcon').src = gunPic(loadoutGun('primary')); // ARMORY button shows your primary
 armIcon();
 function armShow(on) {
   $('armory').style.display = on ? 'flex' : 'none';
@@ -615,3 +599,10 @@ addEventListener('keydown', e => {
   if (armDet) { armDet = false; renderArmory(); } else closeArmory();
 });
 addEventListener('resize', () => { placeAct(); if (armOpen) fitStats($('armAct')); });
+// wear pictures are drawn in idle time too, so the WEAR page opens without a stall
+{
+  const jobs = [...ARMOR_TIERS.map((t, k) => () => armorPic(k)), ...[[BOOTS, bootPic], [HATS, hatPic]].flatMap(([L, f]) => L.flatMap(x => [1, 2, 3].map(s => () => f(x.id, s)))),
+    ...PRESETS.map(p => () => lookPic(p.look)), () => headPic(prof.look)];
+  const later = window.requestIdleCallback || (f => setTimeout(f, 50)), next = () => { const j = jobs.shift(); if (j) { j(); later(next); } };
+  later(next);
+}

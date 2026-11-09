@@ -78,3 +78,26 @@ const COIN = '<i class="coin"></i>';
   rows.forEach((row, y) => [...row].forEach((ch, x) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x, y, 1, 1); } }));
   document.documentElement.style.setProperty('--coin', `url(${c.toDataURL()})`);
 }
+// pictures of 3D models for the UI (guns, armor, boots, hats, skins), drawn in a small renderer of their own and kept as PNGs
+const picCache = new Map(), picRef = new Map(), picBox = new THREE.Box3();
+let pic = null;
+function modelPic(key, build, { yaw = 0, tilt = .3, w = 320, h = 160, ref = null, done = null } = {}) {
+  if (key && picCache.has(key)) return picCache.get(key);
+  if (!pic) {
+    const r = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    const sc = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, -50, 50), tip = new THREE.Group(), turn = new THREE.Group();
+    const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(2, 3, 4);
+    sc.add(new THREE.HemisphereLight(0xffffff, 0x3a4a40, 1.5), sun, tip); tip.add(turn);
+    pic = { r, sc, cam, tip, turn };
+  }
+  const { r, sc, cam, tip, turn } = pic, span = b => Math.max(b.max.x - b.min.x, (b.max.y - b.min.y) * w / h);
+  const fit = f => { turn.clear(); f(turn); turn.rotation.y = yaw; tip.rotation.x = tilt; sc.updateMatrixWorld(true); return picBox.setFromObject(tip, true); };
+  let rs = 0; // ref: a bigger model that sets the scale, so a set's pictures share one
+  if (ref) { const rk = [ref[0], yaw, tilt, w / h].join(); if (!picRef.has(rk)) picRef.set(rk, span(fit(ref[1]))); rs = picRef.get(rk); }
+  const b = fit(build), cx = (b.min.x + b.max.x) / 2, cy = (b.min.y + b.max.y) / 2, fw = Math.max(rs, span(b)) * 1.06 / 2, fh = fw * h / w;
+  Object.assign(cam, { left: cx - fw, right: cx + fw, top: cy + fh, bottom: cy - fh }); cam.updateProjectionMatrix();
+  r.setSize(w, h, false); r.render(sc, cam); turn.clear(); done?.();
+  const url = r.domElement.toDataURL();
+  if (key) picCache.set(key, url);
+  return url;
+}

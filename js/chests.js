@@ -39,8 +39,8 @@ function lootCard(l, n = l.n) {
   else if (l.k === 'boosts') { pic = `<span class="lc">${ico('bolt')}</span>`; name = `${n} BOOSTER${n === 1 ? '' : 'S'}`; }
   else if (l.k === 'xp') { pic = `<span class="lc lx">XP</span>`; name = `${nText(n)} XP`; }
   else if (l.k === 'star') { pic = `<span class="lc ls">${ico('star').repeat(n)}</span>`; name = l.gave ? l.gave.map(([i, k]) => `${BASE[i].name.toUpperCase()} +${k} ${ico('star')}`).join('<br>') || '50 COINS A STAR' : n > 1 ? `+${n} STARS ON YOUR GUNS` : '+1 STAR ON A GUN'; }
-  else if (l.k === 'gun') { pic = `<img src="${gunSprite(gi(l.id))}">`; name = BASE[gi(l.id)].name.toUpperCase(); }
-  else { pic = `<img src="${l.k === 'boots' ? bootSprite(l.id, 1) : hatSprite(l.id, 1)}">`; name = gearOf(l).name.toUpperCase(); }
+  else if (l.k === 'gun') { pic = `<img class="ai" src="${gunPic(gi(l.id))}">`; name = BASE[gi(l.id)].name.toUpperCase(); }
+  else { pic = `<img class="ai" src="${l.k === 'boots' ? bootPic(l.id, 1) : hatPic(l.id, 1)}">`; name = gearOf(l).name.toUpperCase(); }
   return `<div class="loot" style="--rc:${rc}"><div class="pic">${pic}</div><b>${name}</b><small>${rn}</small>${l.p !== undefined ? `<i>${(l.p * 100).toFixed(l.p < .1 ? 1 : 0)}%</i>` : ''}</div>`;
 }
 // open one: pay the keys, roll, hand it over

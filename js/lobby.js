@@ -201,7 +201,9 @@ const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: t
 const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), gust: new THREE.MeshBasicMaterial({ color: 0xd8f4ff }), flare: new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
   beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }),
   shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), frost: new THREE.MeshBasicMaterial({ color: 0xc8f4ff, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
-const heroCan = () => armOpen && inLobby && armPage === 'weapons' && hf.i >= 0 && holdK > .9;
+const heroLive = () => inLobby && (armOpen ? armPage === 'weapons' : lob.on);
+const heroCan = () => heroLive() && hf.i >= 0 && holdK > .9;
+const hv = () => armOpen ? 1 : .55; // quieter when he plays with it in the lobby
 function heroFireStop() {
   hf.held = hf.pend = false; if (hf.beamM) hf.beamM.visible = false;
 }
@@ -215,16 +217,16 @@ function heroTrigger(down) {
 function heroReload() {
   const w = hf.st; if (!heroCan() || !w || w.melee || w.pool || hf.rl > 0) return;
   heroFireStop(); hf.rl = w.reload;
-  sfx('r_' + w.id, { v: .7, rate: BASE[hf.i].reload / w.reload });
+  sfx('r_' + w.id, { v: .7 * hv(), rate: BASE[hf.i].reload / w.reload });
 }
 const _hm = new THREE.Vector3(), _hd = new THREE.Vector3(), _hq = new THREE.Quaternion();
 function heroShot() {
   const w = hf.st;
   if (hf.rl > 0 || hf.cd > 0) return;
-  if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 }); hf.auto = .25; return; }
+  if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
   hf.cd = w.rate; if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
   hf.kick = w.beam ? 0 : w.flame ? .06 : 1; // a beam can't kick: its far end would jump
-  if (w.melee) { sfx(w.swing || 'swing', { v: .7 }); return; }
+  if (w.melee) { sfx(w.swing || 'swing', { v: .7 * hv() }); return; }
   hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
   if (w.flame) {
     flameHeld = .12;
@@ -237,10 +239,10 @@ function heroShot() {
   if (w.beam) {
     if (w.frost) frostHeld = .12; else beamHeld = .12;
     hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.frost ? FX_MATS.frost : w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
-    if (w.shock && Math.random() < .25) sfx('zap', { v: .4 });
+    if (w.shock && Math.random() < .25) sfx('zap', { v: .4 * hv() });
     hf.beamOn = .08; return;
   }
-  sfx(w.id, { v: .5 }); hf.flash = .05;
+  sfx(w.id, { v: .5 * hv() }); hf.flash = .05;
   if (w.starFx) starPuff(hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
@@ -259,7 +261,7 @@ function heroTick(dt) {
   if (hf.i < 0) return;
   const w = hf.st;
   const can = heroCan();
-  if (!armOpen || !inLobby || armPage !== 'weapons') heroFireStop();
+  if (!heroLive()) heroFireStop();
   hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); hf.flash -= dt;
   if (can && hf.held && (autoFire(w) || hf.pend)) { hf.pend = false; heroShot(); }
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
@@ -279,6 +281,36 @@ $('heroShoot').innerHTML = ico('aim'); $('heroReload').innerHTML = ico('reload')
 $('heroShoot').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); $('heroShoot').setPointerCapture(e.pointerId); heroTrigger(true); });
 for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) $('heroShoot').addEventListener(ev, () => heroTrigger(false));
 $('heroReload').addEventListener('pointerdown', e => { e.stopPropagation(); heroReload(); });
+// lobby (armory shut): he pulls out a gun from your loadout most of the time, plays with it, puts it away
+const lob = { on: false, last: -1, next: 2, until: 0, act: 0, taps: [], rel: 0 };
+const LOB_PANELS = ['binds', 'boost', 'daily', 'lb', 'card', 'chests', 'pick', 'post'];
+const lobbyHush = () => LOB_PANELS.some(id => $(id)?.style.display === 'flex'); // no shooting behind a menu
+function lobbyGuns(t) {
+  if (!inLobby || armOpen || custOpen() || drawOpen()) { lob.on = false; lob.taps.length = 0; lob.rel = 0; lob.next = Math.max(lob.next, t + 2.5); return; }
+  if (!lob.on) {
+    if (holdK > .02) return; // still putting the last one away
+    if (hf.i >= 0) heroGun(-1);
+    if (t < lob.next) return;
+    const list = CATS.map(([c]) => loadoutGun(c)).filter(i => i >= 0), pick = list.filter(i => i !== lob.last);
+    const i = (pick.length ? pick : list)[Math.random() * (pick.length || list.length) | 0];
+    if (i === undefined) return;
+    heroGun(i); lob.last = i; lob.on = true; lob.until = t + 8 + Math.random() * 8; lob.act = t + 2.5 + Math.random() * 2;
+    sfx('equip', { v: .3 });
+    return;
+  }
+  if (lob.taps.length && t >= lob.taps[0]) { lob.taps.shift(); hf.held = hf.pend = true; lob.rel = t + .06; }
+  if (lob.rel && t >= lob.rel) { lob.rel = 0; heroFireStop(); }
+  const busy = hf.held || hf.rl > 0 || lob.taps.length;
+  if (t >= lob.until && !busy) { lob.on = false; heroFireStop(); lob.next = t + 3.5 + Math.random() * 3.5; return; }
+  if (t < lob.act || busy || holdK < .9) return;
+  lob.act = t + 3 + Math.random() * 3;
+  const w = hf.st, r = Math.random();
+  if (r < .3 && !w.melee && !w.pool && !w.inf) heroReload();
+  else if (r < .65 && !lobbyHush()) { // a few shots, or a short burst
+    if (autoFire(w)) { hf.held = hf.pend = true; lob.rel = t + .4 + Math.random() * .6; }
+    else { const n = w.rate >= .8 ? 1 : 1 + (Math.random() * 3 | 0), gap = Math.max(w.rate, .3) + .12; for (let k = 0; k < n; k++) lob.taps.push(t + k * gap); }
+  }
+}
 // fidgets with the gun every few seconds
 const FIDGETS = ['look', 'lower', 'shake', 'heft', 'look', 'shake', 'lower', 'heft'], FID_T = { look: 2, lower: 2.8, shake: 1, heft: .9 };
 let fid = null, fidN = 0, fidNext = 0;
@@ -460,7 +492,8 @@ function updateLobby(dt) {
   armL.rotation.set(idle * Math.sin(t * 1.1) * .05, 0, -.05 - idle * Math.sin(t * 1.6) * .03);
   armR.rotation.set(-idle * Math.sin(t * 1.1) * .05, 0, .05 + idle * Math.sin(t * 1.6) * .03);
   // armory: arms up holding the gun
-  holdK += ((armOpen && holdKey ? 1 : 0) - holdK) * Math.min(1, dt * 9);
+  lobbyGuns(t);
+  holdK += (((armOpen || lob.on) && holdKey ? 1 : 0) - holdK) * Math.min(1, dt * 9);
   const e = holdK * holdK * (3 - 2 * holdK);
   if (pose) {
     const k = Math.min(1, dt * 12);

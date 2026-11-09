@@ -79,32 +79,5 @@ function dressBoots(ch, b) {
 function bootsModel(id, st, g) {
   for (const s of [1, -1]) { const m = new THREE.Mesh(bootGeo(id, st, s, 1 / 16), gunLit); m.position.x = s * 2 / 16; m.rotation.z = s * LEG_SPREAD; g.add(m); }
 }
-// boot icons, the left boot from the side
-const bootSpriteCache = {};
-function bootSprite(id, st) {
-  const key = id + st; if (bootSpriteCache[key]) return bootSpriteCache[key];
-  const frame = voxelGrid(bootPieces(id, 3)), { lo, NX, NY, NZ, at } = voxelGrid(bootPieces(id, st));
-  const W = frame.NZ - 2, H = frame.NY - 2, K = 4, z0 = frame.lo[2] + 1, y1 = frame.lo[1] + frame.NY - 2;
-  const dep = new Float32Array(W * H).fill(-99), col = new Array(W * H);
-  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-    const z = z0 + c - lo[2], y = y1 - r - lo[1];
-    for (let x = NX - 1; x >= 0; x--) { const m = at(x, y, z); if (m) { dep[r * W + c] = x; col[r * W + c] = gunPal[m].c; break; } }
-  }
-  const cv = document.createElement('canvas'); cv.width = (W + 2) * K; cv.height = (H + 2) * K;
-  const g = cv.getContext('2d'), filled = (r, c) => r >= 0 && c >= 0 && r < H && c < W && dep[r * W + c] > -99;
-  let dmax = 0; dep.forEach(d => dmax = Math.max(dmax, d));
-  for (let r = -1; r <= H; r++) for (let c = -1; c <= W; c++) {
-    const inside = r >= 0 && c >= 0 && r < H && c < W, i = r * W + c, d = inside ? dep[i] : -99;
-    let black;
-    if (d === -99) black = filled(r - 1, c) || filled(r + 1, c) || filled(r, c - 1) || filled(r, c + 1);
-    else black = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].some(([a, b]) => filled(a, b) && dep[a * W + b] > d);
-    if (d === -99 && !black) continue;
-    if (black) g.fillStyle = '#000';
-    else {
-      const sh = Math.max(.6, 1 - (dmax - d) * .06), h = col[i].getHex();
-      g.fillStyle = `rgb(${(h >> 16 & 255) * sh | 0},${(h >> 8 & 255) * sh | 0},${(h & 255) * sh | 0})`;
-    }
-    g.fillRect((c + 1) * K, (r + 1) * K, K, K);
-  }
-  return bootSpriteCache[key] = cv.toDataURL();
-}
+// boots pictures, at their 3-star size
+const bootPic = (id, st) => modelPic('boots:' + id + st, g => bootsModel(id, st, g), { yaw: .6, tilt: .3, w: 200, h: 180, ref: ['boots:' + id, g => bootsModel(id, 3, g)] });
