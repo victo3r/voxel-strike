@@ -29,6 +29,13 @@ const allTex = []; // so a quality change can update every texture
 // item rarity: name and colour
 const RARITY = { common: ['COMMON', '#c9ced6'], rare: ['RARE', '#4fa3ff'], epic: ['EPIC', '#c06bff'], legend: ['LEGENDARY', '#ff4a4a'], mythic: ['MYTHIC', '#ffc531'] };
 const rarOf = o => o?.rar || 'common';
+// bots pick rarer things less often
+const BOT_RAR = { common: 4, rare: 3, epic: 2, legend: 1, mythic: .5 };
+function pickRare(list) {
+  let r = Math.random() * list.reduce((s, o) => s + BOT_RAR[rarOf(o)], 0);
+  for (const o of list) if ((r -= BOT_RAR[rarOf(o)]) < 0) return o;
+  return list[list.length - 1];
+}
 function tex(draw, rx = 1, ry = 1) {
   const c = document.createElement('canvas'); c.width = c.height = 16;
   draw(c.getContext('2d'));

@@ -340,11 +340,10 @@ const SOUNDS = {
   }],
   frostStart: [.45, .45, s => { // ice forming
     s.crunch({ a: .01, d: .2, dens: .06, lo: 700, hi: 4000, v: .7 });
-    for (const [t, f] of [[0, 660], [.03, 880], [.06, 1175]]) s.tone({ t, f, f2: f * 1.01, d: .22, v: .2 });
     s.tone({ type: 'triangle', f: 220, f2: 330, d: .2, v: .25 });
   }],
-  frostEnd: [.4, .3, s => { s.crunch({ a: .005, d: .15, dens: .05, lo: 600, hi: 3200, v: .7 }); s.tone({ f: 880, f2: 660, d: .2, v: .18 }); }],
-  iceLoop: [2, .3, s => s.draw(0, 2, o => { // the wand's beam: crackling ice and glassy pings, made to loop
+  frostEnd: [.4, .3, s => s.crunch({ a: .005, d: .15, dens: .05, lo: 600, hi: 3200, v: .7 })],
+  iceLoop: [2, .3, s => s.draw(0, 2, o => { // the wand's beam: crackling ice, made to loop
     const N = o.length, kh = 1 - Math.exp(-6.2832 * 3800 / SR), kl = 1 - Math.exp(-6.2832 * 600 / SR);
     let g = 0, p = 0, q = 0;
     for (let k = 0; k < 2 * N; k++) { // twice round so the filters are settled where it loops
@@ -352,9 +351,6 @@ const SOUNDS = {
       g *= .7; p += (g - p) * kh; q += (p - q) * kl;
       if (k >= N) o[k - N] = (p - q) * 1.4;
     }
-    const ping = (f, tau, v) => { const at = s.r() * N | 0; for (let k = 0; k < tau * 6 * SR; k++) o[(at + k) % N] += Math.sin(6.2832 * f * k / SR) * Math.exp(-k / SR / tau) * v; };
-    for (let k = 0; k < 26; k++) ping(900 + s.r() * 1500, .025 + s.r() * .035, .12 + s.r() * .18); // glassy tinkles
-    for (let k = 0; k < 5; k++) ping(260 + s.r() * 200, .09 + s.r() * .06, .2); // low cracks in the ice
   })],
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
   djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // double jump
@@ -369,7 +365,7 @@ const SOUNDS = {
     s.hiss({ ft: 'bandpass', f: 280, f2: 1100, q: 2.5, a: .09, d: .28, v: 1, sweep: .22 });
     s.tone({ f: 95, f2: 60, d: .22, v: .3 });
   }],
-  chill: [.3, .3, s => { for (let k = 0; k < 3; k++) s.tone({ t: k * .035, f: 2800 + k * 700, f2: 2700 + k * 700, d: .14, v: .1 }); }], // frost crackles
+  chill: [.3, .3, s => s.crunch({ a: .005, d: .12, dens: .05, lo: 900, hi: 4200, v: .6 })], // frost crackles
   slash: [.25, .6, s => {
     s.hiss({ ft: 'bandpass', f: 2200, f2: 7500, q: 4, a: .008, d: .2, v: 1, sweep: .18 });
     s.hiss({ ft: 'highpass', f: 5000, f2: 8000, a: .015, d: .15, v: .4 });
@@ -704,7 +700,7 @@ function soundTick(dt, live) {
   }
   if (fOn !== flameOn) { flameOn = fOn; sfx(fOn ? 'flameStart' : 'flameEnd'); flameGain?.gain.setTargetAtTime(fOn ? .45 : 0, t, fOn ? .04 : .08); }
   // eradicator motor
-  const spin = live && gunSpin ? gunSpinV / 30 : 0;
+  const spin = live && gunSpin ? gunSpinV / 30 : inLobby && hf.spin ? hf.spinV / 30 : 0; // yours, or the armory's
   if (spin > 0 && !spinOsc) { // a whine plus rushing air, pulsing as the barrels go round
     spinOsc = ac.createOscillator(); spinOsc.type = 'triangle';
     const air = ac.createBufferSource(), nb = ac.createBuffer(1, SR, SR), nd = nb.getChannelData(0); for (let i = 0; i < SR; i++) nd[i] = Math.random() * 2 - 1; air.buffer = nb; air.loop = true;

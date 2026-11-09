@@ -203,13 +203,14 @@ const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), flar
   shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), frost: new THREE.MeshBasicMaterial({ color: 0xc8f4ff, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
 const heroCan = () => armOpen && inLobby && armPage === 'weapons' && hf.i >= 0 && holdK > .9;
 function heroFireStop() {
-  hf.held = false; if (hf.beamM) hf.beamM.visible = false;
+  hf.held = hf.pend = false; if (hf.beamM) hf.beamM.visible = false;
 }
+// held before the gun is out, it fires once it is
 function heroTrigger(down) {
   if (!down) { heroFireStop(); return; }
-  if (!heroCan()) return;
-  hf.held = true;
-  if (!autoFire(hf.st)) heroShot();
+  if (!armOpen || !inLobby || armPage !== 'weapons') return;
+  hf.held = true; hf.pend = true;
+  if (heroCan()) { hf.pend = false; if (!autoFire(hf.st)) heroShot(); }
 }
 function heroReload() {
   const w = hf.st; if (!heroCan() || !w || w.melee || hf.rl > 0) return;
@@ -257,9 +258,10 @@ function heroTick(dt) {
   }
   if (hf.i < 0) return;
   const w = hf.st;
-  if (!heroCan()) heroFireStop();
+  const can = heroCan();
+  if (!armOpen || !inLobby || armPage !== 'weapons') heroFireStop();
   hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); hf.flash -= dt;
-  if (hf.held && autoFire(w)) heroShot();
+  if (can && hf.held && (autoFire(w) || hf.pend)) { hf.pend = false; heroShot(); }
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
   if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload();
   hf.flashM.visible = hf.flash > 0;

@@ -60,8 +60,17 @@ const BOT_BARE = .15, BOT_SUIT = .25;
 function botArmor() {
   const sets = SUITS.filter(S => suitStars(S.id) || prof.lv >= S.unlock[0]);
   if (sets.length && Math.random() < BOT_SUIT) { const S = sets[Math.random() * sets.length | 0]; return suitN(S.id, 1 + (Math.random() * Math.max(1, suitStars(S.id)) | 0)); }
-  const n = Math.max(1, Math.min(ARMOR_MAX, prof.armor | 0)); return Math.random() >= BOT_BARE ? 1 + (Math.random() * n | 0) : 0;
+  const n = Math.max(1, Math.min(ARMOR_MAX, prof.armor | 0));
+  return Math.random() >= BOT_BARE ? ARMOR_TIERS.indexOf(pickRare(ARMOR_TIERS.slice(0, n))) + 1 : 0;
 }
+// basic armor stops at Champion: refund stars a bug once sold past it
+function fixArmor() {
+  const n = prof.armor | 0; if (n <= ARMOR_MAX) return false;
+  for (let k = ARMOR_MAX; k < n; k++) prof.coins += ARMOR_TIERS[k]?.price ?? 0;
+  prof.armor = ARMOR_MAX; if ((prof.armorUse | 0) > ARMOR_MAX) prof.armorUse = 0;
+  return true;
+}
+if (fixArmor()) saveProf();
 function wearArmor() {
   const T = armorOf(matchArmor());
   P.maxArmor = T ? T.hp : 0; P.dr = T ? T.dr : 0; P.armor = P.maxArmor;
@@ -158,9 +167,9 @@ function suitPieces(T, team) {
   const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a)), st = T.st;
   const M = (x0, x1, y0, y1, z0, z1, m) => { B(x0, x1, y0, y1, z0, z1, m); B(-x1, -x0, y0, y1, z0, z1, m); };
   const C = hex(T.c), HI = hex(T.hi), DK = hex(T.dk), GOLD = hex([240, 196, 64]), LEATHER = hex([92, 60, 34]);
-  const warrior = T.suit === 'warrior', zf = warrior ? 7 : 6, yb = warrior ? -5 : -6;
+  const warrior = T.suit === 'warrior', zf = warrior ? 7 : 6, yb = warrior ? -5 : -12;
   const FB = (x0, x1, y0, y1, m, d = 0) => { B(x0, x1, y0, y1, 4, zf + d, m); B(x0, x1, y0, y1, -zf - d, -4, m); };
-  FB(-8, 8, yb, 13, C); FB(-8, 8, yb, yb + 1, DK); M(5, 8, 12, 13, -4, 4, C);
+  FB(-8, 8, yb, 13, C); if (warrior) FB(-8, 8, yb, yb + 1, DK); M(5, 8, 12, 13, -4, 4, C);
   if (warrior) { // thick steel plate with a red stripe, gold at 5 stars
     const TRIM = st >= 5 ? GOLD : hex([158, 34, 40]);
     M(1, 8, 1, 9, zf, zf + 1, C); M(1, 8, 8, 9, zf, zf + 1, HI); // chest plates
@@ -170,16 +179,15 @@ function suitPieces(T, team) {
     if (st >= 3) for (const y of [yb + 5, 11]) M(6, 7, y, y + 1, zf - 1, zf, HI); // rivets
     if (st >= 4) { B(-2, 2, yb + 3, 12, -zf - 2, -zf, HI); B(-1, 1, yb + 3, 12, -zf - 2, -zf - 1, TRIM); } // back ridge
     if (st >= 5) FB(-8, 8, 12, 13, GOLD);
-  } else { // a dark vest open at the front and a short cape, gold trim at 5 stars
+  } else { // a long dark cloak open at the front, a cape down the back, gold trim at 5 stars (the tails hang on the legs)
     const TRIM = st >= 5 ? GOLD : hex([34, 200, 186]);
     B(-2, 2, yb, 13, 5, zf, 0); B(-2, 2, yb, 13, 4, 5, DK); // the opening
     for (const x of [-3, 2]) B(x, x + 1, yb, 13, 4, zf, TRIM);
-    B(-8, 8, -11, 13, -zf - 2, -zf, C); for (let x = -8; x < 8; x += 4) B(x, x + 2, -12, -11, -zf - 2, -zf, C); // the cape
-    if (st >= 4) B(-8, 8, -11, -10, -zf - 2, -zf, TRIM);
-    FB(-8, 8, yb, yb + 2, team ? hex(team) : LEATHER, 1);
+    B(-8, 8, yb, 13, -zf - 2, -zf, C); // the cape
+    FB(-8, 8, -6, -4, team ? hex(team) : LEATHER, 1); // belt
     B(-3, 3, 6, 8, zf, zf + 1, TRIM); // clasp
     if (st >= 2) for (let k = 0; k < 7; k++) B(-7 + 2 * k, -5 + 2 * k, 8 - 2 * k, 10 - 2 * k, zf - 1, zf + 1, LEATHER); // a strap across the chest
-    if (st >= 3) for (const x of [3, -7]) { B(x, x + 4, yb - 3, yb + 1, zf + 1, zf + 3, LEATHER); B(x, x + 4, yb, yb + 1, zf + 1, zf + 3, TRIM); } // pouches
+    if (st >= 4) { B(-8, 8, 9, 13, -zf - 3, -zf - 2, C); M(4, 8, 10, 13, zf, zf + 1, C); M(4, 8, 10, 11, zf, zf + 1, TRIM); } // a mantle over the shoulders
   }
   NECK_FRONT.forEach((d, a) => { if (d) for (const x of [a, -a - 1]) B(x, x + 1, 13 - d, 13, 4, zf + 3, 0); });
   NECK_BACK.forEach((d, a) => { if (d) for (const x of [a, -a - 1]) B(x, x + 1, 13 - d, 13, -zf - 3, -4, 0); });
@@ -189,7 +197,7 @@ function suitPadPieces(T, s) {
   const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a)), st = T.st;
   const C = hex(T.c), HI = hex(T.hi), GOLD = hex([240, 196, 64]);
   const warrior = T.suit === 'warrior', TRIM = st >= 5 ? GOLD : warrior ? hex([158, 34, 40]) : hex([34, 200, 186]);
-  const x1 = warrior ? 18 : 17, zp = warrior ? 6 : 5, ylo = warrior ? 5 : 8, y1 = warrior ? 16 : 15;
+  const x1 = warrior ? 18 : 17, zp = warrior ? 6 : 5, ylo = warrior ? 5 : -6, y1 = warrior ? 16 : 15;
   const ring = (y0, y1, m) => { B(8, x1, y0, y1, 4, zp, m); B(8, x1, y0, y1, -zp, -4, m); B(16, x1, y0, y1, -zp, zp, m); };
   B(8, x1, 12, y1, -zp, zp, C); B(8, x1, y1 - 1, y1, -zp, zp, HI);
   ring(ylo, 12, C); ring(ylo, ylo + 1, TRIM);
@@ -197,19 +205,39 @@ function suitPadPieces(T, s) {
     ring(9, 10, HI); // two plates
     if (st >= 3) { B(10, x1 - 1, y1, y1 + 2, -4, 4, C); B(10, x1 - 1, y1 + 1, y1 + 2, -4, 4, HI); } // a second plate on top
     if (st >= 4) B(10, x1 - 1, y1 + 1, y1 + 2, -1, 1, TRIM);
-  } else if (st >= 4) { ring(ylo - 2, ylo, C); ring(ylo - 2, ylo - 1, TRIM); } // a second fold
+  } else { // long sleeves with a cuff
+    ring(ylo + 1, ylo + 2, TRIM);
+    if (st >= 4) ring(9, 10, TRIM);
+  }
   if (s < 0) for (const p of out) p[4] = -p[4];
   return out;
 }
-// the whole set, for the armory preview and icon
-const armorAllPieces = n => [...armorPieces(n), ...armorPadPieces(n, 1), ...armorPadPieces(n, -1)];
+// coat tails on a leg, so they swing with it (s = 1 for the left leg, -1 for the right; leg units like boots)
+function suitLegPieces(T, s) {
+  const out = []; if (T.suit !== 'raider') return out;
+  const B = pieceBox(out), hex = a => palIdx(rgbHex(a)), C = hex(T.c), TRIM = T.st >= 5 ? hex([240, 196, 64]) : hex([34, 200, 186]), LO = -10;
+  B(-2, 6, LO, 0, 4, 6, C); B(-4, 6, LO, 0, -8, -4, C); B(4, 6, LO, 0, -4, 4, C);
+  B(-2, -1, LO, 0, 4, 6, TRIM); // the front edge
+  if (T.st >= 3) { B(-2, 6, LO, LO + 1, 4, 6, TRIM); B(-4, 6, LO, LO + 1, -8, -4, TRIM); B(4, 6, LO, LO + 1, -4, 4, TRIM); } // hem
+  if (s < 0) for (const p of out) p[4] = -p[4];
+  return out;
+}
+// the whole set, for the armory preview and icon (cut: drop what hangs below it)
+function armorAllPieces(n, cut = -99) {
+  const T = armorOf(n), legs = [];
+  if (T.suit) for (const s of [1, -1]) for (const p of suitLegPieces(T, s)) legs.push([p[0], p[1], p[2], p[3], p[4] + 4 * s, p[5] - 12, p[6]]);
+  return [...armorPieces(n), ...armorPadPieces(n, 1), ...armorPadPieces(n, -1), ...legs].flatMap(p => {
+    const y0 = p[5] - p[1] / 2, y1 = p[5] + p[1] / 2;
+    return y1 <= cut ? [] : y0 >= cut ? [p] : [[p[0], y1 - cut, p[2], p[3], p[4], (y1 + cut) / 2, p[6]]];
+  });
+}
 const ARMOR_PX = 2; // armor pixels per skin pixel
 const armorGeoCache = {};
-// part: 'body', 'L', 'R' or 'all'
+// part: 'body', 'L', 'R' (pads), 'legL', 'legR' (coat tails) or 'all'
 function armorGeo(n, team, U, part = 'body') {
   const k = n + ':' + part + ':' + (part === 'body' ? team ?? '' : '') + ':' + U;
-  const pieces = part === 'body' ? armorPieces(n, team) : part === 'all' ? armorAllPieces(n) : armorPadPieces(n, part === 'L' ? 1 : -1);
-  return armorGeoCache[k] ??= voxelGeos(pieces, U / ARMOR_PX).lit;
+  return armorGeoCache[k] ??= voxelGeos(part === 'body' ? armorPieces(n, team) : part === 'all' ? armorAllPieces(n)
+    : part.startsWith('leg') ? suitLegPieces(armorOf(n), part === 'legL' ? 1 : -1) : armorPadPieces(n, part === 'L' ? 1 : -1), U / ARMOR_PX).lit;
 }
 // one material per character so it can flash and fade with them
 const armorMat = () => { const m = new THREE.MeshLambertMaterial({ vertexColors: true }); m.onBeforeCompile = gunLit.onBeforeCompile; return m; };
@@ -225,6 +253,7 @@ function dressArmor(ch, n, team = null) {
   };
   // pads ride on the arms so they swing with them
   const meshes = [mesh('body', ch.body, 0, 0), mesh('L', ch.armL, -6, -4), mesh('R', ch.armR, 6, -4)];
+  if (armorOf(n).suit === 'raider') meshes.push(mesh('legL', ch.legL, 0, 0), mesh('legR', ch.legR, 0, 0));
   ch.mats.push(mat); ch.armor = { n, mat, meshes };
 }
 // armory preview
@@ -234,7 +263,7 @@ function armorModel(n, g) { g.add(new THREE.Mesh(armorGeo(n, null, 1 / 16, 'all'
 const armorSpriteCache = [];
 function armorSprite(k) { // k = tier index (0 = Wooden)
   if (armorSpriteCache[k]) return armorSpriteCache[k];
-  const { lo, NX, NY, NZ, at } = voxelGrid(armorAllPieces(k + 1));
+  const { lo, NX, NY, NZ, at } = voxelGrid(armorAllPieces(k + 1, -15));
   const W = 42, H = 38, X0 = -21, YT = 21, K = 4; // Champion just fits
   const dep = new Float32Array(W * H).fill(-99), col = new Array(W * H);
   for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {

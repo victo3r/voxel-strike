@@ -168,12 +168,15 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #armList{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 #armList .card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:1;box-sizing:border-box;min-width:0;overflow:hidden;gap:4px;padding:16px 8px 10px;text-align:center;background:var(--glass);border:3px solid var(--line-dim);box-shadow:4px 4px 0 rgba(0,0,0,.4);cursor:pointer}
 #armList .card:hover{background:var(--hov)}
-#armList .card.sel{border-color:var(--acc);background:rgba(47,191,113,.3)}
+#armList .card.sel{border-color:var(--acc)}
+#armList .card.on{background:rgba(47,191,113,.3)}#armList .card.on:hover{background:rgba(47,191,113,.4)}
 #armList .card.locked{opacity:.5}#armList .card.locked.sel{opacity:.75}
 #armList .tag{position:absolute;top:4px;right:6px;font:bold 11px monospace;color:var(--silver)}
-#armList .card.rr{border-bottom-color:var(--rc)}
+#armList .card.rr{border-bottom-color:var(--rc);isolation:isolate}
+#armList .card.rr::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(0deg,var(--rc),transparent 55%);opacity:var(--rg,.12)}
+#armList .card.set{outline:2px solid #ffe27a;outline-offset:2px}
+#armList .sa{position:absolute;top:4px;left:6px;font:bold 11px monospace;color:#ffe27a}
 .rt{display:inline-block;font:bold 11px monospace;color:var(--rc);border:2px solid var(--rc);padding:0 4px;vertical-align:middle;white-space:nowrap}
-#armList .card .rt{border:0;padding:0}
 #armList .card.on .tag{color:var(--acc-lt)}
 /* armory item card */
 #armAct{position:fixed;right:20px;bottom:20px;width:clamp(270px,27vw,340px);box-sizing:border-box;display:none;flex-direction:column;align-items:stretch;gap:9px;padding:12px 14px 14px;z-index:9;color:#fff;text-shadow:2px 2px 0 #000;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:3px solid var(--line);box-shadow:4px 4px 0 rgba(0,0,0,.4);animation:armIn .25s ease-out}
@@ -237,6 +240,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 /* attributes */
 #armDet .at,#armAct .at{display:flex;flex-wrap:wrap;gap:6px}
 #armDet .at span,#armAct .at span{font:bold 11px monospace;padding:3px 8px;border:2px solid var(--acc);color:var(--acc-lt);background:rgba(47,191,113,.15)}
+#armAct .at.sb span{border-color:#ffe27a;color:#ffe27a;background:rgba(255,226,122,.12)}
 #armList .card img{width:96px;height:48px;image-rendering:pixelated}
 #armList .cn{font-size:17px;font-weight:bold;text-align:center}
 #armList .st{color:var(--acc-lt);font-size:13px}#armList .cn .st{display:block;margin-top:2px}

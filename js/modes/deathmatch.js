@@ -71,15 +71,8 @@ const rewardTable = () => (mode === 'blitz' || mode === 'blitzTeam' ? BLITZ_REWA
 const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t.length) - 1]; };
 // team modes: winners get 1st place pay
 const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res === 0 ? t[1] : t[t.length - 1]; };
-// bot loadouts: one gun per category (listed twice = twice as likely)
-const BOT_PICKS = {
-  primary: ['shotgun', 'ar', 'ar', 'thrasher', 'eradicator', 'trex', 'starsmasher'],
-  backup: ['voxel', 'voxel', 'hitman', 'hitman', 'executioner'],
-  melee: ['knife', 'knife', 'knife', 'herosword', 'herosword', 'warhammer', 'blazesaber', 'windsaber'],
-  special: ['flame', 'flame', 'heatray', 'heatray', 'shockbeam', 'shockbeam', 'frostwand'],
-  sniper: ['sniper', 'sniper', 'semisniper', 'semisniper', 'tigerbite', 'crossbow'],
-  premium: ['flare', 'flare', 'rocket', 'grenade'],
-};
+// bot loadouts: one gun per category, rarer guns less often
+const botGun = c => pickRare(BASE.filter(w => w.cat === c)).id;
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
@@ -134,12 +127,12 @@ function botWear() {
 }
 // online the host makes the room's bots
 function botGearNet() {
-  const load = CATS.map(([c]) => pickOf(BOT_PICKS[c])), stars = {};
+  const load = CATS.map(([c]) => botGun(c)), stars = {};
   for (const id of load) { const top = Math.max(0, gunUse(gi(id)) - 1); stars[id] = Math.random() * (top + 1) | 0; }
   return { ...botWear(), stars, load };
 }
 function botLoadout() {
-  const load = CATS.map(([c]) => gi(pickOf(BOT_PICKS[c]))), taste = tasteFor(load);
+  const load = CATS.map(([c]) => gi(botGun(c))), taste = tasteFor(load);
   // stars: never more than you use on that gun
   const stars = {}, W = {};
   for (const g of load) { const top = Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
@@ -776,8 +769,8 @@ function updateBot(b, dt) {
     }
     // hop now and then like a player
     if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? S.jumpF[0] + Math.random() * S.jumpF[1] : Math.random() < S.chain ? .5 + Math.random() * .4 : S.jumpR[0] + Math.random() * S.jumpR[1]; b.vy = 9 * Math.sqrt(1 + (b.rec.fx.jump ?? 0)); b.dj = b.rec.fx.air && Math.random() < .6 ? b.rec.fx.air : 0; }
-    // Raider Boots double jump (and a third with the set)
-    if (b.dj > 0 && b.vy && b.vy > -2 && b.vy < 2) { b.dj--; b.vy = DJ_V; sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
+    // Raider Boots jump again in the air (twice with the set)
+    if (b.dj > 0 && b.vy && b.vy > -2 && b.vy < 2) { b.dj--; b.vy = 9 * Math.sqrt(1 + (b.rec.fx.jump ?? 0)); sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // footsteps

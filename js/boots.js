@@ -14,7 +14,6 @@ function bootFx(b) {
   const L = b.st - 1;
   return { spd: B.spd?.[L] ?? 0, dmg: B.dmg?.[L] ?? 0, dr: B.dr?.[L] ?? 0, dj: !!B.dj };
 }
-const DJ_V = 8.5; // double jump speed
 // bots get random boots, never better than yours
 const BOOT_BARE = .3;
 function botBoots() {
@@ -33,7 +32,7 @@ function bootPieces(id, st, s = 1) {
   };
   if (id === 'raider') {
     // high-tops with a wing, one feather per star, gold at 3 stars
-    const C = hex([56, 62, 78]), HI = hex([92, 102, 124]), TEAL = hex([34, 200, 186]), SOLE = hex([236, 236, 240]);
+    const C = hex([56, 62, 78]), HI = hex([92, 102, 124]), TEAL = st >= 3 ? hex([240, 196, 64]) : hex([34, 200, 186]), SOLE = hex([236, 236, 240]);
     B(-5, 5, -24, -14, -5, 5, C); B(-5, 5, -24, -19, 5, 8, C);
     B(-5, 5, -24, -22, -5, 8, SOLE); B(-5, 5, -22, -21, -5, 8, TEAL);
     B(-5, 5, -21, -19, 7, 8, HI);

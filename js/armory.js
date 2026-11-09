@@ -32,7 +32,8 @@ function starTable(i) {
 const statBoxes = rows => `<div class="ms" style="grid-template-columns:repeat(${rows.length},1fr)">${rows.map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>`;
 // rarity: a coloured badge by names, a stripe along the bottom of cards
 const rarTag = o => { const [n, c] = RARITY[rarOf(o)]; return `<span class="rt" style="--rc:${c}">${n}</span>`; };
-const rarCls = o => `" style="--rc:${RARITY[rarOf(o)][1]}`;
+const RAR_GLOW = { common: .12, rare: .2, epic: .25, legend: .3, mythic: .36 }; // glow up from a card's bottom edge
+const rarCls = o => `" style="--rc:${RARITY[rarOf(o)][1]};--rg:${RAR_GLOW[rarOf(o)]}`;
 const attrTags = list => list.length ? `<div class="at">${list.map(a => `<span>${a}</span>`).join('')}</div>` : '';
 // gun tags
 function gunAttrs(w) {
@@ -113,7 +114,7 @@ const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${
 const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
 const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS']];
 let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1, suitSel = '';
-const myArmor = () => prof.armor | 0;
+const myArmor = () => Math.min(ARMOR_MAX, prof.armor | 0);
 const pageIcon = p => p === 'weapons' ? SPRITES[loadoutGun('primary')] : armorSprite(Math.max(0, wornArmor() - 1));
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
@@ -132,7 +133,7 @@ function renderArmory() {
     const w = BASE[i], tag = isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
     return `<div class="card rr${isLocked(i) ? ' locked' : ''}${i === armSel ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img src="${SPRITES[i]}">` +
-      `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div>${rarTag(w)}</div>`;
+      `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
   }).join('');
   renderAct();
   if (inLobby) heroGun(armSel);
@@ -175,7 +176,7 @@ function renderDetail() {
 }
 
 // ---- WEAR page: armor
-const ARMOR_DESC = 'Soaks up hits before your health does and fills back up every spawn, and armor, boots and a hat from one set give a bonus';
+const ARMOR_DESC = 'Armor soaks up hits before your health does';
 function renderWear() {
   const n = myArmor(), w = basicWorn(), T = armorOf(w || 1), sid = shownSuit();
   const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, wornArmor() - 1)) : (G => { const on = G.worn(); return on ? G.sprite(on.id, on.st) : G.sprite(G.list[0].id, 1); })(GEAR[c]);
@@ -191,7 +192,7 @@ function renderWear() {
   else {
     const locked = !n && prof.lv < T.unlock, on = n && !wornSuit(), tag = on ? 'WEARING' : n ? '' : locked ? `${ico('lock')} LVL ${T.unlock}` : COIN + T.price;
     $('armList').innerHTML = `<p class="wd">${ARMOR_DESC}</p>` +
-      `<div class="card${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${on ? ' on' : ''}" data-armor="1">${tag ? `<span class="tag">${tag}</span>` : ''}` +
+      `<div class="card rr${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${on ? ' on' : ''}${rarCls(T)}" data-armor="1">${tag ? `<span class="tag">${tag}</span>` : ''}` +
       `<img class="ai" src="${armorSprite((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div></div>` +
       SUITS.map(suitCard).join('');
   }
@@ -217,7 +218,7 @@ function armorStep(d) {
 }
 // armor buttons
 function renderArmorAct() {
-  const n = myArmor(), w = basicWorn(), next = armorOf(n + 1), suit = wornSuit();
+  const n = myArmor(), w = basicWorn(), next = n < ARMOR_MAX ? armorOf(n + 1) : null, suit = wornSuit();
   let btns = '';
   if (armDet && armorPrev && armorPrev <= n && (armorPrev !== w || suit)) btns += `<button data-wear="${armorPrev}">WEAR ${armorOf(armorPrev).name.toUpperCase()}</button>`;
   else if (!armDet && suit && n) btns += `<button data-wear="${w}">WEAR</button>`;
@@ -246,13 +247,15 @@ const suitStarTxt = id => starRow(suitUse(id), suitStars(id), SUIT_ST);
 const suitLocked = S => !suitStars(S.id) && prof.lv < S.unlock[0];
 const lvlName = v => LEVEL_NAMES[v ?? 2];
 const armorBoxes = T => statBoxes([['ARMOR', '+' + T.hp, ''], ['DMG CUT', T.dr ? pct(T.dr) : 'NONE', ''], ['MOBILITY', lvlName(T.mob), ''], ['JUMP', lvlName(T.jump), '']]);
-const setOn = id => youFx().set === id ? '<div class="tn">FULL SET BONUS ON</div>' : '';
+// a full set: its cards get an outline and SET ACTIVE, its corner card the bonus
+const setBonus = id => youFx().set === id ? `<div class="at sb"><span>SET BONUS</span>${SET_TXT[id].split(', ').map(t => `<span>${t}</span>`).join('')}</div>` : '';
+const setTag = (id, worn) => worn && youFx().set === id ? ['<span class="sa">SET ACTIVE</span>', ' set'] : ['', ''];
 function suitCard(S) {
-  const st = suitStars(S.id), worn = wornSuit()?.id === S.id, locked = suitLocked(S);
+  const st = suitStars(S.id), worn = wornSuit()?.id === S.id, locked = suitLocked(S), [sa, set] = setTag(S.id, worn);
   const tag = locked ? `${ico('lock')} LVL ${S.unlock[0]}` : !st ? COIN + S.price[0] : worn ? 'WEARING' : '';
-  return `<div class="card rr${locked ? ' locked' : ''}${suitSel === S.id ? ' sel' : ''}${worn ? ' on' : ''}${rarCls(S)}" data-suit="${S.id}">` +
-    (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${armorSprite(suitN(S.id, suitShown(S.id)) - 1)}">` +
-    `<div class="cn">${S.name} <span class="st">${suitStarTxt(S.id)}</span></div>${rarTag(S)}</div>`;
+  return `<div class="card rr${locked ? ' locked' : ''}${suitSel === S.id ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(S)}" data-suit="${S.id}">` +
+    sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${armorSprite(suitN(S.id, suitShown(S.id)) - 1)}">` +
+    `<div class="cn">${S.name} <span class="st">${suitStarTxt(S.id)}</span></div></div>`;
 }
 function renderSuitDetail() {
   const id = shownSuit(), S = suitOf(id), have = suitStars(id), n = suitN(id, suitShown(id));
@@ -276,7 +279,7 @@ function renderSuitAct() {
       : `<button data-sup="1" ${prof.coins < S.price[st] ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${S.price[st]}</button>`;
   }
   const u = suitUse(id), pick = st > 1 ? lvPick('su', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  const body = armorBoxes(armorOf(suitN(id, suitShown(id)))) + (worn ? setOn(id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
+  const body = armorBoxes(armorOf(suitN(id, suitShown(id)))) + (worn ? setBonus(id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
   $('armAct').innerHTML = actCard(S.name + ' ' + rarTag(S), suitStarTxt(id), body, pick, btns);
   placeAct();
 }
@@ -353,14 +356,14 @@ function openCust() { closeArmory(); showCust(true); }
 const GEAR = {
   boots: { list: BOOTS, I: BOOT_I, own: 'boots', use: 'bootUse', on: 'bootOn', stars: bootStars, using: bootUse, worn: wornBoots,
     sprite: bootSprite, model: bootsModel, face: .6, put: b => heroBoots(b),
-    desc: 'One pair at a time, in every mode',
+    desc: 'Boots give you special stat boosts',
     about: {
       warrior: 'Steel greaves for brawlers, so you hit harder and take a little less',
       raider: 'Winged runners that make you faster and let you jump again in midair',
     } },
   hats: { list: HATS, I: HAT_I, own: 'hats', use: 'hatUse', on: 'hatOn', stars: hatStars, using: hatUse, worn: wornHat,
     sprite: hatSprite, model: hatModel, face: .5, put: h => heroHat(h),
-    desc: 'One hat at a time, in every mode',
+    desc: 'Hats give you special stat boosts',
     about: {
       warrior: 'A steel helmet that takes the edge off hits and sometimes turns a headshot into a body shot',
       raider: 'A dark hood that sometimes halves a hit and hides your red outline from anyone outside its stealth range',
@@ -399,11 +402,11 @@ function renderGear() {
   const G = gearNow();
   if (armDet) renderGearDetail();
   else $('armList').innerHTML = `<p class="wd">${G.desc}</p>` + gearList(G).map(i => {
-    const K = G.list[i], st = G.stars(K.id), worn = prof[G.on] === K.id && st, s = gearShown(G, K);
+    const K = G.list[i], st = G.stars(K.id), worn = prof[G.on] === K.id && st, s = gearShown(G, K), [sa, set] = setTag(K.id, worn);
     const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? COIN + K.price : worn ? 'WEARING' : '';
-    return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel ? ' sel' : ''}${worn ? ' on' : ''}${rarCls(K)}" data-gear="${i}">` +
-      (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${G.sprite(K.id, s)}">` +
-      `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div>${rarTag(K)}</div>`;
+    return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(K)}" data-gear="${i}">` +
+      sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${G.sprite(K.id, s)}">` +
+      `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div></div>`;
   }).join('');
   gearDress();
   renderAct();
@@ -430,7 +433,7 @@ function renderGearAct() {
     if (st < 3) btns += `<button data-gup="1" ${prof.coins < gearUpg(G, B) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${gearUpg(G, B)}</button>`;
   }
   const u = G.using(B.id), pick = st > 1 ? lvPick('gu', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (worn ? setOn(B.id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
+  const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (worn ? setBonus(B.id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
   $('armAct').innerHTML = actCard(B.name + ' ' + rarTag(B), gearStarTxt(G, B.id), body, pick, btns);
   placeAct();
 }
@@ -555,7 +558,7 @@ function armClick(e) {
     saveProf(); armSync(i, 'use'); sfx('equip');
   }
   else if (b.dataset.arm) {
-    const n = myArmor(), T = armorOf(n + 1); if (!T || prof.coins < T.price || prof.lv < T.unlock) return;
+    const n = myArmor(), T = n < ARMOR_MAX && armorOf(n + 1); if (!T || prof.coins < T.price || prof.lv < T.unlock) return;
     prof.coins -= T.price; prof.armor = n + 1; prof.armorUse = 0; if (armDet) armorPrev = n + 1; saveProf(); showProf();
     armorSync(); sfx(n ? 'upgrade' : 'buy');
   }
