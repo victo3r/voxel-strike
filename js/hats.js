@@ -16,7 +16,7 @@ function gearFx(b, h) {
   f.dr += H.dr?.[L] ?? 0; f.hs = H.hs?.[L] ?? 0; f.half = H.half?.[L] ?? 0; f.stealth = H.stealth?.[L] ?? 0;
   return f;
 }
-const youFx = () => gearFx(wornBoots(), wornHat());
+const youFx = () => { const b = wornBoots(), h = wornHat(); return armorFx(gearFx(b, h), wornArmor(), b, h); };
 const HEAD_MUL = 1.5; // headshot damage multiplier
 // helmet can block a headshot, hood can halve a hit
 function gearHit(fx, d, head) {

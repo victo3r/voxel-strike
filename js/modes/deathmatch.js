@@ -122,20 +122,29 @@ function tasteFor(load) {
   for (const g of load) taste[BASE[g].id] = (.85 + Math.random() * .3) * (BASE[g].cat === fav ? 1.3 : 1);
   return taste;
 }
+// bots' armor, boots and hat, sometimes a full set
+function botWear() {
+  const armor = botArmor(), T = armorOf(armor);
+  let boots = botBoots(), hat = botHat();
+  if (T?.suit && Math.random() < .5) {
+    boots = { id: T.suit, st: 1 + (Math.random() * Math.max(1, bootStars(T.suit)) | 0) };
+    hat = { id: T.suit, st: 1 + (Math.random() * Math.max(1, hatStars(T.suit)) | 0) };
+  }
+  return { armor, boots, hat };
+}
 // online the host makes the room's bots
 function botGearNet() {
   const load = CATS.map(([c]) => pickOf(BOT_PICKS[c])), stars = {};
   for (const id of load) { const top = Math.max(0, gunUse(gi(id)) - 1); stars[id] = Math.random() * (top + 1) | 0; }
-  return { armor: botArmor(), boots: botBoots(), hat: botHat(), stars, load };
+  return { ...botWear(), stars, load };
 }
 function botLoadout() {
   const load = CATS.map(([c]) => gi(pickOf(BOT_PICKS[c]))), taste = tasteFor(load);
   // stars: never more than you use on that gun
   const stars = {}, W = {};
   for (const g of load) { const top = Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
-  // boots and a hat
-  const boots = botBoots(), hat = botHat();
-  return { load, taste, stars, W, armor: botArmor(), boots, hat, fx: gearFx(boots, hat) };
+  const { armor, boots, hat } = botWear();
+  return { load, taste, stars, W, armor, boots, hat, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
 }
 
 const BOT_U = 1.85 / 33; // one skin pixel, so bots are as tall as you
@@ -766,9 +775,9 @@ function updateBot(b, dt) {
       if (!b.vy && Math.random() < .4) b.jumpT = 0; // stuck: try a hop
     }
     // hop now and then like a player
-    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? S.jumpF[0] + Math.random() * S.jumpF[1] : Math.random() < S.chain ? .5 + Math.random() * .4 : S.jumpR[0] + Math.random() * S.jumpR[1]; b.vy = 9; b.dj = b.rec.fx.dj && Math.random() < .6 ? 1 : 0; }
-    // Raider Boots double jump
-    if (b.dj === 1 && b.vy && b.vy > -2 && b.vy < 2) { b.dj = 2; b.vy = DJ_V; sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
+    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? S.jumpF[0] + Math.random() * S.jumpF[1] : Math.random() < S.chain ? .5 + Math.random() * .4 : S.jumpR[0] + Math.random() * S.jumpR[1]; b.vy = 9 * Math.sqrt(1 + (b.rec.fx.jump ?? 0)); b.dj = b.rec.fx.air && Math.random() < .6 ? b.rec.fx.air : 0; }
+    // Raider Boots double jump (and a third with the set)
+    if (b.dj > 0 && b.vy && b.vy > -2 && b.vy < 2) { b.dj--; b.vy = DJ_V; sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // footsteps

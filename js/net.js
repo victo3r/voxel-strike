@@ -283,8 +283,8 @@ net = (() => {
     const load = CATS.map(([c], k) => { const i = gi(gear.load?.[k]); return i !== undefined && BASE[i].cat === c ? i : BASE.findIndex(w => w.cat === c && w.start); });
     const boots = gear.boots && bootOf(gear.boots.id) ? { id: gear.boots.id, st: Math.max(1, Math.min(3, gear.boots.st | 0)) } : null;
     const hat = gear.hat && hatOf(gear.hat.id) ? { id: gear.hat.id, st: Math.max(1, Math.min(3, gear.hat.st | 0)) } : null;
-    const armor = Math.max(0, Math.min(ARMOR_MAX, gear.armor | 0));
-    return { stars, load, W, boots, hat, armor, fx: gearFx(boots, hat) };
+    const armor = Math.max(0, Math.min(ARMOR_ALL, gear.armor | 0));
+    return { stars, load, W, boots, hat, armor, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
   }
   function gearMsg(m) { // someone changed gear mid-match
     if (m.pid === undefined) { P.maxArmor = m.maxArmor; P.armor = m.armor; return; } // the server's answer to your own change

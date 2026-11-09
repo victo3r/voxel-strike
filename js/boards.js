@@ -71,7 +71,7 @@ function renderCard() {
   const fi = BASE.findIndex(w => w.id === c.fav), g = c.gear || {};
   const gear = [
     g.hat && HATS.find(h => h.id === g.hat.id) ? `<img title="${HATS.find(h => h.id === g.hat.id).name}" src="${hatSprite(g.hat.id, g.hat.st)}">` : '',
-    g.armor > 0 && armorOf(g.armor) ? `<img title="${armorOf(g.armor).name} Armor" src="${armorSprite(g.armor - 1)}">` : '',
+    g.armor > 0 && armorOf(g.armor) ? `<img title="${armorTitle(armorOf(g.armor))}" src="${armorSprite(g.armor - 1)}">` : '',
     g.boots && BOOTS.find(b => b.id === g.boots.id) ? `<img title="${BOOTS.find(b => b.id === g.boots.id).name}" src="${bootSprite(g.boots.id, g.boots.st)}">` : '',
   ].join('');
   const stat = (label, v) => `<div class="cs"><b>${v}</b><span>${label}</span></div>`;

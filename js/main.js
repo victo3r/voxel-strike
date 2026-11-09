@@ -105,16 +105,16 @@ function update(dt) {
   }
   launchMove(P, P.pos, .35, P.onGround, dt); // rocket blast push
   const jumpKey = held('jump');
-  if (jumpKey && P.onGround) { P.vy = 9 * Math.sqrt(1 + jumpOf(cur)); P.onGround = false; net.ev('jump'); } // height grows with v squared
-  else if (jumpKey && !jumpWas && !P.onGround && !P.dj && youFx().dj) { // Raider Boots double jump
-    P.dj = true; P.vy = Math.max(P.vy, DJ_V); sfx('djump'); burst(tmp.set(P.pos.x, P.pos.y + .1, P.pos.z), 0xe8eef2, 6); net.ev('djump');
+  if (jumpKey && P.onGround) { P.vy = 9 * Math.sqrt(Math.max(.2, 1 + jumpOf(cur) + youFx().jump)); P.onGround = false; net.ev('jump'); } // height grows with v squared
+  else if (jumpKey && !jumpWas && !P.onGround && (P.dj | 0) < youFx().air) { // Raider Boots double jump, a third with the full set
+    P.dj = (P.dj | 0) + 1; P.vy = Math.max(P.vy, DJ_V); sfx('djump'); burst(tmp.set(P.pos.x, P.pos.y + .1, P.pos.z), 0xe8eef2, 6); net.ev('djump');
   }
   jumpWas = jumpKey;
   const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
   if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } }
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
   if (!wasAir && P.vy <= 0 && sticks(prevY - gy, P.onRamp)) P.pos.y = gy; // stick to stairs going down
-  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; P.dj = false; } else P.onGround = false;
+  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; P.dj = 0; } else P.onGround = false;
   if (inWater(P.pos.x, P.pos.z, P.pos.y)) drownYou();
   wetCheck(P, P.pos);
   easeLag(P.pos, dt);

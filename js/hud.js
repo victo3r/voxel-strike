@@ -133,8 +133,8 @@ function killNotice(text, streak, head) {
 }
 
 // health and armor bars, top left; the armor bar takes the colour of the armor you wear
-const armorCss = () => { const T = armorOf(matchArmor()); return !T ? '#c9ced6' : T.champ ? '#c8a2ff' : `rgb(${T.hi.join()})`; };
-const armorFill = () => { const T = armorOf(matchArmor()); if (!T) return '#c9ced6'; if (T.champ) return `linear-gradient(90deg,${Object.values(GEMS).map(c => `rgb(${c.join()})`).join()})`; return `linear-gradient(180deg,rgb(${T.hi.join()}),rgb(${T.c.join()}) 60%,rgb(${T.dk.join()}))`; };
+const armorCss = () => { const T = armorOf(matchArmor()); return !T ? '#c9ced6' : T.champ ? '#c8a2ff' : `rgb(${(T.bar?.[0] ?? T.hi).join()})`; };
+const armorFill = () => { const T = armorOf(matchArmor()); if (!T) return '#c9ced6'; if (T.champ) return `linear-gradient(90deg,${Object.values(GEMS).map(c => `rgb(${c.join()})`).join()})`; const [hi, c, dk] = T.bar ?? [T.hi, T.c, T.dk]; return `linear-gradient(180deg,rgb(${hi.join()}),rgb(${c.join()}) 60%,rgb(${dk.join()}))`; };
 function vitBar(id, v, max, icon) {
   const el = $(id), k = max > 0 ? Math.max(0, Math.min(1, v / max)) : 0, key = `${Math.ceil(v)}/${max}/${id === 'arm' ? matchArmor() : ''}`;
   if (el._k === key) return; el._k = key;

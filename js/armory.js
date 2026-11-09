@@ -112,7 +112,7 @@ const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${
 // armory pages and their sections
 const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
 const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS']];
-let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1;
+let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1, suitSel = '';
 const myArmor = () => prof.armor | 0;
 const pageIcon = p => p === 'weapons' ? SPRITES[loadoutGun('primary')] : armorSprite(Math.max(0, wornArmor() - 1));
 function renderArmory() {
@@ -140,9 +140,9 @@ function renderArmory() {
 // ---- the item card in the corner
 const actCard = (name, stars, body, pick, btns) => `<div class="an"><span>${name} <span class="st">${stars}</span></span>` +
   (armDetOk() ? `<button class="more" data-det="1">${armDet ? ico('left') + ' LIST' : 'DETAILS ' + ico('right')}</button>` : '') + `</div>${body}${pick}<div class="ab">${btns}</div>`;
-const armDetOk = () => armPage === 'weapons' || (wearCat !== 'skins' && (wearCat !== 'armor' || armorCard));
+const armDetOk = () => armPage === 'weapons' || (wearCat !== 'skins' && (wearCat !== 'armor' || armorCard || !!suitSel));
 function renderAct() {
-  if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else renderArmorAct(); return; }
+  if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
   let btns;
   if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
@@ -175,10 +175,10 @@ function renderDetail() {
 }
 
 // ---- WEAR page: armor
-const ARMOR_DESC = 'Soaks up hits before your health does and fills back up every spawn, and every star makes it tougher';
+const ARMOR_DESC = 'Soaks up hits before your health does and fills back up every spawn, and armor, boots and a hat from one set give a bonus';
 function renderWear() {
-  const n = myArmor(), w = wornArmor(), T = armorOf(w || 1);
-  const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, w - 1)) : (G => { const on = G.worn(); return on ? G.sprite(on.id, on.st) : G.sprite(G.list[0].id, 1); })(GEAR[c]);
+  const n = myArmor(), w = basicWorn(), T = armorOf(w || 1), sid = shownSuit();
+  const tabIcon = c => c === 'skins' ? headSprite(prof.look) : c === 'armor' ? armorSprite(Math.max(0, wornArmor() - 1)) : (G => { const on = G.worn(); return on ? G.sprite(on.id, on.st) : G.sprite(G.list[0].id, 1); })(GEAR[c]);
   $('armTabs').innerHTML = WEAR_CATS.map(([c, label]) =>
     `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="${c === 'skins' ? 'hd' : 'ai'}" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
   if (wearCat === 'skins') armDet = false;
@@ -187,18 +187,19 @@ function renderWear() {
   if (wearCat === 'skins') { renderSkins(); return; }
   if (isGear()) { renderGear(); return; }
   wearGear();
-  if (armDet) renderArmorDetail();
+  if (armDet) { if (sid) renderSuitDetail(); else renderArmorDetail(); }
   else {
-    const locked = !n && prof.lv < T.unlock, tag = n ? 'WEARING' : locked ? `${ico('lock')} LVL ${T.unlock}` : COIN + T.price;
+    const locked = !n && prof.lv < T.unlock, on = n && !wornSuit(), tag = on ? 'WEARING' : n ? '' : locked ? `${ico('lock')} LVL ${T.unlock}` : COIN + T.price;
     $('armList').innerHTML = `<p class="wd">${ARMOR_DESC}</p>` +
-      `<div class="card${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${n ? ' on' : ''}" data-armor="1"><span class="tag">${tag}</span>` +
-      `<img class="ai" src="${armorSprite((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div></div>`;
+      `<div class="card${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${on ? ' on' : ''}" data-armor="1">${tag ? `<span class="tag">${tag}</span>` : ''}` +
+      `<img class="ai" src="${armorSprite((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div></div>` +
+      SUITS.map(suitCard).join('');
   }
-  heroArmor(armDet ? armorPrev : w || 1);
+  heroArmor(sid ? suitN(sid, suitShown(sid)) : armDet ? armorPrev : w || 1);
   renderAct();
   if (inLobby) heroGun(-1); // put the gun away to show the armor
 }
-const armorStarTxt = () => starRow(wornArmor(), myArmor(), ARMOR_MAX);
+const armorStarTxt = () => starRow(basicWorn(), myArmor(), ARMOR_MAX);
 function renderArmorDetail() {
   const s = armorPrev, T = armorOf(s), n = myArmor();
   const state = s === wornArmor() ? 'WEARING' : s <= n ? 'OWNED' : prof.lv < T.unlock ? ico('lock') + ' LOCKED' : 'NOT OWNED';
@@ -206,7 +207,7 @@ function renderArmorDetail() {
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button>` +
     `<div id="detView"><button class="arw l" data-av="-1" ${s <= 1 ? 'disabled' : ''}>${ico('left')}</button><button class="arw r" data-av="1" ${s >= ARMOR_MAX ? 'disabled' : ''}>${ico('right')}</button></div>` +
     `<div class="dn">${T.name} ${rarTag(T)} <span class="st">${armorStars(s)}</span></div><p>${desc}</p><div class="ds">` +
-    [['ARMOR BAR', '+' + T.hp], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE'], ['UNLOCKS AT', 'LVL ' + T.unlock],
+    [['ARMOR', '+' + T.hp], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE'], ['MOBILITY', lvlName(T.mob)], ['JUMP', lvlName(T.jump)], ['UNLOCKS AT', 'LVL ' + T.unlock],
       ['PRICE', COIN + T.price], ['STATUS', state]].map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('') + '</div>';
   pvShow('armor' + s, g => armorModel(s, g), .5);
 }
@@ -216,22 +217,87 @@ function armorStep(d) {
 }
 // armor buttons
 function renderArmorAct() {
-  const n = myArmor(), w = wornArmor(), next = armorOf(n + 1);
+  const n = myArmor(), w = basicWorn(), next = armorOf(n + 1), suit = wornSuit();
   let btns = '';
-  if (armDet && armorPrev && armorPrev <= n && armorPrev !== w) btns += `<button data-wear="${armorPrev}">WEAR ${armorOf(armorPrev).name.toUpperCase()}</button>`;
+  if (armDet && armorPrev && armorPrev <= n && (armorPrev !== w || suit)) btns += `<button data-wear="${armorPrev}">WEAR ${armorOf(armorPrev).name.toUpperCase()}</button>`;
+  else if (!armDet && suit && n) btns += `<button data-wear="${w}">WEAR</button>`;
   if (!next) btns += '<button class="eq" disabled>MAXED</button>';
   else if (prof.lv < next.unlock) btns += `<button disabled>${ico('lock')} ${n ? next.name.toUpperCase() + ' ' : ''}AT LVL ${next.unlock}</button>`;
   else btns += `<button data-arm="1" ${prof.coins < next.price ? 'disabled' : ''}>${n ? starRow(n + 1) + ' ' + next.name.toUpperCase() : 'BUY'} ${COIN}${next.price}</button>`;
-  const pick = !armDet && n > 1 ? lvPick('wa', 'WEARING ' + armorOf(w).name.toUpperCase(), w <= 1, w >= n) : '';
+  const pick = !armDet && n > 1 ? lvPick('wa', (suit ? 'USING ' : 'WEARING ') + armorOf(w).name.toUpperCase(), w <= 1, w >= n) : '';
   const T = armorOf(armDet ? armorPrev : w || 1);
-  const body = `<div class="tn">${T.name.toUpperCase()} ${rarTag(T)}${armDet ? '' : n ? ' · WEARING' : ' · NOT OWNED'}</div>` +
-    statBoxes([['ARMOR BAR', '+' + T.hp, ''], ['DAMAGE CUT', T.dr ? Math.round(T.dr * 100) + '%' : 'NONE', '']]);
+  const body = `<div class="tn">${T.name.toUpperCase()} ${rarTag(T)}${armDet ? '' : !n ? ' NOT OWNED' : suit ? '' : ' WEARING'}</div>` + armorBoxes(T);
   $('armAct').innerHTML = actCard(ARMOR_ITEM, n ? armorStarTxt() : '', body, pick, btns);
   placeAct();
 }
-function wearStar(s) {
-  const n = myArmor(); s = Math.max(1, Math.min(n, s)); if (s === wornArmor()) return;
-  prof.armorUse = s === n ? 0 : s; saveProf(); armorSync(false); sfx('equip');
+function wearStar(s, on = false) {
+  const n = myArmor(); s = Math.max(1, Math.min(n, s)); if (s === basicWorn() && !(on && prof.armorOn)) return;
+  prof.armorUse = s === n ? 0 : s; if (on) prof.armorOn = ''; saveProf(); armorSync(false); sfx('equip');
+}
+// ---- WEAR page: set armor
+const SUIT_ABOUT = {
+  warrior: 'Thick steel plate for brawlers, slow and heavy but tough to get through',
+  raider: 'A light cloak for runners, thinner than plate but quick on its feet',
+};
+const SET_TXT = { warrior: '+5% DMG, +5% DMG CUT', raider: 'TRIPLE JUMP, +8% SPEED' };
+const shownSuit = () => armPage === 'wear' && wearCat === 'armor' ? suitSel || (!armorCard && wornSuit()?.id) || '' : '';
+const suitShown = id => Math.max(1, suitUse(id));
+const suitStarTxt = id => starRow(suitUse(id), suitStars(id), SUIT_ST);
+const suitLocked = S => !suitStars(S.id) && prof.lv < S.unlock[0];
+const lvlName = v => LEVEL_NAMES[v ?? 2];
+const armorBoxes = T => statBoxes([['ARMOR', '+' + T.hp, ''], ['DMG CUT', T.dr ? pct(T.dr) : 'NONE', ''], ['MOBILITY', lvlName(T.mob), ''], ['JUMP', lvlName(T.jump), '']]);
+const setOn = id => youFx().set === id ? '<div class="tn">FULL SET BONUS ON</div>' : '';
+function suitCard(S) {
+  const st = suitStars(S.id), worn = wornSuit()?.id === S.id, locked = suitLocked(S);
+  const tag = locked ? `${ico('lock')} LVL ${S.unlock[0]}` : !st ? COIN + S.price[0] : worn ? 'WEARING' : '';
+  return `<div class="card rr${locked ? ' locked' : ''}${suitSel === S.id ? ' sel' : ''}${worn ? ' on' : ''}${rarCls(S)}" data-suit="${S.id}">` +
+    (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${armorSprite(suitN(S.id, suitShown(S.id)) - 1)}">` +
+    `<div class="cn">${S.name} <span class="st">${suitStarTxt(S.id)}</span></div>${rarTag(S)}</div>`;
+}
+function renderSuitDetail() {
+  const id = shownSuit(), S = suitOf(id), have = suitStars(id), n = suitN(id, suitShown(id));
+  const by = (a, f) => a.every(v => v === a[0]) ? f(a[0]) : a.map(f).join(' / ');
+  const rows = [['ARMOR BY STAR', by(S.hp, v => '+' + v)], ['DAMAGE CUT BY STAR', by(S.dr, pct)], ['MOBILITY', lvlName(S.mob)], ['JUMP', lvlName(S.jump)],
+    ['FULL SET', SET_TXT[id]], ['STARS AT LVL', S.unlock.join(' / ')], ['PRICE', COIN + S.price[0]],
+    ['STATUS', wornSuit()?.id === id ? 'WEARING' : have ? 'OWNED' : suitLocked(S) ? ico('lock') + ' LOCKED' : 'NOT OWNED']];
+  $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
+    `<div class="dn">${S.name} ${rarTag(S)} <span class="st">${suitStarTxt(id)}</span></div>` +
+    `<p>${SUIT_ABOUT[id]}</p><div class="ds">${rows.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
+  pvShow('armor' + n, g => armorModel(n, g), .5);
+}
+function renderSuitAct() {
+  const id = shownSuit(), S = suitOf(id), st = suitStars(id), worn = wornSuit()?.id === id;
+  let btns;
+  if (suitLocked(S)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${S.unlock[0]}</button>`;
+  else if (!st) btns = `<button data-sbuy="1" ${prof.coins < S.price[0] ? 'disabled' : ''}>BUY ${COIN}${S.price[0]}</button>`;
+  else {
+    btns = worn ? '<button data-soff="1">TAKE OFF</button>' : '<button data-swear="1">WEAR</button>';
+    if (st < SUIT_ST) btns += prof.lv < S.unlock[st] ? `<button disabled>${ico('lock')} ${starRow(st + 1)} AT LVL ${S.unlock[st]}</button>`
+      : `<button data-sup="1" ${prof.coins < S.price[st] ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${S.price[st]}</button>`;
+  }
+  const u = suitUse(id), pick = st > 1 ? lvPick('su', 'USING ' + starRow(u), u <= 1, u >= st) : '';
+  const body = armorBoxes(armorOf(suitN(id, suitShown(id)))) + (worn ? setOn(id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
+  $('armAct').innerHTML = actCard(S.name + ' ' + rarTag(S), suitStarTxt(id), body, pick, btns);
+  placeAct();
+}
+// set armor buttons
+function suitClick(d) {
+  const id = shownSuit(), S = suitOf(id); if (!S) return;
+  const st = suitStars(id), own = prof.suits ??= {}, use = prof.suitUse ??= {};
+  if (d.sbuy) {
+    if (st || prof.coins < S.price[0] || prof.lv < S.unlock[0]) return;
+    prof.coins -= S.price[0]; own[id] = 1; prof.armorOn = id; sfx('buy');
+  } else if (d.sup) {
+    if (!st || st >= SUIT_ST || prof.coins < S.price[st] || prof.lv < S.unlock[st]) return;
+    prof.coins -= S.price[st]; own[id] = st + 1; delete use[id]; sfx('upgrade');
+  } else if (d.swear) { prof.armorOn = id; sfx('equip'); }
+  else if (d.soff) { prof.armorOn = ''; sfx('equip'); }
+  else if (d.su) {
+    const u = Math.max(1, Math.min(st, suitUse(id) + +d.su));
+    if (u === st) delete use[id]; else use[id] = u;
+    sfx('equip');
+  }
+  saveProf(); showProf(); armorSync(!!(d.sbuy || d.sup));
 }
 // ---- WEAR page: skins
 const SKINS_DESC = 'Pick a look, make your own with CUSTOMIZE, or paint one from scratch with DRAW';
@@ -346,6 +412,7 @@ function renderGear() {
 function renderGearDetail() {
   const G = gearNow(), B = G.list[gearSel], st = gearShown(G, B), have = G.stars(B.id);
   const specs = GEAR_STATS.filter(([f]) => B[f]).map(([f, k, fmt]) => [k + ' BY STAR', B[f].map(fmt).join(' / ')]);
+  if (SET_TXT[B.id]) specs.push(['FULL SET', SET_TXT[B.id]]);
   specs.push(['UNLOCKS AT', 'LVL ' + B.unlock], ['PRICE', COIN + B.price],
     ['STATUS', prof[G.on] === B.id && have ? 'WEARING' : have ? 'OWNED' : gearLocked(G, B) ? ico('lock') + ' LOCKED' : 'NOT OWNED']);
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
@@ -363,7 +430,7 @@ function renderGearAct() {
     if (st < 3) btns += `<button data-gup="1" ${prof.coins < gearUpg(G, B) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${gearUpg(G, B)}</button>`;
   }
   const u = G.using(B.id), pick = st > 1 ? lvPick('gu', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
+  const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (worn ? setOn(B.id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
   $('armAct').innerHTML = actCard(B.name + ' ' + rarTag(B), gearStarTxt(G, B.id), body, pick, btns);
   placeAct();
 }
@@ -389,8 +456,8 @@ function gearClick(d) {
 // armor changed mid-match
 function armorSync(fill = true) {
   if (!inMatch()) return;
-  const T = armorOf(wornArmor()), gain = fill ? Math.max(0, T.hp - P.maxArmor) : 0;
-  P.maxArmor = T.hp; P.dr = T.dr; P.armor = Math.min(P.maxArmor, P.armor + gain);
+  const T = armorOf(wornArmor()), hp = T?.hp ?? 0, gain = fill ? Math.max(0, hp - P.maxArmor) : 0;
+  P.maxArmor = hp; P.dr = T?.dr ?? 0; P.armor = Math.min(P.maxArmor, P.armor + gain);
 }
 
 // ---- spinning model in the details view
@@ -463,7 +530,8 @@ $('armList').addEventListener('click', e => {
   if (c.dataset.dbuy) { drawBuy(); return; }
   if (c.dataset.dnew) { openDraw(-1); return; }
   if (c.dataset.skin) { drawSure = -1; wearLook(+c.dataset.skin); renderArmory(); return; }
-  if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = wornArmor() || 1; } else armorCard = true; sfx('ui'); renderArmory(); return; }
+  if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = basicWorn() || 1; } else { armorCard = true; suitSel = ''; } sfx('ui'); renderArmory(); return; }
+  if (c.dataset.suit) { const id = c.dataset.suit; if (suitSel === id) armDet = true; else { suitSel = id; armorCard = false; } sfx('ui'); renderArmory(); return; }
   if (c.dataset.gear) { const i = +c.dataset.gear; if (i === gearSel) armDet = true; else gearSel = i; sfx('ui'); renderArmory(); return; }
   const i = +c.dataset.i;
   if (i === armSel) armDet = true; else armSel = i;
@@ -474,12 +542,13 @@ function armClick(e) {
   if (b.dataset.cust) { openCust(); return; }
   if (b.dataset.dedit) { openDraw(+b.dataset.dedit); return; }
   if (b.dataset.ddel) { const i = +b.dataset.ddel; if (drawSure === i) { drawSure = -1; drawDelete(i); } else { drawSure = i; sfx('ui'); renderAct(); } return; }
-  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; armSel = -1; gearSel = -1; sfx('ui'); } }
-  else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; armorPrev = 0; gearSel = -1; sfx('ui'); } }
+  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; suitSel = ''; armSel = -1; gearSel = -1; sfx('ui'); } }
+  else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; suitSel = ''; armorPrev = 0; gearSel = -1; sfx('ui'); } }
   else if (b.dataset.gbuy || b.dataset.gup || b.dataset.gwear || b.dataset.goff || b.dataset.gu) gearClick(b.dataset);
   else if (b.dataset.av) { armorStep(+b.dataset.av); return; }
-  else if (b.dataset.wa) wearStar(wornArmor() + +b.dataset.wa);
-  else if (b.dataset.wear) wearStar(+b.dataset.wear);
+  else if (b.dataset.sbuy || b.dataset.sup || b.dataset.swear || b.dataset.soff || b.dataset.su) suitClick(b.dataset);
+  else if (b.dataset.wa) wearStar(basicWorn() + +b.dataset.wa);
+  else if (b.dataset.wear) wearStar(+b.dataset.wear, true);
   else if (b.dataset.use) {
     const i = armSel, st = gunStars(i), u = Math.max(1, Math.min(st, gunUse(i) + +b.dataset.use));
     if (u === st) delete prof.use[BASE[i].id]; else prof.use[BASE[i].id] = u;
@@ -490,7 +559,7 @@ function armClick(e) {
     prof.coins -= T.price; prof.armor = n + 1; prof.armorUse = 0; if (armDet) armorPrev = n + 1; saveProf(); showProf();
     armorSync(); sfx(n ? 'upgrade' : 'buy');
   }
-  else if (b.dataset.det) { armDet = !armDet; if (armDet && armPage === 'wear' && wearCat === 'armor') armorPrev = wornArmor() || 1; sfx('ui'); }
+  else if (b.dataset.det) { armDet = !armDet; if (armDet && armPage === 'wear' && wearCat === 'armor') armorPrev = basicWorn() || 1; sfx('ui'); }
   else if (b.dataset.c) { armCat = b.dataset.c; armDet = false; sfx('ui'); }
   else if (b.id === 'detBack') { armDet = false; sfx('ui'); }
   else if (b.dataset.buy) {
@@ -520,12 +589,12 @@ function armShow(on) {
   if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; }
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
-function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; armShow(true); renderArmory(); }
-function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; gearSel = -1; heroArmor(wornArmor()); wearGear(); }
+function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; suitSel = ''; armShow(true); renderArmory(); }
+function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; gearSel = -1; suitSel = ''; heroArmor(wornArmor()); wearGear(); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // don't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => {
-  if (armOpen && armDet && armPage === 'wear' && wearCat === 'armor' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { armorStep(e.code === 'ArrowLeft' ? -1 : 1); return; }
+  if (armOpen && armDet && armPage === 'wear' && wearCat === 'armor' && !shownSuit() && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { armorStep(e.code === 'ArrowLeft' ? -1 : 1); return; }
   if (e.code !== 'Escape' || !armOpen || $('binds').style.display === 'flex') return;
   if (armDet) { armDet = false; renderArmory(); } else closeArmory();
 });
