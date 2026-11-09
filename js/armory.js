@@ -10,10 +10,10 @@ const inMatch = () => !inLobby && pvp() && !matchOver;
 // main stats for a gun card
 function mainStats(i, L = Math.max(0, gunUse(i) - 1)) {
   const w = BASE[i], s = statsAt(i, L);
-  const per = v => v >= 20 ? Math.round(v) : +v.toFixed(1);
+  const per = v => v >= 10 ? Math.round(v) : +v.toFixed(1);
   return [
-    ['DAMAGE', w.beam ? Math.round(s.dmg / s.rate) : s.dmg * w.pellets, w.beam ? '/ SEC' : ''],
-    ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(s.rate, s.reload) : s.rate)), w.beam ? '' : '/ SEC'],
+    ['DAMAGE', w.beam ? Math.round(s.dmg / s.rate) : s.dmg * w.pellets, w.beam ? '/SEC' : ''],
+    ['FIRE RATE', w.beam ? 'BEAM' : per(1 / (w.mag === 1 && !w.melee ? Math.max(s.rate, s.reload) : s.rate)), w.beam ? '' : '/SEC'],
     ['CAPACITY', w.inf ? ico('inf') : s.mag, ''],
     ['MOBILITY', w.mob ?? 60, ''],
   ].filter(r => !(w.melee && r[0] === 'CAPACITY'));
@@ -29,7 +29,18 @@ function starTable(i) {
   if (w.jump) rows.push(['JUMP', ...w.jump.map(j => '+' + Math.round(j * 100) + '%')]);
   return rows;
 }
-const statBoxes = rows => `<div class="ms" style="grid-template-columns:repeat(${rows.length},1fr)">${rows.map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>`;
+const statBoxes = rows => `<div class="ms" style="grid-template-columns:repeat(${rows.length},minmax(0,1fr))">${rows.map(([k, v, u]) => `<div><span>${k}</span><b>${v}${u ? `<small>${u}</small>` : ''}</b></div>`).join('')}</div>`;
+// one size for every value in a row of boxes, small enough that the widest still fits on its line
+function fitStats(root) {
+  for (const g of root.querySelectorAll('.ms')) {
+    const bs = [...g.querySelectorAll('b')]; let k = 1;
+    for (const b of bs) b.style.fontSize = '';
+    for (const b of bs) { const room = b.parentElement.clientWidth - 6, w = b.getBoundingClientRect().width; if (room > 0 && w > room) k = Math.min(k, room / w); }
+    const f = bs.length && parseFloat(getComputedStyle(bs[0]).fontSize);
+    if (k < 1) for (const b of bs) b.style.fontSize = Math.max(11, Math.floor(f * k)) + 'px';
+  }
+}
+const setAct = html => { $('armAct').innerHTML = html; fitStats($('armAct')); };
 // rarity: a coloured badge by names, a stripe along the bottom of cards
 const rarTag = o => { const [n, c] = RARITY[rarOf(o)]; return `<span class="rt" style="--rc:${c}">${n}</span>`; };
 const RAR_GLOW = { common: .12, rare: .2, epic: .25, legend: .3, mythic: .36 }; // glow up from a card's bottom edge
@@ -53,7 +64,7 @@ function gunAttrs(w) {
   if (w.wand) a.push('WAND');
   if (slows(w)) a.push('SLOW');
   if (w.knock) a.push('KNOCKBACK');
-  if (w.rocket) a.push('ROCKET', 'EXPLOSIVE');
+  if (w.rocket) a.push(...w.gust ? ['WIND BLAST', 'BIG LAUNCH'] : ['ROCKET', 'EXPLOSIVE']);
   if (w.flame || w.flare || w.burn) a.push('FIRE');
   if (w.jump) a.push('JUMP BOOST');
   if (w.starFx) a.push('STARS');
@@ -87,6 +98,7 @@ const DESC = {
   crossbow: 'Silent bolts that hit a head really hard',
   grenade: 'Grenades that bounce off walls and go boom on whoever they touch',
   executioner: 'Purple laser bolts that hit like a sniper, from a pistol',
+  aerial: 'A cannon full of wind that blows foes away and throws you sky high',
 };
 // extra stats for the details view
 function gunSpecs(i) {
@@ -95,6 +107,7 @@ function gunSpecs(i) {
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
   if (w.rocket || w.grenade) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
   if (w.grenade) out.push(['FUSE', GREN_FUSE + 's']);
+  if (w.launch) out.push(['ROCKET JUMP', `${Math.round((w.launch - 1) * 100)}% STRONGER`]);
   if (w.headMul) out.push(['HEADSHOT', 'X' + w.headMul]);
   if (w.spare) out.push([w.bow ? 'SPARE BOLTS' : 'SPARE AMMO', w.mag * w.spare]);
   if (w.burn) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`]);
@@ -153,7 +166,7 @@ function renderAct() {
     if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${upgPrice(i)}</button>`;
   }
   const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  $('armAct').innerHTML = actCard(w.name + ' ' + rarTag(w), starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns);
+  setAct(actCard(w.name + ' ' + rarTag(w), starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns));
   placeAct();
 }
 // SHOOT and RELOAD buttons
@@ -228,7 +241,7 @@ function renderArmorAct() {
   const pick = !armDet && n > 1 ? lvPick('wa', (suit ? 'USING ' : 'WEARING ') + armorOf(w).name.toUpperCase(), w <= 1, w >= n) : '';
   const T = armorOf(armDet ? armorPrev : w || 1);
   const body = `<div class="tn">${T.name.toUpperCase()} ${rarTag(T)}${armDet ? '' : !n ? ' NOT OWNED' : suit ? '' : ' WEARING'}</div>` + armorBoxes(T);
-  $('armAct').innerHTML = actCard(ARMOR_ITEM, n ? armorStarTxt() : '', body, pick, btns);
+  setAct(actCard(ARMOR_ITEM, n ? armorStarTxt() : '', body, pick, btns));
   placeAct();
 }
 function wearStar(s, on = false) {
@@ -280,7 +293,7 @@ function renderSuitAct() {
   }
   const u = suitUse(id), pick = st > 1 ? lvPick('su', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   const body = armorBoxes(armorOf(suitN(id, suitShown(id)))) + (worn ? setBonus(id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
-  $('armAct').innerHTML = actCard(S.name + ' ' + rarTag(S), suitStarTxt(id), body, pick, btns);
+  setAct(actCard(S.name + ' ' + rarTag(S), suitStarTxt(id), body, pick, btns));
   placeAct();
 }
 // set armor buttons
@@ -345,7 +358,7 @@ function renderSkins() {
 function renderSkinAct() {
   const p = lookChoices()[lookIndex()], drawn = p?.drawn !== undefined;
   const btns = !inLobby ? '' : drawn ? `<button data-dedit="${p.drawn}">${ico('pencil')} EDIT</button><button data-ddel="${p.drawn}">${drawSure === p.drawn ? 'SURE?' : 'DELETE'}</button>` : '<button data-cust="1">' + ico('pencil') + ' CUSTOMIZE</button>';
-  $('armAct').innerHTML = actCard(p?.name ?? 'CUSTOM', '', `<div class="tn">WEARING${drawn && CG_ON ? ' · ONLY YOU SEE DRAWN SKINS HERE' : ''}</div>`, '', btns);
+  setAct(actCard(p?.name ?? 'CUSTOM', '', `<div class="tn">WEARING${drawn && CG_ON ? ' · ONLY YOU SEE DRAWN SKINS HERE' : ''}</div>`, '', btns));
   placeAct();
 }
 let drawSure = -1; // delete needs a second click
@@ -434,7 +447,7 @@ function renderGearAct() {
   }
   const u = G.using(B.id), pick = st > 1 ? lvPick('gu', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (worn ? setBonus(B.id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
-  $('armAct').innerHTML = actCard(B.name + ' ' + rarTag(B), gearStarTxt(G, B.id), body, pick, btns);
+  setAct(actCard(B.name + ' ' + rarTag(B), gearStarTxt(G, B.id), body, pick, btns));
   placeAct();
 }
 // boots and hats buttons
@@ -601,4 +614,4 @@ addEventListener('keydown', e => {
   if (e.code !== 'Escape' || !armOpen || $('binds').style.display === 'flex') return;
   if (armDet) { armDet = false; renderArmory(); } else closeArmory();
 });
-addEventListener('resize', placeAct);
+addEventListener('resize', () => { placeAct(); if (armOpen) fitStats($('armAct')); });

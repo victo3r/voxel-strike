@@ -28,6 +28,7 @@ const BASE = [
   { id: 'executioner', rar: 'epic', hold: 'pistol', name: 'Executioner', cat: 'backup', unlock: 14, price: 400, mob: 70, zoom: 4, reticle: '212,123,255', laser: true, dmg: 85, rate: 1 / 1.8, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0x5b3b8a, len: .4 },
   { id: 'crossbow', rar: 'rare', hold: 'rifle', name: 'Crossbow', cat: 'sniper', unlock: 7, price: 175, mob: 60, zoom: 2.5, reticle: '255,190,80', spare: 12, quiet: true, bow: true, headMul: 2.4, dmg: 85, rate: 1, mag: 1, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x6b4a2b, len: .8 },
   { id: 'grenade', rar: 'epic', hold: 'rifle', name: 'Grenade Bouncer', cat: 'premium', unlock: 12, price: 350, mob: 60, grenade: true, dmg: 90, rate: .75, mag: 4, reload: 2.4, pellets: 1, spread: 0, auto: false, color: 0x3f7a3a, len: .7 },
+  { id: 'aerial', rar: 'epic', hold: 'rifle', name: 'Aerial Blast', cat: 'premium', unlock: 15, price: 435, mob: 60, rocket: true, gust: true, launch: 1.1, dmg: 110, rate: 1, mag: 6, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x8fd0f5, len: .8 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -53,7 +54,7 @@ const RECOIL = {
   voxel: { up: 1.4, side: .3, back: 1 }, hitman: { up: 1.1, side: .25, back: 1 }, executioner: { up: 1.8, side: .3, back: .9 }, flare: { up: 2, side: .35, back: .8 },
   ar: { up: .55, side: .25, back: 1 }, thrasher: { up: .5, side: .22, back: 1 }, eradicator: { up: .25, side: .2, back: 1.2 },
   shotgun: { up: 2.8, side: .5, back: .6 }, trex: { up: 3.2, side: .55, back: .55 }, starsmasher: { up: .6, side: .22, back: 1 }, rocket: { up: 2.6, side: .35, back: .5 },
-  sniper: { up: 1.8, side: .2, back: .28 }, semisniper: { up: 1.3, side: .18, back: .4 }, tigerbite: { up: 1.9, side: .2, back: .32 }, crossbow: { up: 1.2, side: .15, back: .5 }, grenade: { up: 2.2, side: .35, back: .6 },
+  sniper: { up: 1.8, side: .2, back: .28 }, semisniper: { up: 1.3, side: .18, back: .4 }, tigerbite: { up: 1.9, side: .2, back: .32 }, crossbow: { up: 1.2, side: .15, back: .5 }, grenade: { up: 2.2, side: .35, back: .6 }, aerial: { up: 2.4, side: .35, back: .55 },
   heatray: { up: .05, side: .06, back: 2 }, shockbeam: { up: .06, side: .08, back: 2 }, frostwand: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 },
 };
 const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4;
@@ -112,12 +113,12 @@ const POSE_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz', 'ay', 'az'
 const magSwap = (roll, drop, lift = .2) => { const h = { rz: roll, rx: lift, y: .06, x: -.07 }; return [[0, {}], [.14, h], [.3, { ...h, my: -drop * .4, ay: -.15 }], [.42, { ...h, my: -drop, ay: -.42 }], [.56, { ...h, my: -drop * .35, ay: -.18 }], [.7, { ...h, y: .07 }], [.74, { ...h, y: .085 }], [.86, { rx: .05, z: .035 }], [.93, { z: -.01 }], [1, {}]]; };
 // rounds pushed in one at a time
 const dips = (h, n, t0, t1, d = .025) => Array.from({ length: n }, (_, i) => { const t = t0 + (t1 - t0) * i / n, w = (t1 - t0) / n; return [[t + w * .45, { ...h, y: (h.y || 0) - d, ay: -.05 }], [t + w * .9, h]]; }).flat();
-const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42] };
+const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], aerial: [.3, .42] };
 const RELOAD_ANIM = (() => {
   const pistol = roll => { const h = { rx: .45, rz: roll, y: .07, x: -.06 }; return [[0, {}], [.16, h], [.3, { ...h, my: -.26 }], [.31, { ...h, my: -.45 }], [.46, { ...h, my: -.11, hand: 1 }], [.58, { ...h, my: -.09, hand: 1 }], [.66, { ...h, y: .03, hand: 1 }], [.72, { ...h, y: .045, hand: .7 }], [.8, { ...h, y: .02 }], [.86, { rx: .08, z: .04 }], [.93, { z: -.012 }], [1, {}]]; };
   const sg = { rz: -.5, rx: .28, y: -.04 }, bolt = { rz: .3, rx: .1, y: -.03, mz: .09, my: .02 }, box = { rz: -.4, ry: -.22, y: -.05 }, cell = { rx: .38, rz: -.25, y: .02 }, tank = { rz: -.5, rx: .18, y: -.02 };
   return {
-    voxel: pistol(-.3), hitman: pistol(-.4), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16),
+    voxel: pistol(-.3), hitman: pistol(-.4), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16), aerial: magSwap(-.4, .36, .2),
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     trex: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
@@ -373,6 +374,24 @@ const GUN_MODELS = {
     p(4, 7, 4, dk, 0, -5.5, -18); // front grip
     const mag = sub(0, 0, 0), mg = at(mag); mg(1, 6, 6, mat(0x555a55), 5.5, -1, -5); // loading gate, swung open to reload
     return { muzzle: [1, -31], grip: [4, 8, 5, 0, -7, 4], fore: [4, 7, 4, 0, -5.5, -18], bands: [-17, -20], band: [8, 8, 1], spin, mag };
+  },
+  aerial({ p, mat, dark, glow, sub, at }) {
+    const sky = mat(0x8fd0f5), dsky = mat(0x5aa6d8), white = mat(0xf2f6fa), gold = mat(0xe8b83a), dgold = mat(0xb08a2a);
+    const ring = (o, i, d, m, z) => { const t = (o - i) / 2, c = (i + t) / 2; p(o, t, d, m, 0, 1 + c, z); p(o, t, d, m, 0, 1 - c, z); p(t, i, d, m, c, 1, z); p(t, i, d, m, -c, 1, z); };
+    p(10, 10, 8, white, 0, 1, 4); p(10, 10, 2, gold, 0, 1, 2); // the turbine housing and its gold band
+    const spin = sub(0, 1, 8), sp = at(spin); // the fan at the back
+    sp(4, 8, 1, sky, 0, 0, 0); sp(8, 4, 1, sky, 0, 0, 0); sp(2, 2, 1, dgold, 0, 0, 1);
+    p(6, 6, 24, sky, 0, 1, -12); // barrel
+    for (const x of [-2.5, 2.5]) for (const z0 of [-3, -13]) for (let t = 0; t < 5; t++) p(1, 1, 2, white, x, -1.5 + t, z0 - 2 * t); // wind swooshes along the sides
+    p(6, 1, 24, dsky, 0, 3.5, -12); p(4, 1, 20, white, 0, 3.5, -12); // a white stripe along the top
+    p(8, 8, 2, white, 0, 1, -25); p(10, 10, 2, sky, 0, 1, -27); ring(12, 8, 3, gold, -29.5); // the bell, flaring out to a gold rim
+    p(8, 8, 1, dsky, 0, 1, -28.5); p(4, 4, 1, glow(0xd8f6ff), 0, 1, -28.5); // inside it, the wind glowing
+    p(6, 6, 1, dsky, 0, 1, 7.5); // the intake behind the fan
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 6, 6, gold, 0, -5, -11); mg(4, 1, 6, white, 0, -8.5, -11); // the air tank
+    p(4, 4, 4, white, 0, -6, -1); p(4, 3, 4, white, 0, -9.5, 0); // grip
+    p(1, 1, 4, dark, 0, -7.5, -5); p(1, 2, 1, mat(0x888888), 0, -5, -4.5); // guard and trigger
+    p(4, 6, 4, dsky, 0, -4, -19); // front grip
+    return { muzzle: [1, -32], grip: [4, 7, 5, 0, -7.5, -.5], fore: [4, 6, 4, 0, -4, -19], bands: [-6, -16], band: [8, 8, 1], spin, mag };
   },
 
   flare({ p, mat, dark, glow, sub, at }) {

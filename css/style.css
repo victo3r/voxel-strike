@@ -232,11 +232,11 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #armDet .ds span{color:var(--muted)}
 /* main stats */
 #armDet .ms,#armAct .ms{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-#armDet .ms div,#armAct .ms div{display:flex;flex-direction:column;align-items:center;padding:6px 2px;background:rgba(0,0,0,.22);border:2px solid var(--line)}
+#armDet .ms div,#armAct .ms div{display:flex;flex-direction:column;align-items:center;min-width:0;padding:6px 2px;background:rgba(0,0,0,.22);border:2px solid var(--line)}
 #armDet .ms span,#armAct .ms span{font-size:10px;color:var(--muted);white-space:nowrap}
-#armDet .ms b,#armAct .ms b{font:bold 20px monospace;color:#fff}
-#armDet .ms small,#armAct .ms small{font-size:10px;color:var(--silver)}
-#armAct .ms small{display:block;text-align:center}#armAct .ms b{font-size:18px}
+#armDet .ms b,#armAct .ms b{font:bold 20px monospace;color:#fff;white-space:nowrap}
+#armDet .ms small,#armAct .ms small{font-size:.5em;color:var(--silver)}
+#armAct .ms b{font-size:18px}
 /* attributes */
 #armDet .at,#armAct .at{display:flex;flex-wrap:wrap;gap:6px}
 #armDet .at span,#armAct .at span{font:bold 11px monospace;padding:3px 8px;border:2px solid var(--acc);color:var(--acc-lt);background:rgba(47,191,113,.15)}

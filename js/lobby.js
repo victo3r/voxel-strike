@@ -198,7 +198,7 @@ function heroGun(i) {
 const hf = { i: -1, rs: { rk: -1 } };
 const heroFx = [], fxGeo = new THREE.BoxGeometry(1, 1, 1);
 const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: .9, depthWrite: false });
-const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), flare: new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
+const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), gust: new THREE.MeshBasicMaterial({ color: 0xd8f4ff }), flare: new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
   beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }),
   shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), frost: new THREE.MeshBasicMaterial({ color: 0xc8f4ff, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
 const heroCan = () => armOpen && inLobby && armPage === 'weapons' && hf.i >= 0 && holdK > .9;
@@ -243,7 +243,7 @@ function heroShot() {
   sfx(w.id, { v: .5 }); hf.flash = .05;
   if (w.starFx) starPuff(hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
-  const n = w.pellets > 1 ? 5 : 1, mat = w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
+  const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
     const len = w.rocket || w.flare || w.grenade ? .6 : 3, m = new THREE.Mesh(fxGeo, mat);

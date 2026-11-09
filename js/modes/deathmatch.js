@@ -77,7 +77,7 @@ const botGun = c => pickRare(BASE.filter(w => w.cat === c)).id;
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
-  herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16],
+  herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -104,6 +104,7 @@ const GUN_FIT = {
   semisniper: d => d > 18 ? 1.05 : d > 12 ? .7 : d > 7 ? .35 : .15,
   rocket: d => d < 5 ? 0 : d < 22 ? .72 : .4,
   grenade: d => d < 5 ? 0 : d < 18 ? .75 : .2,
+  aerial: d => d < 5 ? 0 : d < 22 ? .8 : .45,
   crossbow: d => d > 14 ? .95 : d > 8 ? .55 : .2,
   flare: d => d < 3 ? .1 : d < 20 ? .6 : .35,
 };

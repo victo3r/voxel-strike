@@ -67,6 +67,7 @@ const CROSSES = {
   flare: () => [...xDot(), ...xCorners(8, 4)], // explosives: corners, bigger blast = bigger square
   rocket: () => [...xDot(), ...xCorners(13, 5)],
   grenade: () => [...xDot(), ...xCorners(11, 4)],
+  aerial: () => [...xDot(), ...xCorners(13, 5)],
   crossbow: () => [...xDot(), ...xLines(7, 4, 2, 'lrd')],
 };
 const crossFor = w => (CROSSES[w.id] ?? (w.hold === 'pistol' || w.melee ? CROSSES.voxel : CROSSES.ar))();

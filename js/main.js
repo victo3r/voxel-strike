@@ -376,11 +376,12 @@ function update(dt) {
       const at = onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone();
       net.boom(r.id, at, r.by);
       // rocket self damage
-      blast(at, ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, true, r.id);
+      blast(at, ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, r.g, r.id);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);
-    if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, 0x888888, 1); }
+    if (r.gust) r.m.rotateZ(dt * 18);
+    if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, r.gust ? 0xe8f7ff : 0x888888, 1); }
   }
 
   updateFlares(dt); updateGrenades(dt); beamTick(dt); tracerTick(dt); globTick(dt);

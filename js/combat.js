@@ -198,14 +198,14 @@ const LAUNCH = 13, LAUNCH_OTHER = .45, LAUNCH_JUMP = 1.25, LAUNCH_UP = .35, LAUN
 // sideways push lasts in the air, stops fast on the ground
 const AIR_DRAG = .5, GROUND_DRAG = 10;
 const launchV = new THREE.Vector3();
-// f = 1 at point blank, 0 at the edge
-function launch(o, center, p, f, self) {
+// f = 1 at point blank, 0 at the edge; k = the gun's own launch (Aerial Blast 1.1)
+function launch(o, center, p, f, self, k = 1) {
   launchV.subVectors(center, p); if (launchV.lengthSq() < 1e-4) launchV.set(0, 1, 0);
   launchV.normalize(); launchV.y = Math.max(launchV.y, LAUNCH_UP); launchV.normalize();
   const you = o === P, jumping = you && (P.vy > 0 || held('jump'));
-  let s = LAUNCH * f * (self ? 1 : LAUNCH_OTHER) * (jumping ? LAUNCH_JUMP : 1);
+  let s = LAUNCH * f * k * (self ? 1 : LAUNCH_OTHER) * (jumping ? LAUNCH_JUMP : 1);
   if (!you) s /= o.scale || 1; // bigger zombies are heavier
-  o.vy = Math.min(LAUNCH_MAX, Math.max(o.vy || 0, 0) + launchV.y * s);
+  o.vy = Math.min(LAUNCH_MAX * k, Math.max(o.vy || 0, 0) + launchV.y * s);
   o.lx = (o.lx || 0) + launchV.x * s; o.lz = (o.lz || 0) + launchV.z * s;
   if (you) P.onGround = false;
 }
@@ -221,11 +221,13 @@ function launchMove(o, pos, r, grounded, dt) {
 function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
-  const m = new THREE.Group(), body = box(.1, .1, .4, lam({ color: 0x4b5b3b })), tip = box(.12, .12, .12, lam({ color: 0xaa3333 }));
-  tip.position.z = .24; m.add(body, tip);
+  const m = new THREE.Group();
+  if (w.gust) { m.add(box(.18, .18, .18, GUST_MATS[0])); for (const r of [0, Math.PI / 2]) { const b = box(.42, .06, .06, GUST_MATS[1]); b.rotation.z = r; m.add(b); } } // a ball of wind
+  else { const body = box(.1, .1, .4, lam({ color: 0x4b5b3b })), tip = box(.12, .12, .12, lam({ color: 0xaa3333 })); tip.position.z = .24; m.add(body, tip); }
   m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
-  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id });
+  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust });
 }
+const GUST_MATS = [new THREE.MeshBasicMaterial({ color: 0xc8f0ff }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, drop
 const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and damage
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });

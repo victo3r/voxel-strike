@@ -323,6 +323,16 @@ const SOUNDS = {
     s.click({ f: 1400, v: .35 });
   }],
   bounce: [.15, .35, s => { s.tone({ f: 620, f2: 480, d: .06, v: .5 }); s.click({ f: 2400, v: .25 }); }],
+  aerial: [.8, .85, s => { // a deep whump and a rush of air
+    s.tone({ f: 110, f2: 45, d: .22, v: .9 });
+    s.hiss({ ft: 'bandpass', f: 2400, f2: 380, q: 1.2, a: .01, d: .6, v: .9, sweep: .5 });
+    s.hiss({ ft: 'highpass', f: 4000, d: .05, v: .3 });
+  }],
+  gust: [1.3, 1, s => { // a blast of wind: a thump and a big whoosh, no crackle
+    s.tone({ f: 85, f2: 30, d: .5, v: .9 });
+    s.hiss({ f: 2600, f2: 140, a: .004, d: 1, v: .9 });
+    s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 1, t: .02, a: .06, d: .75, v: .6, sweep: .6 });
+  }],
   flareHit: [.6, .6, s => {
     s.hiss({ ft: 'bandpass', f: 1500, f2: 400, d: .35, v: .9 });
     s.tone({ f: 180, f2: 60, d: .15, v: .7 });
@@ -462,6 +472,7 @@ const SOUNDS = {
   r_rocket: [2.6, .45, s => { s.latch(.3); s.hiss({ ft: 'bandpass', f: 600, f2: 300, q: 2, t: 1.0, a: .1, d: .25, v: .5 }); s.thunk(1.35); s.latch(2.1); }],
   r_crossbow: [2.2, .45, s => { s.latch(.2); for (const t of [.5, .75, 1, 1.25]) s.click({ t, f: 1500, v: .35 }); s.tone({ t: 1.55, type: 'triangle', f: 180, f2: 240, d: .2, v: .35 }); s.latch(1.9); }],
   r_grenade: [2.4, .45, s => { for (const t of [.35, .7, 1.05, 1.4]) s.shell(t); s.latch(2.0); }],
+  r_aerial: [2.2, .45, s => { s.magOut(.15); s.magIn(.8); s.hiss({ ft: 'bandpass', f: 500, f2: 2400, q: 1.5, t: 1.0, a: .2, d: .45, v: .45, sweep: .6 }); s.latch(1.75); }], // a fresh tank, the turbine winding up
   r_flare: [1.3, .45, s => { s.latch(.1); s.shell(.6); s.latch(1.0); }],
   r_hitman: [1.1, .45, s => { s.magOut(.08); s.magIn(.5); s.rack(.82); }],
   r_executioner: [1.4, .45, s => {

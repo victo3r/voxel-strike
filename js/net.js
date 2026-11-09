@@ -372,7 +372,7 @@ net = (() => {
       if (!alive) return;
       youHitFx(!!m.head, armorOnly);
       if (slows(BASE[gi(m.gun)])) shockHit(P, BASE[gi(m.gun)]);
-      if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false); // someone else's blast throws you
+      if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false, BASE[gi(m.gun)]?.launch); // someone else's blast throws you
       return;
     }
     const r = remotes.get(m.v); if (!r) return;
@@ -380,7 +380,7 @@ net = (() => {
     const b = r.body; if (!b) return;
     b.hp = Math.max(m.hp, b.dead ? 0 : .01); b.armor = m.armor;
     if (slows(BASE[gi(m.gun)])) shockHit(b, BASE[gi(m.gun)]); // host bots run slower
-    if (m.launch && !m.launch[4] && r.rec.hostBot && !b.dead) launch(b, b.g.position.clone().setY(b.g.position.y + 1), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false); // a hammer throws my bot
+    if (m.launch && !m.launch[4] && r.rec.hostBot && !b.dead) launch(b, b.g.position.clone().setY(b.g.position.y + 1), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false, BASE[gi(m.gun)]?.launch); // a blast or a hammer throws my bot
     if (r.rec.hostBot && m.by && m.by !== m.v) { // my bot remembers who's hurting it
       const who = m.by === pid ? YOU_T : bodyOf(m.by);
       if (who) { if (b.hitBy !== who || b.hitByT <= 0) b.hitDmg = 0; b.hitBy = who; b.hitByT = 2; b.hitDmg += m.d; }
@@ -500,12 +500,12 @@ net = (() => {
   }
   function remoteBoom(m) {
     const id = m.pid * 100000 + m.id, p = new THREE.Vector3(...m.p);
-    let kind = 'rocket';
+    let kind = 'rocket', gust = false;
     for (const list of [rockets, flares, grenades]) {
       const k = list.findIndex(x => x.ghost && x.id === id);
-      if (k >= 0) { kind = list === flares ? 'flare' : 'rocket'; scene.remove(list[k].m); list.splice(k, 1); break; }
+      if (k >= 0) { kind = list === flares ? 'flare' : 'rocket'; gust = !!list[k].gust; scene.remove(list[k].m); list.splice(k, 1); break; }
     }
-    if (kind === 'rocket') blastFx(p, ROCKET_R);
+    if (kind === 'rocket') blastFx(p, ROCKET_R, gust);
     else flareFx(p);
   }
 

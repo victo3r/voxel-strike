@@ -201,19 +201,21 @@ function explode(z) {
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // explosion effect
-function blastFx(p, R) {
-  burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 });
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: .9 }));
+function blastFx(p, R, gust = false) {
+  if (gust) { burst(p, 0xffffff, 24); burst(p, 0x9fdcff, 16); burst(p, 0xffd45a, 6); sfx('gust', { at: p, far: 120 }); } // a burst of wind instead of fire
+  else { burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 }); }
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
 }
 function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
-  blastFx(p, R);
+  const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', lk = BASE[gi(gun)]?.launch ?? 1;
+  blastFx(p, R, !!BASE[gi(gun)]?.gust);
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
   if (net.on) { // online the server works out who got hurt
-    const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', kind = rocket ? 4 : 6;
+    const kind = rocket ? 4 : 6;
     if (pd < R && !dead && respawnT <= 0) {
       if (pDmg) net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by });
-      if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true);
+      if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true, lk);
     }
     for (const o of zombies) {
       if (o === skip || o.dead || !o.pid) continue; // other players and room bots
@@ -224,14 +226,14 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
   }
   if (pd < R && !dead && respawnT <= 0) {
     if (pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by);
-    if (rocket && respawnT <= 0 && !dead && !(by && friendly(by, YOU_T))) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, !by);
+    if (rocket && respawnT <= 0 && !dead && !(by && friendly(by, YOU_T))) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, !by, lk);
   }
   for (const o of zombies) {
     if (o === skip || o.dead || o.type === 'bot' && friendly(by, o)) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
     if (od >= R) continue;
     hurtZombie(o, o === by ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
-    if (rocket && !o.dead) launch(o, c, p, 1 - od / R, o === by);
+    if (rocket && !o.dead) launch(o, c, p, 1 - od / R, o === by, lk);
   }
 }
 
@@ -260,6 +262,7 @@ const SHOP = [
   { gun: 'executioner', price: 260, desc: `laser pistol, ${BASE[gi('executioner')].dmg} dmg` },
   { gun: 'crossbow', price: 160, desc: 'quiet bolts, huge headshots' },
   { gun: 'grenade', price: 300, desc: 'bouncy grenades, big booms' },
+  { gun: 'aerial', price: 360, desc: 'blasts of wind that throw you sky high' },
   { gun: 'trex', price: 250, desc: 'six big pellets and a dino bite' },
   { gun: 'starsmasher', price: 380, desc: 'stars out of the muzzle, 3x sight' },
   { gun: 'blazesaber', price: 320, desc: 'a blade of fire that burns them' },
