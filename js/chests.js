@@ -86,7 +86,7 @@ function chestModel(i, g) {
     ...[-7, 6].flatMap(x => [-4, 3].map(z => B(x, 1, z, x + 1, 6, z + 1, W))), // corner posts
     B(-8, 3, -5, 8, 4, 5, D), // a band round the body
     B(-8, 6, -5, 8, 10, 5, M), B(-7, 10, -4, 7, 11, 4, M), B(-8, 8, -5, 8, 9, 5, D), // the lid, its rounded top and its band
-    B(-2, 4, 4, 2, 8, 6, D), B(-1, 5, 6, 1, 7, 7, G), // the lock
+    B(-3, 3, 4, 3, 8, 6, D), c.id === 'wood' ? B(-1, 5, 5, 1, 7, 6, G) : B(-1, 5, 6, 1, 7, 7, G), // the lock: a latch set in it, or a glowing gem
   ], 1 / 16);
   for (const [geo, mat] of [[chestGeo[i].lit, gunLit], [chestGeo[i].glow, gunGlow]]) if (geo) { const o = new THREE.Mesh(geo, mat); o.userData.shared = true; g.add(o); }
 }

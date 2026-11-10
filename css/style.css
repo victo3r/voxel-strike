@@ -298,8 +298,8 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #nameIn{height:38px;box-sizing:border-box}
 #prof{display:flex;align-items:center;gap:16px}
 #prof .lv{display:flex;height:38px;box-sizing:border-box;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
-#prof .lv b{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:38px;padding:0 6px;box-sizing:border-box;background:var(--acc);box-shadow:inset -3px -3px 0 var(--acc-dk),inset 3px 3px 0 var(--acc-lt);font-size:17px;line-height:1}
-#prof .lv b small{font-size:9px;letter-spacing:1px;line-height:1;margin-bottom:1px}
+#prof .lv b{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:38px;padding:0 8px 0 5px;box-sizing:border-box;background:var(--acc);box-shadow:inset -3px -3px 0 var(--acc-dk),inset 3px 3px 0 var(--acc-lt);font-size:17px;line-height:1}
+#prof .lv b small{font-size:9px;letter-spacing:1px;margin-right:-1px;line-height:1;margin-bottom:1px}
 #prof .lv .xp{display:flex;flex-direction:column;justify-content:center;gap:4px;width:150px;padding:0 10px}
 #prof .lv .xp small{font-size:11px;line-height:1;color:var(--silver)}#prof .lv .xp span{color:#fff}
 #prof .lv .xpbar{height:10px;margin:0;border:2px solid #000;background:rgba(0,0,0,.5)}
