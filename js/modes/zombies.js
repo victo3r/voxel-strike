@@ -5,6 +5,8 @@ let runCoins = 0, runXp = 0, bossKills = 0, deadT = 0, horde = false, countShown
 const perk = { spd: 0, dmg: 0, hp: 0 }, PAY_WAVES = 30, DEAD_T = .9;
 // zombie hp scale, since gun damage is tuned for deathmatch
 const ZHP = .56;
+// wave size and spawn gap (the server's tables.js has the same, to time runs for the zombie board)
+const isHorde = w => w >= 12 && w % 10 === 2, waveSize = w => Math.round((8 + w * 2.5) * (isHorde(w) ? 1.6 : 1)), spawnGap = w => Math.max(.3, 1.5 - w * .1);
 // zombie types (hp is a multiplier on the wave base)
 const ZTYPES = {
   walker: { hp: 1,   speed: () => Math.min(1.8 + wave * .15, 4.5), scale: 1,    dmg: 10, atk: 1,   coins: 2, shirt: shirtTex },
@@ -193,6 +195,19 @@ function saveBest() {
   if (mode !== 'zombies') return;
   newBest = wave > best.wave || (wave === best.wave && kills > best.kills);
   if (newBest) { best = { wave, kills }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} onSave(); }
+  zRunScore();
+}
+// the zombie board (signed in): the server times each run from its first wave
+let zRun = 0, zRank = null;
+function zRunNew() { zRun++; zRank = null; }
+function zRunStart() { if (auth) api('POST', '/zombies/start').catch(() => {}); }
+function zRunScore() {
+  const run = zRun; if (!auth || !wave) return;
+  api('POST', '/zombies/score', { wave, kills }).then(r => { if (run === zRun && r.status === 200 && r.week && r.all) { zRank = r; zRankRow(); } }).catch(() => {});
+}
+function zRankRow() {
+  if (!zRank || !matchOver || $('zRk')) return;
+  $('postBoard').insertAdjacentHTML('beforeend', `<div class="r" id="zRk"><span>TOP PLAYERS</span><span>#${zRank.week.rank} this week · #${zRank.all.rank} all time</span></div>`);
 }
 const booms = [];
 function explode(z) {
@@ -357,7 +372,9 @@ function zombiesOver() {
   $('postPlace').textContent = `WAVE ${wave}` + (newBest ? ' · NEW BEST!' : '');
   $('postBoard').className = 'lb z';
   const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
-  $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`);
+  $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`)
+    + (auth ? '' : row('TOP PLAYERS', cg.on ? 'Log in to get on the board' : 'Sign in to get on the board'));
+  zRankRow();
   $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '');
   $('post').style.display = 'flex';

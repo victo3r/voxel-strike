@@ -1,5 +1,5 @@
-// leaderboards and player cards (stats only count online public matches)
-const BOARD_BY = [['xp', 'XP'], ['wins', 'WINS'], ['kills', 'KILLS']];
+// leaderboards and player cards (stats only count online public matches; the zombie board counts signed-in zombie runs)
+const BOARD_BY = [['xp', 'XP'], ['wins', 'WINS'], ['kills', 'KILLS'], ['zombies', 'ZOMBIES']];
 let lbB = 'week', lbBy = 'xp', lbData = null, lbErr = '', lbAt = 0, lbKey = '';
 let cardData = null, cardWeek = false, cardErr = '';
 // weekly prizes, by your best place on last week's boards (the server's tables.js has the same): [down to place, golden, iron, wooden chests, coins]
@@ -41,21 +41,22 @@ async function loadBoard(force = false) {
 function renderBoard() {
   if ($('lb').style.display !== 'flex') return;
   const tab = (k, label, on) => `<button data-${k}="${label[0]}" class="${on ? 'on' : ''}">${label[1]}</button>`;
-  const me = myId(), unit = BOARD_BY.find(b => b[0] === lbBy)[1]; lbHeads.length = 0;
-  const wk = lbB === 'week', pz = r => wk ? prizeTag(prizeOf(r.rank)) : '';
-  const row = (r, look = r.look, lv = r.lv) => `<div class="lr${r.id === me ? ' you' : ''}${r.rank <= 3 ? ' p' + r.rank : ''}" data-card="${r.id}"><span class="rk">${r.rank}</span>${lazyHead(look)}<span class="nm">${whoIs(r.nick, r.name, lv)}</span>${pz(r)}<span class="v">${lbNum(r.v)}</span></div>`;
+  const zb = lbBy === 'zombies', me = myId(), unit = zb ? 'WAVE' : BOARD_BY.find(b => b[0] === lbBy)[1]; lbHeads.length = 0;
+  const wk = lbB === 'week', pzOn = wk && !zb, pz = r => pzOn ? prizeTag(prizeOf(r.rank)) : '';
+  const val = r => zb ? `${r.v}<small>${lbNum(r.k)} KILLS</small>` : lbNum(r.v);
+  const row = (r, look = r.look, lv = r.lv) => `<div class="lr${r.id === me ? ' you' : ''}${r.rank <= 3 ? ' p' + r.rank : ''}" data-card="${r.id}"><span class="rk">${r.rank}</span>${lazyHead(look)}<span class="nm">${whoIs(r.nick, r.name, lv)}</span>${pz(r)}<span class="v">${val(r)}</span></div>`;
   const part = (r, i, a) => { const p = LB_PARTS.findLast(([from]) => r.rank >= from); return p && (!i || a[i - 1].rank < p[0]) ? `<div class="lbPart">${p[1]}</div>` : ''; };
   const list = lbErr ? `<p class="lbNote">${lbErr}</p>` : !lbData ? '<p class="lbNote">Loading…</p>'
     : lbData.rows.length ? lbData.rows.map((r, i, a) => part(r, i, a) + row(r)).join('') : `<p class="lbNote">${lbB === 'week' ? 'Nobody yet this week, be the first' : 'Nobody here yet, be the first'}</p>`;
   const signIn = cg.on ? 'Log in to CrazyGames to get on the board' : 'Sign in to get on the board';
   const mine = !auth ? `<p class="lbNote">${signIn}</p>`
     : lbData?.me ? (lbData.rows.some(r => r.id === me) ? '' : row({ ...lbData.me, id: me, nick: myName, name: auth.user }, prof.look, prof.lv))
-    : lbData ? '<p class="lbNote">Play online to get on the board</p>' : '';
-  $('lbBox').className = wk ? 'wk' : '';
+    : lbData ? `<p class="lbNote">${zb ? 'Play zombie waves to get on the board' : 'Play online to get on the board'}</p>` : '';
+  $('lbBox').className = pzOn ? 'wk' : '';
   $('lbBox').innerHTML = `<h1>${ico('trophy')} TOP PLAYERS</h1>` +
     `<div class="lbTabs">${tab('b', ['week', 'THIS WEEK'], lbB === 'week')}${tab('b', ['all', 'ALL TIME'], lbB === 'all')}<span class="sp"></span>${BOARD_BY.map(b => tab('by', b, lbBy === b[0])).join('')}</div>` +
-    `<p class="lbSub">${wk ? `Online matches · new week in ${weekLeft()} · the top 50 win prizes` : 'Online matches'}</p>` +
-    `<div class="lbHead"><span>#</span><span></span><span>PLAYER</span>${wk ? '<span>PRIZE</span>' : ''}<span>${unit}</span></div><div class="lbList">${list}</div>${mine}` +
+    `<p class="lbSub">${zb ? (wk ? `Zombie waves · best runs · new week in ${weekLeft()}` : 'Zombie waves · best runs') : wk ? `Online matches · new week in ${weekLeft()} · the top 50 win prizes` : 'Online matches'}</p>` +
+    `<div class="lbHead"><span>#</span><span></span><span>PLAYER</span>${pzOn ? '<span>PRIZE</span>' : ''}<span>${unit}</span></div><div class="lbList">${list}</div>${mine}` +
     `<div class="lbFoot">${auth && me ? `<button data-card="${me}">MY CARD</button>` : ''}<button id="lbX">CLOSE</button></div>`;
   requestAnimationFrame(lbHeadsDraw);
 }
@@ -86,7 +87,7 @@ function renderCard() {
   if ($('card').style.display !== 'flex') return;
   const c = cardData;
   if (!c) { $('cardBox').innerHTML = `<p class="lbNote">${cardErr || 'Loading…'}</p><div class="lbFoot"><button id="cardX">CLOSE</button></div>`; return; }
-  const s = cardWeek ? c.week : c.all, pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
+  const s = cardWeek ? c.week : c.all, z = c.zombies?.[cardWeek ? 'week' : 'all'], pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
   const fi = BASE.findIndex(w => w.id === c.fav), g = c.gear || {};
   const gear = [
     g.hat && HATS.find(h => h.id === g.hat.id) ? `<img class="ai" title="${HATS.find(h => h.id === g.hat.id).name}" src="${hatPic(g.hat.id, g.hat.st)}">` : '',
@@ -101,6 +102,7 @@ function renderCard() {
       `${stat('K/D', (kd => kd >= 100 ? lbNum(Math.round(kd)) : kd.toFixed(2))(s.kills / Math.max(1, s.deaths)))}${stat('ACCURACY', pct(s.hits, s.shots))}${stat('HEADSHOTS', pct(s.heads, s.hits))}</div>` +
       (!cardWeek && fi >= 0 ? `<div class="cFav"><span>FAVORITE GUN</span><img class="ai" src="${gunPic(fi)}"><b>${BASE[fi].name}</b></div>` : '')
       : `<p class="lbNote">${cardWeek ? 'No online matches this week yet' : 'No online matches yet'}</p>`) +
+    (z ? `<div class="cZom"><span>BEST ZOMBIE RUN</span><b>WAVE ${z.wave}</b><span>${lbNum(z.kills)} KILLS</span></div>` : '') +
     `<div class="lbFoot"><button id="cardX">CLOSE</button></div>`;
 }
 $('card').addEventListener('click', e => {

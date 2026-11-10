@@ -567,7 +567,8 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 .cStats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .cs{display:flex;flex-direction:column;align-items:center;padding:8px 4px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}
 .cs b{font-size:22px;color:#ffd75e}.cs span{font-size:11px;color:var(--muted)}
-.cFav{display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}.cFav span{font-size:11px;color:var(--muted)}.cFav img{height:30px;image-rendering:pixelated}
+.cFav,.cZom{display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}.cFav span,.cZom span{font-size:11px;color:var(--muted)}.cFav img{height:30px;image-rendering:pixelated}.cZom b{color:#ffd75e}
+.lr .v small{display:block;font-size:11px;font-weight:normal;color:var(--muted)}
 #postBoard [data-fid],#friends .pn{cursor:pointer}#postBoard [data-fid]:hover,#friends .pn:hover{text-decoration:underline}
 /* phones and tablets: turn sideways */
 #noTouch{display:none}

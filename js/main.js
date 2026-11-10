@@ -203,7 +203,7 @@ function update(dt) {
 
   if (pvp()) { updateDM(dt); if (matchOver) return; }
 
-  if (mode === 'zombies' && !dead && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = Math.max(.3, 1.5 - wave * .1); }
+  if (mode === 'zombies' && !dead && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = spawnGap(wave); }
   if (mode === 'zombies' && !dead && toSpawn === 0 && zombies.length === 0) {
     if (wave > 0 && shopWave < wave) {
       shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
@@ -215,11 +215,12 @@ function update(dt) {
     }
     if ((waveWait -= dt) <= 0) {
       // hordes and boss waves
-      wave++; horde = wave >= 12 && wave % 10 === 2; toSpawn = Math.round((8 + wave * 2.5) * (horde ? 1.6 : 1)); spawnT = 0; waveWait = 3; countShown = 0;
+      wave++; horde = isHorde(wave); toSpawn = waveSize(wave); spawnT = 0; waveWait = 3; countShown = 0;
       const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };
       banner(`WAVE ${wave}` + (horde ? '\nHORDE!' : news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
       sfx('waveStart');
       if (wave % 5 === 0) { spawnZombie(wave % 10 === 0 ? 'hive' : 'boss'); sfx('bossRoar', { v: .7 }); }
+      if (wave === 1) zRunStart(); // the zombie board's clock
     } else if (wave > 0) { // countdown between waves
       const n = Math.ceil(waveWait);
       if (n !== countShown && n <= 3) { countShown = n; banner(`WAVE ${wave + 1} IN ${n}`); sfx('tick', { v: .5 }); }
