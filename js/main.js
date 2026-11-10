@@ -158,6 +158,7 @@ function update(dt) {
   if (holo && (w.zoom !== holoZoom || (w.reticle || '255,60,60') !== holoCol)) drawHolo(w.zoom, w.reticle);
   $('holo').style.display = holo ? 'block' : 'none';
   $('cross').style.display = scoped ? 'none' : '';
+  $('hotbar').classList.toggle('aimed', !!scoped); // it would cover the bottom of the sight
   vm.visible = !scoped;
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
   const sw = swapTick(dt); // first, so a gun built this frame gets its own pose

@@ -134,7 +134,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #menuBtns button{margin:0;width:100%}
 
 /* hotbar */
-#hotbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px}
+#hotbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px}#hotbar.aimed{visibility:hidden}
 .slot{position:relative;width:84px;height:58px;box-sizing:border-box;background:rgba(0,0,0,.45);border:3px solid #555;display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .15s}
 .slot.on{border-color:#ffd23f;background:rgba(70,50,10,.65);transform:translateY(-6px)}
 .slot img{width:72px;height:36px;image-rendering:pixelated}

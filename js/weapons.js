@@ -320,7 +320,8 @@ const GUN_MODELS = {
     p(4, 4, 18, act, 0, 0, -9); p(4, 3, 10, wood, 0, -3.5, -16); // action, forend
     p(4, 4, 28, mat(GUN_STEEL), 0, .5, -32); p(4, 4, 6, dark, 0, .5, -49); // barrel, suppressor
     p(4, 4, 16, mat(0x2a2a2e), 0, 6, -10); p(6, 6, 2, dark, 0, 6, -1); p(6, 6, 2, dark, 0, 6, -19); // scope tube and bells
-    p(4, 4, 1, glow(0x66ccff), 0, 6, -19.5); // lens
+    p(4, 4, 1, glow(0x66ccff), 0, 6, -18.5); p(4, 4, 1, 0, 0, 6, -19.5); // lens, set back in the bell so it has a rim
+    p(4, 4, 1, mat(0x1f4f6e), 0, 6, -1.5); p(4, 4, 1, 0, 0, 6, -.5); p(1, 1, 1, mat(0x9fdcff), -1.5, 7.5, -1.5); // eyepiece glass and its glint
     p(2, 2, 2, dark, 0, 3, -5); p(2, 2, 2, dark, 0, 3, -15); // scope mounts
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 2, 2, silver, 4, 1, -3); mg(3, 3, 3, silver, 6.5, 1.5, -3.5); // bolt handle and knob (worked back and forward to reload)
     p(4, 5, 4, wood, 0, -4.5, -2); p(4, 3, 4, wood, 0, -8.5, -1); // pistol grip
@@ -475,7 +476,8 @@ const GUN_MODELS = {
     p(6, 6, 16, body, 0, 0, -8); p(4, 1, 16, dark, 0, 3.5, -8); // receiver and top rail
     p(3, 3, 3, mat(0x9a9a9a), 4.5, 1, -4); // charging handle on the right
     p(4, 4, 16, mat(0x2a2a2e), 0, 6, -10); p(6, 6, 2, dark, 0, 6, -1); p(6, 6, 2, dark, 0, 6, -19); // scope tube and bells
-    p(4, 4, 1, glow(0x6bff9a), 0, 6, -19.5); // lens
+    p(4, 4, 1, glow(0x6bff9a), 0, 6, -18.5); p(4, 4, 1, 0, 0, 6, -19.5); // lens, set back in the bell so it has a rim
+    p(4, 4, 1, mat(0x1f5a37), 0, 6, -1.5); p(4, 4, 1, 0, 0, 6, -.5); p(1, 1, 1, mat(0xa8ffc4), -1.5, 7.5, -1.5); // eyepiece glass and its glint
     p(2, 2, 2, dark, 0, 3, -5); p(2, 2, 2, dark, 0, 3, -15); // scope mounts
     p(6, 6, 12, tan, 0, 0, -22); for (const z of [-19, -22, -25]) p(6, 2, 1, vent, 0, 0, z); // handguard and its vents
     p(4, 4, 14, mat(GUN_STEEL), 0, 1, -35); // barrel
@@ -586,7 +588,8 @@ const GUN_MODELS = {
     p(6, 6, 16, orange, 0, 0, -8); for (const z of [-2.5, -6.5, -10.5, -14.5]) p(6, 4, 1, black, 0, 1, z); // receiver and its stripes
     p(4, 1, 16, dark, 0, 3.5, -8); // top rail
     p(4, 4, 16, black, 0, 6, -10); p(6, 6, 2, dorange, 0, 6, -1); p(6, 6, 2, dorange, 0, 6, -19); // scope tube and bells
-    p(4, 4, 1, glow(0xffc531), 0, 6, -19.5); // amber lens, like an eye
+    p(4, 4, 1, glow(0xffc531), 0, 6, -18.5); p(4, 4, 1, 0, 0, 6, -19.5); // amber lens, like an eye, set back in its bell
+    p(4, 4, 1, mat(0x8c6418), 0, 6, -1.5); p(4, 4, 1, 0, 0, 6, -.5); p(1, 1, 1, mat(0xffe08a), -1.5, 7.5, -1.5); // eyepiece glass and its glint
     p(2, 2, 2, dark, 0, 3, -5); p(2, 2, 2, dark, 0, 3, -15); // scope mounts
     p(6, 6, 12, orange, 0, 0, -22); for (const z of [-18.5, -22.5, -26.5]) p(6, 4, 1, black, 0, -1, z); // handguard and its stripes
     p(4, 4, 14, mat(GUN_STEEL), 0, 1, -35); // barrel
@@ -637,7 +640,8 @@ const GUN_MODELS = {
     p(6, 5, 10, blue, 0, -.5, -23); for (const z of [-20.5, -23.5, -26.5]) p(6, 1, 1, cell, 0, -1, z); // handguard and its glowing vents
     p(6, 6, 4, navy, 0, .5, -47); p(2, 2, 1, hot, 0, .5, -49.5); // muzzle and its lens
     p(4, 4, 18, navy, 0, 7, -10); p(6, 6, 2, blue, 0, 7, -1); p(6, 6, 2, blue, 0, 7, -19); // scope tube and bells
-    p(4, 4, 1, glow(0x8fd0ff), 0, 7, -19.5); // lens
+    p(4, 4, 1, glow(0x8fd0ff), 0, 7, -18.5); p(4, 4, 1, 0, 0, 7, -19.5); // lens, set back in the bell so it has a rim
+    p(4, 4, 1, mat(0x24467a), 0, 7, -1.5); p(4, 4, 1, 0, 0, 7, -.5); p(1, 1, 1, mat(0xc4e6ff), -1.5, 8.5, -1.5); // eyepiece glass and its glint
     p(2, 2, 2, dark, 0, 4, -5); p(2, 2, 2, dark, 0, 4, -15); // scope mounts
     const mag = sub(0, 0, 0), mg = at(mag); mg(4, 7, 5, navy, 0, -6.5, -13); mg(4, 3, 3, cell, 0, -6.5, -13); // energy cell with a glowing window
     p(4, 5, 4, navy, 0, -5.5, -2); p(4, 3, 4, navy, 0, -9.5, -1); // pistol grip
