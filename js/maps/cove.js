@@ -313,14 +313,16 @@ function stairs(x, z, ax, dir, y0, y1, n, run = .8, w = 1.3, legs = 0) {
     const [cx, cz] = P((k + .5) * run), t = y0 + (y1 - y0) * (k + 1) / n;
     addSlab(cx, cz, ax === 'x' ? run + .02 : w, ax === 'x' ? w : run + .02, t - .12, t, planks);
   }
-  const L = n * run, len = Math.hypot(L, y1 - y0), a = Math.atan2(y1 - y0, L), [mx, mz] = P(L / 2);
+  const L = n * run, a = Math.atan2(y1 - y0, L), k = (y1 - y0) / L, half = .16 / Math.cos(a);
+  const top = d => y0 + k * d + (y1 - y0) / n - .1; // the side boards' top edge runs under the front of every tread
+  const end = L - Math.min(.3 / k, run), len = end / Math.cos(a), [mx, mz] = P(end / 2); // and stops short of the top so it doesn't stick up past it
   for (const o of [-1, 1]) {
     const s = o * (w / 2 + .06), b = box(ax === 'x' ? len : .12, .32, ax === 'x' ? .12 : len, postMat);
-    b.position.set(mx + (ax === 'x' ? 0 : s), (y0 + y1) / 2 - .1, mz + (ax === 'x' ? s : 0));
+    b.position.set(mx + (ax === 'x' ? 0 : s), top(end / 2) - half, mz + (ax === 'x' ? s : 0));
     if (ax === 'x') b.rotation.z = dir * a; else b.rotation.x = -dir * a;
     add(b);
     if (legs) for (const f of [.4, .75, 1]) { // posts down to the ground
-      const [px, pz] = P(L * f - .1), h = y0 + (y1 - y0) * f - .3 - legs[1], qx = px + (ax === 'x' ? 0 : s), qz = pz + (ax === 'x' ? s : 0);
+      const d = Math.min(L * f - .1, end - .1), [px, pz] = P(d), h = top(d) - 2 * half + .05 - legs[1], qx = px + (ax === 'x' ? 0 : s), qz = pz + (ax === 'x' ? s : 0);
       if (h > .2) building.cover.push(deco(.14, h, .14, postMat, qx, legs[1] + h / 2, qz));
     }
   }
@@ -533,7 +535,8 @@ stairs(-8.6, -14.95, 'x', -1, 0, RIDGE, 7, .8, 1.3, [1, 0]);
 rect(-16.2, -14.2, -17, -14.3, RIDGE - .2, RIDGE, planks); // the landing
 for (const [x, z] of [[-16, -14.5], [-14.4, -14.5], [-16, -16.8]]) building.cover.push(deco(.16, RIDGE - .2, .16, postMat, x, (RIDGE - .2) / 2, z));
 stairs(-14.2, -16.35, 'x', 1, RIDGE, PLAT, 7, .8, 1.3, [1, 0]);
-line([-8.6, 1.4, -14.2], [-14.2, RIDGE + .95, -14.2], ropeMat, .05);
+line([-8.6, .95, -14.3], [-14.3, RIDGE + .95, -14.3], ropeMat, .05); // a rope handrail on two posts
+deco(.1, 1, .1, postMat, -8.6, .5, -14.3); deco(.1, 1, .1, postMat, -14.3, RIDGE + .5, -14.3);
 
 // pines on the tops
 const pineMat = lam({ map: tex(g => { noise(g, [52, 104, 58], 26); g.fillStyle = 'rgba(15,40,20,.4)'; for (let i = 0; i < 12; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); }) });

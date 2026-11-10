@@ -28,6 +28,12 @@ function lootNow(c) {
   const ok = c.loot.filter(lootOk), sum = ok.reduce((s, l) => s + l.w, 0);
   return ok.map(l => ({ ...l, p: l.w / sum }));
 }
+// the "can have" row: common to mythic, then by kind and amount
+const LOOT_KIND = ['coins', 'boosts', 'xp', 'star', 'boots', 'hats', 'gun'], lootLow = n => Array.isArray(n) ? n[0] : n | 0;
+function lootShown(c) {
+  const rk = Object.keys(RARITY), r = l => rk.indexOf(l.r || 'common');
+  return lootNow(c).sort((a, b) => r(a) - r(b) || LOOT_KIND.indexOf(a.k) - LOOT_KIND.indexOf(b.k) || lootLow(a.n) - lootLow(b.n));
+}
 const rollN = n => Array.isArray(n) ? n[0] + Math.floor(Math.random() * (n[1] - n[0] + 1)) : n;
 const nText = n => Array.isArray(n) ? `${n[0]}-${n[1]}` : n;
 const gearOf = l => (l.k === 'boots' ? BOOTS : HATS).find(g => g.id === l.id);
@@ -87,7 +93,7 @@ function renderChests() {
   $('chestBox').innerHTML = `<h1>${ico('key')} CHESTS <span class="kn">${ico('key')} ${keyCount()}</span></h1><p>Win online matches to earn keys</p>` +
     `<div class="row">${CHESTS.map((c, i) => `<div class="chest${i === chestSel ? ' sel' : ''}" data-c="${i}"><img src="${chestPic[i]}"><b>${c.name}</b>` +
       `<button data-open="${i}" class="${keyCount() >= c.cost ? 'go' : ''}" ${keyCount() >= c.cost ? '' : 'disabled'}>OPEN · ${ico('key')} ${c.cost}</button></div>`).join('')}</div>` +
-    `<div class="lootHead">${CHESTS[chestSel].name} CAN HAVE</div><div class="lootRow">${lootNow(CHESTS[chestSel]).map(l => lootCard(l)).join('')}</div>` +
+    `<div class="lootHead">${CHESTS[chestSel].name} CAN HAVE</div><div class="lootRow">${lootShown(CHESTS[chestSel]).map(l => lootCard(l)).join('')}</div>` +
     `<div class="btns">${adOk ? `<button id="keyAd" ${adUsed || wait > 0 ? 'disabled' : ''}>${ico('video')} ${adUsed ? 'NEXT AD KEY TOMORROW' : wait > 0 ? `NEXT AD IN ${Math.floor(wait / 60)}:${String(wait % 60).padStart(2, '0')}` : 'WATCH AD · +1 KEY'}</button>` : ''}<button id="chestX">CLOSE</button></div>`;
 }
 function openChests() { chestGot = null; $('chests').style.display = 'flex'; renderChests(); sfx('ui'); }

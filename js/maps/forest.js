@@ -179,8 +179,8 @@ function bigTree(x, z, inside) {
   const [A, B] = TH, steps = 7;
   const stairs = (x, edge, dir, y, n) => { // open wooden steps on two side boards
     for (let k = 0; k < n; k++) deck(x, edge + dir * (n - k - .5) * .5, 1.4, .5, y * (k + 1) / n, .12);
-    const run = n * .5, len = Math.hypot(run, y);
-    for (const ox of [-.76, .76]) { const r = box(.12, .3, len, postMat); r.position.set(x + ox, y / 2 - .12, edge + dir * run / 2); r.rotation.x = dir * Math.atan2(y, run); add(r); }
+    const run = n * .5, k = y / run, end = run - Math.min(.3 / k, .5), len = end * Math.hypot(1, k), mid = y / n - .1 + k * end / 2 - .15 * Math.hypot(1, k); // the boards' top edge runs under the front of every step, stopping short of the top
+    for (const ox of [-.76, .76]) { const r = box(.12, .3, len, postMat); r.position.set(x + ox, mid, edge + dir * (run - end / 2)); r.rotation.x = dir * Math.atan2(y, run); add(r); }
   };
   stairs(A.x, A.z - TH_R, -1, A.y, steps); // up the south side of the first
   stairs(B.x, B.z + TH_R, 1, B.y, steps + 1); // and the north side of the second

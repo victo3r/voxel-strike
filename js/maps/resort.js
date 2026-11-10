@@ -509,10 +509,10 @@ for (const [x, z] of [[22, -7], [27, -7], [22, -1.5], [27, -1.5]]) {
 
 // open steps on two side boards, from the ground up to an edge
 function openSteps(x, z, ax, dir, y, n, m, side) {
-  const run = n * .5, len = Math.hypot(run, y);
+  const run = n * .5, k = y / run, end = run - Math.min(.3 / k, .5), len = end * Math.hypot(1, k), mid = y / n - .1 + k * end / 2 - .15 * Math.hypot(1, k); // the boards' top edge runs under the front of every step, stopping short of the top
   for (let k = 0; k < n; k++) { const o = dir * (n - k - .5) * .5, t = y * (k + 1) / n; addSlab(x + (ax ? o : 0), z + (ax ? 0 : o), ax ? .5 : 1.4, ax ? 1.4 : .5, t - .12, t, m); }
   for (const s of [-.76, .76]) {
-    const r = box(ax ? len : .12, .3, ax ? .12 : len, side); r.position.set(x + (ax ? dir * run / 2 : s), y / 2 - .12, z + (ax ? s : dir * run / 2));
+    const r = box(ax ? len : .12, .3, ax ? .12 : len, side); r.position.set(x + (ax ? dir * (run - end / 2) : s), mid, z + (ax ? s : dir * (run - end / 2)));
     if (ax) r.rotation.z = -dir * Math.atan2(y, run); else r.rotation.x = dir * Math.atan2(y, run); add(r);
   }
 }

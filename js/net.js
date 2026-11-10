@@ -8,6 +8,7 @@ const NET_WS = NET_HTTP.replace(/^http/, 'ws');
 const NET_BUILD = +(document.currentScript?.src.match(/[?&]v=(\d+)/)?.[1] ?? 0); // lets the server spot old cached clients
 const NET_RATE = 50; // ms between packets (20 a second)
 const NET_HIST = 600; // ms of position history for smoothing
+const REJOIN_FOR = 25000; // keep trying to get back in this long (the server holds your place 30 s)
 // guest id that stays the same on this device
 let guestId = localStorage.getItem('voxelstrike-guest');
 if (!/^[0-9a-f]{16}$/.test(guestId || '')) {
@@ -94,9 +95,19 @@ net = (() => {
     let j = {}; try { j = await r.json(); } catch {}
     return { status: r.status, ...j };
   }
+  // the public match you were last in (this tab), so a drop or a reload can take you back to it
+  const BACK = 'voxelstrike-back';
+  function markBack() { if (api.on && room && !code && phase !== 'over') try { sessionStorage.setItem(BACK, JSON.stringify({ room, mode, map: mapId, gen: NET_GEN, t: Date.now() })); } catch {} }
+  function forgetBack() { try { sessionStorage.removeItem(BACK); } catch {} }
+  function backRoom(o) {
+    let b = null; try { b = JSON.parse(sessionStorage.getItem(BACK)); } catch {}
+    return b && !o.code && !o.create && !o.room && b.mode === o.mode && b.map === o.map && b.gen === NET_GEN && Date.now() - b.t < 300e3 ? b.room : null;
+  }
+  addEventListener('pagehide', markBack);
   function start(o) {
     if (starting) return;
     if (api.on) leave();
+    o.room ||= backRoom(o); // back to the match you dropped out of
     last = o; // kept for PLAY AGAIN
     const job = starting = { o, not: [], tries: 0, dead: false, timer: 0 };
     showFinding(o.friend ? `JOINING ${o.friend.toUpperCase()}…` : o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…');
@@ -171,11 +182,12 @@ net = (() => {
     ws = null;
     if (!wasOn) return;
     if (codeNum === 4010) return; // match ended normally
-    if (codeNum === 1012 || codeNum === 1006 || codeNum === 1001 || codeNum === 1011) { // dropped: try once to get back in
-      if (rejoinInfo && !matchOver && !rejoinInfo.tried) { rejoinInfo.tried = true; netToast('Reconnecting…', 2500); setTimeout(() => { if (!api.on || !rejoinInfo) return; connect(rejoinInfo.room, null, { pid: rejoinInfo.pid, key: rejoinInfo.key }); }, 2000); return; }
+    if (codeNum === 1012 || codeNum === 1006 || codeNum === 1001 || codeNum === 1011) { // dropped: keep trying to get back in while your place is held
+      if (rejoinInfo && !matchOver && localNow() < (rejoinInfo.until ||= localNow() + REJOIN_FOR)) { netToast('Reconnecting…', 2500); setTimeout(() => { if (!api.on || !rejoinInfo) return; connect(rejoinInfo.room, null, { pid: rejoinInfo.pid, key: rejoinInfo.key }); }, 2000); return; }
     }
     const why = { 4000: 'The game was updated, reload the page', 4003: 'You were removed from the match', 4004: 'Disconnected for being away', 4005: 'You joined from another tab' }[codeNum] || 'Connection lost';
     netToast(why, 4000);
+    if (codeNum === 4003) forgetBack(); else markBack();
     endOnline();
     restart(); showLobby(true);
   }
@@ -187,6 +199,7 @@ net = (() => {
     cgRoom();
   }
   function leave() {
+    forgetBack();
     cancelStart();
     if (ws) { try { ws.close(1000); } catch {} ws = null; }
     endOnline();
@@ -227,7 +240,7 @@ net = (() => {
     if (job) { job.dead = true; clearTimeout(job.timer); starting = null; }
     welcomed = true; pid = w.pid; key = w.key; room = w.room; code = w.code || null; myTeamRaw = w.me?.team ?? 0; hostPid = w.host | 0; skillPool = null;
     phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8;
-    rejoinInfo = { room, pid, key, tried: false };
+    rejoinInfo = { room, pid, key, until: 0 };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     mode = w.mode; mapId = w.map;
     api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads);
@@ -255,6 +268,7 @@ net = (() => {
     const rr = $('roomRow'); rr.style.display = code ? '' : 'none'; if (code) $('roomCode').textContent = 'ROOM CODE ' + code;
     lastTop = lastBoard = ''; lastSec = 0;
     if (!rejoining) lockMouse(); else if (locked) tryReady();
+    markBack();
     send({ t: 'ping', c: localNow() });
     cgRoom();
   }
@@ -419,7 +433,7 @@ net = (() => {
     const ranks = m.ranks || [], place = Math.max(1, ranks.indexOf(pid) + 1);
     const lead = m.teams ? Math.sign((m.teams[myTeamRaw] | 0) - (m.teams[1 - myTeamRaw] | 0)) : 0;
     const won = MR.team ? lead > 0 : place === 1, [xp, gold] = m.rewards?.[pid] || [0, 0];
-    phase = 'over'; alive = false; api.banner = '';
+    phase = 'over'; alive = false; api.banner = ''; forgetBack();
     endMatch({ place, won, xp, gold, lead, priv: !!m.priv });
     if (typeof frPostButtons === 'function') frPostButtons(); // + ADD buttons
   }
@@ -605,6 +619,7 @@ net = (() => {
   // send your position 20 times a second, with shots and hits
   function sendState() {
     if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby || document.hidden) return; // hidden tab sends nothing, the server marks you afk
+    if (ws.bufferedAmount > 8192) return; // the connection is stuck: don't pile up moves behind it
     let flags = evFlags; evFlags = 0;
     if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8;
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
