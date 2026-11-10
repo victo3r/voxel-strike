@@ -160,20 +160,16 @@ function starPuff(from, sc = scene, size = 1) { // from: the muzzle object
     starBits.push({ s, sc, v: _sd.clone().multiplyScalar(2 + Math.random() * 2).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(2.2)), life: .35 + Math.random() * .15, k: s.scale.x });
   }
 }
-// ruby shards (Ruby Pierce) and a burst of energy (Paragon)
+// ruby shards (Ruby Pierce) and short lines of energy shooting off the tip (Paragon)
 const SHARD_TEX = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d');
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const dx = x - 3.5, dy = y - 3.5; if (Math.abs(dx) / 3 + Math.abs(dy) / 4 > 1) continue; g.fillStyle = dx < 0 ? (dy < 0 ? '#fff' : '#ddd') : dy < 0 ? '#bbb' : '#888'; g.fillRect(x, y, 1, 1); }
   const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
 })();
 const bitMat = (color, map) => new THREE.SpriteMaterial({ color, map, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
-const SHARD_MATS = [0xff2e48, 0xff4f6c, 0xff8ea4].map(c => bitMat(c, SHARD_TEX)), SPARK_MATS = [0x9fe0ff, 0xffffff, 0x3d9bff].map(c => bitMat(c, null));
-const RING_TEX = (() => {
-  const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d');
-  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) { const r = Math.hypot(x - 15.5, y - 15.5); if (r > 15.5 || r < 11) continue; g.fillStyle = r > 13.5 ? '#fff' : '#9ab8d0'; g.fillRect(x, y, 1, 1); }
-  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
-})();
-const ringGeo = new THREE.PlaneGeometry(1, 1), rings = [];
+const SHARD_MATS = [0xff2e48, 0xff4f6c, 0xff8ea4].map(c => bitMat(c, SHARD_TEX));
+const streakGeo = new THREE.BoxGeometry(1, 1, 1), STREAK_MATS = [0x9fe0ff, 0xffffff, 0x4aa8ff].map(color => new THREE.MeshBasicMaterial({ color, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })), streaks = [], _sv = new THREE.Vector3(), _zAx = new THREE.Vector3(0, 0, 1);
+const STREAK_VM = STREAK_MATS.map(m => Object.assign(m.clone(), { depthTest: false })); // yours, over the barrel
 function muzzleBits(w, from, sc = scene, size = 1) {
   if (w.starFx) starPuff(from, sc, size);
   const k = FLASH_FX[w.id]?.bits; if (!k) return;
@@ -183,12 +179,15 @@ function muzzleBits(w, from, sc = scene, size = 1) {
     starBits.push({ s, sc, v: _sd.clone().multiplyScalar(spd * (.6 + Math.random() * .6)).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread)), life: life * (.8 + Math.random() * .4), k: s.scale.x, g });
   } };
   if (k === 'gem') bit(SHARD_MATS, 9, 4, 2.8, .5, .11, 5);
-  else if (k === 'energy') {
-    bit(SPARK_MATS, 6, 7, 3.4, .22, .03, 0);
-    for (const [r, t, spd] of [[.85, .26, 1.6], [.5, .17, 3]]) { // a fast small ring inside a slow big one
-      const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ map: RING_TEX, color: 0x7cc4ff, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, blending: THREE.AdditiveBlending }));
-      from.getWorldPosition(m.position); m.quaternion.copy(_sq); m.scale.setScalar(.03); sc.add(m);
-      rings.push({ m, sc, v: _sd.clone().multiplyScalar(spd), r: r * size, t, life: t });
+  else if (k === 'energy') { // a fan of short lines out of the tip, riding with the gun
+    const box = from.parent; if (!box) return;
+    const sz = size / box.getWorldScale(_sv).x, mine = box === vm;
+    for (let i = 0; i < 9; i++) {
+      const a = Math.random() * 6.283, sp = .12 + Math.random() * .3, t = .12 + Math.random() * .1, d = new THREE.Vector3(Math.cos(a) * sp, Math.sin(a) * sp, -1).normalize();
+      const m = new THREE.Mesh(streakGeo, (mine ? STREAK_VM : STREAK_MATS)[i % 3]);
+      m.position.copy(from.position).addScaledVector(d, (.01 + Math.random() * .04) * sz); m.quaternion.setFromUnitVectors(_zAx, d); m.scale.setScalar(0);
+      m.userData.shared = true; if (mine) m.renderOrder = 5; box.add(m);
+      streaks.push({ m, sc: box, v: d.multiplyScalar((2 + Math.random() * 2.5) * sz), len: (.12 + Math.random() * .12) * sz, w: (.013 + Math.random() * .01) * sz, t, life: t });
     }
   }
 }
@@ -198,10 +197,10 @@ function starTick(dt) {
     b.s.scale.setScalar(b.k * Math.max(0, Math.min(1, b.life * 4))); b.s.material.rotation += dt * 4;
     if (b.life <= 0) { b.sc.remove(b.s); starBits.splice(i, 1); }
   }
-  for (let i = rings.length - 1; i >= 0; i--) {
-    const g = rings[i], f = 1 - (g.life -= dt) / g.t; g.m.position.addScaledVector(g.v, dt);
-    g.m.scale.setScalar(.03 + g.r * (1 - (1 - Math.min(1, f)) ** 3)); g.m.material.opacity = Math.max(0, 1 - f * f);
-    if (g.life <= 0) { g.sc.remove(g.m); g.m.material.dispose(); rings.splice(i, 1); }
+  for (let i = streaks.length - 1; i >= 0; i--) { // they stretch out fast, then thin away
+    const g = streaks[i], f = Math.min(1, 1 - (g.life -= dt) / g.t); g.m.position.addScaledVector(g.v, dt);
+    g.m.scale.set(g.w * (1 - f), g.w * (1 - f), g.len * Math.min(1, f * 4));
+    if (g.life <= 0) { g.sc.remove(g.m); streaks.splice(i, 1); }
   }
 }
 const BURN_T = 2.5; // burn time after the flames stop

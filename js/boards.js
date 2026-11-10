@@ -2,6 +2,11 @@
 const BOARD_BY = [['xp', 'XP'], ['wins', 'WINS'], ['kills', 'KILLS']];
 let lbB = 'week', lbBy = 'xp', lbData = null, lbErr = '', lbAt = 0, lbKey = '';
 let cardData = null, cardWeek = false, cardErr = '';
+// weekly prizes, by your best place on last week's boards (the server's tables.js has the same): [down to place, golden, iron, wooden chests, coins]
+const WEEK_PRIZES = [[1, 2, 1, 0, 100], [2, 1, 1, 0, 50], [3, 1, 0, 0, 25], [10, 0, 2, 0, 25], [50, 0, 0, 1, 20]];
+const prizeOf = rank => WEEK_PRIZES.find(p => rank <= p[0])?.slice(1) || null;
+const PRIZE_BOX = [[2, 'gold'], [1, 'iron'], [0, 'wood']]; // CHESTS index and id for each chest count, best first
+const prizeTag = z => z ? `<span class="pz">${PRIZE_BOX.map(([i], k) => z[k] ? `<img src="${chestPic[i]}">${z[k] > 1 ? `<i>${z[k]}</i>` : ''}` : '').join('')}${COIN}${z[3]}</span>` : '<span></span>';
 const myId = () => auth?.id || (typeof fr === 'object' && fr.me?.id) || 0;
 const safePic = (look, head) => { try { return skinPic(look && typeof look === 'object' ? look : PRESETS[0].look, head); } catch { return skinPic(PRESETS[0].look, head); } };
 // row heads draw a few a frame, so opening the board doesn't stall
@@ -36,17 +41,19 @@ function renderBoard() {
   if ($('lb').style.display !== 'flex') return;
   const tab = (k, label, on) => `<button data-${k}="${label[0]}" class="${on ? 'on' : ''}">${label[1]}</button>`;
   const me = myId(), unit = BOARD_BY.find(b => b[0] === lbBy)[1]; lbHeads.length = 0;
-  const row = r => `<div class="lr${r.id === me ? ' you' : ''}" data-card="${r.id}"><span class="rk">${r.rank}</span>${lazyHead(r.look)}<span class="nm">${whoIs(r.nick, r.name)}</span><span class="lv">LVL ${r.lv}</span><span class="v">${lbNum(r.v)}</span></div>`;
+  const wk = lbB === 'week', pz = r => wk ? prizeTag(prizeOf(r.rank)) : '';
+  const row = r => `<div class="lr${r.id === me ? ' you' : ''}" data-card="${r.id}"><span class="rk">${r.rank}</span>${lazyHead(r.look)}<span class="nm">${whoIs(r.nick, r.name)}</span>${pz(r)}<span class="lv">LVL ${r.lv}</span><span class="v">${lbNum(r.v)}</span></div>`;
   const list = lbErr ? `<p class="lbNote">${lbErr}</p>` : !lbData ? '<p class="lbNote">Loading…</p>'
     : lbData.rows.length ? lbData.rows.map(row).join('') : `<p class="lbNote">${lbB === 'week' ? 'Nobody yet this week, be the first' : 'Nobody here yet, be the first'}</p>`;
   const signIn = cg.on ? 'Log in to CrazyGames to get on the board' : 'Sign in to get on the board';
   const mine = !auth ? `<p class="lbNote">${signIn}</p>`
-    : lbData?.me ? (lbData.rows.some(r => r.id === me) ? '' : `<div class="lr you" data-card="${me}"><span class="rk">${lbData.me.rank}</span>${lazyHead(prof.look)}<span class="nm">${whoIs(myName, auth.user)}</span><span class="lv">LVL ${prof.lv}</span><span class="v">${lbNum(lbData.me.v)}</span></div>`)
+    : lbData?.me ? (lbData.rows.some(r => r.id === me) ? '' : `<div class="lr you" data-card="${me}"><span class="rk">${lbData.me.rank}</span>${lazyHead(prof.look)}<span class="nm">${whoIs(myName, auth.user)}</span>${pz(lbData.me)}<span class="lv">LVL ${prof.lv}</span><span class="v">${lbNum(lbData.me.v)}</span></div>`)
     : lbData ? '<p class="lbNote">Play online to get on the board</p>' : '';
+  $('lbBox').className = wk ? 'wk' : '';
   $('lbBox').innerHTML = `<h1>${ico('trophy')} TOP PLAYERS</h1>` +
     `<div class="lbTabs">${tab('b', ['week', 'THIS WEEK'], lbB === 'week')}${tab('b', ['all', 'ALL TIME'], lbB === 'all')}<span class="sp"></span>${BOARD_BY.map(b => tab('by', b, lbBy === b[0])).join('')}</div>` +
-    `<p class="lbSub">${lbB === 'week' ? `Online matches · new week in ${weekLeft()}` : 'Online matches'}</p>` +
-    `<div class="lbHead"><span>#</span><span></span><span>PLAYER</span><span></span><span>${unit}</span></div><div class="lbList">${list}</div>${mine}` +
+    `<p class="lbSub">${wk ? `Online matches · new week in ${weekLeft()} · the top 50 win prizes` : 'Online matches'}</p>` +
+    `<div class="lbHead"><span>#</span><span></span><span>PLAYER</span>${wk ? '<span>PRIZE</span>' : ''}<span></span><span>${unit}</span></div><div class="lbList">${list}</div>${mine}` +
     `<div class="lbFoot">${auth && me ? `<button data-card="${me}">MY CARD</button>` : ''}<button id="lbX">CLOSE</button></div>`;
   requestAnimationFrame(lbHeadsDraw);
 }
@@ -103,3 +110,40 @@ $('card').addEventListener('click', e => {
 // clicking a name on the results screen or friends list opens their card
 $('postBoard').addEventListener('click', e => { const n = e.target.closest('[data-fid]'); if (n && !e.target.closest('button')) { e.stopPropagation(); openCard(+n.dataset.fid); } });
 $('friends').addEventListener('click', e => { const n = e.target.closest('[data-card]'); if (n) { e.stopPropagation(); openCard(+n.dataset.card); } });
+
+// weekly prizes: the server says what you won last week (your best place of the three boards), you claim it here
+let prizeQ = [], prizeChk = -1e9;
+async function checkPrizes(force = false) {
+  if (!auth || (!force && performance.now() - prizeChk < 600e3)) return;
+  prizeChk = performance.now();
+  try { const r = await api('GET', '/prizes'); if (r.status === 200 && Array.isArray(r.prizes)) { prizeQ = r.prizes; showPrize(); } } catch {}
+}
+function showPrize(force = false) {
+  const p = prizeQ[0]; if (!p || $('prize').style.display === 'flex') return;
+  const busy = !inLobby || [$('binds'), $('armory'), $('boost'), $('pick'), $('daily'), $('chests'), $('lb'), $('card')].some(el => el && getComputedStyle(el).display !== 'none');
+  if ((busy || navigator.webdriver) && !force) { setTimeout(showPrize, 2000); return; }
+  $('prize').style.display = 'flex'; renderPrize(); sfx('ui');
+}
+function renderPrize(msg = '') {
+  const p = prizeQ[0]; if (!p) return;
+  const tile = (pic, n, name, c) => `<div class="loot" style="--rc:${c}"><div class="pic">${pic}</div><b>${name}</b><small>×${n}</small></div>`;
+  const tiles = PRIZE_BOX.map(([i, id], k) => p.prize[k] ? tile(`<img class="ai" src="${chestPic[i]}">`, p.prize[k], CHESTS[i].name, ['#ffd75e', '#b5bfcc', '#c48a4e'][k]) : '').join('') + tile(`<span class="lc">${COIN}</span>`, p.prize[3], 'COINS', '#ffcf3a');
+  $('prizeBox').innerHTML = `<h1>${ico('trophy')} WEEKLY PRIZE</h1><p>You finished <b>#${p.rank}</b> on last week's ${p.by === 'xp' ? 'XP' : p.by.toUpperCase()} board!</p>` +
+    `<div class="lootRow">${tiles}</div>${msg ? `<p class="err">${msg}</p>` : ''}<button id="prizeGo" class="go">CLAIM</button>`;
+}
+async function claimPrize() {
+  const p = prizeQ[0], b = $('prizeGo'); if (!p || b?.disabled) return;
+  b.disabled = true;
+  let r; try { r = await api('POST', '/prizes/claim', { week: p.week }); } catch { r = { status: 0 }; }
+  if (r.status !== 200 && r.status !== 409) return renderPrize("Couldn't reach the server, try again");
+  prizeQ.shift();
+  if (r.status === 200) { // the server's word, not the list's
+    const z = r.prize; PRIZE_BOX.forEach(([i, id], k) => { if (z[k]) prof.box = { ...prof.box, [id]: (prof.box?.[id] | 0) + z[k] }; });
+    prof.coins += z[3]; prof.earned = (prof.earned ?? 0) + z[3]; saveProf(); showProf(); sfx('levelUp');
+  }
+  $('prize').style.display = 'none';
+  if (prizeQ.length) showPrize(true); else if (r.status === 200 && r.prize.slice(0, 3).some(Boolean)) { chestSel = PRIZE_BOX.find(([i], k) => r.prize[k])[0]; openChests(); }
+}
+$('prize').addEventListener('click', e => { e.stopPropagation(); if (e.target.closest('#prizeGo')) claimPrize(); });
+if (auth) setTimeout(checkPrizes, 3000);
+setInterval(() => { if (inLobby && !document.hidden) checkPrizes(); }, 60e3);

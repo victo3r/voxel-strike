@@ -1,5 +1,7 @@
 // chests: keys from online wins, the daily reward and ads open them
 const keyCount = () => prof.keys | 0;
+// chests you've won (weekly prizes) open free: prof.box[id] = how many
+const boxN = c => prof.box?.[c.id] | 0, boxAll = () => CHESTS.reduce((s, c) => s + boxN(c), 0);
 // loot: k = kind, n = amount or [min, max], w = weight, r = rarity. Things you can only have one of drop out once you own them
 const GUN_DROP = { common: 2, rare: 1.6, epic: 1, legend: .5, mythic: .2 }; // the rarer the gun, the rarer the drop
 const CHESTS = [
@@ -49,13 +51,14 @@ function lootCard(l, n = l.n) {
   else { pic = `<img class="ai" src="${l.k === 'boots' ? bootPic(l.id, 1) : hatPic(l.id, 1)}">`; name = gearOf(l).name.toUpperCase(); }
   return `<div class="loot" style="--rc:${rc}"><div class="pic">${pic}</div><b>${name}</b><small>${rn}</small>${l.p !== undefined ? `<i>${(l.p * 100).toFixed(l.p < .1 ? 1 : 0)}%</i>` : ''}</div>`;
 }
-// open one: pay the keys, roll, hand it over
+// open one: a won chest or the keys, roll, hand it over
 function openChest(c) {
-  if (keyCount() < c.cost) return null;
+  const free = boxN(c) > 0;
+  if (!free && keyCount() < c.cost) return null;
   const list = lootNow(c);
   let r = Math.random(), l = list[list.length - 1];
   for (const x of list) { if ((r -= x.p) <= 0) { l = x; break; } }
-  prof.keys = keyCount() - c.cost;
+  if (free) prof.box = { ...prof.box, [c.id]: boxN(c) - 1 }; else prof.keys = keyCount() - c.cost;
   const got = { ...l, n: rollN(l.n) };
   if (got.k === 'coins') { prof.coins += got.n; prof.earned = (prof.earned ?? 0) + got.n; }
   else if (got.k === 'boosts') prof.boosts = (prof.boosts | 0) + got.n;
@@ -80,8 +83,9 @@ const chestPic = CHESTS.map(c => artIcon(CHEST_ART, { K: '#000', ...c.pal }));
 // the CHESTS screen
 let chestSel = 0, chestGot = null, chestBusy = false;
 function renderChests() {
-  $('keyBtn').innerHTML = ico('key') + `<b>${keyCount()}</b>`;
-  $('keyBtn').classList.toggle('ready', keyCount() >= CHESTS[0].cost);
+  const won = boxAll();
+  $('keyBtn').innerHTML = ico('key') + `<b>${keyCount()}</b>` + (won ? `<i class="cb">${won}</i>` : '');
+  $('keyBtn').classList.toggle('ready', keyCount() >= CHESTS[0].cost || won > 0);
   if ($('chests').style.display !== 'flex') return;
   const today = typeof dayKey === 'function' ? dayKey() : '', adOk = cg.on && !noAds, adUsed = prof.adKey === today, wait = Math.ceil((adNext - performance.now()) / 1000);
   if (chestGot || chestBusy) {
@@ -91,8 +95,9 @@ function renderChests() {
     return;
   }
   $('chestBox').innerHTML = `<h1>${ico('key')} CHESTS <span class="kn">${ico('key')} ${keyCount()}</span></h1><p>Win online matches to earn keys</p>` +
-    `<div class="row">${CHESTS.map((c, i) => `<div class="chest${i === chestSel ? ' sel' : ''}" data-c="${i}"><img src="${chestPic[i]}"><b>${c.name}</b>` +
-      `<button data-open="${i}" class="${keyCount() >= c.cost ? 'go' : ''}" ${keyCount() >= c.cost ? '' : 'disabled'}>OPEN · ${ico('key')} ${c.cost}</button></div>`).join('')}</div>` +
+    `<div class="row">${CHESTS.map((c, i) => { const n = boxN(c), ok = n > 0 || keyCount() >= c.cost;
+      return `<div class="chest${i === chestSel ? ' sel' : ''}" data-c="${i}">${n ? `<i class="own">×${n}</i>` : ''}<img src="${chestPic[i]}"><b>${c.name}</b>` +
+        `<button data-open="${i}" class="${ok ? 'go' : ''}" ${ok ? '' : 'disabled'}>${n ? 'OPEN · FREE' : `OPEN · ${ico('key')} ${c.cost}`}</button></div>`; }).join('')}</div>` +
     `<div class="lootHead">${CHESTS[chestSel].name} CAN HAVE</div><div class="lootRow">${lootShown(CHESTS[chestSel]).map(l => lootCard(l)).join('')}</div>` +
     `<div class="btns">${adOk ? `<button id="keyAd" ${adUsed || wait > 0 ? 'disabled' : ''}>${ico('video')} ${adUsed ? 'NEXT AD KEY TOMORROW' : wait > 0 ? `NEXT AD IN ${Math.floor(wait / 60)}:${String(wait % 60).padStart(2, '0')}` : 'WATCH AD · +1 KEY'}</button>` : ''}<button id="chestX">CLOSE</button></div>`;
 }

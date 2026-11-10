@@ -164,6 +164,7 @@ async function signedIn(r, fresh) {
   const otherAccount = sync.user && sync.user.toLowerCase() !== acctKey(auth);
   sync = { user: acctKey(auth), rev: 0, dirty: false };
   if (auth.cg) cgLook();
+  if (typeof checkPrizes === 'function') setTimeout(() => checkPrizes(true), 1500); // last week's board prizes
   if (fresh || !r.save) { sync.rev = r.rev; saveSync(); if (!r.save) await push(); else setState('saved'); return; }
   // the bigger save wins, unless this device belonged to another account
   if (otherAccount || progress(r.save.prof) >= progress(prof)) { applySave(r.save); sync.rev = r.rev; saveSync(); setState('saved'); }

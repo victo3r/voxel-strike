@@ -105,12 +105,12 @@ const FLASH_FX = {
     if (m <= 5.5 && s <= 8) return m <= 1.5 && s <= 2.5 ? '#fff2f5' : Math.abs(dx - dy) < 1 ? '#ffb8c8' : m > 4.5 || s > 7 ? '#ff5c7a' : dx > dy ? '#ff2448' : '#c8102e';
     if (Math.min(dx, dy) < 1) return '#ffd0da';
   }, .25, 1.15), light: 0xff3050, t: .08, bits: 'gem' },
-  paragon: { spr: flashSpr((dx, dy) => { // a white-hot core in a ring of energy
+  paragon: { spr: flashSpr((dx, dy) => { // a white-hot core with rays of energy
     const r = Math.hypot(dx, dy);
-    if (r < 1.6) return '#ffffff'; if (r < 3) return '#c4ebff'; if (r < 4.2) return '#5ab0ff';
-    if (r >= 5.6 && r < 6.8) return '#7cc8ff';
-    if (Math.min(dx, dy) < 1 && r < 7.6) return '#3d9bff';
-  }, 1.6, 1.3), light: 0x58b0ff, t: .09, bits: 'energy' },
+    if (r < 1.6) return '#ffffff'; if (r < 3) return '#c4ebff'; if (r < 4) return '#5ab0ff';
+    if (Math.min(dx, dy) < 1 && r < 7.6) return r < 5.5 ? '#9fdcff' : '#3d9bff';
+    if (Math.abs(dx - dy) < 1 && r < 5.5) return '#5ab0ff';
+  }, 1.6, 1.2), light: 0x58b0ff, t: .09, bits: 'energy' },
   executioner: { spr: flashSpr((dx, dy) => { // crossed violet blades on a gold core
     const r = Math.hypot(dx, dy);
     if (dx + dy <= 3) return r < 1.5 ? '#fffbe8' : '#ffd86a';
