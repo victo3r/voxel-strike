@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link id="css" rel="stylesheet" href="css/style.css?v=142">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- added to a phone's home screen it opens fullscreen, like an app -->
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Voxel Strike"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
+<link id="css" rel="stylesheet" href="css/style.css?v=144">
 </head>
 <body class="boot">
-<!-- touchscreen-only devices get this note instead of the game -->
-<div id="noTouch"><div><h1 class="logo">VOXEL STRIKE</h1><p>Grab a keyboard and mouse, this one's played on a computer!</p></div></div>
+<!-- phones and tablets: this note while held upright -->
+<div id="noTouch"><div><h1 class="logo">VOXEL STRIKE</h1><p>Turn your phone sideways to play!</p></div></div>
 <script>if (!matchMedia('(any-pointer: fine)').matches && matchMedia('(any-pointer: coarse)').matches) document.body.classList.add('touchOnly');</script>
 <div id="hud">
   <div id="hit"></div><canvas id="scope"></canvas><canvas id="holo"></canvas><canvas id="cross"></canvas><svg id="rl" viewBox="0 0 80 80" style="display:none"><circle class="bg" cx="40" cy="40" r="34"/><circle id="rlFg" cx="40" cy="40" r="34"/></svg><div id="hm"><i></i><i></i><i></i><i></i></div>
@@ -96,19 +99,21 @@
         <section data-t="controls">
           <h2>LOOK</h2>
           <div class="sliders">
-            <span>Mouse sensitivity</span><input id="sens_mouse" type="range" min="0.1" max="3" step="0.05"><b id="sensV_mouse"></b>
-            <span>Arrow-key look speed</span><input id="sens_keys" type="range" min="0.1" max="3" step="0.05"><b id="sensV_keys"></b>
+            <span id="sensLbl">Mouse sensitivity</span><input id="sens_mouse" type="range" min="0.1" max="3" step="0.05"><b id="sensV_mouse"></b>
+            <span class="kb">Arrow-key look speed</span><input id="sens_keys" class="kb" type="range" min="0.1" max="3" step="0.05"><b id="sensV_keys" class="kb"></b>
             <span>Field of view</span><input id="fovIn" type="range" min="60" max="90" step="1"><b id="fovV"></b>
           </div>
           <h2>AIM ASSIST</h2>
           <div id="aaQ" class="seg"><button data-v="0">OFF</button><button data-v="1">LOW</button><button data-v="2">MEDIUM</button></div>
           <small id="aaDesc"></small>
-          <h2>OPTIONS</h2>
-          <label class="tick"><input id="optToggleAim" type="checkbox"> Toggle aim (press once to aim, again to stop)</label>
-          <label class="tick"><input id="optWheel" type="checkbox"> Scroll wheel switches guns</label>
-          <h2>KEYS</h2>
-          <small>Click a box, then press a key, mouse button or scroll (Backspace clears it, Esc cancels)</small>
-          <div id="bindList"></div>
+          <h2 class="tonly">TOUCH BUTTONS</h2>
+          <button id="tEditBtn" class="tonly">MOVE AND RESIZE BUTTONS</button>
+          <h2 class="kb">OPTIONS</h2>
+          <label class="tick kb"><input id="optToggleAim" type="checkbox"> Toggle aim (press once to aim, again to stop)</label>
+          <label class="tick kb"><input id="optWheel" type="checkbox"> Scroll wheel switches guns</label>
+          <h2 class="kb">KEYS</h2>
+          <small class="kb">Click a box, then press a key, mouse button or scroll (Backspace clears it, Esc cancels)</small>
+          <div id="bindList" class="kb"></div>
           <button id="bindReset">RESET CONTROLS</button>
         </section>
         <section data-t="sound">
@@ -207,10 +212,9 @@
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
 // bump V (and the css ?v=) on every update to skip old caches
-const V = 191;
+const V = 193;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js'];
-if (!document.body.classList.contains('touchOnly')) { // touch-only devices stop here
+  'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js', 'js/touch.js'];
 // crazy.js first, so CrazyGames saves are in place before the rest
 await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });
 await (window.cgReady || Promise.resolve());
@@ -218,7 +222,6 @@ for (const src of FILES) {
   const s = document.createElement('script');
   s.src = src + '?v=' + V; s.async = false; // keep them in list order
   document.body.append(s);
-}
 }
 </script>
 </body></html>

@@ -108,7 +108,7 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #gfxQ,.seg{display:flex;gap:8px}#gfxQ button,.seg button{min-width:96px;color:var(--silver)}#binds #gfxQ button.sel,#binds .seg button.sel{background:var(--sel);color:#fff}
 #binds .tick{display:flex;align-items:center;gap:8px;font-size:16px;cursor:pointer}.tick input{accent-color:var(--acc);width:18px;height:18px;cursor:pointer}
 #fps{position:fixed;left:50%;transform:translateX(-50%);top:2px;z-index:50;font:bold 12px monospace;color:#ffd23f;text-shadow:1px 1px 0 #000;pointer-events:none}
-@media (max-width:620px){#setMain{flex-direction:column}#setTabs{flex-direction:row;width:auto;border-right:0;border-bottom:3px solid var(--line-dim);padding:8px}#setTabs button{flex:1;text-align:center;padding:6px 2px;font-size:12px}#setBody{padding:4px 10px 12px}}
+@media (max-width:620px){body:not(.touchOnly) #setMain{flex-direction:column}body:not(.touchOnly) #setTabs{flex-direction:row;width:auto;border-right:0;border-bottom:3px solid var(--line-dim);padding:8px}body:not(.touchOnly) #setTabs button{flex:1;text-align:center;padding:6px 2px;font-size:12px}body:not(.touchOnly) #setBody{padding:4px 10px 12px}} /* phones keep the wide layout, zoomed */
 .sliders{display:grid;grid-template-columns:minmax(100px,190px) minmax(120px,240px) 60px;gap:8px 10px;align-items:center;font-size:16px}
 .sliders:has(.mute){grid-template-columns:minmax(100px,190px) minmax(120px,240px) 60px 40px}
 #binds .sliders .mute{width:36px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;font-size:18px}
@@ -248,7 +248,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #armory button{font-family:monospace}
 #armX{margin-left:auto;font:bold 15px monospace;padding:7px 10px}
 @media (max-height:620px),(max-width:620px){#armory h1{font-size:26px;text-shadow:3px 3px 0 var(--acc-dk)}#armTabs img,#armPages img{width:44px;height:22px}#armory #armTabs button,#armory #armPages button{font-size:9px}#armPages{width:60px}#armList{grid-template-columns:repeat(auto-fill,minmax(124px,1fr))}#armList .cn{font-size:14px}}
-@media (max-width:700px){#armBody{flex-direction:column}#armPages{flex-direction:row;width:auto;align-self:stretch;position:static}#armory #armPages button{flex:1}#armMain{width:100%}#armory{width:100%;-webkit-mask-image:none;mask-image:none;padding:12px 14px 100px}#armAct{right:12px;bottom:12px;width:calc(100vw - 24px)}#armory{padding-bottom:300px}}
+@media (max-width:700px){body:not(.touchOnly) #armBody{flex-direction:column}body:not(.touchOnly) #armPages{flex-direction:row;width:auto;align-self:stretch;position:static}body:not(.touchOnly) #armory #armPages button{flex:1}body:not(.touchOnly) #armMain{width:100%}body:not(.touchOnly) #armory{width:100%;-webkit-mask-image:none;mask-image:none;padding:12px 14px 100px}body:not(.touchOnly) #armAct{right:12px;bottom:12px;width:calc(100vw - 24px)}body:not(.touchOnly) #armory{padding-bottom:300px}}
 
 /* match HUD and leaderboards */
 #top .clock{font-size:30px;color:#fff}
@@ -444,8 +444,8 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #drawBtns button{font:bold 16px monospace;padding:9px 14px;box-shadow:4px 4px 0 rgba(0,0,0,.45)}
 #drawBtns #drawSave{flex:1}
 @media (max-width:700px){
-  #lobby.cust{flex-direction:column}#lobby.cust #stage{order:-1;flex:none;height:40vh}
-  #custPanel,#drawPanel{width:100%;flex:1;-webkit-mask-image:none;mask-image:none;padding:12px 16px}
+  body:not(.touchOnly) #lobby.cust{flex-direction:column}body:not(.touchOnly) #lobby.cust #stage{order:-1;flex:none;height:40vh}
+  body:not(.touchOnly) #custPanel,body:not(.touchOnly) #drawPanel{width:100%;flex:1;-webkit-mask-image:none;mask-image:none;padding:12px 16px}
   #nameRow{width:190px}#lobbyTop{gap:10px}
 }
 @media (max-height:620px){#pickTitle{font-size:30px}#pick{gap:10px}}
@@ -569,12 +569,12 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 .cs b{font-size:22px;color:#ffd75e}.cs span{font-size:11px;color:var(--muted)}
 .cFav{display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}.cFav span{font-size:11px;color:var(--muted)}.cFav img{height:30px;image-rendering:pixelated}
 #postBoard [data-fid],#friends .pn{cursor:pointer}#postBoard [data-fid]:hover,#friends .pn:hover{text-decoration:underline}
-/* phones and tablets without a mouse */
+/* phones and tablets: turn sideways */
 #noTouch{display:none}
-body.touchOnly #noTouch{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2f5a3a,#14241a);font-family:monospace;color:#fff;text-align:center;text-shadow:3px 3px 0 #000}
+@media (orientation:portrait){body.touchOnly #noTouch{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2f5a3a,#14241a);font-family:monospace;color:#fff;text-align:center;text-shadow:3px 3px 0 #000}
 body.touchOnly #noTouch>div{padding:24px 20px;border:4px solid #fff;background:rgba(0,0,0,.35);box-shadow:6px 6px 0 rgba(0,0,0,.45);max-width:420px}
 body.touchOnly #noTouch h1{margin:0 0 14px;font-size:clamp(30px,9vw,46px);--ls:2px}
-body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:1.4}
+body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:1.4}}
 /* game title */
 .logo{font-family:monospace;font-weight:bold;background:linear-gradient(135deg,#1e8cff 0%,#3fa6ff 28%,#fff 46%,#fff 54%,#3fd45e 72%,#1fae3f 100%) 0 0/calc(1ch + var(--ls)) 100% repeat-x;--ls:3px;letter-spacing:var(--ls);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;
   filter:drop-shadow(2px 0 0 #000) drop-shadow(-2px 0 0 #000) drop-shadow(0 2px 0 #000) drop-shadow(0 -2px 0 #000) drop-shadow(3px 4px 0 rgba(0,0,0,.45))}
@@ -626,4 +626,55 @@ body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:
 #chestBox .reveal.open .loot{flex-basis:auto;width:200px;transform:scale(1.25);margin:24px 0;animation:lootPop .35s ease-out;box-shadow:0 0 30px var(--rc)}
 @keyframes chestShake{0%,100%{transform:none}20%{transform:rotate(-4deg)}40%{transform:rotate(4deg) scale(1.04)}60%{transform:rotate(-6deg) scale(1.08)}80%{transform:rotate(6deg) scale(1.12)}}
 @keyframes lootPop{from{transform:scale(.3);opacity:0}to{transform:scale(1.25);opacity:1}}
-
+/* touch controls */
+body.touchOnly{touch-action:manipulation;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+body.touchOnly canvas{height:100dvh!important} /* the screen you can see, under a phone's address bar */
+#tc{position:fixed;inset:0;display:none;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#tc.on{display:block}
+#tStick{position:absolute;left:92px;top:calc(100% - 92px);width:108px;height:108px;margin:-54px 0 0 -54px;box-sizing:border-box;border:3px solid rgba(255,255,255,.5);border-radius:50%;background:rgba(10,14,16,.22);opacity:.5;pointer-events:none}
+#tStick.on{opacity:1}
+#tStick i{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;box-sizing:border-box;border:3px solid #fff;border-radius:50%;background:rgba(255,255,255,.28);box-shadow:2px 2px 0 rgba(0,0,0,.4)}
+.tb{position:absolute;display:flex;align-items:center;justify-content:center;padding:0;box-sizing:border-box;font-size:26px;color:#fff;background:rgba(160,170,178,.22);border:3px solid rgba(255,255,255,.75);box-shadow:3px 3px 0 rgba(0,0,0,.4);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.tb.down{background:rgba(47,191,113,.45);border-color:#fff}
+.tb.on{background:var(--sel);border-color:var(--acc-lt)}
+#tc .tb.off{display:none}
+/* moving the buttons */
+#tc.edit{display:block;z-index:45;background:rgba(10,14,16,.62)}
+#tc.edit #tTop{display:none}#tc.edit .tb.off{display:flex;opacity:.35}#tc.edit .tb.sel{border-color:var(--acc-lt);background:var(--sel)}
+#tGuns,#tEdit{display:none}
+#tc.edit #tGuns{display:flex;position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:330px;height:38px;align-items:center;justify-content:center;box-sizing:border-box;border:2px dashed rgba(255,255,255,.5);color:rgba(255,255,255,.6);font:bold 13px monospace;letter-spacing:2px}
+#tc.edit #tEdit{display:flex;position:absolute;left:50%;top:10px;transform:translateX(-50%);align-items:center;flex-wrap:wrap;justify-content:center;gap:8px 12px;width:max-content;max-width:calc(100% - 20px);padding:8px 12px;background:rgba(20,26,30,.92);border:3px solid var(--line-dim);color:#fff;font:bold 13px monospace;text-shadow:2px 2px 0 #000}
+#tEdit label{display:flex;align-items:center;gap:6px}#tEdit input{width:110px;accent-color:var(--acc)}#tEdit input:disabled{opacity:.4}
+#tEdit button{font:bold 13px monospace;padding:7px 10px;color:#fff;background:var(--glass);border:3px solid var(--line);text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}#tEdit #tDone{background:var(--sel)}
+body:not(.touchOnly) .tonly{display:none!important}
+#tTop{position:absolute;right:14px;top:12px;display:flex;gap:8px}
+#tTop .tb{position:static;width:42px;height:42px;font-size:20px}
+/* phones: the HUD makes room for the controls */
+body.touchOnly #feed{top:64px}
+body.touchOnly #ammo{right:auto;left:50%;bottom:66px;transform:translateX(-50%);text-align:center;font-size:17px}
+body.touchOnly #hotbar{bottom:14px}body.touchOnly #hud:has(#hotbar.aimed) #ammo{visibility:hidden}
+body.touchOnly .slot{width:50px;height:38px}body.touchOnly .slot img{width:44px;height:22px}body.touchOnly .slot .c,body.touchOnly .slot .k{display:none}
+body.touchOnly #chat{bottom:auto;top:72px;width:min(300px,36vw);font-size:13px}
+body.touchOnly .kb{display:none!important}
+/* phones: menus zoom to fit (--uw/--uh stand in for vw/vh inside them) */
+body.touchOnly :is(#armory,#armAct,#chests,#custPanel,#drawPanel,#board,#post){zoom:var(--z,1)}
+body.touchOnly :is(#lobbyUI,#pick,#binds,#boost,#daily,#lb,#card,#prize,#menu,#shop,#finding,#netToast,#away){zoom:var(--z2,1)}
+body.touchOnly:not(.tcOn) #hud{visibility:hidden}
+body.touchOnly :is(#chestBox,#cardBox){overflow-y:auto}body.touchOnly .cSkin{height:120px}body.touchOnly #shop h1{font-size:30px}body.touchOnly #items{grid-template-columns:repeat(3,minmax(0,270px))}body.touchOnly #chestBox .chest img{width:90px}
+body.touchOnly #armory{width:min(720px,calc(var(--uw) * 60))}
+body.touchOnly #armAct{width:clamp(270px,calc(var(--uw) * 27),340px)}
+body.touchOnly #detCv{height:min(280px,calc(var(--uh) * 36))!important}
+body.touchOnly :is(#lbBox,#cardBox){max-height:calc(var(--uh2) * 92)}
+body.touchOnly .lbList{max-height:calc(var(--uh2) * 46)}
+body.touchOnly #chestBox{width:min(820px,calc(var(--uw) * 96));max-height:calc(var(--uh) * 94)}
+body.touchOnly :is(#pickList,#pickPill){max-width:calc(var(--uw2) * 96)}
+body.touchOnly #pickDesc{max-width:calc(var(--uw2) * 90)}
+body.touchOnly #custPanel{width:min(460px,calc(var(--uw) * 46))}
+body.touchOnly #drawPanel{width:min(560px,calc(var(--uw) * 50))}
+body.touchOnly #drawSheet{width:min(440px,100%,calc(var(--uh) * 56))!important}
+/* phones: a tighter lobby and picker */
+body.touchOnly #lobbyTop{flex-direction:column;align-items:flex-start;gap:8px;max-width:none}body.touchOnly #lobbyBtns{flex-basis:auto}
+body.tight #lobbyLogo{display:none}
+body.touchOnly #pickList{gap:10px;flex-wrap:nowrap}
+body.touchOnly #pickList :is([data-mode],[data-map]){width:clamp(96px,calc((var(--uw2) * 100 - 90px) / 5),200px);font-size:14px;padding:10px 6px}
+body.touchOnly #pickList .mc{padding-bottom:50px}

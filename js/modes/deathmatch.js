@@ -881,7 +881,7 @@ function updateDM(dt) {
 }
 // match results (online they come from the server)
 function endMatch(results) {
-  matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('banner').style.opacity = 0;
+  matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('menu').style.display = 'none'; $('banner').style.opacity = 0;
   const place = results ? results.place : ranked().indexOf(youRec) + 1, lead = results ? results.lead : teamLead();
   $('postSub').textContent = MR.name + ' OVER';
   $('postPlace').textContent = MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
@@ -898,7 +898,7 @@ function endMatch(results) {
   sfx(won ? 'win' : 'lose'); musicEnd();
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
   if (ups) setTimeout(() => sfx('levelUp'), 700);
-  document.exitPointerLock();
+  unlockMouse();
 }
 $('againBtn').addEventListener('click', () => { if (net.on) { net.again(); return; } restart(); lockMouse(); });
 $('postLobby').addEventListener('click', () => { net.leave(); restart(); showLobby(true); });

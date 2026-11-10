@@ -86,7 +86,7 @@ $('chatIn').addEventListener('keydown', e => {
   } else if (e.code === 'Escape') { e.preventDefault(); closeChat(); }
 });
 $('chatIn').addEventListener('keyup', e => e.stopPropagation());
-document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement !== renderer.domElement) closeChat(); }); // Esc unlocks the mouse, so close chat too
+document.addEventListener('pointerlockchange', () => { if (TOUCH ? !touchLock : document.pointerLockElement !== renderer.domElement) closeChat(); }); // Esc unlocks the mouse, so close chat too
 function resetChat() { closeChat(); chatQ = []; chatGap = 0; $('chatLog').innerHTML = ''; reported?.clear(); reportAsk = 0; } // new match, new player ids
 
 // players list: show chat, mute and report

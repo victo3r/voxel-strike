@@ -40,7 +40,7 @@ function renderSens() {
 }
 document.querySelectorAll('.sliders .mute').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const k = b.dataset.m; setMute(k, !mutes[k]); renderSens(); if (!mutes.sfx) sfx('ui'); }));
 // other control options
-const DEFAULT_OPTS = { aa: 0, toggleAim: false, wheel: true, chat: true };
+const DEFAULT_OPTS = { aa: TOUCH ? 2 : 0, toggleAim: false, wheel: true, chat: true }; // thumbs get aim help
 let opts = { ...DEFAULT_OPTS };
 try { const o = JSON.parse(localStorage.getItem('voxelstrike-opts')); if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k]; } catch {}
 const saveOpts = () => { try { localStorage.setItem('voxelstrike-opts', JSON.stringify(opts)); } catch {} };
@@ -146,8 +146,9 @@ $('gfxQ').addEventListener('click', e => {
 $('gfxRes').addEventListener('input', e => { gfx.res = +e.target.value; saveGfx(); applyGfx(); renderGfx(); });
 $('gfxFps').addEventListener('change', e => { gfx.fps = e.target.checked; saveGfx(); renderGfx(); });
 renderGfx();
-const held = a =>binds[a].some(c => c && keys[c]);
-const isBind = (a, code) => binds[a].includes(code);
+// touch buttons press 'T:<action>'
+const held = a => keys['T:' + a] || binds[a].some(c => c && keys[c]);
+const isBind = (a, code) => code === 'T:' + a || binds[a].includes(code);
 function nice(code) {
   if (!code) return '-';
   const named = { Mouse0: 'Left Click', Mouse1: 'Middle Click', Mouse2: 'Right Click', Mouse3: 'Mouse 4', Mouse4: 'Mouse 5',
@@ -194,11 +195,11 @@ addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && $('b
 
 function press(code) {
   if (!locked || chatting) return;
-  if (isBind('menu', code)) { document.exitPointerLock(); return; } // like Esc, but stays fullscreen
+  if (isBind('menu', code)) { unlockMouse(); return; } // like Esc, but stays fullscreen
   if (isBind('chat', code)) { openChat(); if (chatting) return; }
   if (isBind('shoot', code)) shoot();
   if (isBind('reload', code)) reload();
-  if (isBind('aim', code) && opts.toggleAim) aimOn = !aimOn;
+  if (isBind('aim', code) && (opts.toggleAim || code === 'T:aim')) aimOn = !aimOn;
   const sw = opts.wheel || !code.startsWith('Wheel');
   const before = cur;
   if (sw && isBind('next', code)) cycle(1);
@@ -222,6 +223,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys[e.code] = false);
 addEventListener('mousedown', e => {
   gestureAt = performance.now();
+  if (TOUCH) return; // taps make fake mouse clicks
   const code = 'Mouse' + e.button;
   if (rebinding) { if (!e.target.closest('#bindReset,#bindX,#setTabs,.sliders,.seg,.tick')) { e.preventDefault(); assign(code); } return; }
   if (chatting) { e.preventDefault(); return; }
@@ -233,6 +235,7 @@ addEventListener('mouseup', e => keys['Mouse' + e.button] = false);
 addEventListener('contextmenu', e => e.preventDefault());
 // lock the mouse, asking for raw input to avoid camera snaps
 function lockMouse() {
+  if (TOUCH) { touchFull(); setTouchLock(true); return; }
   const el = renderer.domElement;
   clearTimeout(relockT); relockT = 0;
   let p;
@@ -240,13 +243,21 @@ function lockMouse() {
   if (p?.catch) p.catch(() => el.requestPointerLock()?.catch?.(() => {}));
   else if (!p && document.pointerLockElement !== el) el.requestPointerLock()?.catch?.(() => {});
 }
+function unlockMouse() { if (TOUCH) setTouchLock(false); else document.exitPointerLock(); }
+function setTouchLock(on) { if (touchLock === on) return; touchLock = on; document.dispatchEvent(new Event('pointerlockchange')); }
+// phones: fullscreen and sideways while you play (CrazyGames does its own)
+function touchFull() {
+  if (cg.on || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+  document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && TOUCH) unlockMouse(); });
 // Chrome refuses to relock right after Esc, so keep retrying for a bit
 let gestureAt = -1e9, relockT = 0;
 const RELOCK_FOR = 3000, RELOCK_EVERY = 150;
 const canRelock = () => !locked && !shopOpen && !inLobby && !matchOver && !armOpen && $('binds').style.display !== 'flex' && $('away').style.display !== 'flex';
 let lastMove = 0;
 addEventListener('mousemove', e => {
-  if (!locked) return;
+  if (!locked || TOUCH) return;
   const dx = e.movementX, dy = e.movementY, m = Math.hypot(dx, dy);
   // ignore one-off huge mouse jumps (a browser glitch)
   if (m > 250 && m > lastMove * 8 + 60) { lastMove = m; return; }
@@ -270,6 +281,8 @@ $('menu').addEventListener('click', () => {
   lockMouse();
 });
 // switching windows mid-match shows a small CLICK TO PLAY bar instead of the menu
+const TAP = TOUCH ? 'Tap' : 'Click';
+if (TOUCH) $('awayBar').firstChild.textContent = 'TAP TO PLAY';
 let blurAt = -1e9, unlockAt = -1e9;
 const AWAY_MS = 300;
 const runsBehindMenu = () => pvp() && !dead && !shopOpen && !inLobby && !matchOver;
@@ -283,7 +296,7 @@ const awayMenu = () => { showAway(false); $('menu').style.display = 'flex'; };
 $('awayMenu').addEventListener('click', e => { e.stopPropagation(); awayMenu(); });
 addEventListener('keydown', e => { if (e.code === 'Escape' && !rebinding && !locked && $('away').style.display === 'flex') awayMenu(); });
 document.addEventListener('pointerlockchange', () => {
-  locked = document.pointerLockElement === renderer.domElement;
+  locked = TOUCH ? touchLock : document.pointerLockElement === renderer.domElement;
   net.onLock?.(locked);
   if (!locked) unlockAt = performance.now();
   const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS);
@@ -297,7 +310,7 @@ document.addEventListener('pointerlockchange', () => {
     aimOn = false;
     $('menuTitle').textContent = dead ? 'YOU DIED' : pvp() ? 'MENU' : 'PAUSED';
     $('menuPlay').textContent = dead ? 'TRY AGAIN' : pvp() ? 'BACK TO GAME' : 'RESUME';
-    $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. Click to try again` : pvp() ? '' : 'Click to resume';
+    $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. ${TAP} to try again` : pvp() ? '' : TAP + ' to resume';
     $('armBtn').style.display = $('menuFriends').style.display = pvp() ? '' : 'none';
     $('menuPlayers').style.display = net.on ? '' : 'none';
     renderHelp();
@@ -307,7 +320,7 @@ document.addEventListener('pointerlockchange', () => {
 document.addEventListener('pointerlockerror', () => {
   if (shopOpen || inLobby || matchOver) return;
   if (performance.now() - gestureAt < RELOCK_FOR) { if (!relockT) relockT = setTimeout(() => { relockT = 0; if (canRelock()) lockMouse(); }, RELOCK_EVERY); return; }
-  showAway(false); $('menuTitle').textContent = 'MENU'; $('msg').textContent = 'Click to continue'; $('menu').style.display = 'flex';
+  showAway(false); $('menuTitle').textContent = 'MENU'; $('msg').textContent = TAP + ' to continue'; $('menu').style.display = 'flex';
 });
 
 function showLobby(on) {

@@ -37,7 +37,7 @@ function audio() {
   return ac;
 }
 // browsers only allow sound after a click or key press
-addEventListener('pointerdown', audio); addEventListener('keydown', audio);
+addEventListener('pointerdown', audio); addEventListener('keydown', audio); addEventListener('touchend', audio); // phones: a touch counts when it ends
 
 // building blocks for the sounds below
 function kit(c, seed) {

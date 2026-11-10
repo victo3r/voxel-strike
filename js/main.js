@@ -78,7 +78,7 @@ function update(dt) {
   if (down) aimOn = false;
   if (!down) {
   aaTarget(); // aim assist target
-  const mx = held('right') - held('left'), mz = held('back') - held('fwd');
+  const mx = held('right') - held('left') + tStick.x, mz = held('back') - held('fwd') + tStick.y;
   const lx = held('lookR') - held('lookL'), ly = held('lookU') - held('lookD');
   if (lx || ly) {
     const ls = 2.4 * sens.keys * dt * camera.fov / fovBase;
@@ -87,7 +87,7 @@ function update(dt) {
   }
   let tx = 0, tz = 0; // the speed you want, which your actual speed eases to (quick, but not an instant flip)
   if (mx || mz) {
-    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) / len;
+    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) * Math.min(1, len) / len; // a half-pushed stick walks
     tx = (mx * c + mz * s) * sp; tz = (-mx * s + mz * c) * sp;
   }
   const ease = 1 - Math.exp(-MOVE_EASE * dt);
@@ -127,11 +127,11 @@ function update(dt) {
 
   // keep the real fire rate at any frame rate
   cd -= dt;
-  if (autoFire(w) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) {
+  if ((autoFire(w) || keys['T:shoot']) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun
     const c0 = cd; shoot(); if (cd === c0) break;
     if (c0 > -dt) cd += c0;
   }
-  aiming = opts.toggleAim ? aimOn : held('aim');
+  aiming = opts.toggleAim || TOUCH ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1)); // gun settles after a shot
   wandOn -= dt; wandK = Math.max(0, Math.min(1, wandK + dt * (wandOn > 0 && gunShown === cur ? 14 : -4)));

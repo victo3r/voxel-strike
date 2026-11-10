@@ -342,7 +342,7 @@ function buy(i) {
   if (it.refill) WEAPONS.forEach((w, g) => { if (owned[g]) { reserve[g] = resMax(g); if (BASE[g].pool) ammo[g] = w.mag; } });
   sfx('buy'); renderShop();
 }
-function openShop() { shopOpen = true; shopOffer = pickOffers(); renderShop(); document.exitPointerLock(); }
+function openShop() { shopOpen = true; shopOffer = pickOffers(); renderShop(); unlockMouse(); }
 $('items').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) buy(+b.dataset.i); });
 $('next').addEventListener('click', () => {
   shopOpen = false; $('shop').style.display = 'none'; waveWait = 3;
@@ -363,7 +363,7 @@ function zombiesOver() {
   $('post').style.display = 'flex';
   sfx(newBest ? 'win' : 'lose');
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
-  document.exitPointerLock();
+  unlockMouse();
 }
 // acid spit
 const GLOB_SPD = 13, GLOB_G = 5, globs = [];

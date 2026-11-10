@@ -697,9 +697,9 @@ net = (() => {
       if (respawnAt) {
         const left = (respawnAt - now()) / 1000;
         respawnT = Math.max(left, .01);
-        if (left <= .15) { api.banner = locked ? 'RESPAWNING…' : 'CLICK TO RESPAWN'; if (locked) tryReady(); }
+        if (left <= .15) { api.banner = locked ? 'RESPAWNING…' : TAP.toUpperCase() + ' TO RESPAWN'; if (locked) tryReady(); }
         else api.banner = '';
-      } else if (!readySent) api.banner = locked ? 'JOINING…' : 'CLICK TO PLAY';
+      } else if (!readySent) api.banner = locked ? 'JOINING…' : TAP.toUpperCase() + ' TO PLAY';
       if (respawnT <= 0) respawnT = .01;
     }
     const sec = Math.max(0, Math.ceil(matchT));

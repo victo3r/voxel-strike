@@ -6,7 +6,11 @@ const GFX_Q = {
   medium: { aa: false, maxRatio: 1, aniso: 4,  detail: true,  view: 1 },
   low:    { aa: false, maxRatio: 1, aniso: 1,  detail: false, view: .7 },
 };
-const gfx = { q: /CrOS/.test(navigator.userAgent) ? 'medium' : 'high', res: 1, fps: false };
+// phones and tablets: touch controls, and the mouse lock is pretend
+const TOUCH = document.body.classList.contains('touchOnly');
+let touchLock = false;
+const tStick = { x: 0, y: 0 }; // move stick, -1 to 1
+const gfx = { q: TOUCH ? 'low' : /CrOS/.test(navigator.userAgent) ? 'medium' : 'high', res: 1, fps: false };
 try { const s = JSON.parse(localStorage.getItem('voxelstrike-gfx')); if (s) { if (GFX_Q[s.q]) gfx.q = s.q; if (s.res >= .5 && s.res <= 1) gfx.res = s.res; gfx.fps = !!s.fps; } } catch {}
 const gfxQ = () => GFX_Q[gfx.q];
 const renderer = new THREE.WebGLRenderer({ antialias: gfxQ().aa, powerPreference: 'high-performance' });
@@ -24,6 +28,17 @@ scene.add(camera);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 1.1); scene.add(hemi); // each map sets its own lighting
 const sun = new THREE.DirectionalLight(0xffffff, 1.3); sun.position.set(10, 20, 5); scene.add(sun);
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+// menus shrink to fit a phone: --z for the big ones, --z2 for the rest (--uw/--uh: 1% of the screen inside them)
+function fitUI() {
+  if (!TOUCH) return;
+  const st = document.documentElement.style;
+  [['', 500, 860], ['2', 420, 760]].forEach(([n, h, w]) => {
+    const z = Math.max(.5, Math.min(1, innerHeight / h, innerWidth / w));
+    st.setProperty('--z' + n, z); st.setProperty('--uw' + n, innerWidth / z / 100 + 'px'); st.setProperty('--uh' + n, innerHeight / z / 100 + 'px');
+    if (n) document.body.classList.toggle('tight', innerWidth / z < 940); // no room for the lobby logo
+  });
+}
+fitUI(); addEventListener('resize', fitUI);
 
 const allTex = []; // so a quality change can update every texture
 // item rarity: name and colour
