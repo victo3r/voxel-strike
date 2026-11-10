@@ -16,7 +16,7 @@ function boostPay(xp, coins) {
 const boostTile = () => gameBoost ? [ico('bolt'), 'BOOST', '2×', 'tb'] : null;
 function renderBoost() {
   const b = $('boostBtn'), on = boostSet();
-  b.innerHTML = ico('bolt') + `<b>${boosts()}</b>` + (on ? `<small>${on} SET</small>` : ''); b.classList.toggle('on', on > 0);
+  b.innerHTML = ico('bolt') + `<b>${boosts()}</b>` + (on ? `<small>${on} ACTIVE</small>` : ''); b.classList.toggle('on', on > 0);
   if ($('boost').style.display !== 'flex') return;
   const n = boosts(), k = boostSet(), wait = Math.ceil((adNext - performance.now()) / 1000), ads = cg.on && !noAds;
   $('boostBox').innerHTML = `<h1>${ico('bolt')} 2× BOOSTER</h1><p>Each one doubles the XP and coins from a game</p>` +

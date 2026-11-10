@@ -187,7 +187,7 @@ function heroGun(i) {
   g.scale.setScalar(GUN_S);
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
   Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rs: { rk: -1 } });
-  hf.flashM = makeFlash(.1); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
+  hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   const kind = holdOf(BASE[i]);
   pose = { pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, sh: kind === 'shoulder', hv: kind === 'heavy' };
@@ -242,8 +242,8 @@ function heroShot() {
     if (w.shock && Math.random() < .25) sfx('zap', { v: .4 * hv() });
     hf.beamOn = .08; return;
   }
-  sfx(w.id, { v: .5 * hv() }); hf.flash = .05;
-  if (w.starFx) starPuff(hf.flashM, lobbyScene, .8);
+  sfx(w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
+  muzzleBits(w, hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
   if (w.lance) { showLance(_hm.clone(), { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, w.lance, .6, lobbyScene); return; }
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
@@ -264,7 +264,7 @@ function heroTick(dt) {
   const w = hf.st;
   const can = heroCan();
   if (!heroLive()) heroFireStop();
-  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8)); hf.flash -= dt;
+  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1)); hf.flash -= dt;
   if (can && hf.held && (autoFire(w) || hf.pend)) { hf.pend = false; heroShot(); }
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
   if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload();
@@ -513,7 +513,7 @@ function updateLobby(dt) {
     down(_l.copy(hFL).sub(hFR).applyQuaternion(tq).add(hFR)); down(_fr.copy(hFR));
     const q0 = _q.copy(_wq).multiply(tq).multiply(hQ);
     // kick or reload animation
-    const w = hf.i >= 0 && hf.st, ra = w && hf.rl > 0 ? reloadPose(w.id, 1 - hf.rl / w.reload) : null, kk = hf.kick || 0;
+    const w = hf.i >= 0 && hf.st, ra = w && hf.rl > 0 ? reloadPose(w.id, 1 - hf.rl / w.reload) : null, kk = (hf.kick || 0) * (w && heavyKick(w) ? HEAVY.lift : 1);
     let leftK = hLK;
     reloadSwap(hf.rs, w ? w.id : '', ra ? 1 - hf.rl / w.reload : -1, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(ra ? ra.mx : 0, ra ? ra.my : 0, ra ? ra.mz : 0));

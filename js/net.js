@@ -583,7 +583,7 @@ net = (() => {
     if (r.fired) {
       const n = Math.min(r.fired, 3); r.fired = 0;
       if (W.melee) { sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING; }
-      else if (!W.flame && !W.beam) { z.muzzle = .05; for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (W.starFx && z.flashM) starPuff(z.flashM); }
+      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (z.flashM) muzzleBits(W, z.flashM); }
       if (W.lance) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); showLance(z.flashM.getWorldPosition(fv).clone(), lanceLine(eyeV, dirV, W, [ground, ...crateMeshes]), W.lance); } // their beam, just for show
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0;

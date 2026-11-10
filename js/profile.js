@@ -43,7 +43,8 @@ const rewardRow = list => `<div class="rw">${list.filter(Boolean).map(([icon, l,
 const xpTile = n => [ico('xp'), 'XP', `+${n}`, 'tx'], coinTile = n => [COIN, 'COINS', `+${n}`, 'tc'];
 const xpText = () => prof.lv >= LV_MAX ? 'MAX LEVEL' : `${prof.xp} / ${xpNeed(prof.lv)} XP`;
 function showProf() { // lobby level badge and coins
-  $('prof').innerHTML = `<div class="lv"><b>LVL ${prof.lv}</b>${xpBar()}<small>${xpText()}</small></div>`;
+  const max = prof.lv >= LV_MAX;
+  $('prof').innerHTML = `<div class="lv${max ? ' max' : ''}"><b><small>LVL</small>${prof.lv}</b><div class="xp"><small>${max ? 'MAX LEVEL' : `<span>${prof.xp} / ${xpNeed(prof.lv)}</span> XP`}</small>${xpBar()}</div></div>`;
   $('lobbyCoins').innerHTML = COIN + prof.coins;
   if (typeof renderBoost === 'function') renderBoost();
   if (typeof renderChests === 'function') renderChests();

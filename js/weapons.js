@@ -60,6 +60,8 @@ const RECOIL = {
   rubypierce: { up: 2.3, side: .3, back: .75 }, paragon: { up: 2, side: .2, back: .3 },
   heatray: { up: .05, side: .06, back: 2 }, shockbeam: { up: .06, side: .08, back: 2 }, frostwand: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 },
 };
+// big single-shot energy guns kick higher and take longer to settle: every lance gun, or heavyKick on a gun
+const HEAVY = { lift: 1.45, settle: .55 }, heavyKick = w => w.heavyKick ?? !!w.lance;
 const ADS_SOFT = .4, REC_RISE = 50, REC_BACK = 8, REC_MAX = 4;
 const rec = { tp: 0, ty: 0, p: 0, y: 0 };
 const ammo = WEAPONS.map(w => w.mag);
@@ -85,23 +87,47 @@ function renderHotbar() {
 }
 
 const vm = new THREE.Group(); camera.add(vm); vm.position.set(.32, -.3, -.55);
-const FLASH_SPR = new THREE.SpriteMaterial({ depthWrite: false, fog: false, blending: THREE.AdditiveBlending, map: (() => { // muzzle flash: a hot core and four spikes
+// muzzle flash pictures (16 px, dx/dy from the middle)
+function flashTex(px) {
   const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d');
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const dx = Math.abs(x - 7.5), dy = Math.abs(y - 7.5), r = Math.max(dx, dy), spike = Math.min(dx, dy) < 1 ? 8 : Math.abs(dx - dy) < 1 ? 4.5 : 2.5;
-    if (r > spike) continue;
-    g.fillStyle = r < 2 ? '#fffbe0' : r < 4 ? '#ffd24a' : '#ff8a1a'; g.fillRect(x, y, 1, 1);
-  }
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const col = px(Math.abs(x - 7.5), Math.abs(y - 7.5)); if (col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }
   const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
-})() });
+}
+const flashSpr = (px, jit = 7, k = 1) => Object.assign(new THREE.SpriteMaterial({ depthWrite: false, fog: false, blending: THREE.AdditiveBlending, map: flashTex(px) }), { userData: { jit, k } });
+const FLASH_SPR = flashSpr((dx, dy) => { // a hot core and four spikes
+  const r = Math.max(dx, dy), spike = Math.min(dx, dy) < 1 ? 8 : Math.abs(dx - dy) < 1 ? 4.5 : 2.5;
+  if (r <= spike) return r < 2 ? '#fffbe0' : r < 4 ? '#ffd24a' : '#ff8a1a';
+});
+// guns with their own flash: picture, light, how long it shows, what flies out (muzzleBits in combat.js)
+const FLASH_FX = {
+  rubypierce: { spr: flashSpr((dx, dy) => { // a cut ruby with a glint
+    const m = Math.max(dx, dy), s = dx + dy;
+    if (m <= 5.5 && s <= 8) return m <= 1.5 && s <= 2.5 ? '#fff2f5' : Math.abs(dx - dy) < 1 ? '#ffb8c8' : m > 4.5 || s > 7 ? '#ff5c7a' : dx > dy ? '#ff2448' : '#c8102e';
+    if (Math.min(dx, dy) < 1) return '#ffd0da';
+  }, .25, 1.15), light: 0xff3050, t: .08, bits: 'gem' },
+  paragon: { spr: flashSpr((dx, dy) => { // a white-hot core in a ring of energy
+    const r = Math.hypot(dx, dy);
+    if (r < 1.6) return '#ffffff'; if (r < 3) return '#c4ebff'; if (r < 4.2) return '#5ab0ff';
+    if (r >= 5.6 && r < 6.8) return '#7cc8ff';
+    if (Math.min(dx, dy) < 1 && r < 7.6) return '#3d9bff';
+  }, 1.6, 1.3), light: 0x58b0ff, t: .09, bits: 'energy' },
+  executioner: { spr: flashSpr((dx, dy) => { // crossed violet blades on a gold core
+    const r = Math.hypot(dx, dy);
+    if (dx + dy <= 3) return r < 1.5 ? '#fffbe8' : '#ffd86a';
+    if (Math.abs(dx - dy) <= (r < 6.5 ? 1 : 0)) return r < 3.5 ? '#ffe9a8' : r < 6 ? '#d6a4ff' : '#a466ff';
+  }, .3, 1.1), light: 0xb47aff },
+};
+const flashOf = w => FLASH_FX[w.id]?.spr || FLASH_SPR, flashTime = w => FLASH_FX[w.id]?.t ?? (w.scope ? .1 : .05);
 function makeFlash(size = .1, mat = FLASH_SPR) {
   const s = new THREE.Sprite(mat); s.scale.setScalar(size);
-  s.onBeforeRender = () => { mat.rotation = Math.random() * Math.PI * 2; s.scale.setScalar(size * (.75 + Math.random() * .5)); };
+  s.onBeforeRender = () => { const m = s.material, u = m.userData; m.rotation = (Math.random() - .5) * (u.jit ?? 7); s.scale.setScalar(size * (u.k || 1) * (.75 + Math.random() * .5)); };
   return s;
 }
-const flashMesh = makeFlash(.12, Object.assign(FLASH_SPR.clone(), { depthTest: false })); // yours draws over the barrel, which would hide it
+const vmFlashMats = new Map(), vmFlashMat = m => vmFlashMats.get(m) || vmFlashMats.set(m, Object.assign(m.clone(), { depthTest: false })).get(m); // yours draws over the barrel, which would hide it
+const flashMesh = makeFlash(.12, vmFlashMat(FLASH_SPR));
 flashMesh.renderOrder = 5;
 const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
+let flashT = 0;
 let gunSpin = null, gunSpinV = 0;
 let gunRound = null;
 let gunHolo = null;
@@ -743,6 +769,7 @@ function buildGun() {
   for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone();
   vmRl.rk = -1;
   if (WEAPONS[cur].melee) return;
+  flashMesh.material = vmFlashMat(flashOf(WEAPONS[cur])); flashLight.color.setHex(FLASH_FX[WEAPONS[cur].id]?.light ?? 0xffcc66);
   flashMesh.position.set(0, my, mz - .015); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
 }
 function cycle(d) { let s = slotOf(cur); do s = (s + d + CATS.length) % CATS.length; while (slotGun[s] < 0); equip(slotGun[s]); }

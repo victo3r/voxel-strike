@@ -6,11 +6,11 @@ function shotTargets() { const t = [ground, ...crateMeshes]; for (const zz of zo
 function recoilKick(w) {
   const r = RECOIL[w.id]; if (!r) return;
   const soft = 1 - adsT * ADS_SOFT;
-  rec.tp = Math.min(REC_MAX, rec.tp + r.up * soft);
+  rec.tp = Math.min(REC_MAX, rec.tp + r.up * soft * (heavyKick(w) ? HEAVY.lift : 1));
   rec.ty = Math.max(-REC_MAX / 2, Math.min(REC_MAX / 2, rec.ty + (Math.random() - .5) * 2 * r.side * soft));
 }
 function recoilTick(dt, w) {
-  const k = Math.exp(-(RECOIL[w.id]?.back ?? 1) * REC_BACK * dt), e = 1 - Math.exp(-REC_RISE * dt);
+  const k = Math.exp(-(RECOIL[w.id]?.back ?? 1) * (heavyKick(w) ? HEAVY.settle : 1) * REC_BACK * dt), e = 1 - Math.exp(-REC_RISE * dt);
   rec.tp *= k; rec.ty *= k;
   rec.p += (rec.tp - rec.p) * e; rec.y += (rec.ty - rec.y) * e;
 }
@@ -48,8 +48,8 @@ function shoot() {
   else if (w.flame) flame(w);
   else if (w.lance) fireLance(w);
   else {
-    kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w)); recoilKick(w);
-    if (w.starFx && !aiming) starPuff(flashMesh, scene, .6); // not while you aim: they'd fill the sight
+    kick = 1; flashMesh.visible = true; flashLight.intensity = 3; flashT = flashTime(w); crossKick(kickFor(w)); recoilKick(w);
+    if (!aiming) muzzleBits(w, flashMesh, scene, .6); // not while you aim: they'd fill the sight
     sfx(w.id);
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);
@@ -122,7 +122,8 @@ function lanceTick(dt) {
 }
 function clearLances() { for (const l of lances) { l.sc.remove(l.g); l.mats.forEach(m => m.dispose()); } lances.length = 0; }
 function fireLance(w) {
-  kick = 1; flashMesh.visible = true; flashLight.intensity = 3; crossKick(kickFor(w)); recoilKick(w);
+  kick = 1; flashMesh.visible = true; flashLight.intensity = 3; flashT = flashTime(w); crossKick(kickFor(w)); recoilKick(w);
+  if (!aiming) muzzleBits(w, flashMesh, scene, .6);
   sfx(w.id);
   ray.setFromCamera(ndc.set(0, 0), camera);
   const L = lanceLine(ray.ray.origin, ray.ray.direction, w, shotTargets(), null, zz => zz.type === 'bot' && friendly(null, zz));
@@ -159,11 +160,48 @@ function starPuff(from, sc = scene, size = 1) { // from: the muzzle object
     starBits.push({ s, sc, v: _sd.clone().multiplyScalar(2 + Math.random() * 2).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(2.2)), life: .35 + Math.random() * .15, k: s.scale.x });
   }
 }
+// ruby shards (Ruby Pierce) and a burst of energy (Paragon)
+const SHARD_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d');
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const dx = x - 3.5, dy = y - 3.5; if (Math.abs(dx) / 3 + Math.abs(dy) / 4 > 1) continue; g.fillStyle = dx < 0 ? (dy < 0 ? '#fff' : '#ddd') : dy < 0 ? '#bbb' : '#888'; g.fillRect(x, y, 1, 1); }
+  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
+})();
+const bitMat = (color, map) => new THREE.SpriteMaterial({ color, map, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
+const SHARD_MATS = [0xff2e48, 0xff4f6c, 0xff8ea4].map(c => bitMat(c, SHARD_TEX)), SPARK_MATS = [0x9fe0ff, 0xffffff, 0x3d9bff].map(c => bitMat(c, null));
+const RING_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d');
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) { const r = Math.hypot(x - 15.5, y - 15.5); if (r > 15.5 || r < 11) continue; g.fillStyle = r > 13.5 ? '#fff' : '#9ab8d0'; g.fillRect(x, y, 1, 1); }
+  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
+})();
+const ringGeo = new THREE.PlaneGeometry(1, 1), rings = [];
+function muzzleBits(w, from, sc = scene, size = 1) {
+  if (w.starFx) starPuff(from, sc, size);
+  const k = FLASH_FX[w.id]?.bits; if (!k) return;
+  from.getWorldQuaternion(_sq); _sd.set(0, 0, -1).applyQuaternion(_sq);
+  const bit = (mats, n, spd, spread, life, sz, g) => { for (let i = 0; i < n; i++) {
+    const s = new THREE.Sprite(mats[Math.random() * mats.length | 0]); from.getWorldPosition(s.position); s.scale.setScalar(sz * (.7 + Math.random() * .6) * size); sc.add(s);
+    starBits.push({ s, sc, v: _sd.clone().multiplyScalar(spd * (.6 + Math.random() * .6)).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread)), life: life * (.8 + Math.random() * .4), k: s.scale.x, g });
+  } };
+  if (k === 'gem') bit(SHARD_MATS, 9, 4, 2.8, .5, .11, 5);
+  else if (k === 'energy') {
+    bit(SPARK_MATS, 6, 7, 3.4, .22, .03, 0);
+    for (const [r, t, spd] of [[.85, .26, 1.6], [.5, .17, 3]]) { // a fast small ring inside a slow big one
+      const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ map: RING_TEX, color: 0x7cc4ff, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, blending: THREE.AdditiveBlending }));
+      from.getWorldPosition(m.position); m.quaternion.copy(_sq); m.scale.setScalar(.03); sc.add(m);
+      rings.push({ m, sc, v: _sd.clone().multiplyScalar(spd), r: r * size, t, life: t });
+    }
+  }
+}
 function starTick(dt) {
   for (let i = starBits.length - 1; i >= 0; i--) {
-    const b = starBits[i]; b.life -= dt; b.s.position.addScaledVector(b.v, dt); b.v.multiplyScalar(Math.exp(-3 * dt));
+    const b = starBits[i]; b.life -= dt; b.s.position.addScaledVector(b.v, dt); b.v.multiplyScalar(Math.exp(-3 * dt)); if (b.g) b.v.y -= b.g * dt;
     b.s.scale.setScalar(b.k * Math.max(0, Math.min(1, b.life * 4))); b.s.material.rotation += dt * 4;
     if (b.life <= 0) { b.sc.remove(b.s); starBits.splice(i, 1); }
+  }
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const g = rings[i], f = 1 - (g.life -= dt) / g.t; g.m.position.addScaledVector(g.v, dt);
+    g.m.scale.setScalar(.03 + g.r * (1 - (1 - Math.min(1, f)) ** 3)); g.m.material.opacity = Math.max(0, 1 - f * f);
+    if (g.life <= 0) { g.sc.remove(g.m); g.m.material.dispose(); rings.splice(i, 1); }
   }
 }
 const BURN_T = 2.5; // burn time after the flames stop

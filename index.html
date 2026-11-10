@@ -2,7 +2,7 @@
 <html><head><meta charset="utf-8"><title>Voxel Strike</title>
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link id="css" rel="stylesheet" href="css/style.css?v=137">
+<link id="css" rel="stylesheet" href="css/style.css?v=138">
 </head>
 <body class="boot">
 <!-- touchscreen-only devices get this note instead of the game -->
@@ -77,7 +77,7 @@
   </div>
 </div>
 <div id="armAct"></div>
-<div id="heroAct"><button id="heroShoot" title="Shoot"></button><button id="heroReload" title="Reload"></button></div>
+<div id="heroAct"><button id="heroShoot" class="quiet" title="Shoot"></button><button id="heroReload" class="quiet" title="Reload"></button></div>
 <div id="binds">
   <div id="setBox">
     <div id="setHead"><h1>SETTINGS</h1><button id="bindX">CLOSE</button></div>
@@ -206,7 +206,7 @@
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
 // bump V (and the css ?v=) on every update to skip old caches
-const V = 186;
+const V = 187;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js'];
 if (!document.body.classList.contains('touchOnly')) { // touch-only devices stop here

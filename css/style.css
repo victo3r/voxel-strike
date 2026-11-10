@@ -297,10 +297,13 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #nameDice{font-size:16px;padding:0;width:38px;height:38px;flex:none}
 #nameIn{height:38px;box-sizing:border-box}
 #prof{display:flex;align-items:center;gap:16px}
-.lv{display:grid;grid-template-columns:auto 130px;column-gap:9px;align-items:center}
-.lv b{grid-row:span 2;font-size:20px}
-.lv .xpbar{height:6px;margin:0;border-width:2px}
-.lv small{font-size:11px;color:var(--silver);margin-top:2px}
+#prof .lv{display:flex;height:38px;box-sizing:border-box;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+#prof .lv b{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:38px;padding:0 6px;box-sizing:border-box;background:var(--acc);box-shadow:inset -3px -3px 0 var(--acc-dk),inset 3px 3px 0 var(--acc-lt);font-size:17px;line-height:1}
+#prof .lv b small{font-size:9px;letter-spacing:1px;line-height:1;margin-bottom:1px}
+#prof .lv .xp{display:flex;flex-direction:column;justify-content:center;gap:4px;width:150px;padding:0 10px}
+#prof .lv .xp small{font-size:11px;line-height:1;color:var(--silver)}#prof .lv .xp span{color:#fff}
+#prof .lv .xpbar{height:10px;margin:0;border:2px solid #000;background:rgba(0,0,0,.5)}
+#prof .lv.max b{background:#e0a91e;box-shadow:inset -3px -3px 0 #7a5208,inset 3px 3px 0 #ffe07a}#prof .lv.max .xpbar>div{background:#ffcf3a;box-shadow:inset 0 -3px 0 #a87612}
 /* coins */
 #coinRow{position:absolute;top:18px;right:calc(32px + clamp(48px,7vmin,64px));display:flex;gap:12px}
 #lobbyCoins{height:clamp(48px,7vmin,64px);box-sizing:border-box;display:flex;align-items:center;padding:0 14px;margin:0;font:bold clamp(17px,2.6vmin,22px) monospace;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
@@ -350,7 +353,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #boostBox button:hover:not(:disabled){background:var(--hov)}#boostBox button:disabled{opacity:.45;cursor:default}
 #boostBox .bs{display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px}
 #boostBox .bs button{width:40px;height:40px;padding:0;font-size:22px}#boostBox .bs b{min-width:34px;text-align:center;font-size:26px;color:var(--muted)}#boostBox .bs b.on{color:#ffd75e}
-#boostBtn small{font-size:.6em;color:#ffd75e;margin-left:2px}
+#boostBtn small{flex-basis:100%;text-align:center;font-size:.55em;line-height:1;color:#ffd75e;white-space:nowrap}#boostBtn.on{flex-wrap:wrap;align-content:center;row-gap:3px;line-height:1}
 #lobbySet img{width:62%}
 
 /* mode and map picker */

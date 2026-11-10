@@ -270,7 +270,7 @@ function holdGun(b) {
   b.armL.quaternion.setFromUnitVectors(ARM_DOWN, h.dL ? _hv.fromArray(h.dL) : _hv.set(.08, -.95, .3).normalize());
   b.holdTurn = h.turn; // sideways stance so the gun points where it aims
   b.round = round;
-  b.flashM ??= makeFlash(.1);
+  b.flashM ??= makeFlash(.1); b.flashM.material = flashOf(BASE[b.gun]);
   b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
   b.gunM = gunM; b.spin = spin; b.spinV = 0; b.wf = 0;
@@ -579,8 +579,8 @@ function botFlame(b, W) {
 }
 function botFire(b, W, dist) {
   botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);
-  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : .05; net.shot(W, b);
-  if (W.starFx) starPuff(b.flashM);
+  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); net.shot(W, b);
+  muzzleBits(W, b.flashM);
   // beams in long sweeps, everything else in short bursts
   if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto: about as fast as a person clicks
