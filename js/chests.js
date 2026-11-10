@@ -76,10 +76,21 @@ function openChest(c) {
   if (got.k === 'xp') grant(got.n, 0); else { saveProf(); showProf(); }
   return got;
 }
-// pixel chest art
-const CHEST_ART = ['..KKKKKKKKKKKK..', '.KwwwwwwwwwwwwK.', 'KwwmmmmmmmmmmwwK', 'KwmmmmmmmmmmmmwK', 'KbbbbbbbbbbbbbbK', 'KwmmmmmggmmmmmwK',
-  'KKKKKKKggKKKKKKK', 'KwmmmmmggmmmmmwK', 'KwmmmmmmmmmmmmwK', 'KbbbbbbbbbbbbbbK', 'KwmmmmmmmmmmmmwK', 'KwmmmmmmmmmmmmwK', 'KKKKKKKKKKKKKKKK'];
-const chestPic = CHESTS.map(c => artIcon(CHEST_ART, { K: '#000', ...c.pal }));
+// chest models: voxel boxes like the guns, the lock at the front (+z)
+const chestGeo = [];
+function chestModel(i, g) {
+  const c = CHESTS[i], { m, w, b, g: gem } = c.pal, M = palIdx(m), W = palIdx(w), D = palIdx(b), G = palIdx(gem, c.id !== 'wood');
+  const B = (x0, y0, z0, x1, y1, z1, k) => [x1 - x0, y1 - y0, z1 - z0, k, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2];
+  chestGeo[i] ??= voxelGeos([
+    B(-7, 1, -4, 7, 6, 4, M), B(-8, 0, -5, 8, 1, 5, W), // body on a rim
+    ...[-7, 6].flatMap(x => [-4, 3].map(z => B(x, 1, z, x + 1, 6, z + 1, W))), // corner posts
+    B(-8, 3, -5, 8, 4, 5, D), // a band round the body
+    B(-8, 6, -5, 8, 10, 5, M), B(-7, 10, -4, 7, 11, 4, M), B(-8, 8, -5, 8, 9, 5, D), // the lid, its rounded top and its band
+    B(-2, 4, 4, 2, 8, 6, D), B(-1, 5, 6, 1, 7, 7, G), // the lock
+  ], 1 / 16);
+  for (const [geo, mat] of [[chestGeo[i].lit, gunLit], [chestGeo[i].glow, gunGlow]]) if (geo) { const o = new THREE.Mesh(geo, mat); o.userData.shared = true; g.add(o); }
+}
+const chestPic = i => modelPic('chest:' + CHESTS[i].id, g => chestModel(i, g), { yaw: .5, tilt: .32, w: 200, h: 170 });
 // the CHESTS screen
 let chestSel = 0, chestGot = null, chestBusy = false;
 function renderChests() {
@@ -90,13 +101,13 @@ function renderChests() {
   const today = typeof dayKey === 'function' ? dayKey() : '', adOk = cg.on && !noAds, adUsed = prof.adKey === today, wait = Math.ceil((adNext - performance.now()) / 1000);
   if (chestGot || chestBusy) {
     const c = CHESTS[chestSel];
-    $('chestBox').innerHTML = `<h1>${c.name}</h1><div class="reveal${chestBusy ? ' shake' : ' open'}"><img class="big" src="${chestPic[chestSel]}">${chestGot && !chestBusy ? lootCard({ ...chestGot, p: undefined }) : ''}</div>` +
+    $('chestBox').innerHTML = `<h1>${c.name}</h1><div class="reveal${chestBusy ? ' shake' : ' open'}"><img class="big" src="${chestPic(chestSel)}">${chestGot && !chestBusy ? lootCard({ ...chestGot, p: undefined }) : ''}</div>` +
       (chestBusy ? '' : `<button id="chestOk" class="go">NICE!</button>`);
     return;
   }
   $('chestBox').innerHTML = `<h1>${ico('key')} CHESTS <span class="kn">${ico('key')} ${keyCount()}</span></h1><p>Win online matches to earn keys</p>` +
     `<div class="row">${CHESTS.map((c, i) => { const n = boxN(c), ok = n > 0 || keyCount() >= c.cost;
-      return `<div class="chest${i === chestSel ? ' sel' : ''}" data-c="${i}">${n ? `<i class="own">×${n}</i>` : ''}<img src="${chestPic[i]}"><b>${c.name}</b>` +
+      return `<div class="chest${i === chestSel ? ' sel' : ''}" data-c="${i}">${n ? `<i class="own">×${n}</i>` : ''}<img src="${chestPic(i)}"><b>${c.name}</b>` +
         `<button data-open="${i}" class="${ok ? 'go' : ''}" ${ok ? '' : 'disabled'}>${n ? 'OPEN · FREE' : `OPEN · ${ico('key')} ${c.cost}`}</button></div>`; }).join('')}</div>` +
     `<div class="lootHead">${CHESTS[chestSel].name} CAN HAVE</div><div class="lootRow">${lootShown(CHESTS[chestSel]).map(l => lootCard(l)).join('')}</div>` +
     `<div class="btns">${adOk ? `<button id="keyAd" ${adUsed || wait > 0 ? 'disabled' : ''}>${ico('video')} ${adUsed ? 'NEXT AD KEY TOMORROW' : wait > 0 ? `NEXT AD IN ${Math.floor(wait / 60)}:${String(wait % 60).padStart(2, '0')}` : 'WATCH AD · +1 KEY'}</button>` : ''}<button id="chestX">CLOSE</button></div>`;

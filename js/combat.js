@@ -99,7 +99,7 @@ function lanceLine(eye, dir, w, parts, you = null, skip = null) {
   return { hits, walls, end: end ? end.clone() : eye.clone().addScaledVector(dir, LANCE_FAR), stop: !!end };
 }
 // the beam: a glow and a hot core, k = thickness
-function showLance(from, L, col, k = 1, sc = scene) {
+function showLance(from, L, col, k = 1, sc = scene, tip = null) { // tip: the muzzle it keeps coming out of while the gun kicks
   for (const p of L.walls) burst(p, col, 3); // punched through here
   if (L.stop) burst(L.end, col, 4);
   const len = from.distanceTo(L.end); if (len < .3) return;
@@ -108,9 +108,10 @@ function showLance(from, L, col, k = 1, sc = scene) {
     new THREE.MeshBasicMaterial({ color: _lc.set(col).lerp(new THREE.Color(0xffffff), .65), transparent: true, depthWrite: false, fog: false }), // it glows, fog doesn't hide it
   ];
   for (const [m, s] of [[mats[0], .17], [mats[1], .06]]) { const b = new THREE.Mesh(lanceGeo, m); b.scale.set(s * k, s * k, 1); g.add(b); }
-  g.position.lerpVectors(from, L.end, .5); g.lookAt(L.end); g.scale.z = len;
-  sc.add(g); lances.push({ g, mats, sc, t: LANCE_T });
+  const l = { g, mats, sc, t: LANCE_T, end: L.end.clone(), tip }; lanceAt(l, from);
+  sc.add(g); lances.push(l);
 }
+function lanceAt(l, from) { l.g.position.lerpVectors(from, l.end, .5); l.g.lookAt(l.end); l.g.scale.z = from.distanceTo(l.end); }
 function lanceTick(dt) {
   for (let i = lances.length - 1; i >= 0; i--) {
     const l = lances[i];
@@ -118,6 +119,7 @@ function lanceTick(dt) {
     const f = l.t / LANCE_T;
     l.mats[0].opacity = .5 * f; l.mats[1].opacity = Math.min(1, f * 1.6);
     l.g.scale.x = l.g.scale.y = .5 + .5 * f; // thins out as it fades
+    if (l.tip) lanceAt(l, l.tip.getWorldPosition(_lf));
   }
 }
 function clearLances() { for (const l of lances) { l.sc.remove(l.g); l.mats.forEach(m => m.dispose()); } lances.length = 0; }
@@ -132,7 +134,7 @@ function fireLance(w) {
   if (adsT > .5 && (w.scope || gunHolo)) {
     const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), D = Math.min(.5 / t, .4 * camera.position.distanceTo(L.end));
     showLance(camera.localToWorld(_lf.set(0, -.7 * D * t, -D)), L, w.lance, .3);
-  } else showLance(flashMesh.getWorldPosition(_lf), L, w.lance);
+  } else showLance(flashMesh.getWorldPosition(_lf), L, w.lance, 1, scene, flashMesh);
 }
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {
@@ -168,8 +170,10 @@ const SHARD_TEX = (() => {
 })();
 const bitMat = (color, map) => new THREE.SpriteMaterial({ color, map, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
 const SHARD_MATS = [0xff2e48, 0xff4f6c, 0xff8ea4].map(c => bitMat(c, SHARD_TEX));
-const streakGeo = new THREE.BoxGeometry(1, 1, 1), STREAK_MATS = [0x9fe0ff, 0xffffff, 0x4aa8ff].map(color => new THREE.MeshBasicMaterial({ color, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })), streaks = [], _sv = new THREE.Vector3(), _zAx = new THREE.Vector3(0, 0, 1);
-const STREAK_VM = STREAK_MATS.map(m => Object.assign(m.clone(), { depthTest: false })); // yours, over the barrel
+// a streak is a white-hot core in a blue glow, so it shows on the sky as well as in the dark
+const streakGeo = new THREE.BoxGeometry(1, 1, 1), streaks = [], _sv = new THREE.Vector3(), _zAx = new THREE.Vector3(0, 0, 1);
+const streakMat = (color, vm) => new THREE.MeshBasicMaterial({ color, fog: false, transparent: true, depthWrite: false, depthTest: !vm });
+const STREAK_MATS = [streakMat(0x2f8cff), streakMat(0xeefaff)], STREAK_VM = [streakMat(0x2f8cff, true), streakMat(0xeefaff, true)]; // yours draw over the barrel and the flash
 function muzzleBits(w, from, sc = scene, size = 1) {
   if (w.starFx) starPuff(from, sc, size);
   const k = FLASH_FX[w.id]?.bits; if (!k) return;
@@ -179,15 +183,15 @@ function muzzleBits(w, from, sc = scene, size = 1) {
     starBits.push({ s, sc, v: _sd.clone().multiplyScalar(spd * (.6 + Math.random() * .6)).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread)), life: life * (.8 + Math.random() * .4), k: s.scale.x, g });
   } };
   if (k === 'gem') bit(SHARD_MATS, 9, 4, 2.8, .5, .11, 5);
-  else if (k === 'energy') { // a fan of short lines out of the tip, riding with the gun
+  else if (k === 'energy') { // short lines of energy shooting out of the tip, riding with the gun
     const box = from.parent; if (!box) return;
-    const sz = size / box.getWorldScale(_sv).x, mine = box === vm;
-    for (let i = 0; i < 9; i++) {
-      const a = Math.random() * 6.283, sp = .12 + Math.random() * .3, t = .12 + Math.random() * .1, d = new THREE.Vector3(Math.cos(a) * sp, Math.sin(a) * sp, -1).normalize();
-      const m = new THREE.Mesh(streakGeo, (mine ? STREAK_VM : STREAK_MATS)[i % 3]);
-      m.position.copy(from.position).addScaledVector(d, (.01 + Math.random() * .04) * sz); m.quaternion.setFromUnitVectors(_zAx, d); m.scale.setScalar(0);
-      m.userData.shared = true; if (mine) m.renderOrder = 5; box.add(m);
-      streaks.push({ m, sc: box, v: d.multiplyScalar((2 + Math.random() * 2.5) * sz), len: (.12 + Math.random() * .12) * sz, w: (.013 + Math.random() * .01) * sz, t, life: t });
+    const sz = size / box.getWorldScale(_sv).x, mine = box === vm, mats = mine ? STREAK_VM : STREAK_MATS;
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * 6.283, sp = .22 + Math.random() * .5, d = new THREE.Vector3(Math.cos(a) * sp, Math.sin(a) * sp, -1).normalize();
+      const o = from.position.clone().add(new THREE.Vector3(Math.cos(a), Math.sin(a), 0).multiplyScalar((.004 + Math.random() * .012) * sz)).addScaledVector(d, -.02 * sz); // from just inside the barrel
+      const ms = mats.map((mt, j) => { const m = new THREE.Mesh(streakGeo, mt); m.quaternion.setFromUnitVectors(_zAx, d); m.visible = false; m.userData.shared = true; if (mine) m.renderOrder = 6 + j; box.add(m); return m; });
+      const t = .18 + Math.random() * .12;
+      streaks.push({ ms, sc: box, o, d, sp: (2.6 + Math.random() * 2.4) * sz, len: (.15 + Math.random() * .13) * sz, w: (.02 + Math.random() * .012) * sz, t, age: -i * .009 });
     }
   }
 }
@@ -197,10 +201,11 @@ function starTick(dt) {
     b.s.scale.setScalar(b.k * Math.max(0, Math.min(1, b.life * 4))); b.s.material.rotation += dt * 4;
     if (b.life <= 0) { b.sc.remove(b.s); starBits.splice(i, 1); }
   }
-  for (let i = streaks.length - 1; i >= 0; i--) { // they stretch out fast, then thin away
-    const g = streaks[i], f = Math.min(1, 1 - (g.life -= dt) / g.t); g.m.position.addScaledVector(g.v, dt);
-    g.m.scale.set(g.w * (1 - f), g.w * (1 - f), g.len * Math.min(1, f * 4));
-    if (g.life <= 0) { g.sc.remove(g.m); streaks.splice(i, 1); }
+  for (let i = streaks.length - 1; i >= 0; i--) { // each grows out of the tip, lets go, then thins away
+    const g = streaks[i]; if ((g.age += dt) < 0) continue;
+    if (g.age >= g.t) { g.ms.forEach(m => g.sc.remove(m)); streaks.splice(i, 1); continue; }
+    const head = g.sp * g.age, tail = Math.max(0, head - g.len), th = g.w * (1 - (g.age / g.t) ** 2);
+    g.ms.forEach((m, j) => { m.visible = true; m.position.copy(g.o).addScaledVector(g.d, (head + tail) / 2); m.scale.set(th * (j ? .45 : 1), th * (j ? .45 : 1), head - tail + (j ? 0 : th * .5)); });
   }
 }
 const BURN_T = 2.5; // burn time after the flames stop

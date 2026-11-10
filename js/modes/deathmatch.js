@@ -646,7 +646,7 @@ function botLance(b, W) {
     if (h.zz === YOU_T) hurtPlayer(Math.max(1, Math.round(d)), false, b, h.head, 0, 0, h.thru);
     else hurtZombie(h.zz, d, h.point, h.head, false, b, 0, 0, h.thru);
   }
-  showLance(b.flashM.getWorldPosition(beamFrom).clone(), L, W.lance);
+  showLance(b.flashM.getWorldPosition(beamFrom).clone(), L, W.lance, 1, scene, b.flashM);
 }
 
 function updateBot(b, dt) {

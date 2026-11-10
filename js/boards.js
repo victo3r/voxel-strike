@@ -6,7 +6,8 @@ let cardData = null, cardWeek = false, cardErr = '';
 const WEEK_PRIZES = [[1, 2, 1, 0, 100], [2, 1, 1, 0, 50], [3, 1, 0, 0, 25], [10, 0, 2, 0, 25], [50, 0, 0, 1, 20]];
 const prizeOf = rank => WEEK_PRIZES.find(p => rank <= p[0])?.slice(1) || null;
 const PRIZE_BOX = [[2, 'gold'], [1, 'iron'], [0, 'wood']]; // CHESTS index and id for each chest count, best first
-const prizeTag = z => z ? `<span class="pz">${PRIZE_BOX.map(([i], k) => z[k] ? `<img src="${chestPic[i]}">${z[k] > 1 ? `<i>${z[k]}</i>` : ''}` : '').join('')}${COIN}${z[3]}</span>` : '<span></span>';
+const prizeTag = z => z ? `<span class="pz">${PRIZE_BOX.map(([i], k) => z[k] ? `<span class="ch"><img src="${chestPic(i)}">${z[k] > 1 ? `<i>${z[k]}</i>` : ''}</span>` : '').join('')}${COIN}${z[3]}</span>` : '<span></span>';
+const LB_PARTS = [[1, '1ST TO 3RD'], [4, '4TH TO 10TH'], [11, '11TH TO 50TH']]; // the board in sections, from these places down
 const myId = () => auth?.id || (typeof fr === 'object' && fr.me?.id) || 0;
 const safePic = (look, head) => { try { return skinPic(look && typeof look === 'object' ? look : PRESETS[0].look, head); } catch { return skinPic(PRESETS[0].look, head); } };
 // row heads draw a few a frame, so opening the board doesn't stall
@@ -19,7 +20,7 @@ function lbHeadsDraw() {
   }
 }
 // in-game name, with @username under it when different
-const whoIs = (nick, user) => `<b>${esc(nick || user)}</b>${user && (nick || user).toLowerCase() !== user.toLowerCase() ? `<small>@${esc(user)}</small>` : ''}`;
+const whoIs = (nick, user, lv) => `<b>${esc(nick || user)}</b><small>LVL ${lv}${user && (nick || user).toLowerCase() !== user.toLowerCase() ? ` · @${esc(user)}` : ''}</small>`;
 const lbNum = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? (n / 1e3).toFixed(1) + 'K' : String(n);
 function weekLeft() { // time until Monday 00:00 UTC
   const d = new Date(), next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + ((8 - d.getUTCDay()) % 7 || 7)), s = (next - d) / 1000;
@@ -42,18 +43,19 @@ function renderBoard() {
   const tab = (k, label, on) => `<button data-${k}="${label[0]}" class="${on ? 'on' : ''}">${label[1]}</button>`;
   const me = myId(), unit = BOARD_BY.find(b => b[0] === lbBy)[1]; lbHeads.length = 0;
   const wk = lbB === 'week', pz = r => wk ? prizeTag(prizeOf(r.rank)) : '';
-  const row = r => `<div class="lr${r.id === me ? ' you' : ''}" data-card="${r.id}"><span class="rk">${r.rank}</span>${lazyHead(r.look)}<span class="nm">${whoIs(r.nick, r.name)}</span>${pz(r)}<span class="lv">LVL ${r.lv}</span><span class="v">${lbNum(r.v)}</span></div>`;
+  const row = (r, look = r.look, lv = r.lv) => `<div class="lr${r.id === me ? ' you' : ''}${r.rank <= 3 ? ' p' + r.rank : ''}" data-card="${r.id}"><span class="rk">${r.rank}</span>${lazyHead(look)}<span class="nm">${whoIs(r.nick, r.name, lv)}</span>${pz(r)}<span class="v">${lbNum(r.v)}</span></div>`;
+  const part = (r, i, a) => { const p = LB_PARTS.findLast(([from]) => r.rank >= from); return p && (!i || a[i - 1].rank < p[0]) ? `<div class="lbPart">${p[1]}</div>` : ''; };
   const list = lbErr ? `<p class="lbNote">${lbErr}</p>` : !lbData ? '<p class="lbNote">Loading…</p>'
-    : lbData.rows.length ? lbData.rows.map(row).join('') : `<p class="lbNote">${lbB === 'week' ? 'Nobody yet this week, be the first' : 'Nobody here yet, be the first'}</p>`;
+    : lbData.rows.length ? lbData.rows.map((r, i, a) => part(r, i, a) + row(r)).join('') : `<p class="lbNote">${lbB === 'week' ? 'Nobody yet this week, be the first' : 'Nobody here yet, be the first'}</p>`;
   const signIn = cg.on ? 'Log in to CrazyGames to get on the board' : 'Sign in to get on the board';
   const mine = !auth ? `<p class="lbNote">${signIn}</p>`
-    : lbData?.me ? (lbData.rows.some(r => r.id === me) ? '' : `<div class="lr you" data-card="${me}"><span class="rk">${lbData.me.rank}</span>${lazyHead(prof.look)}<span class="nm">${whoIs(myName, auth.user)}</span>${pz(lbData.me)}<span class="lv">LVL ${prof.lv}</span><span class="v">${lbNum(lbData.me.v)}</span></div>`)
+    : lbData?.me ? (lbData.rows.some(r => r.id === me) ? '' : row({ ...lbData.me, id: me, nick: myName, name: auth.user }, prof.look, prof.lv))
     : lbData ? '<p class="lbNote">Play online to get on the board</p>' : '';
   $('lbBox').className = wk ? 'wk' : '';
   $('lbBox').innerHTML = `<h1>${ico('trophy')} TOP PLAYERS</h1>` +
     `<div class="lbTabs">${tab('b', ['week', 'THIS WEEK'], lbB === 'week')}${tab('b', ['all', 'ALL TIME'], lbB === 'all')}<span class="sp"></span>${BOARD_BY.map(b => tab('by', b, lbBy === b[0])).join('')}</div>` +
     `<p class="lbSub">${wk ? `Online matches · new week in ${weekLeft()} · the top 50 win prizes` : 'Online matches'}</p>` +
-    `<div class="lbHead"><span>#</span><span></span><span>PLAYER</span>${wk ? '<span>PRIZE</span>' : ''}<span></span><span>${unit}</span></div><div class="lbList">${list}</div>${mine}` +
+    `<div class="lbHead"><span>#</span><span></span><span>PLAYER</span>${wk ? '<span>PRIZE</span>' : ''}<span>${unit}</span></div><div class="lbList">${list}</div>${mine}` +
     `<div class="lbFoot">${auth && me ? `<button data-card="${me}">MY CARD</button>` : ''}<button id="lbX">CLOSE</button></div>`;
   requestAnimationFrame(lbHeadsDraw);
 }
@@ -127,7 +129,7 @@ function showPrize(force = false) {
 function renderPrize(msg = '') {
   const p = prizeQ[0]; if (!p) return;
   const tile = (pic, n, name, c) => `<div class="loot" style="--rc:${c}"><div class="pic">${pic}</div><b>${name}</b><small>×${n}</small></div>`;
-  const tiles = PRIZE_BOX.map(([i, id], k) => p.prize[k] ? tile(`<img class="ai" src="${chestPic[i]}">`, p.prize[k], CHESTS[i].name, ['#ffd75e', '#b5bfcc', '#c48a4e'][k]) : '').join('') + tile(`<span class="lc">${COIN}</span>`, p.prize[3], 'COINS', '#ffcf3a');
+  const tiles = PRIZE_BOX.map(([i, id], k) => p.prize[k] ? tile(`<img class="ai" src="${chestPic(i)}">`, p.prize[k], CHESTS[i].name, ['#ffd75e', '#b5bfcc', '#c48a4e'][k]) : '').join('') + tile(`<span class="lc">${COIN}</span>`, p.prize[3], 'COINS', '#ffcf3a');
   $('prizeBox').innerHTML = `<h1>${ico('trophy')} WEEKLY PRIZE</h1><p>You finished <b>#${p.rank}</b> on last week's ${p.by === 'xp' ? 'XP' : p.by.toUpperCase()} board!</p>` +
     `<div class="lootRow">${tiles}</div>${msg ? `<p class="err">${msg}</p>` : ''}<button id="prizeGo" class="go">CLAIM</button>`;
 }
