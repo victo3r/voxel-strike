@@ -93,8 +93,9 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
     return;
   }
   if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // hats can block or soften headshots
-  // damage boots
-  dmg *= 1 + (by ? by.rec?.fx.dmg ?? 0 : youFx().dmg + perk.dmg * .1); // Sharpshooter perk
+  // damage boots, the Sharpshooter perk, the Arcane set on wands
+  const fx = by ? by.rec?.fx : youFx(), wand = !quiet && (by ? BASE[by.gun] : BASE[cur])?.wand;
+  dmg *= 1 + (fx?.dmg ?? 0) + (by ? 0 : perk.dmg * .1) + (wand ? fx?.wand ?? 0 : 0);
   if (zz.type === 'bot') { // bot armor works like yours
     dmg *= 1 - zz.dr - zz.rec.fx.dr;
     const soak = Math.min(zz.armor, dmg); zz.armor -= soak; zz.hp -= dmg - soak;
@@ -136,7 +137,7 @@ function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0
     net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
   }
-  if (by?.rec) d *= 1 + by.rec.fx.dmg;
+  if (by?.rec) d *= 1 + by.rec.fx.dmg + (kind !== 7 && BASE[by.gun]?.wand ? by.rec.fx.wand ?? 0 : 0);
   if (by?.rec) youHelpers.add(by.rec); // for assists
   const wasHead = head; [d, head] = gearHit(youFx(), d, head); // hats can block or soften headshots
   d *= 1 - P.dr - youFx().dr; // armor and boots cut every hit
@@ -147,8 +148,9 @@ function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0
   if (P.hp <= 0 && !dead) { P.hp = 0; zombiesDead(); }
 }
 // set someone on fire
-function applyBurn(victim, t, dmgPerTick, by, gunId, max = false) {
-  if (net.on) { net.burn(victim, gunId, by); return; } // online the server runs the burn
+function applyBurn(victim, t, dmgPerTick, by, gunId, max = false, pj = 0) {
+  if (net.on) { net.burn(victim, gunId, by, pj); return; } // online the server runs the burn
+  if (shrugs(victim, 'burn', t)) return;
   if (victim === P) { burnYou(t, dmgPerTick, by); return; }
   if (max) { victim.burn = Math.max(victim.burn || 0, t); victim.burnDmg = Math.max(victim.burnDmg || 0, dmgPerTick); }
   else { victim.burn = t; victim.burnDmg = dmgPerTick; }
@@ -222,33 +224,37 @@ function blastFx(p, R, gust = false) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
 }
-function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0) {
-  const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', lk = BASE[gi(gun)]?.launch ?? 1;
-  blastFx(p, R, !!BASE[gi(gun)]?.gust);
+// el: the Ancient Wand's spell (0 fire, 1 ice, 2 wind), which never hurts whoever cast it
+function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -1) {
+  const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', W = BASE[gi(gun)], lk = W?.launch ?? 1, spell = !!W?.spell;
+  if (spell) spellFx(p, el); else blastFx(p, R, !!W?.gust);
+  const k = spell ? longOf(by ? by.rec?.fx : youFx(), W) : 1, push = self => !self && spell && el === 2 ? SPELL_GUST : 1;
+  const hex = o => { if (el === 0) applyBurn(o, W.burnT * k, W.burn, by, W.id, true, pj); else if (el === 1 && !net.on) shockHit(o, FROST, k); }; // online the server sends the ice
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
   if (net.on) { // online the server works out who got hurt
     const kind = rocket ? 4 : 6;
     if (pd < R && !dead && respawnT <= 0) {
-      if (pDmg) net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by });
+      if (pDmg) { net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by }); if (spell) hex(P); }
       if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true, lk);
     }
     for (const o of zombies) {
-      if (o === skip || o.dead || !o.pid) continue; // other players and room bots
+      if (o === skip || o.dead || !o.pid || spell && o === by) continue; // other players and room bots
       const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-      if (od < R) net.claim(o, { kind, point: c, gun, pj, by });
+      if (od < R) { net.claim(o, { kind, point: c, gun, pj, by }); if (spell) hex(o); }
     }
     return;
   }
-  if (pd < R && !dead && respawnT <= 0) {
-    if (pDmg) hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by);
-    if (rocket && respawnT <= 0 && !dead && !(by && friendly(by, YOU_T))) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, !by, lk);
+  if (pd < R && !dead && respawnT <= 0 && !(by && friendly(by, YOU_T))) {
+    if (pDmg) { hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by); if (spell) hex(P); }
+    if (rocket && respawnT <= 0 && !dead) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, (1 - pd / R) * push(!by), !by, lk);
   }
   for (const o of zombies) {
     if (o === skip || o.dead || o.type === 'bot' && friendly(by, o)) continue;
-    const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
+    const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p), self = o === by;
     if (od >= R) continue;
-    hurtZombie(o, o === by ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
-    if (rocket && !o.dead) launch(o, c, p, 1 - od / R, o === by, lk);
+    if (!(spell && self)) hurtZombie(o, self ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
+    if (spell && !self && !o.dead) hex(o);
+    if (rocket && !o.dead) launch(o, c, p, (1 - od / R) * push(self), self, lk);
   }
 }
 
@@ -286,6 +292,11 @@ const SHOP = [
   { gun: 'windsaber', price: 480, desc: 'run faster and jump higher' },
   { gun: 'frostwand', price: 300, desc: 'an icy beam that slows them right down' },
   { gun: 'warhammer', price: 320, desc: 'a heavy swing that knocks them flying' },
+  { gun: 'windwand', price: 280, desc: 'gusts that blow them back a step' },
+  { gun: 'stunwand', price: 260, desc: 'a zap that freezes them in place' },
+  { gun: 'flamewand', price: 380, desc: 'fireballs that leave them burning' },
+  { gun: 'soulwand', price: 400, desc: 'every kill gives you a little health' },
+  { gun: 'ancientwand', price: 520, desc: 'fire, ice or wind, never the same twice' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
 // gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often (chest odds)

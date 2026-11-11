@@ -4,6 +4,7 @@ const keyCount = () => prof.keys | 0;
 const boxN = c => prof.box?.[c.id] | 0, boxAll = () => CHESTS.reduce((s, c) => s + boxN(c), 0);
 // loot: k = kind, n = amount or [min, max], w = weight, r = rarity. Things you can only have one of drop out once you own them
 const GUN_DROP = { common: 2, rare: 1.6, epic: 1, legend: .5, mythic: .2 }; // the rarer the gun, the rarer the drop
+const CHEST_GUN_DROP = .5; // guns you can only find in a golden chest (the Ancient Wand) come up more than other mythics
 const CHESTS = [
   { id: 'wood', name: 'WOODEN CHEST', cost: 1, pal: { m: '#9a6634', w: '#c48a4e', b: '#5d5d66', g: '#d8d8e0' }, loot: [
     { k: 'coins', n: [10, 16], w: 40 }, { k: 'boosts', n: 1, w: 30 }, { k: 'xp', n: [100, 160], w: 20 },
@@ -19,7 +20,7 @@ const CHESTS = [
     { k: 'coins', n: [120, 180], w: 24 }, { k: 'boosts', n: 12, w: 16 }, { k: 'star', n: 2, w: 14, r: 'rare' },
     ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 3, r: rarOf(b) })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 3, r: rarOf(h) })),
     { k: 'coins', n: 300, w: 12, r: 'epic' },
-    ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: GUN_DROP[rarOf(w)], r: rarOf(w) })),
+    ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: w.chest ? CHEST_GUN_DROP : GUN_DROP[rarOf(w)], r: rarOf(w) })),
     { k: 'coins', n: 500, w: 3, r: 'legend' },
   ] },
 ];

@@ -360,6 +360,58 @@ const SOUNDS = {
     s.hiss({ f: 2600, f2: 140, a: .004, d: 1, v: .9 });
     s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 1, t: .02, a: .06, d: .75, v: .6, sweep: .6 });
   }],
+  // wands
+  windwand: [.45, .55, s => { // a puff of wind and a soft chime
+    s.hiss({ ft: 'bandpass', f: 700, f2: 2600, q: 1.4, a: .015, d: .28, v: 1, sweep: .25 });
+    s.tone({ type: 'triangle', f: 880, f2: 1320, d: .2, v: .18 }); s.tone({ f: 1760, t: .03, d: .18, v: .08 });
+  }],
+  flamewand: [.4, .5, s => { // a little fireball: a whoosh of flame, a roar and a crackle
+    s.hiss({ f: 260, f2: 1500, a: .012, d: .2, v: 1, sweep: .09 });
+    s.hiss({ ft: 'bandpass', f: 900, f2: 350, q: .8, t: .04, a: .02, d: .22, v: .55 });
+    s.tone({ f: 120, f2: 60, d: .14, v: .45 });
+    for (let k = 0; k < 5; k++) s.click({ t: .04 + s.r() * .22, f: 1600 + s.r() * 2600, v: .16 });
+  }],
+  soulwand: [.9, .55, s => { // a ghostly crack and a wail
+    s.tone({ f: 120, f2: 40, d: .3, v: .8 });
+    s.tone({ type: 'triangle', f: 660, f2: 440, a: .02, d: .55, v: .22 }); s.tone({ type: 'triangle', f: 667, f2: 446, a: .02, d: .55, v: .16 });
+    s.hiss({ ft: 'bandpass', f: 2600, f2: 900, q: 2, a: .005, d: .3, v: .5, sweep: .3 });
+  }],
+  ancientwand: [.7, .6, s => { // an old spell: a deep thrum rising into a shimmer
+    s.tone({ f: 90, f2: 180, a: .01, d: .4, v: .7, glide: .3 });
+    s.tone({ type: 'triangle', f: 330, f2: 990, a: .02, d: .35, v: .25, glide: .25 });
+    for (let k = 0; k < 5; k++) s.tone({ f: 1400 + k * 330, t: .05 + k * .05, d: .2, v: .06 });
+    s.hiss({ ft: 'bandpass', f: 400, f2: 2400, q: 1.5, a: .02, d: .3, v: .6, sweep: .3 });
+  }],
+  zapSwing: [.35, .5, s => { // a crackling blast leaves the tip: a rising buzz, a snap and sparks
+    s.tone({ type: 'sawtooth', f: 180, f2: 720, a: .005, d: .13, v: .2, lp: 2400 });
+    s.tone({ type: 'square', f: 1500, f2: 700, t: .02, d: .09, v: .08, lp: 5000 });
+    s.hiss({ ft: 'bandpass', f: 1400, f2: 3800, q: 2, a: .01, d: .12, v: .7, sweep: .1 });
+    for (let k = 0; k < 6; k++) s.click({ t: .015 + k * .022 + s.r() * .01, f: 3000 + s.r() * 3500, v: .24 });
+  }],
+  zapHit: [.4, .65, s => { // a hard zap
+    s.tone({ type: 'square', f: 1800, f2: 200, d: .12, v: .3, lp: 4000 });
+    s.tone({ type: 'sawtooth', f: 120, f2: 60, d: .2, v: .4, lp: 900 });
+    for (let k = 0; k < 6; k++) s.click({ t: k * .025 + s.r() * .02, f: 2500 + s.r() * 3500, v: .4 });
+    s.thud({ d: .04, f: 160, v: .6 });
+  }],
+  stunned: [.6, .35, s => { for (let k = 0; k < 4; k++) s.tone({ type: 'triangle', f: k % 2 ? 1568 : 1319, t: k * .11, d: .12, v: .3 }); }], // seeing stars
+  soulHeal: [.6, .4, s => s.arp(0, [523, 659, 784, 1047], { gap: .06, d: .3, v: .3 })],
+  shrug: [.3, .35, s => { s.tone({ f: 1200, f2: 2400, d: .12, v: .2 }); s.hiss({ ft: 'highpass', f: 5000, d: .12, v: .3 }); }],
+  spellFire: [1, .9, s => { // a burst of fire
+    s.tone({ f: 100, f2: 35, d: .45, v: .9 });
+    s.hiss({ ft: 'bandpass', f: 1800, f2: 300, q: .8, a: .005, d: .6, v: 1, sweep: .5 });
+    for (let k = 0; k < 8; k++) s.click({ t: .05 + s.r() * .5, f: 2000 + s.r() * 3000, v: .3 });
+  }],
+  spellIce: [.9, .8, s => { // ice cracking apart
+    s.tone({ f: 110, f2: 50, d: .25, v: .7 });
+    s.crunch({ a: .005, d: .35, dens: .08, lo: 1200, hi: 6000, v: 1 });
+    s.ring({ f: 1480, t: .02, d: .5, v: .2 });
+  }],
+  spellWind: [1, .85, s => { // a short gust
+    s.tone({ f: 90, f2: 35, d: .35, v: .8 });
+    s.hiss({ f: 2400, f2: 200, a: .004, d: .7, v: .9 });
+    s.hiss({ ft: 'bandpass', f: 600, f2: 2600, q: 1, t: .02, a: .05, d: .5, v: .5, sweep: .45 });
+  }],
   flareHit: [.6, .6, s => {
     s.hiss({ ft: 'bandpass', f: 1500, f2: 400, d: .35, v: .9 });
     s.tone({ f: 180, f2: 60, d: .15, v: .7 });
@@ -494,6 +546,8 @@ const SOUNDS = {
     s.hiss({ ft: 'bandpass', f: 1200, f2: 420, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
     s.clack({ t: .1, f: 1200, d: .012, v: .3, body: .3 });
   }],
+  zin_soulwand: [.3, .34, s => { s.tone({ type: 'triangle', f: 440, f2: 880, a: .01, d: .14, v: .16, glide: .1 }); s.hiss({ ft: 'bandpass', f: 1200, f2: 2600, q: 2, a: .01, d: .06, v: .3 }); }],
+  zout_soulwand: [.25, .3, s => { s.tone({ type: 'triangle', f: 880, f2: 440, a: .01, d: .12, v: .14, glide: .1 }); }],
   dry: [.1, .5, s => { s.clack({ f: 2800, d: .01, v: .8 }); }],
   equip: [.25, .4, s => { s.scrape({ d: .07, f: 1500, v: .4 }); s.clack({ t: .07, f: 2200, d: .015, v: .8, body: .3 }); }],
 
@@ -531,6 +585,11 @@ const SOUNDS = {
     s.magOut(.2); s.magIn(1.05);
     s.tone({ type: 'sine', f: 200, f2: 1600, t: 1.25, a: .3, d: .15, v: .22, glide: .4 }); s.clack({ t: 1.8, f: 1700, d: .015, v: .5, body: .3 });
   }],
+  // wands: the old charge out of the pommel, a new one in, and it hums back to life
+  r_windwand: [1.5, .45, s => { s.latch(.15); s.hiss({ ft: 'bandpass', f: 1800, f2: 600, q: 2, t: .4, d: .15, v: .4 }); s.thunk(.65); s.hiss({ ft: 'bandpass', f: 500, f2: 2200, q: 1.5, t: .95, a: .1, d: .3, v: .4, sweep: .35 }); }],
+  r_flamewand: [1.8, .45, s => { s.latch(.18); s.thunk(.8); s.hiss({ ft: 'bandpass', f: 400, f2: 1400, q: 1, t: 1.15, a: .08, d: .35, v: .5 }); for (let k = 0; k < 4; k++) s.click({ t: 1.2 + s.r() * .4, f: 2500 + s.r() * 2000, v: .2 }); }],
+  r_soulwand: [2, .45, s => { s.latch(.2); s.thunk(.9); s.tone({ type: 'triangle', f: 330, f2: 660, t: 1.25, a: .15, d: .35, v: .2, glide: .4 }); s.tone({ type: 'triangle', f: 334, f2: 668, t: 1.25, a: .15, d: .35, v: .14, glide: .4 }); }],
+  r_ancientwand: [2.2, .45, s => { s.latch(.22); s.thunk(.95); s.tone({ f: 110, f2: 220, t: 1.3, a: .2, d: .4, v: .4, glide: .5 }); for (let k = 0; k < 4; k++) s.tone({ f: 1200 + k * 300, t: 1.5 + k * .08, d: .2, v: .07 }); }],
   r_tigerbite: [2, .45, s => { s.magOut(.2); s.magIn(1.0); s.clack({ t: 1.1, f: 1500, d: .015, v: .5, body: .3 }); s.rack(1.55); }],
   r_shockbeam: [2, .45, s => {
     s.latch(.12); s.magOut(.7); s.magIn(1.15);

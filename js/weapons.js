@@ -31,6 +31,12 @@ const BASE = [
   { id: 'aerial', rar: 'epic', hold: 'rifle', name: 'Aerial Blast', cat: 'premium', unlock: 15, price: 435, mob: 60, rocket: true, gust: true, launch: 1.1, dmg: 95, rate: 1, mag: 6, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x8fd0f5, len: .8 },
   { id: 'rubypierce', rar: 'legend', hold: 'pistol', name: 'Ruby Pierce', cat: 'backup', unlock: 22, price: 835, mob: 60, zoom: 4, reticle: '255,70,90', lance: 0xff2e48, pierce: true, wallBreak: true, dmg: 115, rate: 1 / .9, mag: 6, reload: 1.6, pellets: 1, spread: 0, auto: false, color: 0xb3162e, len: .5 },
   { id: 'paragon', rar: 'legend', hold: 'rifle', name: 'Paragon', cat: 'sniper', unlock: 20, price: 760, mob: 55, zoom: 8, scope: true, lance: 0x3d9bff, pierce: true, wallBreak: true, dmg: 125, rate: 1 / .7, mag: 5, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x2a5bd8, len: .95 },
+  // the wand set
+  { id: 'windwand', rar: 'epic', hold: 'melee', name: 'Wind Wand', cat: 'backup', unlock: 18, price: 520, mob: 70, wand: 'wind', knock: .7, dmg: 45, rate: 1 / 3, mag: 9, reload: 1.5, pellets: 1, spread: 0, auto: false, color: 0xd8f2ff, len: .5 },
+  { id: 'stunwand', rar: 'epic', hold: 'melee', name: 'Stun Wand', cat: 'melee', unlock: 19, price: 550, inf: true, melee: true, wand: 'stun', swing: 'zapSwing', hit: 'zapHit', knock: .8, stun: .7, mob: 80, dmg: 50, rate: .65, range: 4.5, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xffd23a, len: .5 },
+  { id: 'flamewand', rar: 'legend', hold: 'melee', name: 'Flame Wand', cat: 'primary', unlock: 21, price: 800, mob: 65, wand: 'flame', fast: true, burn: 3, burnT: 2, dmg: 25, rate: 1 / 6, mag: 36, reload: 1.8, pellets: 1, spread: 0, auto: true, color: 0xff7a2a, len: .5 },
+  { id: 'soulwand', rar: 'legend', hold: 'melee', name: 'Soul Wand', cat: 'sniper', unlock: 23, price: 875, mob: 60, wand: 'soul', heavyKick: true, zoom: 6, reticle: '110,255,215', soul: 25, dmg: 110, rate: .8, mag: 5, reload: 2.0, pellets: 1, spread: 0, auto: false, color: 0x6fffd8, len: .5 },
+  { id: 'ancientwand', rar: 'mythic', hold: 'melee', name: 'Ancient Wand', cat: 'premium', unlock: 25, price: 1250, chest: true, mob: 65, wand: 'spell', spell: true, heavyKick: true, burn: 3, burnT: 3, dmg: 100, rate: 1, mag: 6, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x8a6a4a, len: .5 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -44,13 +50,13 @@ const STAR_DPS = b => b.rate < .15 ? .1 : b.rate < .5 ? .12 : .15, STAR_MAG = .2
 const magAt = (b, L) => b.mag === 1 ? 1 : Math.round(b.mag * (1 + STAR_MAG * L));
 // a gun's stats at a star level
 const statsAt = (i, L) => {
-  const b = BASE[i], k = 1 + STAR_DPS(b) * L, fast = b.rate < STAR_FAST;
+  const b = BASE[i], k = 1 + STAR_DPS(b) * L, fast = b.fast ?? b.rate < STAR_FAST; // fast: stars add fire rate (the Flame Wand opts in)
   return { ...b, dmg: fast ? b.dmg : Math.max(b.dmg + L, Math.round(b.dmg * k)), rate: fast ? +(b.rate / k).toFixed(4) : b.rate, mag: magAt(b, L), reload: +(b.reload * (1 - STAR_RELOAD * L)).toFixed(2) };
 };
 function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, rate: s.rate, mag: s.mag, reload: s.reload }); }
 const upgradable = i => !BASE[i].start;
 const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
-let cur = gi('voxel'), cd = 0, reloading = 0, kick = 0, aiming = false, adsT = 0, wandOn = 0, wandK = 0;
+let cur = gi('voxel'), cd = 0, reloading = 0, reloadFull = 1, kick = 0, aiming = false, adsT = 0, wandOn = 0, wandK = 0;
 // camera recoil per gun
 const RECOIL = {
   voxel: { up: 1.4, side: .3, back: 1 }, hitman: { up: 1.1, side: .25, back: 1 }, executioner: { up: 1.8, side: .3, back: .9 }, flare: { up: 2, side: .35, back: .8 },
@@ -59,6 +65,7 @@ const RECOIL = {
   sniper: { up: 1.8, side: .2, back: .28 }, semisniper: { up: 1.3, side: .18, back: .4 }, tigerbite: { up: 1.9, side: .2, back: .32 }, crossbow: { up: 1.2, side: .15, back: .5 }, grenade: { up: 2.2, side: .35, back: .6 }, aerial: { up: 2.4, side: .35, back: .55 },
   rubypierce: { up: 2.3, side: .3, back: .75 }, paragon: { up: 2, side: .2, back: .3 },
   heatray: { up: .05, side: .06, back: 2 }, shockbeam: { up: .06, side: .08, back: 2 }, frostwand: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 },
+  windwand: { up: 1.2, side: .3, back: .9 }, flamewand: { up: .5, side: .22, back: 1.1 }, soulwand: { up: 1.6, side: .2, back: .4 }, ancientwand: { up: 2.2, side: .3, back: .55 },
 };
 // big single-shot energy guns kick higher and take longer to settle: every lance gun, or heavyKick on a gun
 const HEAVY = { lift: 1.45, settle: .55 }, heavyKick = w => w.heavyKick ?? !!w.lance;
@@ -116,6 +123,24 @@ const FLASH_FX = {
     if (dx + dy <= 3) return r < 1.5 ? '#fffbe8' : '#ffd86a';
     if (Math.abs(dx - dy) <= (r < 6.5 ? 1 : 0)) return r < 3.5 ? '#ffe9a8' : r < 6 ? '#d6a4ff' : '#a466ff';
   }, .3, 1.1), light: 0xb47aff },
+  flamewand: { spr: flashSpr((dx, dy) => { // a puff of flame, ragged at the edge
+    const r = Math.hypot(dx, dy);
+    if (r < 1.6) return '#fff6d0'; if (r < 3.2) return '#ffd04a'; if (r < 4.8) return '#ff8a1a'; if (r < 6.2 && (dx + dy | 0) % 3 < 2) return '#ff4a1a';
+  }, 1.4, .9), light: 0xff7a1a, t: .06, bits: 'ember' },
+  windwand: { spr: flashSpr((dx, dy) => { // a bright eye in a ring of wind
+    const r = Math.hypot(dx, dy);
+    if (r < 1.5) return '#ffffff'; if (r > 3.6 && r < 5.4) return r < 4.5 ? '#e8f8ff' : '#9fdcff'; if (Math.abs(dx - dy) < 1 && r < 7) return '#cfefff';
+  }, 2.4, 1.1), light: 0xcff0ff, t: .07, bits: 'wind' },
+  soulwand: { spr: flashSpr((dx, dy) => { // a pale ghost light with four wisps
+    const r = Math.hypot(dx, dy);
+    if (r < 1.6) return '#ffffff'; if (r < 3) return '#c8fff0'; if (r < 4) return '#5ff0c8';
+    if (Math.min(dx, dy) < 1 && r < 7.5) return r < 5.5 ? '#9fffe4' : '#3fd0a8';
+  }, .4, 1.2), light: 0x6fffd8, t: .1, bits: 'soul' },
+  ancientwand: { spr: flashSpr((dx, dy) => { // a gold rune star
+    const r = Math.hypot(dx, dy);
+    if (r < 1.5) return '#fffbea'; if (dx + dy <= 4) return '#ffe08a';
+    if (Math.min(dx, dy) < 1 && r < 7.5) return r < 5 ? '#ffd060' : '#c89a30'; if (Math.abs(dx - dy) < 1 && r < 4.5) return '#ffeaa8';
+  }, .5, 1.2), light: 0xffe2a0, t: .09, bits: 'rune' },
 };
 const flashOf = w => FLASH_FX[w.id]?.spr || FLASH_SPR, flashTime = w => FLASH_FX[w.id]?.t ?? (w.scope ? .1 : .05);
 function makeFlash(size = .1, mat = FLASH_SPR) {
@@ -142,13 +167,15 @@ const POSE_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz', 'ay', 'az'
 const magSwap = (roll, drop, lift = .2) => { const h = { rz: roll, rx: lift, y: .06, x: -.07 }; return [[0, {}], [.14, h], [.3, { ...h, my: -drop * .4, ay: -.15 }], [.42, { ...h, my: -drop, ay: -.42 }], [.56, { ...h, my: -drop * .35, ay: -.18 }], [.7, { ...h, y: .07 }], [.74, { ...h, y: .085 }], [.86, { rx: .05, z: .035 }], [.93, { z: -.01 }], [1, {}]]; };
 // rounds pushed in one at a time
 const dips = (h, n, t0, t1, d = .025) => Array.from({ length: n }, (_, i) => { const t = t0 + (t1 - t0) * i / n, w = (t1 - t0) / n; return [[t + w * .45, { ...h, y: (h.y || 0) - d, ay: -.05 }], [t + w * .9, h]]; }).flat();
-const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], aerial: [.3, .42], rubypierce: [.3, .36], paragon: [.3, .42] };
+const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], aerial: [.3, .42], rubypierce: [.3, .36], paragon: [.3, .42], flamewand: [.3, .42], windwand: [.3, .42], soulwand: [.3, .42], ancientwand: [.3, .42] };
 const RELOAD_ANIM = (() => {
   const pistol = roll => { const h = { rx: .45, rz: roll, y: .07, x: -.06 }; return [[0, {}], [.16, h], [.3, { ...h, my: -.26 }], [.31, { ...h, my: -.45 }], [.46, { ...h, my: -.11, hand: 1 }], [.58, { ...h, my: -.09, hand: 1 }], [.66, { ...h, y: .03, hand: 1 }], [.72, { ...h, y: .045, hand: .7 }], [.8, { ...h, y: .02 }], [.86, { rx: .08, z: .04 }], [.93, { z: -.012 }], [1, {}]]; };
+  const wandRl = (() => { const h = { rx: .5, y: .05, x: -.05 }; return [[0, {}], [.14, h], [.24, { ...h, hand: 1 }], [.3, { ...h, mz: .12, hand: 1 }], [.5, { ...h, mz: .12, hand: 1 }], [.62, { ...h, hand: 1 }], [.72, { ...h, hand: .6 }], [.86, { rx: .06 }], [1, {}]]; })(); // tip up, a fresh charge into the pommel
   const sg = { rz: -.5, rx: .28, y: -.04 }, bolt = { rz: .3, rx: .1, y: -.03, mz: .09, my: .02 }, box = { rz: -.4, ry: -.22, y: -.05 }, cell = { rx: .38, rz: -.25, y: .02 }, tank = { rz: -.5, rx: .18, y: -.02 };
   return {
     voxel: pistol(-.3), hitman: pistol(-.4), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16), aerial: magSwap(-.4, .36, .2),
     rubypierce: pistol(-.35), paragon: magSwap(-.35, .38, .16),
+    flamewand: wandRl, windwand: wandRl, soulwand: wandRl, ancientwand: wandRl,
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     trex: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
@@ -212,7 +239,7 @@ function partMid(part) {
 const partBounds = part => { const m = partMid(part); return { c: [part.position.x + m.x, part.position.y + m.y, part.position.z + m.z], h: part.userData.half }; };
 
 // voxel models: boxes filled into a pixel grid, edges drawn black
-const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, grenade: .85 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
+const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, windwand: .6, stunwand: .6, flamewand: .6, soulwand: .6, ancientwand: .6, grenade: .85 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
 const gunPal = [null], gunPalI = {};
 function palIdx(col, glow = false) {
   const k = (glow ? 'g' : '') + col;
@@ -558,6 +585,64 @@ const GUN_MODELS = {
     p(4, 4, 2, ice, 0, 0, 12); // a frost charge in the pommel
     return { muzzle: [0, -35], grip: [6, 6, 18, 0, 0, 2.5], fore: null, bands: [-9, -12], band: [6, 6, 0] };
   },
+  flamewand({ p, mat, glow, sub, at }) {
+    const wood = mat(0x4a2c1c), dwood = mat(0x2a1810), brass = mat(0xc8902a), dbrass = mat(0x8a5c18), ember = glow(0xff6a1a), hot = glow(0xffc04a), core = glow(0xfff0b0);
+    p(4, 4, 12, dwood, 0, 0, 2); for (const z of [-1.5, 2.5, 6.5]) p(4, 4, 1, brass, 0, 0, z); // handle and its brass wraps
+    p(6, 6, 3, dbrass, 0, 0, 9.5); // pommel
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 2, ember, 0, 0, 12); // an ember charge in the pommel
+    p(6, 6, 2, brass, 0, 0, -5); // brass collar
+    p(4, 4, 18, wood, 0, 0, -15); for (const z of [-11, -20]) p(4, 4, 1, dwood, 0, 0, z); // charred shaft and its knots
+    p(6, 6, 3, dbrass, 0, 0, -25.5); // a brass cup for the ember
+    for (const [x, y] of [[3, 2], [-3, -2], [-2, 3], [2, -3]]) p(2, 2, 4, brass, x, y, -28); // prongs round it
+    p(6, 6, 4, ember, 0, 0, -29); p(4, 4, 3, hot, 0, 0, -32.5); p(2, 2, 2, core, 0, 0, -35); // the ember, hotter toward the tip
+    return { muzzle: [0, -37], grip: [6, 6, 18, 0, 0, 2.5], fore: null, bands: [-8, -14], band: [6, 6, 0], mag };
+  },
+  windwand({ p, mat, glow, sub, at }) {
+    const birch = mat(0xece6d8), fleck = mat(0x8a8274), silver = mat(0xb4bcc6), teal = mat(0x3ab8c8), dteal = mat(0x24808c), wind = glow(0xc8f0ff), core = glow(0xffffff);
+    p(4, 4, 12, teal, 0, 0, 2); for (const z of [-1.5, 2.5, 6.5]) p(4, 4, 1, dteal, 0, 0, z); // teal handle and its wraps
+    p(6, 6, 3, silver, 0, 0, 9.5); // pommel
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 2, wind, 0, 0, 12); // a wind charge in the pommel
+    p(6, 6, 2, silver, 0, 0, -5); // silver collar
+    p(4, 4, 18, birch, 0, 0, -15); for (const z of [-9, -14, -20]) p(4, 4, 1, fleck, 0, 0, z); // a birch shaft with dark flecks
+    p(6, 6, 2, silver, 0, 0, -25); // a silver cap
+    p(6, 6, 6, wind, 0, 0, -29); p(8, 8, 2, silver, 0, 0, -29); p(2, 2, 2, core, 0, 0, -33); // a ball of wind in a silver ring
+    for (const [x, y] of [[3, 3], [-3, -3]]) p(2, 2, 4, wind, x, y, -25); for (const [x, y] of [[-3, 3], [3, -3]]) p(2, 2, 3, core, x, y, -32.5); // wisps curling round it
+    return { muzzle: [0, -35], grip: [6, 6, 18, 0, 0, 2.5], fore: null, bands: [-8, -17], band: [6, 6, 0], mag };
+  },
+  stunwand({ p, mat, glow }) {
+    const steel = mat(0x7a808a), dsteel = mat(0x4a4e58), copper = mat(0xc87a3a), rubber = mat(0x2a2a30), zap = glow(0xffe24a), core = glow(0xffffff);
+    p(4, 4, 12, rubber, 0, 0, 2); for (const z of [-1.5, 2.5, 6.5]) p(4, 4, 1, dsteel, 0, 0, z); // a rubber grip and its rings
+    p(6, 6, 3, dsteel, 0, 0, 9.5); p(4, 4, 2, zap, 0, 0, 12); // pommel and a little battery light
+    p(6, 6, 2, copper, 0, 0, -5); // copper collar
+    p(4, 4, 18, steel, 0, 0, -15); for (const z of [-10, -13, -16, -19, -22]) p(6, 6, 1, copper, 0, 0, z); // a steel rod wound with copper coils
+    p(6, 6, 2, dsteel, 0, 0, -25); for (const x of [-2, 2]) p(2, 2, 6, dsteel, x, 0, -29); // two prongs
+    p(4, 4, 4, zap, 0, 0, -28); p(2, 4, 2, core, 0, 0, -31); // the spark that jumps between them
+    return { muzzle: [0, -33], grip: [6, 6, 18, 0, 0, 2.5], fore: null, bands: [-7.5, -24], band: [6, 6, 0] };
+  },
+  soulwand({ p, mat, glow, sub, at }) {
+    const bone = mat(0xe6e0cc), dbone = mat(0xa8a08a), wrap = mat(0x3a2a52), dwrap = mat(0x241a36), iron = mat(0x3c3c46), soul = glow(0x6fffd8), core = glow(0xe0fff6);
+    p(4, 4, 12, wrap, 0, 0, 2); for (const z of [-1.5, 2.5, 6.5]) p(4, 4, 1, dwrap, 0, 0, z); // a dark wrapped handle
+    p(6, 6, 3, iron, 0, 0, 9.5); // pommel
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 2, soul, 0, 0, 12); // a soul charge in the pommel
+    p(6, 6, 2, iron, 0, 0, -5); // iron collar
+    p(4, 4, 18, bone, 0, 0, -15); for (const z of [-9, -15, -21]) p(6, 6, 2, dbone, 0, 0, z); // a bone shaft with knuckles
+    p(6, 6, 2, iron, 0, 0, -25); for (const [x, y] of [[2, 2], [-2, 2], [2, -2], [-2, -2]]) p(2, 2, 8, iron, x, y, -30); p(6, 6, 2, iron, 0, 0, -35); // an iron cage
+    p(4, 4, 6, soul, 0, 0, -30); p(2, 2, 2, core, 0, 0, -30); // the trapped soul
+    return { muzzle: [0, -37], grip: [6, 6, 18, 0, 0, 2.5], fore: null, bands: [-12, -18], band: [6, 6, 0], holo: [0, -30], mag };
+  },
+  ancientwand({ p, mat, glow, sub, at }) {
+    const wood = mat(0x5a4030), dwood = mat(0x3a281c), lwood = mat(0x7a5a40), ruby = glow(0xff4a3a), ice = glow(0x8fe0ff), wind = glow(0xeefff6), pale = glow(0xf0ecff), core = glow(0xffffff);
+    p(4, 4, 12, dwood, 0, 0, 2); p(4, 4, 2, wood, 0, 0, -1); p(4, 4, 2, wood, 0, 0, 5); // a twisted root for a handle
+    p(6, 6, 3, dwood, 0, 0, 9.5); p(4, 4, 2, lwood, 1, 1, 10); // a knot of root for a pommel
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 2, pale, 0, 0, 12); // a pale charge in the pommel
+    p(6, 6, 2, lwood, 0, 0, -5); // a gnarl where the root meets the shaft
+    p(4, 4, 6, wood, 0, 0, -9); p(4, 4, 6, wood, 1, 0, -15); p(4, 4, 6, wood, 0, 1, -21); // a crooked old shaft
+    p(6, 6, 2, dwood, 0, 0, -12); p(6, 6, 2, dwood, 1, 0, -18); // its gnarls
+    p(4, 2, 4, ruby, 0, 3, -9); p(4, 2, 4, ice, 0, 3, -15); p(4, 2, 4, wind, 0, 3, -21); // three gems in a row: fire, ice and wind
+    p(6, 6, 2, dwood, 0, 1, -25); for (const [x, y] of [[2, 3], [-2, 3], [0, -1]]) p(2, 2, 4, lwood, x, y, -27); // old wood fingers
+    p(4, 4, 5, pale, 0, 1, -28.5); p(2, 2, 2, core, 0, 1, -32); // a pale crystal that shows the next spell
+    return { muzzle: [1, -34], grip: [6, 6, 18, 0, 0, 2.5], fore: null, bands: [-7, -24], band: [6, 6, 0], mag };
+  },
   warhammer({ p, mat, glow }) {
     const steel = mat(0x8a8e98), dsteel = mat(0x5a5e68), wood = mat(0x6a4428), wrap = mat(0x3a2414), gold = mat(0xd8a838);
     p(4, 4, 22, wood, 0, 1, 1); for (const z of [3.5, 6.5, 9.5]) p(4, 4, 1, wrap, 0, 1, z); // long handle, a wrapped grip
@@ -772,9 +857,9 @@ function buildGun() {
   if (gunHand) gunHand.visible = false;
   for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone();
   vmRl.rk = -1;
-  if (WEAPONS[cur].melee) return;
-  flashMesh.material = vmFlashMat(flashOf(WEAPONS[cur])); flashLight.color.setHex(FLASH_FX[WEAPONS[cur].id]?.light ?? 0xffcc66);
   flashMesh.position.set(0, my, mz - .015); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
+  if (WEAPONS[cur].melee) return; // still marks the tip, where the Stun Wand's blast starts
+  flashMesh.material = vmFlashMat(flashOf(WEAPONS[cur])); flashLight.color.setHex(FLASH_FX[WEAPONS[cur].id]?.light ?? 0xffcc66);
 }
 function cycle(d) { let s = slotOf(cur); do s = (s + d + CATS.length) % CATS.length; while (slotGun[s] < 0); equip(slotGun[s]); }
 function selectSlot(s) {
@@ -802,7 +887,7 @@ let reloadSnd = null;
 function reload() {
   const w = WEAPONS[cur]; if (w.melee || w.pool || reloading > 0 || ammo[cur] === w.mag || swapOff > 0) return;
   if (!reserve[cur]) { dry(); return; }
-  reloading = w.reload; reloadSnd = sfx('r_' + w.id, { rate: BASE[cur].reload / w.reload });
+  reloading = reloadFull = rlOf(w, youFx()); reloadSnd = sfx('r_' + w.id, { rate: BASE[cur].reload / reloading });
 }
 function cancelReload() { reloading = 0; stopSfx(reloadSnd); reloadSnd = null; }
 buildGun();

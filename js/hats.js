@@ -2,6 +2,8 @@
 const HATS = [
   { id: 'warrior', rar: 'rare', name: 'Warrior Helmet', unlock: 6, price: 90, dr: [.04, .06, .08], hs: [.20, .27, .33] },
   { id: 'raider', rar: 'rare', name: 'Raider Hood', unlock: 8, price: 130, half: [.05, .07, .10], stealth: [30, 22, 15] },
+  { id: 'ironclad', rar: 'epic', name: 'Ironclad Helm', unlock: 17, price: 260, dr: [.04, .06, .08], hs: [.25, .33, .4] },
+  { id: 'arcane', rar: 'epic', name: 'Arcane Hat', unlock: 20, price: 300, shrug: [.25, .35, .5] },
 ];
 const HAT_I = Object.fromEntries(HATS.map((H, i) => [H.id, i]));
 const hatOf = id => HATS[HAT_I[id]] ?? null;
@@ -10,10 +12,10 @@ const hatUse = id => { const st = hatStars(id), u = prof.hatUse?.[id] | 0; retur
 const wornHat = () => { const id = prof.hatOn; return id && hatStars(id) ? { id, st: hatUse(id) } : null; };
 // boots and hat effects combined
 function gearFx(b, h) {
-  const f = { ...bootFx(b), hs: 0, half: 0, stealth: 0 }, H = h && hatOf(h.id);
+  const f = { ...bootFx(b), hs: 0, half: 0, stealth: 0, shrug: 0 }, H = h && hatOf(h.id);
   if (!H) return f;
   const L = h.st - 1;
-  f.dr += H.dr?.[L] ?? 0; f.hs = H.hs?.[L] ?? 0; f.half = H.half?.[L] ?? 0; f.stealth = H.stealth?.[L] ?? 0;
+  f.dr += H.dr?.[L] ?? 0; f.hs = H.hs?.[L] ?? 0; f.half = H.half?.[L] ?? 0; f.stealth = H.stealth?.[L] ?? 0; f.shrug = H.shrug?.[L] ?? 0;
   return f;
 }
 const youFx = () => { const b = wornBoots(), h = wornHat(); return armorFx(gearFx(b, h), wornArmor(), b, h); };
@@ -45,6 +47,33 @@ function hatPieces(id, st) {
     B(-8, 8, 1, 15, 8, 9, TRIM); B(-6, 6, 1, 13, 8, 9, 0); // face opening
     if (st >= 2) { B(-7, 7, 0, 5, 8, 10, C); B(-7, 7, 4, 5, 8, 10, TRIM); } // scarf
     if (st >= 3) B(-1, 1, 17, 18, -9, 9, TRIM);
+  } else if (id === 'ironclad') {
+    // heavy iron helm, horns at 2 stars, gold at 3
+    const C = hex([78, 82, 92]), HI = hex([128, 134, 146]), DK = hex([44, 46, 54]);
+    const TRIM = st >= 3 ? hex([226, 178, 40]) : hex([150, 110, 60]), BONE = hex([214, 204, 176]), BONE2 = hex([160, 148, 120]);
+    B(-9, 9, 6, 19, -9, 9, C); B(-9, 9, 3, 6, -9, -6, C);
+    B(-9, 9, 18, 19, -9, 9, HI); B(-9, 9, 13, 14, -9, 9, DK);
+    head();
+    B(-6, 6, 6, 11, 8, 9, 0); // face opening
+    B(-8, 8, 11, 14, 8, 10, HI); B(-8, 8, 11, 12, 9, 10, TRIM); // brow
+    for (const sx of [-1, 1]) {
+      const X = (a, c) => sx > 0 ? [a, c] : [-c, -a];
+      B(...X(8, 10), 3, 10, 0, 10, DK); B(...X(6, 10), 3, 9, 8, 10, DK); B(...X(4, 10), 3, 6, 8, 10, DK); // cheek guards
+      if (st >= 2) { // horns
+        B(...X(9, 13), 12, 16, -2, 2, BONE2); B(...X(10, 14), 16, 20, -2, 2, BONE);
+        B(...X(11, 14), 20, 23, -1, 2, st >= 3 ? hex([240, 196, 64]) : BONE);
+      }
+    }
+    B(-2, 2, 3, 12, 8, 10, DK); // nose guard
+    if (st >= 3) B(-2, 2, 19, 20, -7, 7, TRIM);
+  } else if (id === 'arcane') {
+    // a wizard hat with a tip that leans back, a gold clasp at 2 stars, a gold band at 3
+    const C = hex([44, 52, 120]), DK = hex([26, 30, 76]), BAND = st >= 3 ? hex([255, 214, 90]) : hex([96, 40, 128]);
+    B(-12, 12, 12, 14, -12, 12, C); B(-12, 12, 12, 13, -12, 12, DK); // brim, darker underneath
+    B(-9, 9, 12, 19, -9, 9, C); B(-9, 9, 14, 16, -9, 9, BAND); // band
+    head();
+    B(-7, 7, 19, 23, -7, 7, C); B(-5, 5, 23, 26, -6, 4, C); B(-4, 4, 26, 29, -7, 1, C); B(-3, 3, 27, 30, -10, -4, C); // the tip leans back
+    if (st >= 2) { B(-2, 2, 14, 16, 8, 9, hex([196, 150, 60])); B(-1, 1, 14, 16, 8, 9, DK); } // a gold clasp on the band
   } else {
     // steel helmet, ridge at 2 stars, gold at 3
     const C = hex([150, 156, 166]), HI = hex([204, 210, 220]), DK = hex([90, 96, 108]);

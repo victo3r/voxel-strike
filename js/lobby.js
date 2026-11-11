@@ -226,7 +226,11 @@ function heroShot() {
   if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
   hf.cd = w.rate; if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
   hf.kick = w.beam ? 0 : w.flame ? .06 : 1; // a beam can't kick: its far end would jump
-  if (w.melee) { sfx(w.swing || 'swing', { v: .7 * hv() }); return; }
+  if (w.melee) {
+    sfx(w.swing || 'swing', { v: .7 * hv() });
+    if (w.wand) { hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq); stunZap(_hm.clone(), _hm.clone().addScaledVector(_hd, w.range), lobbyScene, .7); }
+    return;
+  }
   hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
   if (w.flame) {
     flameHeld = .12;
@@ -246,6 +250,7 @@ function heroShot() {
   muzzleBits(w, hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
   if (w.lance) { showLance(_hm.clone(), { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, w.lance, .6, lobbyScene, hf.flashM); return; }
+  if (w.wand) { hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
@@ -272,7 +277,8 @@ function heroTick(dt) {
   if (hf.spin) { hf.spin.rotation.z += hf.spinV * dt; hf.spinV = Math.max(0, hf.spinV - dt * 25); }
   if (hf.round) hf.round.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .4);
   if (w.flare && hf.mag) hf.mag.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .6);
-  if (w.wand) hf.wf = Math.max(0, Math.min(1, hf.wf + dt * (hf.held && can ? 14 : -4)));
+  hf.wt = (hf.wt || 0) - dt;
+  if (w.wand) hf.wf = Math.max(0, Math.min(1, hf.wf + dt * (hf.held && can || hf.wt > 0 ? 14 : -4)));
   if (hf.beamM) {
     hf.beamOn -= dt; hf.beamM.visible = hf.held && hf.beamOn > 0;
     if (hf.beamM.visible) { hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);

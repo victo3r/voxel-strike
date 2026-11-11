@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 2; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 3; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -230,6 +230,8 @@ net = (() => {
       case 'host': return setHost(m.pid);
       case 'fill': return fill(m.n | 0);
       case 'chat': if (chatHidden(cleanName(m.name))) return; return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80));
+      case 'heal': return healed(m);
+      case 'shrug': if (m.pid === pid && alive) { toast('SHOOK IT OFF', '#c8b0ff'); sfx('shrug'); } return; // the Arcane Hat shook off a burn
       case 'over': return over(m);
       case 'kick': return;
       case 'probe': return;
@@ -385,7 +387,7 @@ net = (() => {
       P.hp = m.hp; P.armor = m.armor;
       if (!alive) return;
       youHitFx(!!m.head, armorOnly);
-      if (slows(BASE[gi(m.gun)])) shockHit(P, BASE[gi(m.gun)]);
+      wandFx(P, m);
       if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false, BASE[gi(m.gun)]?.launch); // someone else's blast throws you
       return;
     }
@@ -393,7 +395,7 @@ net = (() => {
     r.rec.alive = true;
     const b = r.body; if (!b) return;
     b.hp = Math.max(m.hp, b.dead ? 0 : .01); b.armor = m.armor;
-    if (slows(BASE[gi(m.gun)])) shockHit(b, BASE[gi(m.gun)]); // host bots run slower
+    wandFx(b, m); // host bots run slower, stars show on anyone stunned
     if (m.launch && !m.launch[4] && r.rec.hostBot && !b.dead) launch(b, b.g.position.clone().setY(b.g.position.y + 1), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false, BASE[gi(m.gun)]?.launch); // a blast or a hammer throws my bot
     if (r.rec.hostBot && m.by && m.by !== m.v) { // my bot remembers who's hurting it
       const who = m.by === pid ? YOU_T : bodyOf(m.by);
@@ -401,6 +403,24 @@ net = (() => {
     }
     if (m.by === pid) return; // your own hits already showed
     hitFx(b, pt ? pt.clone() : b.g.position.clone().setY(b.g.position.y + 1.1), !!m.head, m.kind === 'burn');
+  }
+  // slows, the Ancient Wand's ice and the Stun Wand's stun land on whoever the server says got hit (long: the Arcane set)
+  function wandFx(o, m) {
+    const W = BASE[gi(m.gun)], k = 1 + (+m.long || 0);
+    if (slows(W) || m.el === 1) shockHit(o, m.el === 1 ? FROST : W, k);
+    if (m.stun > 0) stunHit(o, Math.min(3, m.stun * k));
+  }
+  // the Soul Wand: a kill gave someone health back
+  function healed(m) {
+    const from = Array.isArray(m.p) ? new THREE.Vector3(...m.p) : null;
+    if (m.pid === pid) {
+      if (!alive) return;
+      const gain = Math.round(m.hp - P.hp); P.hp = m.hp;
+      if (gain > 0) { toast('+' + gain + ' HP', '#6fffd8'); sfx('soulHeal'); if (from) soulFly(from, null); }
+      return;
+    }
+    const b = remotes.get(m.pid)?.body; if (!b || b.dead) return;
+    b.hp = m.hp; if (from) soulFly(from, b.g.position.clone().setY(b.g.position.y + 1.2));
   }
   function died(m) {
     const killer = m.by && m.by !== m.v ? recOf(m.by) : null, victim = recOf(m.v);
@@ -509,11 +529,18 @@ net = (() => {
   const botEye = new THREE.Vector3();
   function remoteFire(m) {
     const i = gi(m.g); if (i === undefined || !m.o || !m.d) return;
-    const w = WEAPONS[i], by = bodyOf(m.pid), from = new THREE.Vector3(...m.o), dir = new THREE.Vector3(...m.d).normalize();
-    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : null)?.(w, from, dir, by, { ghost: true, id: m.pid * 100000 + m.id });
+    const w = WEAPONS[i], by = bodyOf(m.pid), from = new THREE.Vector3(...m.o), dir = new THREE.Vector3(...m.d).normalize(), id = m.pid * 100000 + m.id;
+    if (w.spell) { // their spell flies until the server says where it went off
+      const el = [0, 1, 2].includes(m.el) ? m.el : 0, tip = by?.flashM ? by.flashM.getWorldPosition(new THREE.Vector3()) : from;
+      const b = wandBolt('spell' + el, tip, from.clone().addScaledVector(dir, SPELL_FAR)); b.ghost = id; b.el = el;
+      return;
+    }
+    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : null)?.(w, from, dir, by, { ghost: true, id });
   }
   function remoteBoom(m) {
     const id = m.pid * 100000 + m.id, p = new THREE.Vector3(...m.p);
+    const sb = bolts.findIndex(b => b.ghost === id);
+    if (sb >= 0) { const b = bolts[sb]; b.ms.forEach(x => b.sc.remove(x)); bolts.splice(sb, 1); spellFx(p, b.el); return; }
     let kind = 'rocket', gust = false;
     for (const list of [rockets, flares, grenades]) {
       const k = list.findIndex(x => x.ghost && x.id === id);
@@ -573,17 +600,29 @@ net = (() => {
     if (cur.gun !== BASE[z.gun].id) { const i = gi(cur.gun); if (i !== undefined) { z.gun = i; z.ammo = 1; holdGun(z); sfx('equip', { at: pos, far: 15, v: .7 }); } }
     const W = BASE[z.gun];
     // their reload animation and sound
-    const rlT = z.rec.W?.[z.gun]?.reload ?? W.reload;
+    const rlT = rlOf(z.rec.W?.[z.gun] ?? W, z.rec.fx);
     if (r.q & 2) { if (!W.inf) sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); z.rlLeft = W.inf || W.melee ? 0 : rlT; }
     if (!r.reloadWas) z.rlLeft = 0;
     if (z.rlLeft > 0) z.rlLeft = Math.max(0, z.rlLeft - dt);
-    holdReload(z, z.rlLeft, rlT); wandHold(z, dt);
+    holdReload(z, z.rlLeft, rlT); wandHold(z, dt); z.wandT = (z.wandT || 0) - dt;
+    stunTick(z, dt, grounded); // just for the stars, they move themselves
     if (r.q & 64) { sfx('djump', { at: pos, far: 20, v: .7 }); burst(fv.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     r.q = 0;
     if (r.fired) {
       const n = Math.min(r.fired, 3); r.fired = 0;
-      if (W.melee) { sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING; }
+      if (W.melee) {
+        sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING;
+        if (W.wand && z.flashM) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); stunZap(z.flashM.getWorldPosition(fv).clone(), zapEnd(W, eyeV, dirV, z)); } // their stun blast, just for show
+      }
       else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (z.flashM) muzzleBits(W, z.flashM); }
+      if (W.wand && !W.melee && !W.beam) { // a wand flicks and throws a bolt (a spell comes in its own message)
+        z.wandT = .15;
+        if (!W.spell && z.flashM) { // where it lands, just for show: the first wall or body, you included
+          eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV);
+          const L = lanceLine(eyeV, dirV, W, targetsFor(z)), yd = rayHitsYou(lanceRay.ray, eyeV.distanceTo(L.end));
+          wandBolt(W.wand, z.flashM.getWorldPosition(fv).clone(), yd < Infinity ? youHitP.clone() : L.end);
+        }
+      }
       if (W.lance) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); showLance(z.flashM.getWorldPosition(fv).clone(), lanceLine(eyeV, dirV, W, [ground, ...crateMeshes]), W.lance, 1, scene, z.flashM); } // their beam, just for show
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0;
@@ -612,7 +651,7 @@ net = (() => {
     }
     if (z.fireOn > 0 && (z.fireOn -= dt) <= 0) sfx(z.fireEnd, { at: pos, far: 50 });
     z.flash -= dt;
-    const e = z.flash > 0 ? 0x880000 : r.burn ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : 0;
+    const e = z.flash > 0 ? 0x880000 : r.burn ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : z.stunT > 0 ? (Math.sin(performance.now() * .04) > 0 ? 0x5a5000 : 0x1a1800) : 0;
     z.mats.forEach(m => m.emissive.setHex(e));
   }
 
@@ -665,11 +704,12 @@ net = (() => {
     const c = [vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(seen), o.pj | 0, o.thru | 0]; // thru: how a lance got there
     c.s = shotN; list.push(c);
   }
-  const burn = (victim, gunId, by) => claim(victim, { kind: 7, gun: gunId, pellets: 1, by });
-  function launchP(gunId, from, dir, by) {
+  const burn = (victim, gunId, by, pj) => claim(victim, { kind: 7, gun: gunId, pellets: 1, by, pj });
+  function launchP(gunId, from, dir, by, el) {
     if (!api.on) return 0;
     const h = hostedOf(by); if (by && !h) return 0;
     const id = ++pjSeq, m = { t: 'fire', id, g: gunId, o: [r2(from.x), r2(from.y), r2(from.z)], d: [r3(dir.x), r3(dir.y), r3(dir.z)] };
+    if (el !== undefined) m.el = el; // the Ancient Wand's spell
     if (h) m.by = by.pid;
     send(m);
     return id;

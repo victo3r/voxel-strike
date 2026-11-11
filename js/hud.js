@@ -71,6 +71,12 @@ const CROSSES = {
   rubypierce: () => [...xDot(), ...xLines(6, 6), ...xTicks(9, 11)],
   paragon: () => [...xDot(), ...xLines(10, 6, 2, 'lrd')],
   crossbow: () => [...xDot(), ...xLines(7, 4, 2, 'lrd')],
+  // wands: rings for the spells
+  flamewand: () => [...xDot(), ...xLines(4, 5), ...xArcs(11, DIAG, 34)],
+  windwand: () => [...xDot(), ...xArcs(8, DIAG, 50)],
+  stunwand: () => [...xDot(), ...xLines(5, 5), ...xTicks(8, 10)],
+  soulwand: () => [...xDot(), ...xLines(8, 5, 2, 'lrd'), ...xArcs(5, [270], 70)],
+  ancientwand: () => [...xDot(), ...xArcs(12, [0, 90, 180, 270], 30), ...xTicks(6, 8)],
 };
 const crossFor = w => (CROSSES[w.id] ?? (w.hold === 'pistol' || w.melee ? CROSSES.voxel : CROSSES.ar))();
 // shooting kicks the crosshair out, then it settles back

@@ -66,8 +66,11 @@ function gunAttrs(w) {
   if (w.wand) a.push('WAND');
   if (slows(w)) a.push('SLOW');
   if (w.knock) a.push('KNOCKBACK');
+  if (w.stun) a.push('STUN');
+  if (w.soul) a.push('HEALS ON KILL');
   if (w.rocket) a.push(...w.gust ? ['WIND BLAST', 'BIG LAUNCH'] : ['ROCKET', 'EXPLOSIVE']);
-  if (w.flame || w.flare || w.burn) a.push('FIRE');
+  if (w.spell) a.push('FIRE ICE OR WIND', 'EXPLOSIVE', 'NO SELF DAMAGE');
+  else if (w.flame || w.flare || w.burn) a.push('FIRE');
   if (w.jump) a.push('JUMP BOOST');
   if (w.starFx) a.push('STARS');
   if (w.flare) a.push('SPLASH');
@@ -103,13 +106,18 @@ const DESC = {
   aerial: 'A cannon full of wind that blows foes away and throws you sky high',
   rubypierce: 'One red beam from a glowing ruby core, through walls and anyone behind them',
   paragon: 'Line them up and one blue beam goes through the lot, walls included',
+  windwand: 'A pale wand that throws gusts of wind and blows foes back a step',
+  stunwand: 'A crackling wand that zaps foes back and leaves them stuck in place',
+  flamewand: 'A wand with an ember tip that throws fireballs and leaves foes burning',
+  soulwand: 'A ghostly wand that takes a little life back from every foe it finishes',
+  ancientwand: 'An old twisted wand that casts fire, ice or wind and never knows which',
 };
 // extra stats for the details view
 function gunSpecs(i) {
   const w = BASE[i], out = [], rl = +statsAt(i, Math.max(0, gunUse(i) - 1)).reload.toFixed(1);
   if (!w.melee && w.start) out.push(['RELOAD', rl + 's']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
-  if (w.rocket || w.grenade) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
+  if (w.rocket || w.grenade || w.spell) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
   if (w.grenade) out.push(['FUSE', GREN_FUSE + 's']);
   if (w.launch) out.push(['ROCKET JUMP', `${Math.round((w.launch - 1) * 100)}% STRONGER`]);
   if (w.headMul) out.push(['HEADSHOT', 'X' + w.headMul]);
@@ -118,14 +126,18 @@ function gunSpecs(i) {
   if (w.flare) out.push(['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
   if (slows(w)) out.push(['SLOW', `${Math.round((1 - (w.frost ? FROST_K : SLOW_K)) * 100)}% FOR ${SLOW_T}s`]);
-  if (w.knock) out.push(['KNOCKBACK', 'BIG']);
+  if (w.knock) out.push(['KNOCKBACK', w.knock >= 1.2 ? 'BIG' : w.knock >= .75 ? 'MEDIUM' : 'SMALL']);
+  if (w.stun) out.push(['STUN', w.stun + 's']);
+  if (w.soul) out.push(['HEAL ON KILL', w.soul + ' HP']);
   if (w.pierce) out.push(['PIERCE', `-${Math.round((1 - PIERCE_FALL) * 100)}% A BODY`]);
   if (w.wallBreak) out.push(['THROUGH WALLS', `${Math.round(WALL_MUL * 100)}% DAMAGE`]);
-  if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
+  if (w.chest) out.push(['FOUND IN', 'GOLDEN CHESTS']);
+  else if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }
 const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
 const isLocked = i => !hasGun(i) && prof.lv < (BASE[i].unlock ?? 0);
+const chestOnly = i => BASE[i].chest && !hasGun(i); // not for sale, only in golden chests
 const starTxt = i => BASE[i].start ? '' : starRow(gunUse(i), gunStars(i), 3);
 // star picker under your character
 const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>${ico('left')}</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>${ico('right')}</button></div>`;
@@ -149,8 +161,8 @@ function renderArmory() {
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
   else $('armList').innerHTML = catList().map(i => {
-    const w = BASE[i], tag = isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
-    return `<div class="card rr${isLocked(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
+    const w = BASE[i], tag = chestOnly(i) ? `${ico('lock')} GOLDEN CHEST` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
+    return `<div class="card rr${isLocked(i) || chestOnly(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${gunPic(i)}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
   }).join('');
@@ -165,7 +177,8 @@ function renderAct() {
   if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
   let btns;
-  if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
+  if (chestOnly(i)) btns = `<button disabled>${ico('lock')} FOUND IN GOLDEN CHESTS</button>`;
+  else if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
   else if (!hasGun(i)) btns = `<button data-buy="${i}" ${prof.coins < w.price ? 'disabled' : ''}>BUY ${COIN}${w.price}</button>`;
   else {
     btns = i === eq ? '<button class="eq" disabled>EQUIPPED</button>' : `<button data-eq="${i}">EQUIP</button>`;
@@ -258,8 +271,11 @@ function wearStar(s, on = false) {
 const SUIT_ABOUT = {
   warrior: 'Thick steel plate for brawlers, slow and heavy but tough to get through',
   raider: 'A light cloak for runners, thinner than plate but quick on its feet',
+  ironclad: 'Heavy iron plate that nothing can push around',
+  arcane: 'Starry robes for wand users, light on armor but full of magic',
 };
-const SET_TXT = { warrior: '+5% DMG, +5% DMG CUT', raider: 'TRIPLE JUMP, +8% SPEED' };
+const SET_TXT = { warrior: '+5% DMG, +5% DMG CUT', raider: 'TRIPLE JUMP, +8% SPEED', ironclad: '+5% DMG CUT, NO KNOCKBACK, NO SLOWS OR STUNS',
+  arcane: '+10% WAND DMG, WAND EFFECTS LAST 50% LONGER' };
 const shownSuit = () => armPage === 'wear' && wearCat === 'armor' ? suitSel || (!armorCard && wornSuit()?.id) || '' : '';
 const suitShown = id => Math.max(1, suitUse(id));
 const suitStarTxt = id => starRow(suitUse(id), suitStars(id), SUIT_ST);
@@ -363,6 +379,8 @@ const GEAR = {
     about: {
       warrior: 'Steel greaves for brawlers, so you hit harder and take a little less',
       raider: 'Winged runners that make you faster and let you jump again in midair',
+      ironclad: 'Iron boots so heavy that blasts and hammers barely move you',
+      arcane: 'Soft midnight boots that keep you quick and your wands charged',
     } },
   hats: { list: HATS, I: HAT_I, own: 'hats', use: 'hatUse', on: 'hatOn', stars: hatStars, using: hatUse, worn: wornHat,
     pic: hatPic, model: hatModel, face: .5, put: h => heroHat(h),
@@ -370,6 +388,8 @@ const GEAR = {
     about: {
       warrior: 'A steel helmet that takes the edge off hits and sometimes turns a headshot into a body shot',
       raider: 'A dark hood that sometimes halves a hit and hides your red outline from anyone outside its stealth range',
+      ironclad: 'A horned iron helm that shrugs off hits and headshots',
+      arcane: 'A pointy wizard hat that sometimes lets you shake off fire, ice and stuns',
     } },
 };
 const wearGear = () => { for (const k in GEAR) GEAR[k].put(GEAR[k].worn()); };
@@ -378,13 +398,13 @@ const pct = v => Math.round(v * 100) + '%';
 // gear stats as [label, value]
 const plusPct = v => '+' + pct(v);
 const GEAR_STATS = [['spd', 'SPEED', plusPct], ['dmg', 'DAMAGE', plusPct], ['dr', 'DAMAGE CUT', pct], ['hs', 'HEADSHOT BLOCK', pct],
-  ['half', 'HALF DAMAGE', pct], ['stealth', 'STEALTH', v => v + 'M']];
+  ['half', 'HALF DAMAGE', pct], ['stealth', 'STEALTH', v => v + 'M'], ['rl', 'FASTER RELOAD', plusPct], ['heavy', 'KNOCKBACK CUT', pct], ['shrug', 'SHAKE OFF', pct]];
 function gearLines(B, st) {
   const o = GEAR_STATS.filter(([f]) => B[f]).map(([f, k, fmt]) => [k, fmt(B[f][st - 1])]);
   if (B.dj) o.push(['JUMPS', '2']);
   return o;
 }
-const GEAR_SHORT = { 'DAMAGE CUT': 'DMG CUT', DAMAGE: 'DMG', 'HEADSHOT BLOCK': 'HS BLOCK', 'HALF DAMAGE': 'HALF DMG' };
+const GEAR_SHORT = { 'DAMAGE CUT': 'DMG CUT', DAMAGE: 'DMG', 'HEADSHOT BLOCK': 'HS BLOCK', 'HALF DAMAGE': 'HALF DMG', 'FASTER RELOAD': 'RELOAD', 'KNOCKBACK CUT': 'KB CUT' };
 const gearList = G => G.list.map((B, i) => i).sort((a, b) => G.list[a].unlock - G.list[b].unlock);
 const gearLocked = (G, B) => !G.stars(B.id) && prof.lv < B.unlock;
 const gearUpg = (G, B) => Math.round(B.price * UPG[G.stars(B.id) - 1]);
@@ -569,7 +589,7 @@ function armClick(e) {
   else if (b.dataset.c) { armCat = b.dataset.c; armDet = false; sfx('ui'); }
   else if (b.id === 'detBack') { armDet = false; sfx('ui'); }
   else if (b.dataset.buy) {
-    const i = +b.dataset.buy, w = BASE[i]; if (prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
+    const i = +b.dataset.buy, w = BASE[i]; if (w.chest || prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
     prof.coins -= w.price; prof.guns[w.id] = 1; prof.loadout[w.cat] = w.id; saveProf(); showProf();
     armSync(i, 'buy'); sfx('buy');
   } else if (b.dataset.up) {

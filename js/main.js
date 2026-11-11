@@ -78,7 +78,8 @@ function update(dt) {
   if (down) aimOn = false;
   if (!down) {
   aaTarget(); // aim assist target
-  const mx = held('right') - held('left') + tStick.x, mz = held('back') - held('fwd') + tStick.y;
+  const stunned = stunTick(P, dt, P.onGround); // stunned: you can look and shoot but not move
+  const mx = stunned ? 0 : held('right') - held('left') + tStick.x, mz = stunned ? 0 : held('back') - held('fwd') + tStick.y;
   const lx = held('lookR') - held('lookL'), ly = held('lookU') - held('lookD');
   if (lx || ly) {
     const ls = 2.4 * sens.keys * dt * camera.fov / fovBase;
@@ -104,7 +105,7 @@ function update(dt) {
     if (Math.abs(P.kx) + Math.abs(P.kz) < .2) P.kx = P.kz = 0;
   }
   launchMove(P, P.pos, .35, P.onGround, dt); // rocket blast push
-  const jumpKey = held('jump');
+  const jumpKey = !stunned && held('jump');
   const jumpV = 9 * Math.sqrt(Math.max(.2, 1 + jumpOf(cur) + youFx().jump)); // height grows with v squared
   if (jumpKey && P.onGround) { P.vy = jumpV; P.onGround = false; net.ev('jump'); }
   else if (jumpKey && !jumpWas && !P.onGround && (P.dj | 0) < youFx().air) { // Raider Boots jump again in the air, twice with the full set
@@ -138,9 +139,9 @@ function update(dt) {
   tickCross(dt, BASE[cur]);
   if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // barrels wind down
   if ((flashT -= dt) <= 0) { flashMesh.visible = false; flashLight.intensity = 0; }
-  if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / w.reload < .6); // flare leaves the muzzle when fired
+  if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / reloadFull < .6); // flare leaves the muzzle when fired
   if (gunRound) { // rocket leaves the tube when fired
-    const k = reloading > 0 ? reloading / w.reload : 0;
+    const k = reloading > 0 ? reloading / reloadFull : 0;
     gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
     gunRound.position.z = reloading > 0 ? k / .4 * 10 * GPX : 0;
   }
@@ -184,7 +185,7 @@ function update(dt) {
     if (vw.wand) vm.rotation.x += WAND_UP * (1 - wandK) * (1 - adsT); // a wand rests tipped up, points straight while it fires
   }
   // reload animation
-  const ra = reloading > 0 && gunShown === cur ? reloadPose(w.id, 1 - reloading / w.reload) : null;
+  const ra = reloading > 0 && gunShown === cur ? reloadPose(w.id, 1 - reloading / reloadFull) : null;
   if (ra) { vm.position.x += ra.x; vm.position.y += ra.y; vm.position.z += ra.z; vm.rotation.x += ra.rx; vm.rotation.y += ra.ry; vm.rotation.z += ra.rz; }
   if (gunMag) { const r = gunMag.userData.rest; gunMag.position.set(r.x + (ra ? ra.mx : 0), r.y + (ra ? ra.my : 0), r.z + (ra ? ra.mz : 0)); }
   if (gunArmL) { const r = gunArmL.userData.rest; gunArmL.position.set(r.x, r.y + (ra ? ra.ay : 0), r.z + (ra ? ra.az : 0)); }
@@ -192,13 +193,13 @@ function update(dt) {
     const r = gunHand.userData.rest, hd = ra ? ra.hand : 0; gunHand.visible = hd > .01;
     if (ra) gunHand.position.set(r.x + ra.mx, r.y + ra.my - (1 - hd) * .35, r.z + ra.mz);
   }
-  reloadSwap(vmRl, w.id, ra ? 1 - reloading / w.reload : -1, gunMag, scene); // mag swap
-  if (ra && w.id === 'eradicator' && reloading / w.reload < .12) gunSpinV = Math.max(gunSpinV, 16);
+  reloadSwap(vmRl, w.id, ra ? 1 - reloading / reloadFull : -1, gunMag, scene); // mag swap
+  if (ra && w.id === 'eradicator' && reloading / reloadFull < .12) gunSpinV = Math.max(gunSpinV, 16);
   // weapon swap
   if (sw > 0) { const e = sw * sw * (3 - 2 * sw); vm.position.y -= e * .5; vm.rotation.x -= e * .9; }
   // reload ring
   const rl = $('rl');
-  if (reloading > 0) { rl.style.display = 'block'; $('rlFg').style.strokeDashoffset = RL_C * reloading / w.reload; } else if (rl.style.display !== 'none') rl.style.display = 'none';
+  if (reloading > 0) { rl.style.display = 'block'; $('rlFg').style.strokeDashoffset = RL_C * reloading / reloadFull; } else if (rl.style.display !== 'none') rl.style.display = 'none';
   }
 
   if (pvp()) { updateDM(dt); if (matchOver) return; }
@@ -255,9 +256,10 @@ function update(dt) {
     const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = P.pos.y - z.g.position.y;
     const way = MAP.nav?.(z.g.position, P.pos); // head for the stairs
     const wx = way ? way.x - z.g.position.x : dx, wz = way ? way.z - z.g.position.z : dz, wd = Math.hypot(wx, wz) || .001;
-    z.g.rotation.y = Math.atan2(wx, wz);
+    const zapped = stunTick(z, dt, !z.vy); // a stun wand froze it
+    if (!zapped) z.g.rotation.y = Math.atan2(wx, wz);
     // exploders swell and blink, then blow up
-    if (z.type === 'exploder' && z.fuse <= 0 && dist < 1.8 && Math.abs(dy) < 2.5) { z.fuse = FUSE; z.beepT = 0; }
+    if (z.type === 'exploder' && !zapped && z.fuse <= 0 && dist < 1.8 && Math.abs(dy) < 2.5) { z.fuse = FUSE; z.beepT = 0; }
     if (z.fuse > 0) {
       z.fuse -= dt;
       z.g.scale.setScalar(z.scale * (1 + (FUSE - z.fuse) * .6));
@@ -271,7 +273,8 @@ function update(dt) {
     if (z.slowT > 0) z.slowT -= dt;
     let spd = z.speed * slowMul(z), hold = false;
     z.glow = 0;
-    if (z.type === 'boss') {
+    if (zapped) { hold = true; z.glow = Math.sin(performance.now() * .04) > 0 ? 0x5a5000 : 0x1a1800; }
+    else if (z.type === 'boss') {
       if (z.stun > 0) {
         z.stun -= dt; hold = true;
         z.glow = Math.sin(z.stun * 25) > 0 ? 0x555500 : 0;
@@ -308,7 +311,7 @@ function update(dt) {
       }
     }
     // spitters keep away and lob acid
-    if (z.spit) {
+    if (z.spit && !zapped) {
       if (z.windS > 0) { // winding up a spit
         z.windS -= dt; hold = true; z.glow = Math.sin(z.windS * 40) > 0 ? 0x335500 : 0x112200;
         if (z.windS <= 0) { spit(z); z.spitT = z.hive ? 2.4 : 2.8 + Math.random(); }
@@ -438,7 +441,7 @@ function fpsTick(raw) {
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // dropped mags
-  starTick(dt);
+  starTick(dt); boltTick(dt);
   if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pause in the menu, matches don't

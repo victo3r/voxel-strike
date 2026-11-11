@@ -25,6 +25,10 @@ const SUITS = [
     unlock: [7, 14, 22, 32, 50], price: [150, 220, 340, 520, 800], c: [150, 156, 166], hi: [204, 210, 220], dk: [90, 96, 108] },
   { id: 'raider', rar: 'rare', name: 'Raider Cloak', mob: 3, jump: 3, hp: [60, 70, 85, 100, 100], dr: [0, 0, 0, 0, .06],
     unlock: [9, 16, 24, 34, 50], price: [170, 240, 360, 540, 800], c: [56, 62, 78], hi: [92, 102, 124], dk: [34, 38, 50], bar: [[110, 232, 220], [34, 200, 186], [16, 128, 120]] },
+  { id: 'ironclad', rar: 'epic', name: 'Ironclad Plate', mob: 0, jump: 0, hp: [100, 100, 100, 100, 100], dr: [.04, .09, .13, .17, .21],
+    unlock: [15, 21, 29, 39, 50], price: [320, 420, 580, 780, 1000], c: [78, 82, 92], hi: [128, 134, 146], dk: [44, 46, 54] },
+  { id: 'arcane', rar: 'epic', name: 'Arcane Robes', mob: 2, jump: 3, hp: [60, 70, 85, 100, 100], dr: [0, 0, 0, .04, .08],
+    unlock: [18, 23, 30, 40, 50], price: [340, 440, 600, 800, 1000], c: [44, 52, 120], hi: [82, 96, 176], dk: [26, 30, 76], bar: [[170, 150, 255], [110, 96, 220], [56, 48, 140]] },
 ];
 for (const S of SUITS) for (let k = 0; k < SUIT_ST; k++) ARMOR_TIERS.push({ id: S.id + (k + 1), suit: S.id, st: k + 1, rar: S.rar, name: S.name,
   hp: S.hp[k], dr: S.dr[k], mob: S.mob, jump: S.jump, unlock: S.unlock[k], price: S.price[k], c: S.c, hi: S.hi, dk: S.dk, bar: S.bar });
@@ -34,11 +38,11 @@ const armorOf = n => ARMOR_TIERS[n - 1] ?? null;
 const LEVEL_NAMES = ['VERY LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY HIGH'];
 const MOB_FX = [-.12, -.06, 0, .06, .12], JUMP_FX = [-.16, -.08, 0, .1, .2];
 // full set bonuses: boots, hat and armor of one set
-const SET_FX = { warrior: { dmg: .05, dr: .05 }, raider: { spd: .08, air: 1 } };
+const SET_FX = { warrior: { dmg: .05, dr: .05 }, raider: { spd: .08, air: 1 }, ironclad: { dr: .05, steady: true }, arcane: { wand: .1, long: .5 } };
 function armorFx(f, n, b, h) {
   const T = armorOf(n), set = T?.suit && b?.id === T.suit && h?.id === T.suit ? T.suit : '', S = SET_FX[set] ?? {};
   return { ...f, spd: f.spd + MOB_FX[T?.mob ?? 2] + (S.spd ?? 0), dmg: f.dmg + (S.dmg ?? 0), dr: f.dr + (S.dr ?? 0),
-    jump: JUMP_FX[T?.jump ?? 2], air: (f.dj ? 1 : 0) + (S.air ?? 0), set };
+    jump: JUMP_FX[T?.jump ?? 2], air: (f.dj ? 1 : 0) + (S.air ?? 0), set, steady: !!S.steady, wand: S.wand ?? 0, long: S.long ?? 0 };
 }
 const ARMOR_ITEM = 'Basic Armor';
 const armorTitle = T => T.suit ? T.name : T.name + ' Armor';
@@ -167,10 +171,32 @@ function suitPieces(T, team) {
   const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a)), st = T.st;
   const M = (x0, x1, y0, y1, z0, z1, m) => { B(x0, x1, y0, y1, z0, z1, m); B(-x1, -x0, y0, y1, z0, z1, m); };
   const C = hex(T.c), HI = hex(T.hi), DK = hex(T.dk), GOLD = hex([240, 196, 64]), LEATHER = hex([92, 60, 34]);
-  const warrior = T.suit === 'warrior', zf = warrior ? 7 : 6, yb = warrior ? -5 : -12;
+  const warrior = T.suit === 'warrior', iron = T.suit === 'ironclad', arc = T.suit === 'arcane', plate = warrior || iron;
+  const zf = iron ? 8 : warrior ? 7 : 6, yb = iron ? -7 : warrior ? -5 : -12;
   const FB = (x0, x1, y0, y1, m, d = 0) => { B(x0, x1, y0, y1, 4, zf + d, m); B(x0, x1, y0, y1, -zf - d, -4, m); };
-  FB(-8, 8, yb, 13, C); if (warrior) FB(-8, 8, yb, yb + 1, DK); M(5, 8, 12, 13, -4, 4, C);
-  if (warrior) { // thick steel plate with a red stripe, gold at 5 stars
+  const P = (x0, x1, y0, y1, m) => { B(x0, x1, y0, y1, zf - 1, zf, m); B(x0, x1, y0, y1, -zf, -zf + 1, m); }; // painted on, front and back
+  FB(-8, 8, yb, 13, C); if (plate) FB(-8, 8, yb, yb + 1, DK); M(5, 8, 12, 13, -4, 4, C);
+  if (iron) { // thick dark iron in bands, bronze trim, gold at 5 stars
+    const TRIM = st >= 5 ? GOLD : hex([150, 110, 60]);
+    for (const y of [-2, 4]) P(-8, 8, y, y + 1, DK); // plate seams
+    M(1, 8, 6, 11, zf, zf + 1, C); M(1, 8, 10, 11, zf, zf + 1, HI); // chest plates
+    B(-1, 1, yb + 3, 11, zf - 1, zf, HI); // a line down the middle
+    FB(-8, 8, yb, yb + 3, team ? hex(team) : DK, 1); B(-3, 3, yb, yb + 3, zf + 1, zf + 2, TRIM); // belt and buckle
+    if (st >= 2) for (const [z0, z1] of [[4, zf], [-zf, -4]]) { M(1, 8, yb - 4, yb, z0, z1, C); M(1, 8, yb - 4, yb - 3, z0, z1, TRIM); } // hip plates
+    if (st >= 3) for (const y of [yb + 5, 1, 7]) M(6, 7, y, y + 1, zf - 1, zf, HI); // rivets
+    if (st >= 4) { B(-3, 3, yb + 3, 12, -zf - 2, -zf, C); B(-1, 1, yb + 3, 12, -zf - 2, -zf - 1, TRIM); } // back ridge
+    if (st >= 5) FB(-8, 8, 12, 13, GOLD);
+  } else if (arc) { // midnight robes with gold trim and stars
+    const TRIM = st >= 5 ? hex([255, 214, 90]) : hex([196, 150, 60]), SASH = team ? hex(team) : hex([96, 40, 128]);
+    M(8, 9, yb, 13, -zf, zf, C); // the sides, under the arms
+    const gem = (cx, cy, r, z, m) => { for (let k = -r; k < r; k++) { const w = r - (k < 0 ? -k - 1 : k); B(cx - w, cx + w, cy + k, cy + k + 1, z, z + 1, m); } };
+    B(-1, 1, yb, -6, zf - 1, zf, TRIM); P(-8, 8, yb, yb + 1, TRIM); // trim down the front and round the hem
+    FB(-8, 8, -6, -3, SASH, 1); M(8, 9, -6, -3, -zf - 1, zf + 1, SASH); B(-2, 2, -6, -3, zf + 1, zf + 2, TRIM); // sash and clasp
+    gem(0, 6, 3, zf - 1, TRIM); // a gold diamond on the chest
+    if (st >= 2) for (const [x, y] of [[-6, -10], [5, -9], [-5, 0], [4, 1]]) B(x, x + 1, y, y + 1, zf - 1, zf, HI); // little stars
+    if (st >= 3) { gem(0, 3, 5, -zf, TRIM); gem(0, 3, 2, -zf, C); } // a big diamond on the back
+    if (st >= 4) { B(-8, 8, 9, 13, -zf - 2, -zf, HI); M(4, 8, 10, 13, zf, zf + 1, HI); M(4, 8, 10, 11, zf, zf + 1, TRIM); } // a mantle over the shoulders
+  } else if (warrior) { // thick steel plate with a red stripe, gold at 5 stars
     const TRIM = st >= 5 ? GOLD : hex([158, 34, 40]);
     M(1, 8, 1, 9, zf, zf + 1, C); M(1, 8, 8, 9, zf, zf + 1, HI); // chest plates
     B(-1, 1, yb + 3, 9, zf, zf + 1, TRIM);
@@ -197,12 +223,22 @@ function suitPieces(T, team) {
 function suitPadPieces(T, s) {
   const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a)), st = T.st;
   const C = hex(T.c), HI = hex(T.hi), GOLD = hex([240, 196, 64]);
-  const warrior = T.suit === 'warrior', TRIM = st >= 5 ? GOLD : warrior ? hex([158, 34, 40]) : hex([34, 200, 186]);
-  const x1 = warrior ? 18 : 17, zp = warrior ? 6 : 5, ylo = warrior ? 5 : -6, y1 = warrior ? 16 : 15;
+  const warrior = T.suit === 'warrior', iron = T.suit === 'ironclad', arc = T.suit === 'arcane';
+  const TRIM = st >= 5 ? (arc ? hex([255, 214, 90]) : GOLD) : warrior ? hex([158, 34, 40]) : iron ? hex([150, 110, 60]) : arc ? hex([196, 150, 60]) : hex([34, 200, 186]);
+  const x1 = iron ? 19 : warrior ? 18 : 17, zp = iron ? 7 : warrior ? 6 : 5, ylo = iron ? 3 : warrior ? 5 : arc ? -8 : -6, y1 = iron ? 17 : warrior ? 16 : 15;
   const ring = (y0, y1, m) => { B(8, x1, y0, y1, 4, zp, m); B(8, x1, y0, y1, -zp, -4, m); B(16, x1, y0, y1, -zp, zp, m); };
   B(8, x1, 12, y1, -zp, zp, C); B(8, x1, y1 - 1, y1, -zp, zp, HI);
   ring(ylo, 12, C); ring(ylo, ylo + 1, TRIM);
-  if (warrior) {
+  if (iron) { // big rounded plates, three deep
+    ring(7, 8, hex(T.dk)); ring(10, 11, HI);
+    if (st >= 3) { B(10, x1 - 1, y1, y1 + 2, -5, 5, C); B(10, x1 - 1, y1 + 1, y1 + 2, -5, 5, HI); } // a plate on top
+    if (st >= 4) B(10, x1 - 1, y1 + 1, y1 + 2, -1, 1, TRIM);
+  } else if (arc) { // wide sleeves that flare at the cuff
+    B(7, 8, ylo, 12, -zp, zp, C);
+    const flare = (y0, y1, m) => { B(8, 18, y0, y1, 4, 6, m); B(8, 18, y0, y1, -6, -4, m); B(16, 18, y0, y1, -6, 6, m); B(7, 8, y0, y1, -6, 6, m); };
+    flare(ylo, ylo + 3, C); flare(ylo, ylo + 1, TRIM);
+    if (st >= 3) ring(9, 10, TRIM);
+  } else if (warrior) {
     ring(9, 10, HI); // two plates
     if (st >= 3) { B(10, x1 - 1, y1, y1 + 2, -4, 4, C); B(10, x1 - 1, y1 + 1, y1 + 2, -4, 4, HI); } // a second plate on top
     if (st >= 4) B(10, x1 - 1, y1 + 1, y1 + 2, -1, 1, TRIM);
@@ -216,8 +252,9 @@ function suitPadPieces(T, s) {
 }
 // coat tails on a leg, so they swing with it (s = 1 for the left leg, -1 for the right; leg units like boots)
 function suitLegPieces(T, s) {
-  const out = []; if (T.suit !== 'raider') return out;
-  const B = pieceBox(out), hex = a => palIdx(rgbHex(a)), C = hex(T.c), TRIM = T.st >= 5 ? hex([240, 196, 64]) : hex([34, 200, 186]), LO = -10;
+  const out = []; if (T.suit !== 'raider' && T.suit !== 'arcane') return out;
+  const arc = T.suit === 'arcane', B = pieceBox(out), hex = a => palIdx(rgbHex(a)), C = hex(T.c), LO = -10;
+  const TRIM = arc ? T.st >= 5 ? hex([255, 214, 90]) : hex([196, 150, 60]) : T.st >= 5 ? hex([240, 196, 64]) : hex([34, 200, 186]);
   B(-2, 6, LO, 0, 4, 6, C); B(-4, 6, LO, 0, -8, -4, C); B(4, 6, LO, 0, -4, 4, C);
   B(-2, -1, LO, 0, 4, 6, TRIM); // the front edge
   if (T.st >= 3) { B(-2, 6, LO, LO + 1, 4, 6, TRIM); B(-4, 6, LO, LO + 1, -8, -4, TRIM); B(4, 6, LO, LO + 1, -4, 4, TRIM); } // hem
@@ -255,7 +292,7 @@ function dressArmor(ch, n, team = null) {
   };
   // pads ride on the arms so they swing with them
   const meshes = [mesh('body', ch.body, 0, 0), mesh('L', ch.armL, -6, -4), mesh('R', ch.armR, 6, -4)];
-  if (armorOf(n).suit === 'raider') meshes.push(mesh('legL', ch.legL, 0, 0), mesh('legR', ch.legR, 0, 0));
+  if (suitLegPieces(armorOf(n), 1).length) meshes.push(mesh('legL', ch.legL, 0, 0), mesh('legR', ch.legR, 0, 0)); // coat tails
   ch.mats.push(mat); ch.armor = { n, mat, meshes };
 }
 // armory preview

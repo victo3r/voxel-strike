@@ -2,17 +2,19 @@
 const BOOTS = [
   { id: 'warrior', rar: 'rare', name: 'Warrior Boots', unlock: 5, price: 80, dmg: [.06, .10, .14], dr: [.04, .06, .08] },
   { id: 'raider', rar: 'rare', name: 'Raider Boots', unlock: 7, price: 120, spd: [.08, .11, .14], dj: true },
+  { id: 'ironclad', rar: 'epic', name: 'Ironclad Boots', unlock: 16, price: 240, dr: [.05, .07, .09], heavy: [.3, .45, .6] },
+  { id: 'arcane', rar: 'epic', name: 'Arcane Boots', unlock: 19, price: 280, spd: [.04, .06, .08], rl: [.1, .15, .2] },
 ];
 const BOOT_I = Object.fromEntries(BOOTS.map((B, i) => [B.id, i]));
 const bootOf = id => BOOTS[BOOT_I[id]] ?? null;
 const bootStars = id => prof.boots?.[id] | 0; // 0 = not bought
 const bootUse = id => { const st = bootStars(id), u = prof.bootUse?.[id] | 0; return u ? Math.max(1, Math.min(st, u)) : st; };
 const wornBoots = () => { const id = prof.bootOn; return id && bootStars(id) ? { id, st: bootUse(id) } : null; };
-const FX_NONE = { spd: 0, dmg: 0, dr: 0, dj: false };
+const FX_NONE = { spd: 0, dmg: 0, dr: 0, dj: false, rl: 0, heavy: 0 };
 function bootFx(b) {
   const B = b && bootOf(b.id); if (!B) return FX_NONE;
   const L = b.st - 1;
-  return { spd: B.spd?.[L] ?? 0, dmg: B.dmg?.[L] ?? 0, dr: B.dr?.[L] ?? 0, dj: !!B.dj };
+  return { spd: B.spd?.[L] ?? 0, dmg: B.dmg?.[L] ?? 0, dr: B.dr?.[L] ?? 0, dj: !!B.dj, rl: B.rl?.[L] ?? 0, heavy: B.heavy?.[L] ?? 0 };
 }
 // bots get random boots, never better than yours
 const BOOT_BARE = .3;
@@ -46,6 +48,26 @@ function bootPieces(id, st, s = 1) {
       const y = -16 + 2 * k, back = -8 - 2 * k;
       B(5, 7, y, y + 1, back, -1, WD); B(5, 7, y + 1, y + 2, back, -1, W); B(5, 7, y, y + 2, back, back + 1, WD);
     }
+  } else if (id === 'ironclad') {
+    // heavy iron sabatons with a thick sole, bronze trim, gold at 3 stars
+    const C = hex([78, 82, 92]), HI = hex([128, 134, 146]), DK = hex([44, 46, 54]), SOLE = hex([30, 30, 34]);
+    const TRIM = st >= 3 ? hex([226, 178, 40]) : hex([150, 110, 60]);
+    B(-5, 6, -24, -11, -6, 6, C); B(-5, 6, -24, -18, 6, 10, C);
+    B(-5, 6, -24, -22, -6, 10, SOLE);
+    B(-5, 6, -22, -19, 9, 10, HI); // toe cap
+    for (const y of [-20, -16]) B(-5, 6, y, y + 1, -6, 6, DK); // bands
+    B(-5, 7, -14, -11, -7, 7, C); B(-5, 7, -12, -11, -7, 7, TRIM); // cuff
+    if (st >= 2) { B(-3, 3, -19, -13, 6, 8, HI); B(-3, 3, -19, -18, 6, 8, TRIM); } // shin plate
+    if (st >= 3) B(5, 6, -21, -19, -3, 3, TRIM); // a buckle on the side
+  } else if (id === 'arcane') {
+    // soft midnight boots with a folded cuff, a gold clasp at 2 stars, bright gold at 3
+    const C = hex([44, 52, 120]), HI = hex([82, 96, 176]), DK = hex([26, 30, 76]), SOLE = hex([30, 24, 50]);
+    const TRIM = st >= 3 ? hex([255, 214, 90]) : hex([196, 150, 60]);
+    B(-5, 5, -24, -15, -5, 5, C); B(-5, 5, -24, -20, 5, 9, C); B(-4, 4, -24, -21, 9, 10, C); // a rounded toe
+    B(-5, 5, -24, -22, -5, 9, SOLE); B(-4, 4, -24, -22, 9, 10, SOLE);
+    B(-5, 5, -21, -20, 8, 9, DK); // a seam over the toes
+    B(-5, 6, -17, -14, -6, 6, HI); B(-5, 6, -17, -16, -6, 6, TRIM); // folded cuff with a gold edge
+    if (st >= 2) B(4, 5, -21, -18, -2, 2, TRIM); // a gold clasp on the side
   } else {
     // steel greaves, fancier with each star
     const C = hex([150, 156, 166]), HI = hex([204, 210, 220]), DK = hex([90, 96, 108]), SOLE = hex([52, 52, 58]);
@@ -58,7 +80,7 @@ function bootPieces(id, st, s = 1) {
     if (st >= 3) B(-1, 1, -17, -13, 7, 8, DK);
   }
   // hollow inside so it looks wearable in the armory
-  const top = id === 'raider' ? -14 : -10, floor = id === 'raider' ? -22 : -21;
+  const [top, floor] = { raider: [-14, -22], ironclad: [-11, -22], arcane: [-14, -22] }[id] ?? [-10, -21];
   B(-4, 4, floor, top, -4, 4, 0); B(-4, 4, floor, floor + 1, -4, 4, hex([40, 40, 46]));
   if (s < 0) for (const p of out) p[4] = -p[4];
   return out;

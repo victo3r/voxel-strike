@@ -78,7 +78,7 @@ const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
-  rubypierce: [10, 24], paragon: [18, 36],
+  rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -110,6 +110,11 @@ const GUN_FIT = {
   aerial: d => d < 5 ? 0 : d < 22 ? .8 : .45,
   crossbow: d => d > 14 ? .95 : d > 8 ? .55 : .2,
   flare: d => d < 3 ? .1 : d < 20 ? .6 : .35,
+  windwand: d => d < 3 ? .6 : d < 20 ? .78 : .5,
+  stunwand: d => d < 4 ? 1.3 : d < 6 ? .4 : 0,
+  flamewand: d => d < 3 ? .65 : d < 22 ? .95 : .6,
+  soulwand: d => d > 20 ? 1.15 : d > 14 ? .65 : d > 8 ? .25 : .1,
+  ancientwand: d => d < 3 ? .2 : d < 22 ? .85 : .45,
 };
 const HUNT_D = 8;
 const pickOf = list => list[Math.random() * list.length | 0];
@@ -285,7 +290,7 @@ const _wfq = new THREE.Quaternion(), _wfI = new THREE.Quaternion(), _wfd = new T
 function wandFlick(q, k) { _wfd.set(0, 0, -1).applyQuaternion(q); _wfl.set(_wfd.x, 0, _wfd.z).normalize(); return _wfq.setFromUnitVectors(_wfd, _wfl).slerp(_wfI, 1 - k); }
 function wandHold(b, dt) {
   const R = b.rl, g = b.gunM; if (!R || !g || R.on || !BASE[b.gun].wand) return;
-  b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 ? 14 : -4)));
+  b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 || b.wandT > 0 ? 14 : -4)));
   const r = wandFlick(R.q, b.wf); g.quaternion.copy(R.q).premultiply(r); g.position.copy(R.p).sub(R.fA).applyQuaternion(r).add(R.fA);
 }
 // knife swing for bots and other players
@@ -336,7 +341,7 @@ function botEquip(b, g) {
   b.pickT = Math.max(b.pickT, 1.2 + Math.random() * .8);
   holdGun(b); sfx('equip', { at: b.g.position, far: 15, v: .7 });
   const W = b.rec.W[g];
-  if (!W.inf && b.ammo <= 0) { b.reload = drawT(W) + W.reload; sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); } // picked up an empty one: reload it
+  if (!W.inf && b.ammo <= 0) { b.reload = drawT(W) + rlOf(W, b.rec.fx); sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 }); } // picked up an empty one: reload it
 }
 // spawn a bot (online the server picks the spot)
 function makeBot(rec, spot) {
@@ -429,7 +434,7 @@ function youDown(by) {
 function respawnYou(x, z, yaw) {
   gunSpinV = 0;
   if (x == null) [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, slowT: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   youHelpers.clear(); killCam = null;
   cancelReload(); recoilReset(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
@@ -538,20 +543,22 @@ function burnYou(t, burn, by) {
 function burnTick(dt) {
   if (!(P.burn > 0) || respawnT > 0) return;
   P.burn -= dt;
-  if ((P.burnT -= dt) <= 0) { P.burnT = .25; hurtPlayer(Math.max(1, Math.round(P.burnDmg)), false, P.burnBy); }
+  if ((P.burnT -= dt) <= 0) { P.burnT = .25; hurtPlayer(Math.max(1, Math.round(P.burnDmg)), false, P.burnBy, false, 7); }
 }
 // bot knife
 function botStab(b, W, t, dist) {
   b.cd = W.rate; b.stab = KNIFE_SWING; sfx(W.swing || 'swing', { at: b.g.position, far: 20 }); net.shot(W, b);
   const p = tPos(t), pos = b.g.position, want = Math.atan2(p.x - pos.x, p.z - pos.z);
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
-  if (dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing) return;
-  const at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
+  const miss = dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing, at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
+  if (W.wand) { aimDir(b.aimYaw, b.aimPitch, dirV); stunZap(b.flashM.getWorldPosition(new THREE.Vector3()), miss ? zapEnd(W, pos.clone().setY(pos.y + 1.6), dirV, b) : at); } // a little stun blast
+  if (miss) return;
   sfx(W.hit || 'slash', { at, far: 20 });
   if (W.knock && !net.on) launch(t.you ? P : t, t.you ? new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z) : t.g.position.clone().setY(t.g.position.y + 1), pos.clone().setY(pos.y + 1), W.knock, false);
   if (t.you) hurtPlayer(Math.round(W.dmg * BOT.dmgMul), false, b, false, 1);
   else hurtZombie(t, W.dmg * BOT.dmgMul, at, false, false, b, 1);
   if (W.burn && (t.you ? !dead : !t.dead)) applyBurn(t.you ? P : t, W.burnT, W.burn, b, W.id, true);
+  if (W.stun && !net.on) stunHit(t.you ? P : t, W.stun * longOf(b.rec.fx, W)); // online the server says
 }
 // bot flamethrower
 const coneV = new THREE.Vector3(), flameV = new THREE.Vector3();
@@ -580,6 +587,7 @@ function botFlame(b, W) {
 function botFire(b, W, dist) {
   botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);
   b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); net.shot(W, b);
+  const bolt = W.wand && !W.beam; if (bolt) b.wandT = .15; // a wand flicks forward
   muzzleBits(W, b.flashM);
   // beams in long sweeps, everything else in short bursts
   if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
@@ -588,15 +596,16 @@ function botFire(b, W, dist) {
   if (W.beam) { if (!(b.fireOn > 0)) sfx(W.frost ? 'frostStart' : 'heatStart', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = W.frost ? 'frostEnd' : 'heatEnd'; }
   else if (!W.flame) sfx(W.id, { at: b.g.position, far: W.quiet ? 35 : 100 });
   if (b.ammo <= 0) {
-    b.reload = W.reload; if (!W.pool) sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
+    b.reload = rlOf(W, b.rec.fx); if (!W.pool) sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
     b.pickT = Math.min(b.pickT, .15 + Math.random() * .25); // out of ammo: think about switching
   }
   if (W.flame) return botFlame(b, W);
   const S = skillOf(b), err = S.aimErr + S.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
-  if (W.rocket || W.flare || W.grenade) {
+  if (W.rocket || W.flare || W.grenade || W.spell) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
-    (W.rocket ? fireRocket : W.grenade ? fireGrenade : fireFlare)(W, eye.clone(), dirV, b);
+    if (W.spell) castSpell(W, eye.clone(), dirV.clone(), b, b.flashM);
+    else (W.rocket ? fireRocket : W.grenade ? fireGrenade : fireFlare)(W, eye.clone(), dirV, b);
     b.leadGuess = .6 + Math.random() * .6;
     return;
   }
@@ -620,15 +629,20 @@ function botFire(b, W, dist) {
     const onYou = youUp && losRay.ray.intersectBox(pBox, hitV), youD = onYou ? eye.distanceTo(hitV) : Infinity;
     const near = Math.min(wallD, botD, youD);
     if (W.beam) showBeam(b, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)), beamKind(W));
+    if (bolt) wandBolt(W.wand, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, 90)));
     if (near === Infinity) continue;
     if (near === youD) {
-      const head = hitV.y > P.pos.y + 1.45;
+      const head = hitV.y > P.pos.y + 1.45, was = respawnT;
       hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? headMul(W) : 1))), false, b, head, W.beam ? 2 : 0);
       if (slows(W)) shockHit(P, W);
+      if (bolt) { wandHit(W, P, eye, b); if (W.soul && !net.on && was <= 0 && respawnT > 0) soulHeal(b, P.pos.clone().setY(P.pos.y + 1), W.soul); }
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
-      if (!zz.dead) { hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W); }
-    } else burst(wall.point, 0x999999, 2);
+      if (!zz.dead) {
+        hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W);
+        if (bolt) { wandHit(W, zz, eye, b); if (W.soul && !net.on && zz.dead) soulHeal(b, zz.g.position.clone().setY(zz.g.position.y + 1), W.soul); }
+      }
+    } else if (!bolt) burst(wall.point, 0x999999, 2);
   }
 }
 // a bot's lance: through anyone in the way (not its team), you included
@@ -651,6 +665,7 @@ function botLance(b, W) {
 
 function updateBot(b, dt) {
   if (b.slowT > 0) b.slowT -= dt;
+  const stunned = stunTick(b, dt, !b.vy);
   let W = b.rec.W[b.gun];
   const pos = b.g.position;
   if (b.gazeT === undefined) botMind(b);
@@ -695,7 +710,7 @@ function updateBot(b, dt) {
   }
   // reload when nothing is around
   if (!sees && (!t || b.lostT > 1)) {
-    if (!W.inf && !W.pool && b.reload <= 0 && b.swap <= 0 && b.ammo < W.mag) { b.reload = W.reload; sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); }
+    if (!W.inf && !W.pool && b.reload <= 0 && b.swap <= 0 && b.ammo < W.mag) { b.reload = rlOf(W, b.rec.fx); sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); }
     for (const g of b.rec.load) {
       const G = b.rec.W[g];
       if (g === b.gun || b.mags[g] >= G.mag) continue;
@@ -710,10 +725,10 @@ function updateBot(b, dt) {
     if (b.seeT <= dt) { b.lpx = tp.x; b.lpz = tp.z; }
     if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
     b.lpx = tp.x; b.lpz = tp.z;
-    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
+    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : W.spell ? dist / WAND_BOLT.spell0.spd : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
     const tx = dx + (fly ? b.pvx * fly * b.leadGuess : (b.pvx * S.lead - b.vx * S.self) * lag), tz = dz + (fly ? b.pvz * fly * b.leadGuess : (b.pvz * S.lead - b.vz * S.self) * lag), th = Math.hypot(tx, tz);
     wantYaw = Math.atan2(tx, tz);
-    wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);
+    wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade || W.spell ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);
   } else {
     // nobody around: look where it's going and glance about
     if ((b.gazeT -= dt) <= 0) {
@@ -730,15 +745,15 @@ function updateBot(b, dt) {
   botLook(b, wantYaw, wantPitch, dt);
   b.g.rotation.y = b.aimYaw - b.holdTurn; b.headPiv.rotation.y = b.holdTurn; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
-  b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.flashM.visible = b.muzzle > 0;
+  b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.wandT = (b.wandT || 0) - dt; b.flashM.visible = b.muzzle > 0;
   if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx(b.fireEnd, { at: pos, far: 50 });
   b.stab = Math.max(0, b.stab - dt); knifeChop(b); // knife chop
   if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
-  holdReload(b, b.reload, W.reload); wandHold(b, dt);
+  holdReload(b, b.reload, rlOf(W, b.rec.fx)); wandHold(b, dt);
   // in range for this gun
-  const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : true;
+  const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : W.spell ? dist > 2.5 : true;
   const ready = sees && b.seeT >= S.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
   b.aimT = ready && sniper ? b.aimT + dt : 0;
   if (ready && b.cd <= 0 && (!sniper || b.aimT >= SNIPE_T)) { if (W.melee) botStab(b, W, t, dist); else botFire(b, W, dist); }
@@ -773,7 +788,8 @@ function updateBot(b, dt) {
     const ox = pos.x - P.pos.x, oz = pos.z - P.pos.z, od = Math.hypot(ox, oz);
     if (od < .75) { if (od > .001) { mx += ox / od * 2; mz += oz / od * 2; } else mx += 2; }
   }
-  if (b.idle > 0 || b.rest > 0) mx = mz = 0;
+  if (b.idle > 0 || b.rest > 0 || stunned) mx = mz = 0;
+  if (stunned) b.mvx = b.mvz = 0; // stuck in place
   else if (!sees && !way && !pad && b.detour <= 0 && Math.hypot(mx, mz) > .05) {
     // walk in a loose curve, not a straight line
     if ((b.wobT -= dt) <= 0) { b.wobT = 1 + Math.random() * 1.8; b.wobWant = (Math.random() * 2 - 1) * (gd > 5 ? .6 : .15); }
@@ -828,7 +844,7 @@ function updateBot(b, dt) {
   }
 
   b.flash -= dt;
-  const e = b.flash > 0 ? 0x880000 : b.burn > 0 ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : b.slowT > 0 ? (Math.sin(performance.now() * .05) > 0 ? 0x1a4a66 : 0x0a1a2a) : 0;
+  const e = b.flash > 0 ? 0x880000 : b.burn > 0 ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : b.stunT > 0 ? (Math.sin(performance.now() * .04) > 0 ? 0x5a5000 : 0x1a1800) : b.slowT > 0 ? (Math.sin(performance.now() * .05) > 0 ? 0x1a4a66 : 0x0a1a2a) : 0;
   b.mats.forEach(m => m.emissive.setHex(e));
 }
 

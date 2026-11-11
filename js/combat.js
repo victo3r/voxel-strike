@@ -51,9 +51,11 @@ function shoot() {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3; flashT = flashTime(w); crossKick(kickFor(w)); recoilKick(w);
     if (!aiming) muzzleBits(w, flashMesh, scene, .6); // not while you aim: they'd fill the sight
     sfx(w.id);
+    if (w.wand) wandOn = .15;
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);
     else if (w.grenade) fireGrenade(w);
+    else if (w.spell) castSpell(w, camera.position.clone(), camera.getWorldDirection(fwd).clone(), null, flashMesh);
     else {
       const targets = shotTargets();
       flashMesh.getWorldPosition(trFrom);
@@ -63,11 +65,16 @@ function shoot() {
         ndc.set((Math.random() - .5) * spread * 2, (Math.random() - .5) * spread * 2);
         ray.setFromCamera(ndc, camera);
         const hit = ray.intersectObjects(targets, false)[0];
-        if (tracerOk(w, i)) tracer(trFrom, hit ? hit.point : ray.ray.at(60, trTo), w.laser);
+        const end = hit ? hit.point : ray.ray.at(60, trTo);
+        if (w.wand) wandBolt(w.wand, trFrom, end); else if (tracerOk(w, i)) tracer(trFrom, end, w.laser); // wands throw a bolt
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
-        if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? headMul(w) : 1), hit.point, head, false, null, 0); }
-        else burst(hit.point, 0x999999, 2);
+        if (zz && !zz.dead) {
+          const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? headMul(w) : 1), hit.point, head, false, null, 0);
+          if (w.wand) wandHit(w, zz, camera.position, null);
+          if (w.soul && !net.on && zz.dead) soulHeal(null, zz.g.position.clone().setY(zz.g.position.y + 1), mode === 'zombies' ? SOUL_Z : w.soul); // online the server heals you
+        }
+        else if (!w.wand) burst(hit.point, 0x999999, 2);
       }
     }
   }
@@ -139,14 +146,22 @@ function fireLance(w) {
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {
   cd = w.rate; kick = 1; sfx(w.swing || 'swing'); crossKick(kickFor(w)); net.shot(w);
+  const zap = p => { if (w.wand) stunZap(flashMesh.getWorldPosition(new THREE.Vector3()), p); }; // the Stun Wand throws a little blast
   const knock = (o, from) => { if (w.knock && !net.on && !o.dead) launch(o, o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); }; // online the server sends the push
   const targets = shotTargets();
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
     const hit = ray2.intersectObjects(targets, false)[0], zz = hit?.object.userData.zombie;
-    if (zz && !zz.dead) { const head = !!hit.object.userData.head; sfx(w.hit || 'slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1); if (w.burn && !zz.dead) applyBurn(zz, w.burnT, w.burn, null, w.id, true); knock(zz, camera.position); return; }
-    if (hit) return;
+    if (zz && !zz.dead) {
+      const head = !!hit.object.userData.head; sfx(w.hit || 'slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1);
+      if (w.burn && !zz.dead) applyBurn(zz, w.burnT, w.burn, null, w.id, true);
+      knock(zz, camera.position);
+      if (w.stun && !net.on && !zz.dead) stunHit(zz, w.stun * longOf(youFx(), w)); // online the server says
+      zap(hit.point); return;
+    }
+    if (hit) { zap(hit.point); return; }
   }
+  zap(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(w.range).add(camera.position));
 }
 // little stars out of the muzzle (Starsmasher)
 const starBits = [], STAR_MATS = [0xffe27a, 0xffffff, 0xffc84a].map(color => new THREE.SpriteMaterial({ color, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, map: (() => {
@@ -183,6 +198,7 @@ function muzzleBits(w, from, sc = scene, size = 1) {
     starBits.push({ s, sc, v: _sd.clone().multiplyScalar(spd * (.6 + Math.random() * .6)).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread)), life: life * (.8 + Math.random() * .4), k: s.scale.x, g });
   } };
   if (k === 'gem') bit(SHARD_MATS, 9, 4, 2.8, .5, .11, 5);
+  else if (WAND_BITS[k]) bit(...WAND_BITS[k]);
   else if (k === 'energy') { // short lines of energy shooting out of the tip, riding with the gun
     const box = from.parent; if (!box) return;
     const sz = size / box.getWorldScale(_sv).x, mine = box === vm, mats = mine ? STREAK_VM : STREAK_MATS;
@@ -258,7 +274,10 @@ const shockMats = [new THREE.MeshBasicMaterial({ color: 0x4fc8ff, transparent: t
 const SLOW_T = 2.5, SLOW_K = .85, FROST_K = .65; // frost slows harder
 const slowMul = o => (o?.slowT || 0) > 0 ? o.slowK || SLOW_K : 1;
 const slows = w => !!(w?.shock || w?.frost);
-function shockHit(o, w) { const k = w?.frost ? FROST_K : SLOW_K; o.slowK = o.slowT > 0 ? Math.min(o.slowK || SLOW_K, k) : k; o.slowT = SLOW_T; }
+function shockHit(o, w, k = 1) { // k: how much longer it lasts
+  if (fxOf(o)?.steady || shrugs(o, 'slow', SLOW_T * k)) return;
+  const m = w?.frost ? FROST_K : SLOW_K; o.slowK = o.slowT > 0 ? Math.min(o.slowK || SLOW_K, m) : m; o.slowT = Math.max(o.slowT || 0, SLOW_T * k);
+}
 function showBeam(by, from, to, shock = false) {
   let b = beams.get(by);
   if (!b) {
@@ -303,6 +322,7 @@ const AIR_DRAG = .5, GROUND_DRAG = 10;
 const launchV = new THREE.Vector3();
 // f = 1 at point blank, 0 at the edge; k = the gun's own launch (Aerial Blast 1.1)
 function launch(o, center, p, f, self, k = 1) {
+  if (!self) { const fx = fxOf(o); if (fx?.steady) return; f *= 1 - (fx?.heavy || 0); } // Ironclad stands its ground
   launchV.subVectors(center, p); if (launchV.lengthSq() < 1e-4) launchV.set(0, 1, 0);
   launchV.normalize(); launchV.y = Math.max(launchV.y, LAUNCH_UP); launchV.normalize();
   const you = o === P, jumping = you && (P.vy > 0 || held('jump'));
