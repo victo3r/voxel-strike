@@ -317,7 +317,9 @@ function stairs(x, z, ax, dir, y0, y1, n, run = .8, w = 1.3, legs = 0) {
   const top = d => y0 + k * d + (y1 - y0) / n - .1; // the side boards' top edge runs under the front of every tread
   const end = L - Math.min(.3 / k, run), len = end / Math.cos(a), [mx, mz] = P(end / 2); // and stops short of the top so it doesn't stick up past it
   for (const o of [-1, 1]) {
-    const s = o * (w / 2 + .06), b = box(ax === 'x' ? len : .12, .32, ax === 'x' ? .12 : len, postMat);
+    const s = o * (w / 2 + .06), e = o * (w / 2 + .12), side = d => { const [px, pz] = P(d); return hAt(px + (ax === 'x' ? 0 : e), pz + (ax === 'x' ? e : 0)); };
+    if ([.15, .35, .55, .75].some(f => side(L * f) > top(L * f) - 2 * half)) continue; // against a cliff: the treads run into the rock, no board or posts
+    const b = box(ax === 'x' ? len : .12, .32, ax === 'x' ? .12 : len, postMat);
     b.position.set(mx + (ax === 'x' ? 0 : s), top(end / 2) - half, mz + (ax === 'x' ? s : 0));
     if (ax === 'x') b.rotation.z = dir * a; else b.rotation.x = -dir * a;
     add(b);
