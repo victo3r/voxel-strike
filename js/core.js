@@ -10,8 +10,8 @@ const GFX_Q = {
 const TOUCH = document.body.classList.contains('touchOnly');
 let touchLock = false;
 const tStick = { x: 0, y: 0 }; // move stick, -1 to 1
-const gfx = { q: TOUCH ? 'low' : /CrOS/.test(navigator.userAgent) ? 'medium' : 'high', res: 1, fps: false };
-try { const s = JSON.parse(localStorage.getItem('voxelstrike-gfx')); if (s) { if (GFX_Q[s.q]) gfx.q = s.q; if (s.res >= .5 && s.res <= 1) gfx.res = s.res; gfx.fps = !!s.fps; } } catch {}
+const gfx = { q: TOUCH ? 'low' : /CrOS/.test(navigator.userAgent) ? 'medium' : 'high', res: 1, fps: false, auto: true }; // auto: turns itself down when the game runs slow
+try { const s = JSON.parse(localStorage.getItem('voxelstrike-gfx')); if (s) { if (GFX_Q[s.q]) gfx.q = s.q; if (s.res >= .5 && s.res <= 1) gfx.res = s.res; gfx.fps = !!s.fps; gfx.auto = s.auto !== false; } } catch {}
 const gfxQ = () => GFX_Q[gfx.q];
 const renderer = new THREE.WebGLRenderer({ antialias: gfxQ().aa, powerPreference: 'high-performance' });
 const gfxAA = gfxQ().aa; // antialias only changes on reload
@@ -27,6 +27,7 @@ camera.rotation.order = 'YXZ';
 scene.add(camera);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 1.1); scene.add(hemi); // each map sets its own lighting
 const sun = new THREE.DirectionalLight(0xffffff, 1.3); sun.position.set(10, 20, 5); scene.add(sun);
+hemi.layers.enableAll(); sun.layers.enableAll(); // lights on every layer, so the glow passes see the same lights (a change re-checks every material)
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 // menus shrink to fit a phone: --z for the big ones, --z2 for the rest (--uw/--uh: 1% of the screen inside them)
 function fitUI() {

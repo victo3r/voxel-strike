@@ -77,7 +77,7 @@ function wandHit(w, o, from, by) {
 // the Stun Wand's swing throws a little crackling blast, as far as it reaches
 function zapEnd(w, eye, dir, by) {
   ray2.set(eye, dir); ray2.far = w.range;
-  const hit = ray2.intersectObjects(targetsFor(by), false)[0];
+  const hit = ray2.intersectObjects(targetsFor(by, ray2), false)[0];
   let d = hit ? hit.distance : w.range;
   if (by) d = Math.min(d, rayHitsYou(ray2.ray, d));
   return eye.clone().addScaledVector(dir, d);
@@ -146,7 +146,7 @@ function castSpell(w, eye, dir, by, tip) {
   const el = by ? by.spellEl ?? rollEl() : spellNext;
   if (by) by.spellEl = rollEl(); else spellNext = rollEl();
   ray2.set(eye, dir); ray2.far = SPELL_FAR;
-  const hit = ray2.intersectObjects(targetsFor(by), false)[0];
+  const hit = ray2.intersectObjects(targetsFor(by, ray2), false)[0];
   let d = hit ? hit.distance : SPELL_FAR;
   if (by && !friendly(by, YOU_T)) d = Math.min(d, rayHitsYou(ray2.ray, d));
   const at = eye.clone().addScaledVector(dir, d), id = net.launch(w.id, eye, dir, by, el);

@@ -334,23 +334,25 @@ function randomLook(seedStr, topC) {
 }
 
 // ---- red glow around enemies
-const GLOW_LAYER = 2;
+const GLOW_LAYER = 2, OCC_LAYER = 3; // OCC: what can hide an enemy's glow
 const GLOW_C = new THREE.Vector3(1, .16, .12), GLOW_A = .65;
 // call before adding the gun, so the gun doesn't glow
 function addOutline(z) {
   z.glowMs = []; z.g.traverse(o => { if (o.isMesh) { o.layers.enable(GLOW_LAYER); z.glowMs.push(o); } });
   z.glowOn = true;
 }
-// no glow on dead enemies or hooded ones out of range
+// no glow on dead enemies or hooded ones out of range; returns how many glow on screen
+const _glFr = new THREE.Frustum(), _glFm = new THREE.Matrix4(), _glFs = new THREE.Sphere(), occOn = o => o.layers.enable(OCC_LAYER);
 function outlineTick(cam) {
   let n = 0;
+  _glFr.setFromProjectionMatrix(_glFm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
   for (const z of zombies) {
     if (!z.glowMs) continue;
     let on = !z.dead;
     const far = z.rec?.fx.stealth;
     if (on && far) { const d = cam.position.distanceTo(z.g.position); on = z.glowOn ? d <= far + .5 : d < far - .5; }
     if (on !== z.glowOn) { z.glowOn = on; for (const m of z.glowMs) on ? m.layers.enable(GLOW_LAYER) : m.layers.disable(GLOW_LAYER); }
-    if (on) n++;
+    if (on && z.g.visible) { _glFs.center.copy(z.g.position); _glFs.radius = 2.2 * z.g.scale.y; _glFs.center.y += _glFs.radius / 2; if (_glFr.intersectsSphere(_glFs)) n++; }
   }
   return n;
 }
@@ -394,8 +396,10 @@ function outlineRender(cam) {
   const bg = scene.background, auto = renderer.autoClear, cl = renderer.getClearAlpha(), layers = cam.layers.mask;
   renderer.getClearColor(_gcc);
   scene.background = null; renderer.setClearColor(0x000000, 1);
-  // mask: everything black, then visible enemies white
+  // mask: what can hide an enemy in black (the map as a few chunks, trees, anyone not glowing, your gun), then visible enemies white
   renderer.setRenderTarget(glowRT[0]); renderer.clear();
+  for (const z of zombies) if (z.g.visible && !(z.glowOn && !z.dead)) z.g.traverse(occOn);
+  vm.traverse(occOn); cam.layers.set(OCC_LAYER);
   scene.overrideMaterial = maskBlack; renderer.render(scene, cam);
   renderer.autoClear = false; cam.layers.set(GLOW_LAYER);
   scene.overrideMaterial = maskWhite; renderer.render(scene, cam);

@@ -13,16 +13,30 @@ function topAt(s, x, z, r) {
   const c = R.ax === 'x' ? x : z, h = v => s.bot + (s.top - s.bot) * Math.max(0, Math.min(1, (v - R.a) / (R.b - R.a)));
   return Math.max(h(c - r), h(c + r));
 }
+// solids near a spot: a 2 m grid per map, each square holding what's within 1 m of it
+const SG = 2, SM = 1;
+let sg = null;
+function solidGrid(list) {
+  const x0 = -((MAP?.half ?? 24) + 4), n = Math.ceil(-x0 * 2 / SG), cells = Array.from({ length: n * n }, () => []);
+  const ci = v => Math.max(0, Math.min(n - 1, Math.floor((v - x0) / SG)));
+  for (const s of list) for (let j = ci(s.minZ - SM); j <= ci(s.maxZ + SM); j++) for (let i = ci(s.minX - SM); i <= ci(s.maxX + SM); i++) cells[j * n + i].push(s);
+  return { list, len: list.length, n, x0, cells };
+}
+function solidsNear(x, z, r) {
+  if (sg?.list !== solids || sg.len !== solids.length) sg = solidGrid(solids);
+  const i = Math.floor((x - sg.x0) / SG), j = Math.floor((z - sg.x0) / SG);
+  return r > SM || i < 0 || j < 0 || i >= sg.n || j >= sg.n ? solids : sg.cells[j * sg.n + i];
+}
 const hits = (s, x, z, r, feet) => overlaps(s, x, z, r) && feet < topAt(s, x, z, r) - 0.05 && feet + BODY > (s.bot || 0);
 const depth = (s, x, z, r) => Math.min(x + r - s.minX, s.maxX - x + r, z + r - s.minZ, s.maxZ - z + r);
 // if you're stuck inside something, let moves that don't go deeper
 function blocked(x, z, r, feet, from) {
-  return solids.some(s => hits(s, x, z, r, feet) && !(from && hits(s, from.x, from.z, r, from.y) && depth(s, x, z, r) <= depth(s, from.x, from.z, r) + 1e-6));
+  return solidsNear(x, z, r).some(s => hits(s, x, z, r, feet) && !(from && hits(s, from.x, from.z, r, from.y) && depth(s, x, z, r) <= depth(s, from.x, from.z, r) + 1e-6));
 }
 let groundRamp = false, groundSolid = null;
 function groundAt(x, z, r, feet) {
   let g = MAP.floor ? MAP.floor(x, z) : 0; groundRamp = false; groundSolid = null;
-  for (const s of solids) if (overlaps(s, x, z, r)) {
+  for (const s of solidsNear(x, z, r)) if (overlaps(s, x, z, r)) {
     const t = topAt(s, x, z, r);
     if (t > feet + 0.05 || t < g) continue;
     const slope = !!(s.ramp || s.peak);
@@ -36,7 +50,7 @@ const floorY = (x, z) => MAP.top?.(x, z) ?? 0;
 const sticks = (drop, wasRamp) => drop <= STEP && (groundRamp || wasRamp || drop < .06);
 // smooth out the camera when stepping up a ledge
 function easeLag(pos, dt) { if (pos.lag) { pos.lag *= Math.exp(-14 * dt); if (pos.lag < .005) pos.lag = 0; } }
-function ceilingAt(x, z, r, feet, rise) { let c = Infinity; for (const s of solids) { const b = s.bot || 0; if (b > feet + BODY - .1 && b < feet + BODY + rise && overlaps(s, x, z, r)) c = Math.min(c, b); } return c; }
+function ceilingAt(x, z, r, feet, rise) { let c = Infinity; for (const s of solidsNear(x, z, r)) { const b = s.bot || 0; if (b > feet + BODY - .1 && b < feet + BODY + rise && overlaps(s, x, z, r)) c = Math.min(c, b); } return c; }
 // move a player, bot or zombie, stepping up small ledges
 function walkTo(pos, nx, nz, r, grounded) {
   if (!blocked(nx, nz, r, pos.y, pos)) {
@@ -51,7 +65,7 @@ function walkTo(pos, nx, nz, r, grounded) {
 }
 // slide out from under a low edge instead of getting stuck
 function slideOut(pos, nx, nz, r, h) {
-  const s = solids.find(s => (s.bot || 0) > h + STEP && hits(s, nx, nz, r, h));
+  const s = solidsNear(nx, nz, r).find(s => (s.bot || 0) > h + STEP && hits(s, nx, nz, r, h));
   if (!s) return false;
   const dx = nx - pos.x, dz = nz - pos.z, len = Math.hypot(dx, dz), side = Math.abs(dz) >= Math.abs(dx) ? 'x' : 'z';
   const c = pos[side], lo = side === 'x' ? s.minX : s.minZ, hi = side === 'x' ? s.maxX : s.maxZ;

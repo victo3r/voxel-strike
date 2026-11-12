@@ -101,7 +101,7 @@ function aaPick() {
   for (const [, t] of near.slice(0, 3)) {
     const p = t.z.g.position, to = aaV.set(p.x, p.y + 1.1 * (t.z.scale || 1), p.z).sub(c), d = to.length();
     aaRay.set(c, to.divideScalar(d)); aaRay.far = d;
-    if (!aaRay.intersectObjects(crateMeshes, false).length) { aaT = t; return; }
+    if (!aaRay.intersectObjects(coverAlong(c, to, d), false).length) { aaT = t; return; }
   }
 }
 // add aim assist to a mouse movement
@@ -137,24 +137,37 @@ function renderGfx() {
   document.body.classList.toggle('lowfx', gfx.q === 'low');
   $('gfxRes').value = gfx.res; $('gfxResV').textContent = Math.round(gfx.res * 100) + '%';
   $('gfxFps').checked = gfx.fps; $('fps').style.display = gfx.fps ? '' : 'none';
-  $('gfxNote').textContent = gfxQ().aa !== gfxAA ? 'Edge smoothing turns ' + (gfxQ().aa ? 'on' : 'off') + ' the next time you reload the page.' : '';
+  $('gfxNote').textContent = gfxQ().aa !== gfxAA ? 'Edge smoothing turns ' + (gfxQ().aa ? 'on' : 'off') + ' the next time you reload the page.' : gfx.auto ? 'Turns itself down if the game runs slow, until you pick one' : '';
 }
 $('gfxQ').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.dataset.q === gfx.q) return;
-  gfx.q = b.dataset.q; saveGfx(); applyGfx(); renderGfx(); sfx('ui');
+  gfx.q = b.dataset.q; gfx.auto = false; saveGfx(); applyGfx(); renderGfx(); sfx('ui');
 });
-$('gfxRes').addEventListener('input', e => { gfx.res = +e.target.value; saveGfx(); applyGfx(); renderGfx(); });
+$('gfxRes').addEventListener('input', e => { gfx.res = +e.target.value; gfx.auto = false; saveGfx(); applyGfx(); renderGfx(); });
 $('gfxFps').addEventListener('change', e => { gfx.fps = e.target.checked; saveGfx(); renderGfx(); });
 renderGfx();
 // touch buttons press 'T:<action>'
 const held = a => keys['T:' + a] || binds[a].some(c => c && keys[c]);
 const isBind = (a, code) => code === 'T:' + a || binds[a].includes(code);
+// key names: mouse buttons as pictures, punctuation as itself
+const MOUSE_IC = { Mouse0: 'mL', Mouse1: 'mM', Mouse2: 'mR', Mouse3: 'm4', Mouse4: 'm5', WheelUp: 'mUp', WheelDown: 'mDown' };
+const KEY_SYM = { Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
+  ArrowUp: ico('up'), ArrowDown: ico('down'), ArrowLeft: ico('left'), ArrowRight: ico('right') };
 function nice(code) {
   if (!code) return '-';
-  const named = { Mouse0: 'Left Click', Mouse1: 'Middle Click', Mouse2: 'Right Click', Mouse3: 'Mouse 4', Mouse4: 'Mouse 5',
-    WheelUp: 'Scroll Up', WheelDown: 'Scroll Down', ArrowUp: ico('up'), ArrowDown: ico('down'), ArrowLeft: ico('left'), ArrowRight: ico('right'),
-    ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl', AltLeft: 'L Alt', AltRight: 'R Alt' };
-  return named[code] ?? code.replace(/^Key|^Digit/, '');
+  const named = { Mouse0: 'Left Click', Mouse1: 'Middle Click', Mouse2: 'Right Click', WheelUp: 'Scroll Up', WheelDown: 'Scroll Down',
+    ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl', AltLeft: 'L Alt', AltRight: 'R Alt', CapsLock: 'Caps Lock', ...KEY_SYM };
+  const m = /^Mouse(\d+)$/.exec(code), pic = MOUSE_IC[code] || (m ? 'mouse' : '');
+  return (pic ? ico(pic) + ' ' : '') + (named[code] ?? (m ? 'Mouse ' + (+m[1] + 1) : code.replace(/^Key|^Digit|^Numpad/, '')));
+}
+// short label for a hotbar key cap
+function keyCap(code) {
+  if (!code) return '';
+  const m = /^Mouse(\d+)$/.exec(code);
+  if (MOUSE_IC[code] || m) return ico(MOUSE_IC[code] || 'mouse') + (m && +m[1] > 2 ? '<small>' + (+m[1] + 1) + '</small>' : '');
+  const short = { ShiftLeft: 'SHIFT', ShiftRight: 'SHIFT', ControlLeft: 'CTRL', ControlRight: 'CTRL', AltLeft: 'ALT', AltRight: 'ALT', Space: 'SPACE', CapsLock: 'CAPS',
+    Backspace: 'BKSP', Escape: 'ESC', Enter: 'ENTER', Tab: 'TAB', ...KEY_SYM };
+  return short[code] ?? code.replace(/^Key|^Digit/, '').replace(/^Numpad/, 'N').toUpperCase().slice(0, 6);
 }
 const renderHelp = () => renderHotbar();
 let rebinding = null;
@@ -302,8 +315,8 @@ document.addEventListener('pointerlockchange', () => {
   const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS);
   showAway(away);
   $('menu').style.display = locked || away || shopOpen || inLobby || matchOver ? 'none' : 'flex';
-  $('menuTip').textContent = cg.on && binds.menu[0] ? `Tip: press ${nice(binds.menu[0])} for this menu to stay in fullscreen` : '';
-  $('shop').style.display = shopOpen && !locked ? 'flex' : 'none';
+  $('menuTip').innerHTML = cg.on && binds.menu[0] ? `Tip: press ${nice(binds.menu[0])} for this menu to stay in fullscreen` : '';
+  showShop(shopOpen && !locked);
   if (locked) closeArmory();
   if (!locked) {
     for (const k in keys) keys[k] = false;
@@ -334,10 +347,9 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave();
 
 // the play button brings up mode select, then map select
 const ALL_MAPS = ['roofs', 'forest', 'cove', 'resort', 'sky'];
-const V_MAPS = 10; // bump when the map pictures change
+const V_MAPS = 11; // bump when the map pictures change
 const MODES = [
-  // zombies only on the yard for now
-  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Test your loadout and strategy against endless zombie waves', maps: ['yard'] },
+  { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Test your loadout and strategy against endless zombie waves', maps: ['yard', 'graveyard', 'farm'] }, // zombie-only maps
   { id: 'dm', name: 'DEATHMATCH', desc: 'A 4 minute free-for-all, top score wins', maps: ALL_MAPS },
   { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes of blue vs red, most kills wins', maps: ALL_MAPS },
   { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds to rack up all the kills you can', sub: [
@@ -563,9 +575,9 @@ function restart(spot) {
   flares.forEach(f => scene.remove(f.m)); flares.length = 0; grenades.forEach(g => scene.remove(g.m)); grenades.length = 0; clearBeams(); clearTracers(); clearLances(); clearBolts(scene); recoilReset();
   parts.forEach(p => scene.remove(p.m)); parts.length = 0; clearDrops(scene);
   useMap(mapId); setupPads();
-  Object.assign(P, { drowned: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, groundAt(0, 0, .35, floorY(0, 0)), 0); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, hitBy: null, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, groundAt(0, 0, .35, floorY(0, 0)), 0); P.pos.lag = 0;
   if (spot) { P.pos.set(spot.x, spot.y ?? 0, spot.z); P.yaw = spot.yaw ?? 0; }
-  wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = ''; resetRun(); zRunNew();
+  wave = 0; toSpawn = 0; waveWait = 1.5; kills = 0; coins = 0; dead = false; shopWave = 0; shopOpen = false; armorBought = 0; waveReward = null; resetRun(); zRunNew();
   WEAPONS.forEach((w, i) => { lvl[i] = 0; applyLvl(i); ammo[i] = w.mag; owned[i] = !!w.free; reserve[i] = w.inf ? Infinity : w.free ? resMax(i) : 0; }); cancelReload(); soundsOff(); newBest = false;
   emptyPads();
   cur = gi('voxel'); aimOn = false; resetSlots(); buildGun(); renderHotbar();

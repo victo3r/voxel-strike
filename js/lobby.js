@@ -249,7 +249,7 @@ function heroShot() {
   sfx(w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
   muzzleBits(w, hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
-  if (w.lance) { showLance(_hm.clone(), { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, w.lance, .6, lobbyScene, hf.flashM); return; }
+  if (w.lance) { showLance(_hm.clone(), { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, w.lance, .6, lobbyScene, hf.flashM, (gi => () => hf.i === gi)(hf.i)); return; }
   if (w.wand) { hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {

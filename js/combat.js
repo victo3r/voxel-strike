@@ -1,7 +1,7 @@
 const ray = new THREE.Raycaster(), ray2 = new THREE.Raycaster(), ndc = new THREE.Vector2(), fwd = new THREE.Vector3(), tmp = new THREE.Vector3();
 // what bullets can hit
 const headMul = w => w.headMul ?? HEAD_MUL; // the crossbow hits heads harder
-function shotTargets() { const t = [ground, ...crateMeshes]; for (const zz of zombies) if (!zz.dead) t.push(...zz.parts); return t; }
+function shotTargets(rc) { const t = [ground, ...(rc ? coverAlong(rc.ray.origin, rc.ray.direction, rc.far) : crateMeshes)]; for (const zz of zombies) if (!zz.dead) t.push(...zz.parts); return t; } // rc: only the cover along that ray
 // recoil only moves the camera, your real aim stays put
 function recoilKick(w) {
   const r = RECOIL[w.id]; if (!r) return;
@@ -57,14 +57,13 @@ function shoot() {
     else if (w.grenade) fireGrenade(w);
     else if (w.spell) castSpell(w, camera.position.clone(), camera.getWorldDirection(fwd).clone(), null, flashMesh);
     else {
-      const targets = shotTargets();
       flashMesh.getWorldPosition(trFrom);
       // only primaries spread, aiming halves it
       const spread = w.spread * (1 - adsT * .5);
       for (let i = 0; i < w.pellets; i++) {
         ndc.set((Math.random() - .5) * spread * 2, (Math.random() - .5) * spread * 2);
         ray.setFromCamera(ndc, camera);
-        const hit = ray.intersectObjects(targets, false)[0];
+        const hit = ray.intersectObjects(shotTargets(ray), false)[0];
         const end = hit ? hit.point : ray.ray.at(60, trTo);
         if (w.wand) wandBolt(w.wand, trFrom, end); else if (tracerOk(w, i)) tracer(trFrom, end, w.laser); // wands throw a bolt
         if (!hit) continue;
@@ -106,7 +105,7 @@ function lanceLine(eye, dir, w, parts, you = null, skip = null) {
   return { hits, walls, end: end ? end.clone() : eye.clone().addScaledVector(dir, LANCE_FAR), stop: !!end };
 }
 // the beam: a glow and a hot core, k = thickness
-function showLance(from, L, col, k = 1, sc = scene, tip = null) { // tip: the muzzle it keeps coming out of while the gun kicks
+function showLance(from, L, col, k = 1, sc = scene, tip = null, held = null) { // tip: the muzzle it keeps coming out of while the gun kicks, until held() says the gun was put away
   for (const p of L.walls) burst(p, col, 3); // punched through here
   if (L.stop) burst(L.end, col, 4);
   const len = from.distanceTo(L.end); if (len < .3) return;
@@ -115,7 +114,7 @@ function showLance(from, L, col, k = 1, sc = scene, tip = null) { // tip: the mu
     new THREE.MeshBasicMaterial({ color: _lc.set(col).lerp(new THREE.Color(0xffffff), .65), transparent: true, depthWrite: false, fog: false }), // it glows, fog doesn't hide it
   ];
   for (const [m, s] of [[mats[0], .17], [mats[1], .06]]) { const b = new THREE.Mesh(lanceGeo, m); b.scale.set(s * k, s * k, 1); g.add(b); }
-  const l = { g, mats, sc, t: LANCE_T, end: L.end.clone(), tip }; lanceAt(l, from);
+  const l = { g, mats, sc, t: LANCE_T, end: L.end.clone(), tip, held }; lanceAt(l, from);
   sc.add(g); lances.push(l);
 }
 function lanceAt(l, from) { l.g.position.lerpVectors(from, l.end, .5); l.g.lookAt(l.end); l.g.scale.z = from.distanceTo(l.end); }
@@ -126,6 +125,7 @@ function lanceTick(dt) {
     const f = l.t / LANCE_T;
     l.mats[0].opacity = .5 * f; l.mats[1].opacity = Math.min(1, f * 1.6);
     l.g.scale.x = l.g.scale.y = .5 + .5 * f; // thins out as it fades
+    if (l.tip && l.held && !l.held()) l.tip = null; // switched guns: it stays where it was
     if (l.tip) lanceAt(l, l.tip.getWorldPosition(_lf));
   }
 }
@@ -135,23 +135,22 @@ function fireLance(w) {
   if (!aiming) muzzleBits(w, flashMesh, scene, .6);
   sfx(w.id);
   ray.setFromCamera(ndc.set(0, 0), camera);
-  const L = lanceLine(ray.ray.origin, ray.ray.direction, w, shotTargets(), null, zz => zz.type === 'bot' && friendly(null, zz));
+  const L = lanceLine(ray.ray.origin, ray.ray.direction, w, shotTargets(ray), null, zz => zz.type === 'bot' && friendly(null, zz));
   for (const h of L.hits) hurtZombie(h.zz, w.dmg * h.mul * (h.head ? headMul(w) : 1), h.point, h.head, false, null, 0, 0, h.thru);
   // through a sight it starts further out, or it would cover the view
   if (adsT > .5 && (w.scope || gunHolo)) {
     const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), D = Math.min(.5 / t, .4 * camera.position.distanceTo(L.end));
     showLance(camera.localToWorld(_lf.set(0, -.7 * D * t, -D)), L, w.lance, .3);
-  } else showLance(flashMesh.getWorldPosition(_lf), L, w.lance, 1, scene, flashMesh);
+  } else { const g = cur; showLance(flashMesh.getWorldPosition(_lf), L, w.lance, 1, scene, flashMesh, () => cur === g && respawnT <= 0); }
 }
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {
   cd = w.rate; kick = 1; sfx(w.swing || 'swing'); crossKick(kickFor(w)); net.shot(w);
   const zap = p => { if (w.wand) stunZap(flashMesh.getWorldPosition(new THREE.Vector3()), p); }; // the Stun Wand throws a little blast
   const knock = (o, from) => { if (w.knock && !net.on && !o.dead) launch(o, o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); }; // online the server sends the push
-  const targets = shotTargets();
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
-    const hit = ray2.intersectObjects(targets, false)[0], zz = hit?.object.userData.zombie;
+    const hit = ray2.intersectObjects(shotTargets(ray2), false)[0], zz = hit?.object.userData.zombie;
     if (zz && !zz.dead) {
       const head = !!hit.object.userData.head; sfx(w.hit || 'slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1);
       if (w.burn && !zz.dead) applyBurn(zz, w.burnT, w.burn, null, w.id, true);
@@ -243,7 +242,7 @@ function flame(w) {
     const off = Math.sqrt(Math.max(0, d * d - along * along));
     if (off > .5 + along * .15 + zz.r) continue;
     ray2.set(camera.position, to.divideScalar(d)); ray2.far = d;
-    if (ray2.intersectObjects(crateMeshes, false).length) continue;
+    if (ray2.intersectObjects(coverAlong(ray2.ray.origin, ray2.ray.direction, d), false).length) continue;
     hurtZombie(zz, w.dmg, c, false, false, null, 3);
     applyBurn(zz, BURN_T, w.dmg * .6, null, 'flame');
   }
@@ -255,7 +254,7 @@ function heatBeam(w) {
   crossKick(.4, 1.5); recoilKick(w);
   camera.getWorldDirection(fwd);
   ray2.setFromCamera(ndc.set(0, 0), camera); ray2.far = w.range;
-  const hit = ray2.intersectObjects(shotTargets(), false)[0];
+  const hit = ray2.intersectObjects(shotTargets(ray2), false)[0];
   const end = hit ? hit.point : tmp.copy(camera.position).addScaledVector(fwd, w.range);
   const zz = hit?.object.userData.zombie;
   if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (slows(w)) shockHit(zz, w); }
@@ -312,7 +311,7 @@ function rayHitsYou(r, far) { // distance to your body along the ray, or Infinit
   if (!r.intersectBox(youBox, youHitP)) return Infinity;
   const d = r.origin.distanceTo(youHitP); return d <= far ? d : Infinity;
 }
-const targetsFor = by => by ? shotTargets().filter(o => o.userData.zombie !== by) : shotTargets();
+const targetsFor = (by, rc) => by ? shotTargets(rc).filter(o => o.userData.zombie !== by) : shotTargets(rc);
 const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 12; // speed, blast radius, max self damage
 const rockets = [];
 // rocket jumping: blasts push everyone away
@@ -368,7 +367,7 @@ function updateFlares(dt) {
     const f = flares[i]; f.life -= dt; f.v.y -= FLARE_DROP * dt;
     const step = f.v.length() * dt;
     ray2.set(f.m.position, tmp.copy(f.v).normalize()); ray2.far = step;
-    let hit = ray2.intersectObjects(targetsFor(f.by), false)[0];
+    let hit = ray2.intersectObjects(targetsFor(f.by, ray2), false)[0];
     const onYou = !f.ghost && f.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
     if (onYou) hit = null;
     if (hit || onYou || f.life <= 0) {
@@ -416,7 +415,7 @@ function updateGrenades(dt) {
     const g = grenades[i]; g.life -= dt; g.v.y -= GREN_GRAV * dt;
     const step = g.v.length() * dt;
     ray2.set(g.m.position, tmp.copy(g.v).normalize()); ray2.far = step + .08;
-    const hit = ray2.intersectObjects(targetsFor(g.by), false)[0];
+    const hit = ray2.intersectObjects(targetsFor(g.by, ray2), false)[0];
     const onYou = !g.ghost && g.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
     const body = onYou || !!hit?.object.userData.zombie;
     if (body || g.life <= 0) {

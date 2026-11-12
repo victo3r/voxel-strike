@@ -39,6 +39,22 @@ ICON_ART.starO = ICON_ART.star.map((row, y, a) => [...row].map((ch, x) => ch ===
 ICON_ART.right = ICON_ART.left.map(r => [...r].reverse().join(''));
 ICON_ART.up = ICON_ART.left[0].split('').map((_, x) => ICON_ART.left.map(r => r[x]).join(''));
 ICON_ART.down = [...ICON_ART.up].reverse();
+ICON_ART.plus = ['..###..', '..###..', '#######', '#######', '#######', '..###..', '..###..']; // medkit
+ICON_ART.fast = ['#...#...', '##..##..', '###.###.', '########', '###.###.', '##..##..', '#...#...']; // speed
+// mouse buttons and the wheel, for key labels
+{
+  const M = ['..#####..', '.#..#..#.', '#...#...#', '#...#...#', '#...#...#', '#########', '#.......#', '#.......#', '#.......#', '#.......#', '.#.....#.', '..#####..'];
+  const fill = f => M.map((r, y) => [...r].map((c, x) => c === '#' || (y > 0 && y < 5 && x > r.indexOf('#') && x < r.lastIndexOf('#') && f(x)) ? '#' : '.').join(''));
+  const up = ['..#..', '.###.', '#####', '..#..', '..#..'], down = [...up].reverse();
+  ICON_ART.mouse = M;
+  ICON_ART.mL = fill(x => x < 4);
+  ICON_ART.mR = fill(x => x > 4);
+  ICON_ART.mM = fill(x => x >= 3 && x <= 5);
+  ICON_ART.m4 = M.map((r, y) => (y === 8 || y === 9 ? '##' : '..') + r); // side buttons: back is the lower one
+  ICON_ART.m5 = M.map((r, y) => (y === 6 || y === 7 ? '##' : '..') + r);
+  ICON_ART.mUp = ICON_ART.mM.map((r, y) => r + '.' + (up[y] || '.....'));
+  ICON_ART.mDown = ICON_ART.mM.map((r, y) => r + '.' + (down[y - 7] || '.....'));
+}
 // booster lightning bolt
 {
   const m = ['.....#####', '....#####.', '....####..', '...####...', '..####....', '.#########', '.########.', '....####..', '....###...', '...###....', '...##.....', '..##......', '..#.......'];

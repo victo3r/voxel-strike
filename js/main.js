@@ -211,7 +211,7 @@ function update(dt) {
       // wave rewards, only up to PAY_WAVES
       const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 1 + (bossW ? 5 : 0) : 0), r = grant(xp, gold); // boosters double it
       runXp += xp; runCoins += gold + r.bonus;
-      waveReward = (pay ? `Account: +${gold} ${COIN} +${xp} XP` : `Account: past wave ${PAY_WAVES} the run pays no more`) + (r.ups ? `   ·   LEVEL UP! LVL ${prof.lv} +${r.bonus} ${COIN} +${r.boostUp} ${ico('bolt')}` : '');
+      waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp };
       openShop(); return;
     }
     if ((waveWait -= dt) <= 0) {
@@ -251,6 +251,7 @@ function update(dt) {
       if (z.dead) continue;
     }
     if (z.type === 'bot') { updateBot(z, dt); continue; }
+    if (z.rise > 0) { riseTick(z, dt); continue; } // still climbing out of a grave
     settle(z, dt);
     if (inSea(z.g.position.x, z.g.position.z, z.g.position.y)) { drownZombie(z); continue; } // zombies drown in the sea
     const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = P.pos.y - z.g.position.y;
@@ -374,7 +375,7 @@ function update(dt) {
   for (let i = rockets.length - 1; i >= 0; i--) {
     const r = rockets[i], step = ROCKET_SPD * dt; r.life -= dt;
     ray2.set(r.m.position, r.dir); ray2.far = step;
-    const hit = ray2.intersectObjects(targetsFor(r.by), false)[0];
+    const hit = ray2.intersectObjects(targetsFor(r.by, ray2), false)[0];
     const onYou = !r.ghost && r.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
     if (hit || onYou || r.life <= 0) {
       scene.remove(r.m); rockets.splice(i, 1);
@@ -411,7 +412,7 @@ function update(dt) {
   vitBar('hp', P.hp, P.max, 'heart'); vitBar('arm', P.armor, P.maxArmor, 'shield');
   const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
   setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : w.pool ? ammo[cur] : ammo[cur] + ' / ' + spare}`);
-  if (!pvp()) $('top').innerHTML = `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead).length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`;
+  if (!pvp()) setHTML($('top'), `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead).length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`);
 }
 
 // knife swing curve
@@ -433,6 +434,28 @@ function fpsTick(raw) {
   fpsN++; fpsT += raw;
   if (fpsT >= .5) { $('fps').textContent = Math.round(fpsN / fpsT) + ' FPS'; fpsN = fpsT = 0; }
 }
+// graphics turn themselves down while the game runs slow: a quality step, then resolution; a step that doesn't help is undone and it stops
+const autoG = { wait: 6, t: 0, n: 0, prev: 0, undo: null };
+function autoGfx(raw, playing) {
+  if (!gfx.auto || !playing || document.hidden || raw > .25) return;
+  if ((autoG.wait -= raw) > 0) return;
+  autoG.t += raw; autoG.n++;
+  if (autoG.t < 5) return;
+  const fps = autoG.n / autoG.t; autoG.t = autoG.n = 0;
+  if (autoG.undo) {
+    const was = autoG.undo; autoG.undo = null;
+    if (fps < autoG.prev * 1.1) { Object.assign(gfx, was, { auto: false }); saveGfx(); applyGfx(); renderGfx(); return; } // not the graphics
+  }
+  if (fps >= 45) return;
+  const was = { q: gfx.q, res: gfx.res };
+  if (gfx.q !== 'low') gfx.q = gfx.q === 'high' ? 'medium' : 'low';
+  else if (gfx.res > .8) gfx.res = .8;
+  else if (gfx.res > .65) gfx.res = .65;
+  else { gfx.auto = false; saveGfx(); return; }
+  autoG.undo = was; autoG.prev = fps; autoG.wait = 2;
+  saveGfx(); applyGfx(); renderGfx();
+  netToast(gfx.q !== was.q ? `Graphics turned down to ${gfx.q.toUpperCase()} to keep things smooth` : 'Resolution turned down to keep things smooth');
+}
 (function loop() {
   requestAnimationFrame(loop);
   // split slow frames into steps
@@ -448,6 +471,7 @@ function fpsTick(raw) {
   const isLive = () => !dead && !shopOpen && !matchOver && (pvp() || locked);
   const live = isLive();
   cgPlay(live && locked && !inLobby); // tell CrazyGames you're playing
+  autoGfx(raw, live && locked);
   if (live) for (let k = 0; k < steps && (k === 0 || isLive()); k++) update(sdt);
   if ((dead || respawnT > 0 || matchOver || inLobby) && $('rl').style.display !== 'none') $('rl').style.display = 'none'; // reload ring only while playing
   else if (mode === 'zombies' && dead && !matchOver && (deadT += dt) >= DEAD_T) zombiesOver(); // zombie waves game over

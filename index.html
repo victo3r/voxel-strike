@@ -5,7 +5,7 @@
 <!-- added to a phone's home screen it opens fullscreen, like an app -->
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Voxel Strike"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
-<link id="css" rel="stylesheet" href="css/style.css?v=146">
+<link id="css" rel="stylesheet" href="css/style.css?v=147">
 </head>
 <body class="boot">
 <!-- phones and tablets: this note while held upright -->
@@ -13,7 +13,7 @@
 <script>if (!matchMedia('(any-pointer: fine)').matches && matchMedia('(any-pointer: coarse)').matches) document.body.classList.add('touchOnly');</script>
 <div id="hud">
   <div id="hit"></div><canvas id="scope"></canvas><canvas id="holo"></canvas><canvas id="cross"></canvas><svg id="rl" viewBox="0 0 80 80" style="display:none"><circle class="bg" cx="40" cy="40" r="34"/><circle id="rlFg" cx="40" cy="40" r="34"/></svg><div id="hm"><i></i><i></i><i></i><i></i></div>
-  <div id="top"></div><div id="bossbar"><div id="bossfill"></div><span>BOSS</span></div><div id="banner"></div>
+  <div id="top"></div><div id="bossbar"><div id="bossfill"></div><span>BOSS</span></div><div id="banner"></div><div id="kcard"></div>
   <div id="board" class="lb"></div><div id="feed"></div>
   <div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="80" autocomplete="off" spellcheck="false"></div>
   <div id="toast"></div><div id="killNote"></div><div id="vit"><div id="hp" class="vb"><span class="vi"></span><div class="bar"><u></u><i></i><b></b></div></div><div id="arm" class="vb"><span class="vi"></span><div class="bar"><u></u><i></i><b></b></div></div></div><div id="ammo"></div><div id="hotbar"></div>
@@ -202,7 +202,7 @@
 <div id="finding"><p id="findingMsg">FINDING MATCH…</p><button id="findingX">CANCEL</button></div>
 <div id="netToast"></div>
 <div id="shop">
-  <h1>SHOP</h1>
+  <h1 id="shopH">SHOP</h1>
   <p id="shopInfo"></p>
   <div id="items"></div>
   <button id="next">NEXT WAVE</button>
@@ -212,8 +212,8 @@
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
 // bump V (and the css ?v=) on every update to skip old caches
-const V = 196;
-const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
+const V = 197;
+const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js', 'js/touch.js'];
 // crazy.js first, so CrazyGames saves are in place before the rest
 await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });

@@ -87,8 +87,8 @@ function loadoutGun(cat) { // loadout gun, or the starter
 
 function renderHotbar() {
   $('hotbar').innerHTML = CATS.map(([, label], s) => {
-    const i = slotGun[s], key = nice(binds['slot' + (s + 1)][0] || binds['slot' + (s + 1)][1]);
-    return `<div class="slot ${i === cur ? 'on' : ''} ${i < 0 ? 'empty' : ''}"><span class="k">${key === '-' ? '' : key}</span>` +
+    const i = slotGun[s], key = keyCap(binds['slot' + (s + 1)][0] || binds['slot' + (s + 1)][1]);
+    return `<div class="slot ${i === cur ? 'on' : ''} ${i < 0 ? 'empty' : ''}" style="--rc:${RARITY[rarOf(BASE[i])][1]}">${key ? `<span class="k">${key}</span>` : ''}` +
       `<span class="s">${i >= 0 ? stars(i) : ''}</span><img class="ai" src="${gunPic(Math.max(0, i))}"><span class="c">${label}</span></div>`;
   }).join('');
 }
@@ -151,7 +151,7 @@ function makeFlash(size = .1, mat = FLASH_SPR) {
 const vmFlashMats = new Map(), vmFlashMat = m => vmFlashMats.get(m) || vmFlashMats.set(m, Object.assign(m.clone(), { depthTest: false })).get(m); // yours draws over the barrel, which would hide it
 const flashMesh = makeFlash(.12, vmFlashMat(FLASH_SPR));
 flashMesh.renderOrder = 5;
-const flashLight = new THREE.PointLight(0xffcc66, 0, 8);
+const flashLight = new THREE.PointLight(0xffcc66, 0, 8); flashLight.layers.enableAll();
 let flashT = 0;
 let gunSpin = null, gunSpinV = 0;
 let gunRound = null;
@@ -895,7 +895,7 @@ buildGun();
 {
   const later = window.requestIdleCallback || (f => setTimeout(f, 50));
   let k = 0;
-  const next = () => { if (k >= BASE.length) return; gunPic(k); k++; later(next); }; // a picture builds its model too
+  const next = () => { if (k >= BASE.length) return; if (inLobby) { gunPic(k); k++; } later(next); }; // a picture builds its model too; none mid-match
   later(next);
 }
 

@@ -174,7 +174,7 @@ let recs = [], youRec = null, matchT = 0, killedBy = '', joins = [];
 const youHelpers = new Set(); // for assists
 // killCam: the bot that killed you, the camera watches it
 let killCam = null;
-const ASSIST_PTS = 15;
+const ASSIST_PTS = 15, PUSH_KILL = 5; // falling or drowning this many seconds after a hit is the hitter's kill
 function makeRecs() {
   youRec = { name: myName, you: true, team: 0, css: '#8ff0b6', score: 0, kills: 0, deaths: 0, streak: 0 };
   recs = [youRec]; joins = [];
@@ -428,15 +428,39 @@ function youDownFx(by) {
 // you died in a bot match
 function youDown(by) {
   youDownFx(by);
+  killerCard(by?.rec, by && (killGuns.get(by.rec) ?? by.gun));
   scoreKill(by ? by.rec : null, youRec, false, youHelpers);
 }
+// who got you: the gun they used and what they wear, under the banner
+const killGuns = new Map(); // the last gun each enemy hit you with
+let kcTok = 0;
+function killerCard(rec, gun) {
+  const tok = ++kcTok, el = $('kcard'); el.classList.remove('show');
+  if (!rec) return;
+  setTimeout(() => { // a moment later, so drawing the pictures doesn't hitch the hit
+    if (tok !== kcTok) return;
+    const item = (pic, name, o, stars, cls = '') => `<div class="ki${cls}" style="--rc:${RARITY[rarOf(o)][1]}"><img src="${pic}"><b>${name}</b><span>${stars}</span></div>`;
+    const n = rec.armor | 0, T = armorOf(n), B = rec.boots && bootOf(rec.boots.id), H = rec.hat && hatOf(rec.hat.id);
+    const gear = [
+      T && item(armorPic(n - 1), armorTitle(T), T, starRow(T.suit ? T.st : n)),
+      B && item(bootPic(B.id, rec.boots.st), B.name, B, starRow(rec.boots.st)),
+      H && item(hatPic(H.id, rec.hat.st), H.name, H, starRow(rec.hat.st)),
+    ].filter(Boolean);
+    const w = BASE[gun], st = (rec.stars?.[gun] | 0) + 1, set = rec.fx?.set && suitOf(rec.fx.set);
+    if (!w && !gear.length) return;
+    el.innerHTML = (w ? item(gunPic(gun), w.name, w, w.start ? '' : starRow(st), ' kg') : '') +
+      (gear.length ? `<div class="kw"><div class="kr">${gear.join('')}</div>${set ? `<div class="ks">FULL ${set.name.split(' ')[0].toUpperCase()} SET</div>` : ''}</div>` : '');
+    el.classList.add('show');
+  }, 250);
+}
+function hideKillerCard() { kcTok++; killGuns.clear(); $('kcard').classList.remove('show'); }
 // respawn you
 function respawnYou(x, z, yaw) {
   gunSpinV = 0;
   if (x == null) [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { drowned: false, drownFlag: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, hitBy: null, drownFlag: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
-  youHelpers.clear(); killCam = null;
+  youHelpers.clear(); killCam = null; hideKillerCard();
   cancelReload(); recoilReset(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
 }
 
@@ -445,7 +469,7 @@ const losRay = new THREE.Raycaster(), pBox = new THREE.Box3();
 function clearLine(a, c) { // line of sight (crates block, the fence doesn't)
   losDir.subVectors(c, a); const d = losDir.length(); if (d < .01) return true;
   losRay.set(a, losDir.divideScalar(d)); losRay.far = d;
-  return !losRay.intersectObjects(crateMeshes, false).length;
+  return !losRay.intersectObjects(coverAlong(a, losDir, d), false).length;
 }
 const aimDir = (yaw, pitch, out) => out.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
 const tPos = t => t.you ? P.pos : t.g.position;
@@ -619,12 +643,11 @@ function botFire(b, W, dist) {
   // shots hit any enemy in the way
   const others = []; for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) others.push(...z.parts);
   // bot snipers line up shots, so a tighter cone
-  const walls = [ground, ...crateMeshes];
   for (let i = 0; i < W.pellets; i++) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
     losRay.set(eye, dirV); losRay.far = W.range || 90;
-    const wall = losRay.intersectObjects(walls, false)[0], wallD = wall ? wall.distance : Infinity;
+    const wall = losRay.intersectObjects([ground, ...coverAlong(eye, dirV, losRay.far)], false)[0], wallD = wall ? wall.distance : Infinity;
     const bot = others.length ? losRay.intersectObjects(others, false)[0] : null, botD = bot ? bot.distance : Infinity;
     const onYou = youUp && losRay.ray.intersectBox(pBox, hitV), youD = onYou ? eye.distanceTo(hitV) : Infinity;
     const near = Math.min(wallD, botD, youD);
@@ -653,14 +676,14 @@ function botLance(b, W) {
     losRay.set(eye, dirV);
     if (losRay.ray.intersectBox(pBox, hitV)) you = { you: true, distance: eye.distanceTo(hitV), point: hitV.clone() };
   }
-  const parts = [ground, ...crateMeshes]; for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) parts.push(...z.parts);
+  const parts = [ground, ...coverAlong(eye, dirV, LANCE_FAR)]; for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) parts.push(...z.parts);
   const L = lanceLine(eye, dirV, W, parts, you);
   for (const h of L.hits) {
     const d = W.dmg * BOT.dmgMul * h.mul * (h.head ? headMul(W) : 1);
     if (h.zz === YOU_T) hurtPlayer(Math.max(1, Math.round(d)), false, b, h.head, 0, 0, h.thru);
     else hurtZombie(h.zz, d, h.point, h.head, false, b, 0, 0, h.thru);
   }
-  showLance(b.flashM.getWorldPosition(beamFrom).clone(), L, W.lance, 1, scene, b.flashM);
+  const g = b.gun; showLance(b.flashM.getWorldPosition(beamFrom).clone(), L, W.lance, 1, scene, b.flashM, () => b.gun === g && !b.dead);
 }
 
 function updateBot(b, dt) {
@@ -871,7 +894,7 @@ function dmDown(dt) {
     camera.rotation.set(k.pitch, k.yaw, 0);
   }
   else { camera.position.set(P.pos.x, P.pos.y + 1.6 + f * f * .5 + Math.min(t, 1.5) * 1.2, P.pos.z); camera.rotation.set(P.pitch + (-.9 - P.pitch) * f, P.yaw, 0); }
-  const b = $('banner'); b.textContent = net.on && net.banner ? net.banner : `${killedBy ? 'KILLED BY ' + killedBy : 'YOU DIED'}\n${Math.ceil(respawnT)}`; b.style.opacity = 1;
+  const b = $('banner'), bt = net.on && net.banner ? net.banner : `${killedBy ? 'KILLED BY ' + killedBy : 'YOU DIED'}\n${Math.ceil(respawnT)}`; if (b.textContent !== bt) b.textContent = bt; b.style.opacity = 1;
   return true;
 }
 let lastTop = '', lastBoard = '', lastSec = 0;
@@ -897,7 +920,7 @@ function updateDM(dt) {
 }
 // match results (online they come from the server)
 function endMatch(results) {
-  matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('menu').style.display = 'none'; $('banner').style.opacity = 0;
+  matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('menu').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard();
   const place = results ? results.place : ranked().indexOf(youRec) + 1, lead = results ? results.lead : teamLead();
   $('postSub').textContent = MR.name + ' OVER';
   $('postPlace').textContent = MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
@@ -910,7 +933,7 @@ function endMatch(results) {
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
     + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
-  $('post').style.display = 'flex';
+  $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(won ? 'win' : 'lose'); musicEnd();
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
   if (ups) setTimeout(() => sfx('levelUp'), 700);
@@ -929,7 +952,7 @@ function setupMode() {
   matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = ''; youHelpers.clear(); killCam = null;
   MR = RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join;
   BOT_COUNT = net.on ? 0 : MR.players[MAP.size] - 1;
-  $('post').style.display = 'none'; $('board').style.display = 'none'; $('banner').style.opacity = 0; // clears "KILLED BY"
+  $('post').style.display = 'none'; document.body.classList.remove('results'); $('board').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard(); // clears "KILLED BY"
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
   $('chat').style.display = pvp() ? '' : 'none';
   if (pvp()) {

@@ -629,6 +629,6 @@ addEventListener('resize', () => { placeAct(); if (armOpen) fitStats($('armAct')
 {
   const jobs = [...ARMOR_TIERS.map((t, k) => () => armorPic(k)), ...[[BOOTS, bootPic], [HATS, hatPic]].flatMap(([L, f]) => L.flatMap(x => [1, 2, 3].map(s => () => f(x.id, s)))),
     ...PRESETS.map(p => () => lookPic(p.look)), () => headPic(prof.look)];
-  const later = window.requestIdleCallback || (f => setTimeout(f, 50)), next = () => { const j = jobs.shift(); if (j) { j(); later(next); } };
+  const later = window.requestIdleCallback || (f => setTimeout(f, 50)), next = () => { if (!inLobby) { later(next); return; } const j = jobs.shift(); if (j) { j(); later(next); } };
   later(next);
 }

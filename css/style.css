@@ -47,6 +47,17 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #toast{position:absolute;left:0;right:0;top:58%;text-align:center;font-size:20px;text-shadow:2px 2px 0 rgba(0,0,0,.6);opacity:0;transition:opacity .3s}
 #top{position:absolute;left:0;right:0;top:12px;text-align:center;color:#fff;text-shadow:2px 2px 0 var(--acc-dk)}
 #banner{position:absolute;left:0;right:0;top:30%;text-align:center;font-size:64px;color:#fff;text-shadow:4px 4px 0 var(--acc-dk);opacity:0;transition:opacity .4s;white-space:pre-line}
+#kcard{position:absolute;left:50%;top:calc(30% + 170px);transform:translateX(-50%);display:flex;align-items:flex-start;gap:14px;pointer-events:none;opacity:0;transition:opacity .4s}
+#kcard.show{opacity:1}
+#kcard .ki{position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;gap:2px;width:104px;height:112px;box-sizing:border-box;padding:6px 4px 5px;text-align:center;background:rgba(0,0,0,.45);border:3px solid #555;border-bottom-color:var(--rc);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
+#kcard .ki::after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,var(--rc),transparent 60%);opacity:.25}
+#kcard .ki img{flex:1;min-height:0;width:100%;object-fit:contain}
+#kcard .ki.kg{width:190px;border-color:#ffd23f;border-bottom-color:var(--rc)}
+#kcard .ki b{font-size:13px;line-height:1.1;color:#fff;text-shadow:2px 2px 0 #000}
+#kcard .ki span{min-height:14px;font-size:11px;color:#ffd23f}
+#kcard .kw{display:flex;flex-direction:column;align-items:center;gap:8px}
+#kcard .kr{display:flex;gap:8px}
+#kcard .ks{font-size:12px;letter-spacing:1px;color:#ffe27a;padding:2px 10px;background:rgba(0,0,0,.45);border:2px solid #ffe27a;box-shadow:3px 3px 0 rgba(0,0,0,.4)}
 #killNote{position:absolute;left:0;right:0;top:61%;display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;opacity:0;text-shadow:2px 2px 0 rgba(0,0,0,.6)}
 #killNote.show{opacity:1;animation:knPop .32s ease-out}#killNote.gone{opacity:0;transition:opacity .35s}
 #killNote .kt{font-size:20px;color:var(--acc-lt)}#killNote .kn{font-size:22px;font-weight:bold;letter-spacing:3px;color:#fff}#killNote .ki{font-size:46px;line-height:1;position:relative}
@@ -79,14 +90,47 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #menu p{font-size:18px;margin:6px}
 #menu #msg{font-size:34px;font-weight:bold;margin-bottom:10px}
 #shop{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-shadow:2px 2px 0 #000}
-#shop h1{font-size:56px;margin:0}
-#shopInfo{font-size:20px;white-space:pre-line}
-#items{display:grid;grid-template-columns:repeat(3,210px);gap:12px;margin:14px}
-#shop button{font:bold 18px monospace;padding:12px}
-#shop button:disabled{opacity:.4;cursor:default}
-#shop button.own{border-color:var(--acc);opacity:.7}
-#shop small{color:var(--silver);font-size:13px}
-#shop .cat{color:var(--acc-lt)}
+#shop h1{font-size:46px;margin:0}
+/* what the wave paid */
+#shopInfo{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 22px;margin:10px 0 4px}
+#shopInfo .sg{display:flex;gap:8px}
+.sb{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:5px 12px 6px;background:rgba(10,14,16,.55);border:2px solid var(--line-dim);box-shadow:3px 3px 0 rgba(0,0,0,.4)}
+.sb small{font-size:11px;letter-spacing:1px;color:var(--muted);text-shadow:none}
+.sb b{font-size:19px;display:flex;align-items:center;gap:6px;white-space:nowrap;position:relative}
+.sb em{font-style:normal;font-size:13px;color:var(--acc-lt)}
+.sb.gold b{color:#ffcf3a}
+.sb.up{border-color:var(--acc);background:rgba(47,191,113,.38)}.sb.up small{color:#fff}
+.sbar{position:absolute;left:0;right:0;bottom:-5px;height:3px;background:rgba(255,255,255,.15)}
+.sbar::after{content:'';position:absolute;inset:0;right:auto;width:calc(var(--f) * 100%);background:var(--bc)}
+#shopInfo .acct{padding-left:22px;border-left:2px solid var(--line-dim)}
+/* the shop: supplies and perks on the left, guns on the right */
+#items{display:flex;gap:22px;margin:12px 0;align-items:flex-start}
+.scol{display:flex;flex-direction:column;gap:12px;width:430px}
+#items section{display:flex;flex-direction:column;gap:7px}
+#items h2{margin:0;font-size:14px;letter-spacing:3px;color:var(--acc-lt);display:flex;align-items:center;gap:10px}
+#items h2::after{content:'';flex:1;height:2px;background:var(--line-dim)}
+#items .none{margin:2px 0;font-size:13px;color:var(--muted)}
+#shop .si{position:relative;isolation:isolate;display:flex;align-items:center;gap:10px;width:100%;min-height:54px;padding:5px 10px 5px 6px;text-align:left;background:rgba(10,14,16,.55);border:2px solid var(--line-dim);border-left:5px solid var(--rc);box-shadow:3px 3px 0 rgba(0,0,0,.4);font:bold 16px monospace}
+.si::after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,var(--rc),transparent 45%);opacity:.18}
+#shop .si:hover:not(:disabled){background:var(--hov);border-color:#fff;border-left-color:var(--rc)}
+.si .sp{flex:none;width:40px;display:flex;justify-content:center;font-size:26px;color:var(--rc)}
+.si.gun .sp{width:76px}.si .sp img{width:76px;height:38px;image-rendering:pixelated}
+.si .sn{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.si .sn b{font-size:16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#shop .si .sn small{font-size:12px;color:var(--silver);font-weight:normal;line-height:1.25}
+#shop .si .sn small:first-child:not(:last-child){font-size:10px;letter-spacing:1px;color:var(--acc-lt);font-weight:bold}
+.si .st{font-size:12px;color:#ffd23f}
+.si .pips{display:flex;gap:3px}.si .pips i{width:9px;height:9px;border:2px solid var(--acc-lt);box-sizing:border-box}.si .pips i.on{background:var(--acc-lt)}
+.si .sc{flex:none;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;min-width:70px;font-size:17px;color:#ffcf3a;white-space:nowrap}.si .sc b{display:flex;align-items:center}
+#shop .si .sc small{font-size:10px;letter-spacing:1px;color:var(--acc-lt)}
+#shop .si:disabled{cursor:default}
+#shop .si.done{opacity:.55}#shop .si.done .sc{color:var(--acc-lt);font-size:14px}
+#shop .si.poor .sp,#shop .si.poor .sn{opacity:.5}#shop .si.poor .sc{color:#ff7a6a}
+#next{font:bold 20px monospace;padding:10px 26px}
+/* the shop covers the HUD, so it hides */
+:is(body.shopping,body.results) :is(#hotbar,#ammo,#top,#vit){visibility:hidden}
+@media (max-width:980px){.scol{width:min(430px,46vw)}#items{gap:14px}}
+@media (max-height:620px){#shop .si{min-height:42px;padding:3px 8px 3px 5px;gap:8px}.si.gun .sp,.si .sp img{width:58px}.si .sp img{height:29px}.si .sp{font-size:20px;width:30px}.si .sn b{font-size:14px}#shop .si .sn small{font-size:11px}.si .sc{font-size:15px}.sb{padding:3px 9px 4px}.sb b{font-size:16px}#shopInfo{margin:6px 0 0}#items section{gap:5px}.scol{gap:8px}#items{margin:8px 0}}
 
 /* settings */
 #binds{position:fixed;inset:0;display:none;align-items:center;justify-content:center;color:#fff;text-shadow:2px 2px 0 #000;z-index:10;padding:12px;box-sizing:border-box}
@@ -122,7 +166,6 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 /* small windows: menus scroll */
 #menu,#shop{overflow-y:auto;justify-content:flex-start;padding:12px 8px;box-sizing:border-box}
 #menu>:first-child,#shop>h1{margin-top:auto!important}#menu>:last-child,#shop>:last-child{margin-bottom:auto!important}
-#items{grid-template-columns:repeat(3,minmax(0,210px))}
 #menu #msg:empty{display:none}
 #menuTitle{font-size:56px;margin:0 0 6px}
 #menuBtns{display:flex;flex-direction:column;gap:10px;margin-top:12px;width:220px}
@@ -134,16 +177,23 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #menuBtns button{margin:0;width:100%}
 
 /* hotbar */
-#hotbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px}#hotbar.aimed{visibility:hidden}
-.slot{position:relative;width:84px;height:58px;box-sizing:border-box;background:rgba(0,0,0,.45);border:3px solid #555;display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .15s}
-.slot.on{border-color:#ffd23f;background:rgba(70,50,10,.65);transform:translateY(-6px)}
-.slot img{width:72px;height:36px;image-rendering:pixelated}
+#hotbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:9px}#hotbar.aimed{visibility:hidden}
+.slot{position:relative;isolation:isolate;width:84px;height:60px;box-sizing:border-box;background:rgba(10,14,16,.55);border:2px solid var(--line-dim);border-bottom:4px solid var(--rc);box-shadow:3px 3px 0 rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;transition:transform .15s,background .15s}
+.slot::after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,var(--rc),transparent 70%);opacity:.22}
+.slot.on{border-color:#fff;border-bottom-color:var(--rc);background:rgba(47,191,113,.38);transform:translateY(-7px);box-shadow:3px 3px 0 rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.25),0 0 0 2px rgba(0,0,0,.35)}
+.slot.on::before{content:'';position:absolute;left:50%;bottom:-14px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#fff;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.5))}
+.slot.empty{opacity:.45;border-bottom-color:var(--line-dim)}.slot.empty::after{display:none}
+.slot img{width:72px;height:36px;margin-top:2px;image-rendering:pixelated}
 .slot.empty img{visibility:hidden}
-.slot .k{position:absolute;left:3px;top:0;font-size:12px}
-.slot .s{position:absolute;right:3px;top:1px;font-size:10px;color:#ffd23f}
-.slot .c{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:9px;color:#ccc}
-@media (max-width:900px){.slot{width:56px;height:42px}.slot img{width:48px;height:24px}.slot .c{display:none}.slot .k{font-size:10px}}
-@media (max-width:1150px){#ammo{bottom:84px}} /* keeps the gun name off the hotbar */
+.slot .k{position:absolute;left:-6px;top:-11px;min-width:20px;height:21px;padding:0 4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:2px;background:#0b0e10;border:2px solid var(--line-dim);box-shadow:2px 2px 0 rgba(0,0,0,.45);font-size:11px;line-height:1;letter-spacing:.5px;white-space:nowrap;text-shadow:none}
+.slot .k .ic{height:15px;width:calc(15px * var(--ar,1));filter:none;vertical-align:0}
+.slot .k small{font-size:9px}
+.slot.on .k{background:var(--acc);border-color:#fff;text-shadow:1px 1px 0 var(--acc-dk)}
+.slot .s{position:absolute;right:4px;top:2px;font-size:10px;color:#ffd23f}
+.slot .c{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:9px;letter-spacing:1px;color:var(--muted)}
+.slot.on .c{color:#fff}
+@media (max-width:900px){#hotbar{gap:7px}.slot{width:58px;height:44px}.slot img{width:48px;height:24px}.slot .c{display:none}.slot .k{font-size:10px;height:17px;top:-9px}.slot .k .ic{height:11px;width:calc(11px * var(--ar,1))}}
+@media (max-width:1150px){#ammo{bottom:96px}} /* keeps the gun name off the hotbar */
 
 /* armory */
 #armory{position:fixed;left:0;top:0;bottom:0;width:min(720px,60vw);display:none;flex-direction:column;background:rgba(30,36,40,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);color:#fff;text-shadow:2px 2px 0 #000;z-index:9;overflow-y:auto;padding:16px 56px 18px 22px;box-sizing:border-box;animation:armIn .3s ease-out}
@@ -453,6 +503,8 @@ img.ai{image-rendering:auto!important;object-fit:contain}
   #shop h1{font-size:36px}#binds h1{font-size:28px}#menu p{font-size:14px;margin:3px}#menu #msg{font-size:22px}
   #bindList,.sliders{font-size:13px;gap:3px 6px}#binds button{font-size:12px;padding:3px 6px}#setHead h1{font-size:24px}
   #shop button{font-size:14px;padding:6px}#items{gap:6px;margin:6px}#banner{font-size:36px}
+  #kcard{top:calc(30% + 92px);gap:8px}#kcard .ki{width:72px;height:70px;padding:3px 2px;border-width:2px}#kcard .ki.kg{width:110px}#kcard .kr{gap:5px}#kcard .kw{gap:5px}
+  #kcard .ki b{font-size:9px}#kcard .ki span{min-height:10px;font-size:8px}#kcard .ks{font-size:9px;padding:1px 6px}
 }
 
 /* account */
@@ -652,16 +704,17 @@ body:not(.touchOnly) .tonly{display:none!important}
 #tTop .tb{position:static;width:42px;height:42px;font-size:20px}
 /* phones: the HUD makes room for the controls */
 body.touchOnly #feed{top:64px}
+body.touchOnly .vb .bar{width:min(230px,22vw)}body.touchOnly #top{left:calc(22vw + 62px);right:70px;font-size:17px} /* clear of the health bars */
 body.touchOnly #ammo{right:auto;left:50%;bottom:66px;transform:translateX(-50%);text-align:center;font-size:17px}
-body.touchOnly #hotbar{bottom:14px}body.touchOnly #hud:has(#hotbar.aimed) #ammo{visibility:hidden}
-body.touchOnly .slot{width:50px;height:38px}body.touchOnly .slot img{width:44px;height:22px}body.touchOnly .slot .c,body.touchOnly .slot .k{display:none}
+body.touchOnly #hotbar{bottom:14px}body.touchOnly #hud:has(#hotbar.aimed) #ammo,body.touchOnly #hud:has(#kcard.show) #ammo{visibility:hidden}
+body.touchOnly .slot{width:50px;height:38px}body.touchOnly .slot .s{font-size:8px;top:1px;right:2px}body.touchOnly .slot img{width:44px;height:22px}body.touchOnly .slot .c,body.touchOnly .slot .k{display:none}
 body.touchOnly #chat{bottom:auto;top:72px;width:min(300px,36vw);font-size:13px}
 body.touchOnly .kb{display:none!important}
 /* phones: menus zoom to fit (--uw/--uh stand in for vw/vh inside them) */
 body.touchOnly :is(#armory,#armAct,#chests,#custPanel,#drawPanel,#board,#post){zoom:var(--z,1)}
 body.touchOnly :is(#lobbyUI,#pick,#binds,#boost,#daily,#lb,#card,#prize,#menu,#shop,#finding,#netToast,#away){zoom:var(--z2,1)}
 body.touchOnly:not(.tcOn) #hud{visibility:hidden}
-body.touchOnly :is(#chestBox,#cardBox){overflow-y:auto}body.touchOnly .cSkin{height:120px}body.touchOnly #shop h1{font-size:30px}body.touchOnly #items{grid-template-columns:repeat(3,minmax(0,270px))}body.touchOnly #chestBox .chest img{width:90px}
+body.touchOnly :is(#chestBox,#cardBox){overflow-y:auto}body.touchOnly .cSkin{height:120px}body.touchOnly #shop h1{font-size:30px}body.touchOnly #chestBox .chest img{width:90px}
 body.touchOnly #armory{width:min(720px,calc(var(--uw) * 60))}
 body.touchOnly #armAct{width:clamp(270px,calc(var(--uw) * 27),340px)}
 body.touchOnly #detCv{height:min(280px,calc(var(--uh) * 36))!important}

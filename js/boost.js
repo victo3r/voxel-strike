@@ -13,7 +13,7 @@ function boostPay(xp, coins) {
   if (!boostSpent) { boostSpent = true; prof.boostSet = Math.max(0, boostSet() - 1); prof.boosts = Math.max(0, boosts() - 1); }
   return [xp * 2, coins * 2];
 }
-const boostTile = () => gameBoost ? [ico('bolt'), 'BOOST', '2×', 'tb'] : null;
+const boostTile = () => gameBoost ? [ico('bolt'), 'BOOST', '2×', 'tbo'] : null;
 function renderBoost() {
   const b = $('boostBtn'), on = boostSet();
   b.innerHTML = ico('bolt') + `<b>${boosts()}</b>` + (on ? `<small>${on} ACTIVE</small>` : ''); b.classList.toggle('on', on > 0);

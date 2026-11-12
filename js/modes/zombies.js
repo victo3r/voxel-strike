@@ -62,8 +62,28 @@ function makeZombie(x, z, type) {
   zombies.push(zz);
   return zz;
 }
+const RISE_T = 1.1; // climbing out of a grave
 function spawnZombie(type = pickType()) {
   const r0 = .3 * ZTYPES[type].scale;
+  if (MAP.graves && Math.random() < .8) { // out of an open grave, not right beside you
+    const ok = MAP.graves.filter(([x, z]) => Math.hypot(x - P.pos.x, z - P.pos.z) > 9 && !zombies.some(o => !o.dead && Math.hypot(o.g.position.x - x, o.g.position.z - z) < 1.2));
+    if (ok.length) {
+      const [x, z] = ok[Math.random() * ok.length | 0], zz = makeZombie(x, z, type);
+      zz.rise = RISE_T; zz.g.position.y = -1.9 * zz.scale; zz.g.rotation.y = Math.atan2(P.pos.x - x, P.pos.z - z);
+      sfx('zDie', { at: zz.g.position, far: 45, rate: .5, v: .45 });
+      return zz;
+    }
+  }
+  if (MAP.spawns && Math.random() < .8) { // out of the corn, not right beside you
+    const ok = MAP.spawns.filter(([x, z]) => Math.hypot(x - P.pos.x, z - P.pos.z) > 9 && !zombies.some(o => !o.dead && Math.hypot(o.g.position.x - x, o.g.position.z - z) < 1.2));
+    if (ok.length) {
+      const [x, z] = ok[Math.random() * ok.length | 0], zz = makeZombie(x, z, type);
+      zz.g.rotation.y = Math.atan2(P.pos.x - x, P.pos.z - z);
+      riseAt.set(x, 1.2, z); burst(riseAt, 0x6f9a3a, 8);
+      if (!zz.boss) sfx('zDie', { at: zz.g.position, far: 45, rate: .5, v: .45 });
+      return zz;
+    }
+  }
   for (let tries = 0; tries < 80; tries++) {
     let x, z;
     if (MAP.water) { x = (Math.random() * 2 - 1) * (A - 2); z = (Math.random() * 2 - 1) * (A - 2); } // anywhere on dry land
@@ -74,6 +94,16 @@ function spawnZombie(type = pickType()) {
       return zz;
     }
   }
+}
+// a zombie climbing out of its grave, kicking up dirt
+const riseAt = new THREE.Vector3();
+function riseTick(z, dt) {
+  z.rise = Math.max(0, z.rise - dt);
+  const f = z.rise / RISE_T, p = z.g.position;
+  p.y = -1.9 * z.scale * f * f;
+  z.g.rotation.x = -.35 * f; z.pivL.rotation.x = Math.sin(z.rise * 18) * .5; z.pivR.rotation.x = -z.pivL.rotation.x;
+  if (Math.random() < dt * 16) burst(riseAt.set(p.x + (Math.random() - .5) * .9, .1, p.z + (Math.random() - .5) * 1.6), 0x4a3a28, 2);
+  if (!z.rise) z.g.rotation.x = 0;
 }
 // hit effects on a zombie or bot
 function hitFx(zz, point, head, quiet) {
@@ -138,7 +168,8 @@ function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0
     return;
   }
   if (by?.rec) d *= 1 + by.rec.fx.dmg + (kind !== 7 && BASE[by.gun]?.wand ? by.rec.fx.wand ?? 0 : 0);
-  if (by?.rec) youHelpers.add(by.rec); // for assists
+  if (by?.rec) { youHelpers.add(by.rec); P.hitBy = by; P.hitAt = performance.now(); } // for assists, and knock-off kills
+  if (by?.rec && kind !== 7) killGuns.set(by.rec, by.gun); // a burn keeps the gun that lit it
   const wasHead = head; [d, head] = gearHit(youFx(), d, head); // hats can block or soften headshots
   d *= 1 - P.dr - youFx().dr; // armor and boots cut every hit
   const soak = pierce ? 0 : Math.min(P.armor, d);
@@ -163,7 +194,7 @@ function drownYou() {
   if (!MAP.void) { sfx('splash'); splash(P.pos); }
   P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0; P.drowned = true;
   if (net.on) { P.drownFlag = true; return; } // online the server calls it
-  if (pvp()) { youDown(null); return; }
+  if (pvp()) { youDown(P.hitBy && performance.now() - P.hitAt < PUSH_KILL * 1000 ? P.hitBy : null); return; } // knocked in: whoever hurt you last gets the kill
   zombiesDead();
 }
 // blue screen when your eyes are underwater
@@ -185,7 +216,9 @@ function drownZombie(z) {
   z.drowned = true;
   if (z.type === 'bot') {
     if (net.on && z.pid) { z.drownFlag = true; return; } // online the server calls it
-    z.hp = 0; z.dead = .0001; botDown(z, null, false, true); return;
+    const by = z.hitBy && z.hitByT > 2 - PUSH_KILL ? z.hitBy : null; // knocked in: whoever hurt it last gets the kill
+    z.hp = 0; z.dead = .0001; if (by === YOU_T) hitMarker('kill');
+    botDown(z, by === YOU_T ? null : by, false, !by); return;
   }
   if (z.type === 'exploder') z.boomed = true; // water puts the fuse out
   hurtZombie(z, z.hp + 1, z.g.position.clone(), false, true);
@@ -260,12 +293,12 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -
 
 // shop between waves
 const SHOP = [
-  { name: 'Medkit',  price: 15, heal: 50, desc: '+50 HP' },
-  { name: 'Armor Plate', price: 40, armor: 25, desc: `+25 max armor, refills it (cap ${ARMOR_CAP})` },
-  { name: 'Ammo',    price: 20, refill: true, desc: 'refill all spare ammo' },
-  { name: 'Adrenaline', price: 60, perk: 'spd', desc: '+10% run speed, up to 3 times' },
-  { name: 'Sharpshooter', price: 80, perk: 'dmg', desc: '+10% damage, up to 3 times' },
-  { name: 'Vitality', price: 50, perk: 'hp', desc: '+25 max HP and heals it, up to 3 times' },
+  { name: 'Medkit',  price: 15, heal: 50, desc: '+50 HP', ic: 'plus', col: '#ff6b6b' },
+  { name: 'Armor Plate', price: 40, armor: 25, desc: `+25 max armor and a refill, up to ${ARMOR_CAP}`, ic: 'shield', col: '#9fd3ff' },
+  { name: 'Ammo',    price: 20, refill: true, desc: 'fills up all your spare ammo', ic: 'bullet', col: '#ffcf3a' },
+  { name: 'Adrenaline', price: 60, perk: 'spd', desc: '+10% run speed', ic: 'fast', col: '#8ff0b6' },
+  { name: 'Sharpshooter', price: 80, perk: 'dmg', desc: '+10% damage', ic: 'aim', col: '#8ff0b6' },
+  { name: 'Vitality', price: 50, perk: 'hp', desc: '+25 max HP, healed too', ic: 'heart', col: '#8ff0b6' },
   { gun: 'shotgun', price: 40, desc: '9 pellets, close range' },
   { gun: 'ar', price: 90, desc: 'full auto, 30 mag' },
   { gun: 'hitman', price: 60, desc: 'quiet pistol, 2x sight' },
@@ -319,34 +352,55 @@ function pickOffers() {
   return out.sort((a, b) => a - b);
 }
 const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i) && (!BASE[i].pool || ammo[i] >= w.mag));
-let shopOpen = false, shopWave = 0, bonus = 0, armorBought = 0, waveReward = '';
+let shopOpen = false, shopWave = 0, bonus = 0, armorBought = 0, waveReward = null;
 // shop prices go up each time you buy
 const rental = g => owned[g] && !hasGun(g); // rented this run, so it can be upgraded
 const isUpg = it => it.gun !== undefined && rental(it.gun);
 const maxed = it => (isUpg(it) && lvl[it.gun] >= 2) || (it.armor && P.maxArmor >= ARMOR_CAP) || (it.perk && perk[it.perk] >= PERK_MAX);
 const priceOf = it => it.armor ? it.price + armorBought * 25 : it.perk ? Math.round(it.price * (1 + perk[it.perk] * .5)) : isUpg(it) ? Math.round(it.price * (lvl[it.gun] ? 1.25 : .75)) : it.gun !== undefined && hasGun(it.gun) ? Math.ceil(it.price * FETCH) : it.price;
+function showShop(on) { $('shop').style.display = on ? 'flex' : 'none'; document.body.classList.toggle('shopping', on); }
+// what the wave paid: run coins and health, then the account
+function shopTop() {
+  const box = (label, val, cls = '') => `<div class="sb${cls}"><small>${label}</small><b>${val}</b></div>`;
+  const bar = (v, max, col) => `<span class="sbar" style="--f:${Math.max(0, Math.min(1, v / max))};--bc:${col}"></span>`;
+  const R = waveReward;
+  return `<div class="sg">${box('SHOP COINS', `${COIN}${coins}<em>+${bonus}</em>`, ' gold')}${box('HEALTH', `${ico('heart')} ${Math.ceil(P.hp)}/${P.max}${bar(P.hp, P.max, '#ff5a5a')}`)}` +
+    (P.maxArmor ? box('ARMOR', `${ico('shield')} ${Math.ceil(P.armor)}/${P.maxArmor}${bar(P.armor, P.maxArmor, '#9fd3ff')}`) : '') + '</div>' +
+    (R ? `<div class="sg acct">${box('ACCOUNT', R.pay ? `+${R.gold}${COIN} +${R.xp} XP` : `paid up to wave ${PAY_WAVES}`)}` +
+      (R.ups ? box(`LEVEL ${R.lv}!`, `+${R.bonus}${COIN} +${R.boost} ${ico('bolt')}`, ' up') : '') + '</div>' : '');
+}
+// one row: icon or gun picture, name and what it does, price
+function shopRow(it, i) {
+  const upg = isUpg(it), done = maxed(it), price = priceOf(it), g = it.gun, gun = g !== undefined;
+  const full = (it.heal && P.hp >= P.max) || (it.refill && ammoFull()), poor = !done && !full && coins < price;
+  let name = it.name, tag = '', desc = it.desc, cost = `<b>${COIN}${price}</b>`;
+  if (gun) {
+    const mine = hasGun(g); // yours from the armory: cheap
+    tag = CATS[slotOf(g)][1] + (upg ? '' : mine ? ' · YOURS' : ' · RENT');
+    if (upg) name += ` <span class="st">${stars(g)}</span>`;
+    else if (mine && gunUse(g)) name += ` <span class="st">${starRow(gunUse(g), gunUse(g), 3)}</span>`;
+  }
+  if (upg) {
+    const nx = statsAt(g, lvl[g] + 1);
+    const to = (k, a, b) => `${k} ${a} ${ico('right')} ${b}`, W = WEAPONS[g];
+    desc = done ? 'fully upgraded' : [nx.dmg !== W.dmg ? to('dmg', W.dmg, nx.dmg) : to('rate', +(1 / W.rate).toFixed(1), +(1 / nx.rate).toFixed(1) + '/s'), nx.mag !== W.mag && to('mag', W.mag, nx.mag), 'faster reload'].filter(Boolean).join(' · ');
+  }
+  if (it.perk) name += ` <span class="pips">${'<i class="on"></i>'.repeat(perk[it.perk])}${'<i></i>'.repeat(PERK_MAX - perk[it.perk])}</span>`;
+  if (done) cost = 'MAXED'; else if (full) cost = 'FULL';
+  const col = gun ? RARITY[rarOf(BASE[g])][1] : it.col, pic = gun ? `<img src="${gunPic(g)}">` : ico(it.ic);
+  return `<button data-i="${i}" class="si${gun ? ' gun' : ''}${done || full ? ' done' : ''}${poor ? ' poor' : ''}" style="--rc:${col}" ${done || full || poor ? 'disabled' : ''}>` +
+    `<span class="sp">${pic}</span><span class="sn">${tag ? `<small>${tag}</small>` : ''}<b>${name}</b><small>${desc}</small></span>` +
+    `<span class="sc">${upg && !done ? '<small>UPGRADE</small>' : ''}${cost}</span></button>`;
+}
 function renderShop() {
-  $('shopInfo').innerHTML = `Wave ${wave} cleared! +${bonus} bonus   ·   <span class="pc">${COIN}${coins}</span>   ·   ${ico('heart')} ${P.hp}/${P.max}` + (P.maxArmor ? `   ·   ${ico('shield')} ${P.armor}/${P.maxArmor}` : '') + (waveReward ? `\n${waveReward}` : '');
-  // shop items for this visit
-  const list = SHOP.map((it, i) => [it, i]).filter(([it, i]) => it.gun === undefined || isUpg(it) || shopOffer.includes(i) && !owned[it.gun]);
-  $('items').innerHTML = list.map(([it, i]) => {
-    const upg = isUpg(it), done = maxed(it);
-    const off = done || (it.heal && P.hp >= P.max) || (it.refill && ammoFull()) || coins < priceOf(it);
-    let label = it.name, desc = it.desc, cost = COIN + priceOf(it);
-    if (it.gun !== undefined) {
-      const mine = hasGun(it.gun); // yours from the armory: cheap
-      label = `<small class="cat">${CATS[slotOf(it.gun)][1]}${mine ? ' · YOURS' : ' · RENT'}</small><br>${label}` + (mine && gunUse(it.gun) ? ` <span class="cat">${starRow(gunUse(it.gun), gunUse(it.gun), 3)}</span>` : '');
-    }
-    if (upg) {
-      const g = it.gun, nx = statsAt(g, lvl[g] + 1);
-      label = `<small class="cat">${CATS[slotOf(g)][1]}</small><br>${it.name} <span class="cat">${stars(g)}</span>`;
-      desc = done ? 'fully upgraded' : (nx.dmg !== WEAPONS[g].dmg ? `dmg ${WEAPONS[g].dmg} ${ico('right')} ${nx.dmg} · ` : `rate ${+(1 / WEAPONS[g].rate).toFixed(1)} ${ico('right')} ${+(1 / nx.rate).toFixed(1)}/s · `) + `mag ${WEAPONS[g].mag} ${ico('right')} ${nx.mag} · faster reload`;
-      cost = done ? 'MAXED' : 'UPGRADE ' + COIN + priceOf(it);
-    }
-    if (it.perk) { label = `${it.name} <span class="cat">${ico('star').repeat(perk[it.perk])}</span>`; if (done) cost = 'MAXED'; }
-    if (it.armor && done) { desc = `armor maxed at ${ARMOR_CAP}`; cost = 'MAXED'; }
-    return `<button data-i="${i}" class="${done ? 'own' : ''}" ${off ? 'disabled' : ''}>${label}<br><small>${desc}</small><br>${cost}</button>`;
-  }).join('');
+  $('shopH').textContent = `WAVE ${wave} CLEARED`;
+  $('shopInfo').innerHTML = shopTop();
+  // this visit: supplies and perks always, a few gun offers, upgrades for guns you rented
+  const rows = f => SHOP.map((it, i) => [it, i]).filter(([it, i]) => f(it, i)).map(([it, i]) => shopRow(it, i)).join('');
+  const sec = (title, html) => html ? `<section><h2>${title}</h2>${html}</section>` : '';
+  const ups = rows(it => isUpg(it) && !maxed(it)) + rows(it => isUpg(it) && maxed(it)); // maxed ones last
+  $('items').innerHTML = `<div class="scol">${sec('SUPPLIES', rows(it => it.gun === undefined && !it.perk))}${sec('PERKS', rows(it => it.perk))}</div>` +
+    `<div class="scol">${sec('GUNS', rows((it, i) => shopOffer.includes(i) && !owned[it.gun]) || '<p class="none">nothing new this time</p>')}${sec('UPGRADES', ups)}</div>`;
 }
 function buy(i) {
   const it = SHOP[i], price = priceOf(it); if (coins < price || maxed(it)) return;
@@ -371,7 +425,7 @@ function buy(i) {
 function openShop() { shopOpen = true; shopOffer = pickOffers(); renderShop(); unlockMouse(); }
 $('items').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) buy(+b.dataset.i); });
 $('next').addEventListener('click', () => {
-  shopOpen = false; $('shop').style.display = 'none'; waveWait = 3;
+  shopOpen = false; showShop(false); waveWait = 3;
   rerollPads(); // so pickups match what you own now
   lockMouse();
 });
@@ -388,7 +442,7 @@ function zombiesOver() {
   zRankRow();
   $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '');
-  $('post').style.display = 'flex';
+  $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
   unlockMouse();

@@ -551,7 +551,11 @@ const pineMat = lam({ map: tex(g => { noise(g, [52, 104, 58], 26); g.fillStyle =
     if (!ok) continue;
     const s = .8 + rnd() * .45, y = lo, c = LEAF_TINTS[rnd() * LEAF_TINTS.length | 0];
     pines.push([x, z]); addSlab(x, z, .45 * s, .45 * s, y, y + 1.5 * s, barkMat);
-    for (const [k, w, t] of [[1.7, 2.6, .9], [2.5, 2, .8], [3.2, 1.4, .7], [3.8, .8, .6], [4.25, .35, .4]]) leaves.push([x, y + k * s, z, w * s, t * s, w * s, rnd() * .6, c]);
+    for (const [k, w, t] of [[1.7, 2.6, .9], [2.5, 2, .8], [3.2, 1.4, .7], [3.8, .8, .6], [4.25, .35, .4]]) {
+      const ry = rnd() * .6, hw = w * s / 2 / (Math.cos(ry) + Math.sin(ry)); // the square that fits inside the turned layer
+      leaves.push([x, y + k * s, z, w * s, t * s, w * s, ry, c]);
+      if (w > .5) { const sol = addSolid(x, z, hw * 2, hw * 2, y + (k + t / 2) * s, 'grass'); sol.bot = y + (k - t / 2) * s; } // you can stand on the layers, and shoot through them
+    }
   }
   instanced(unit, pineMat, leaves);
   M.pines = pines;
@@ -576,6 +580,7 @@ const pineMat = lam({ map: tex(g => { noise(g, [52, 104, 58], 26); g.fillStyle =
   const cliff = (x0, x1, z0, z1, t) => {
     const b = tbox(x1 - x0, t - .3 + SEA_D, z1 - z0, rockM, 2); b.position.set((x0 + x1) / 2, (t - .3 - SEA_D) / 2, (z0 + z1) / 2); add(b);
     const c = tbox(x1 - x0, .3, z1 - z0, capM, 2); c.position.set((x0 + x1) / 2, t - .15, (z0 + z1) / 2); add(c);
+    building.cover.push(b, c); // shots and rockets stop on them, past the invisible wall
     for (let k = 0; k < (x1 - x0) * (z1 - z0) / 60; k++) { const x = x0 + 1 + rnd() * (x1 - x0 - 2), z = z0 + 1 + rnd() * (z1 - z0 - 2), s = .8 + rnd() * .6; trees.push([x, t, z, s]); }
   };
   for (const [z0, z1, lo, hi] of [[-44, -36.2, PLAT + .45, PLAT + 1.8], [-58, -44, PLAT + 2.5, PLAT + 4.5], [-95, -58, PLAT + 5, PLAT + 9]]) for (let x = -110; x < 110;) { const w = 7 + rnd() * 8; cliff(x, x + w, z0 - rnd() * 2, z1, lo + rnd() * (hi - lo)); x += w; }
@@ -623,150 +628,12 @@ M.water = (x, z, feet) => M.sea(x, z, feet) && SF[cellAt(x, z)] <= -SEA_D; // on
 M.wet = (x, z, y) => kindAt(x, z) === SEA && y < WATER_Y && !M.water(x, z, y);
 M.surfAt = (x, z, y, b, s) => { if (s) return b; const c = cellAt(x, z); return c < 0 ? 'sand' : cave[c] ? 'stone' : kind[c] === SAND || kind[c] === SEA ? 'sand' : kind[c] === ROCK ? 'stone' : 'grass'; };
 
-// --- bots: a walk grid of half-metre cells holding every level you can stand on, built the first time it's needed ---
-const NS = .5, NG = CA * 2 / NS, BR = .3, DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-const gx = i => -CA + (i + .5) * NS, colOf = (x, z) => clamp(Math.floor((z + CA) / NS), 0, NG - 1) * NG + clamp(Math.floor((x + CA) / NS), 0, NG - 1);
-let NAV = null;
-function buildNav() {
-  const t0 = performance.now(), keep = solids, BK = 2, NB = CA * 2 / BK, bk = [];
-  for (let j = 0; j < NB; j++) for (let i = 0; i < NB; i++) { // solids near each 2 m square, so probing is quick
-    const x0 = -CA + i * BK - 1, z0 = -CA + j * BK - 1;
-    bk.push(M.solids.filter(s => s.maxX > x0 && s.minX < x0 + BK + 2 && s.maxZ > z0 && s.minZ < z0 + BK + 2));
-  }
-  const near = (x, z) => { solids = bk[clamp(Math.floor((z + CA) / BK), 0, NB - 1) * NB + clamp(Math.floor((x + CA) / BK), 0, NB - 1)]; };
-  // room for a body, ground right under the middle (not just a thin edge), and not out in the sea
-  const stand = (x, z, g) => { if (blocked(x, z, BR, g) || M.sea(x, z, g)) return false; const g0 = groundAt(x, z, 0, g + .05); return g - g0 <= STEP && !M.sea(x, z, g0); };
-  try {
-    const colStart = new Int32Array(NG * NG + 1), ys = [];
-    for (let c = 0; c < NG * NG; c++) { // every level in each column, top down
-      colStart[c] = ys.length;
-      const x = gx(c % NG), z = gx(c / NG | 0); near(x, z);
-      let feet = 60, last = 1e9;
-      for (let k = 0; k < 8; k++) {
-        const g = groundAt(x, z, BR, feet), s = groundSolid;
-        if (g < last - .01) { if (stand(x, z, g)) ys.push(Math.round(g * 1000) / 1000); last = g; }
-        if (!s) break;
-        feet = (s.bot || 0) - .06;
-      }
-    }
-    const NN = colStart[NG * NG] = ys.length, Y = Float32Array.from(ys), nodeCol = new Int32Array(NN);
-    const levelIn = (c, y) => { for (let n = colStart[c]; n < colStart[c + 1]; n++) if (Math.abs(Y[n] - y) < .02) return n; return -1; };
-    for (let c = 0; c < NG * NG; c++) for (let n = colStart[c]; n < colStart[c + 1]; n++) nodeCol[n] = c;
-    // where you end up walking from each node into each neighbouring column
-    const oS = new Int32Array(NN + 1), oT = [], oC = [], ok = new Uint8Array(8), lands = new Float64Array(8);
-    for (let u = 0; u < NN; u++) {
-      oS[u] = oT.length;
-      const c = nodeCol[u], i = c % NG, j = c / NG | 0, y = Y[u];
-      for (let d = 0; d < 8; d++) {
-        ok[d] = 0;
-        const [a, b] = DIRS[d], ni = i + a, nj = j + b, ax = a > 0 ? 0 : 1, az = b > 0 ? 2 : 3;
-        if (ni < 0 || nj < 0 || ni >= NG || nj >= NG || d >= 4 && !(ok[ax] && ok[az] && Math.abs(lands[ax] - y) < .02 && Math.abs(lands[az] - y) < .02)) continue; // diagonals only on the flat
-        const nc = nj * NG + ni, x = gx(ni), z = gx(nj); near(x, z);
-        let land = null;
-        if (!blocked(x, z, BR, y)) land = groundAt(x, z, BR, y);
-        else { const up = groundAt(x, z, BR, y + STEP); if (up > y && !blocked(x, z, BR, up)) land = up; }
-        if (land === null || d >= 4 && Math.abs(land - y) > .02) continue;
-        let v = levelIn(nc, land), cost = (d < 4 ? 5 : 7) + (y - land > 1.4 ? 6 : 0);
-        if (v < 0 && d < 4 && land < y + .01 && !M.sea(x, z, groundAt(x, z, 0, y + .05))) { // off a ledge edge: land a step further out
-          const i2 = ni + a, j2 = nj + b, x2 = gx(i2), z2 = gx(j2);
-          if (i2 < 0 || j2 < 0 || i2 >= NG || j2 >= NG) continue;
-          near(x2, z2);
-          if (blocked(x2, z2, BR, y)) continue;
-          const l2 = groundAt(x2, z2, BR, y);
-          v = y - l2 > STEP ? levelIn(j2 * NG + i2, l2) : -1; cost = 10 + (y - l2 > 1.4 ? 6 : 0);
-        }
-        if (v < 0) continue;
-        ok[d] = 1; lands[d] = land; oT.push(v); oC.push(cost);
-      }
-    }
-    oS[NN] = oT.length;
-    const iS = new Int32Array(NN + 1), iF = new Int32Array(oT.length), iC = new Uint8Array(oT.length);
-    for (const v of oT) iS[v + 1]++;
-    for (let v = 0; v < NN; v++) iS[v + 1] += iS[v];
-    const fill = iS.slice(0, NN);
-    for (let u = 0; u < NN; u++) for (let e = oS[u]; e < oS[u + 1]; e++) { const k = fill[oT[e]]++; iF[k] = u; iC[k] = oC[e]; }
-    NAV = { Y, colStart, nodeCol, oS, oT: Int32Array.from(oT), oC: Uint8Array.from(oC), iS, iF, iC, cache: new Map(), main: null };
-    // the main area: everywhere you can walk to from the beach and back
-    const ref = nodeNear(1, -5, 0, false, .6, 3), reach = (S, T) => { const seen = new Uint8Array(NN), q = [ref]; seen[ref] = 1; for (let k = 0; k < q.length; k++) for (let e = S[q[k]]; e < S[q[k] + 1]; e++) { const v = T[e]; if (!seen[v]) { seen[v] = 1; q.push(v); } } return seen; };
-    const fw = reach(oS, NAV.oT), bw = reach(iS, iF);
-    NAV.main = fw.map((f, n) => f & bw[n]);
-    NAV.ms = performance.now() - t0;
-  } finally { solids = keep; }
-}
-// the node nearest a spot, at most `up` above it and `down` below
-function nodeNear(x, z, y, mainOnly, up, down) {
-  const i0 = clamp(Math.floor((x + CA) / NS), 0, NG - 1), j0 = clamp(Math.floor((z + CA) / NS), 0, NG - 1);
-  let best = -1, bs = 1e9;
-  for (let j = Math.max(0, j0 - 3); j <= Math.min(NG - 1, j0 + 3); j++) for (let i = Math.max(0, i0 - 3); i <= Math.min(NG - 1, i0 + 3); i++) {
-    const c = j * NG + i;
-    for (let n = NAV.colStart[c]; n < NAV.colStart[c + 1]; n++) {
-      if (mainOnly && !NAV.main[n]) continue;
-      const dy = NAV.Y[n] - y; if (dy > up || dy < -down) continue;
-      const s = Math.hypot(gx(i) - x, gx(j) - z) + Math.abs(dy) * 2;
-      if (s < bs) { bs = s; best = n; }
-    }
-  }
-  return best;
-}
-// cost to reach a goal from every node (cached per 2 m square and level)
-function fieldTo(g) {
-  const c = NAV.nodeCol[g], bi = (c % NG) >> 2, bj = (c / NG | 0) >> 2, key = (bj * 64 + bi) * 128 + Math.round(NAV.Y[g] / LV) + 20;
-  let f = NAV.cache.get(key);
-  if (f) { NAV.cache.delete(key); NAV.cache.set(key, f); return f; }
-  const inB = n => { const cc = NAV.nodeCol[n]; return (cc % NG) >> 2 === bi && (cc / NG | 0) >> 2 === bj && Math.abs(NAV.Y[n] - NAV.Y[g]) < .5; };
-  const seeds = [g], seen = new Set(seeds);
-  for (let k = 0; k < seeds.length; k++) for (let e = NAV.oS[seeds[k]]; e < NAV.oS[seeds[k] + 1]; e++) { const v = NAV.oT[e]; if (!seen.has(v) && inB(v)) { seen.add(v); seeds.push(v); } }
-  f = new Uint16Array(NAV.Y.length).fill(65535);
-  const B = Array.from({ length: 16 }, () => []);
-  for (const s of seeds) { f[s] = 0; B[0].push(s); }
-  let left = seeds.length;
-  for (let cur = 0; left > 0 && cur < 65000; cur++) {
-    const q = B[cur & 15];
-    while (q.length) {
-      const v = q.pop(); left--;
-      if (f[v] !== cur) continue;
-      for (let e = NAV.iS[v]; e < NAV.iS[v + 1]; e++) { const u = NAV.iF[e], nd = cur + NAV.iC[e]; if (nd < f[u]) { f[u] = nd; B[nd & 15].push(u); left++; } }
-    }
-  }
-  NAV.cache.set(key, f); if (NAV.cache.size > 48) NAV.cache.delete(NAV.cache.keys().next().value);
-  return f;
-}
-// a straight walk from p to node v stays on v's level
-const straight = (p, v) => {
-  const c = NAV.nodeCol[v], tx = gx(c % NG), tz = gx(c / NG | 0), n = Math.ceil(Math.hypot(tx - p.x, tz - p.z) / .25);
-  for (let k = 1; k < n; k++) {
-    const cc = colOf(p.x + (tx - p.x) * k / n, p.z + (tz - p.z) * k / n);
-    let hit = false; for (let m = NAV.colStart[cc]; m < NAV.colStart[cc + 1]; m++) if (Math.abs(NAV.Y[m] - NAV.Y[v]) < .55) { hit = true; break; }
-    if (!hit) return false;
-  }
-  return true;
-};
-const navReady = () => MAP === M && (NAV || buildNav(), true);
-M.nav = (p, t) => {
-  if (!navReady()) return null;
-  const s = nodeNear(p.x, p.z, p.y, false, .6, 3), g = nodeNear(t.x, t.z, t.y ?? p.y, true, 99, 99);
-  if (s < 0 || g < 0) return null;
-  const f = fieldTo(g);
-  if (f[s] === 0 || f[s] === 65535) return null; // there already, or no way there
-  let u = s; const y0 = NAV.Y[s];
-  for (let k = 0; k < 4; k++) { // a few cells down the field, stopping at a step
-    let best = -1, bv = 1e9;
-    for (let e = NAV.oS[u]; e < NAV.oS[u + 1]; e++) { const v = NAV.oT[e]; if (f[v] < f[u] && f[v] + NAV.oC[e] < bv) { bv = f[v] + NAV.oC[e]; best = v; } }
-    if (best < 0 || k && (Math.abs(NAV.Y[best] - y0) > .05 || !straight(p, best))) break;
-    u = best;
-  }
-  const c = NAV.nodeCol[u];
-  return { x: gx(c % NG), y: NAV.Y[u], z: gx(c / NG | 0) };
-};
-M.around = (p, t) => Math.abs(t.y - p.y) > 1.3 ? M.nav(p, t) : null; // someone up or down a level: take the way round
-M.top = (x, z) => {
-  if (!navReady()) return hAt(x, z);
-  const c = colOf(x, z);
-  for (let n = NAV.colStart[c]; n < NAV.colStart[c + 1]; n++) if (NAV.main[n]) return NAV.Y[n];
-  return hAt(x, z);
-};
-M.land = (x, z) => { if (!navReady()) return kindAt(x, z) !== SEA; const c = colOf(x, z); for (let n = NAV.colStart[c]; n < NAV.colStart[c + 1]; n++) if (NAV.main[n] && NAV.Y[n] > -.1) return true; return false; };
-M.debug = { kind, H, SF, cave, CF, CC, N, O, nav: () => NAV, nodeNear: (...a) => nodeNear(...a), build: () => navReady() };
+// --- bots and zombies: the walk grid (world.js), built the first time it's needed ---
+const NV = makeNav(M, [1, 0, -5], M.sea);
+M.nav = NV.nav; M.around = NV.around;
+M.top = (x, z) => NV.top(x, z) ?? hAt(x, z);
+M.land = (x, z) => NV.ready() ? NV.land(x, z, -.1) : kindAt(x, z) !== SEA;
+M.debug = { kind, H, SF, cave, CF, CC, N, O, nav: NV.data, nodeNear: NV.nodeNear, build: NV.ready };
 
 M.tick = dt => {
   const t = performance.now() / 1000;

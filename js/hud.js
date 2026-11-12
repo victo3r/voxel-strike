@@ -86,7 +86,7 @@ const crossRay = new THREE.Raycaster(), crossNdc = new THREE.Vector2();
 function crossOnEnemy(w) {
   if (respawnT > 0) return false;
   crossRay.setFromCamera(crossNdc, camera); crossRay.far = w.melee ? w.range : 150;
-  const zz = crossRay.intersectObjects(shotTargets(), false)[0]?.object.userData.zombie;
+  const zz = crossRay.intersectObjects(shotTargets(crossRay), false)[0]?.object.userData.zombie;
   return !!zz && !zz.dead && !(zz.type === 'bot' && friendly(null, zz)) && (!zz.glowMs || zz.glowOn);
 }
 const CROSS_BACK = 26; // settle speed in pixels per second

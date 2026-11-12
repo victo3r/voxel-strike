@@ -51,6 +51,22 @@ const SONGS = {
     bass: [[0, 0, 6], [6, 7, 2], [8, 12, 4], [12, 7, 4]],
     keys: true, lead: true, amb: 'wind', hats: .7, reese: .4,
   },
+  graveyard: { // eerie and creeping, E minor
+    bpm: 158,
+    chords: [[40, [55, 59, 62, 64]], [36, [55, 60, 64, 67]], [45, [57, 60, 64, 65]], [47, [54, 57, 59, 63]]],
+    pad: { cut: 950, a: 1.6, v: .9 },
+    kit: { kickD: .13, snare: 180, drive: 1.4, bright: .85, room: .4, ride: 1.1 },
+    bass: [[0, 0, 4], [4, 7, 2], [6, 0, 2], [8, 12, 2], [10, 7, 2], [12, 0, 2], [14, 10, 2]],
+    lead: true, amb: 'wind', hats: .65, reese: .8,
+  },
+  farm: { // sunny and stomping, G major
+    bpm: 168,
+    chords: [[43, [55, 59, 62, 66]], [40, [55, 59, 62, 64]], [36, [52, 55, 60, 64]], [38, [54, 57, 62, 66]]],
+    pad: { cut: 1700, a: .9, v: .75 },
+    kit: { kickD: .12, snare: 200, drive: 1.2, bright: 1.1, room: .22, ride: .95 },
+    bass: [[0, 0, 2], [2, 7, 2], [4, 0, 2], [6, 12, 2], [8, 0, 2], [10, 7, 2], [12, 0, 2], [14, 10, 2]],
+    keys: true, steel: true, amb: 'wind', hats: .9, reese: .4,
+  },
   cove: { // salty and swaggering, G minor
     bpm: 166,
     chords: [[43, [55, 58, 62, 65]], [39, [55, 58, 62, 63]], [41, [53, 57, 60, 65]], [38, [54, 57, 62, 66]]],
@@ -60,7 +76,7 @@ const SONGS = {
     keys: true, lead: true, amb: 'waves', hats: .75, reese: .55,
   },
 };
-const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky', 'cove'];
+const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky', 'cove', 'graveyard', 'farm'];
 
 // what should be playing
 let muWant = { kind: 'lobby', id: 0, seed: 1 },muNow = null, muId = 0, muOld = [];

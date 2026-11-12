@@ -385,6 +385,7 @@ net = (() => {
     if (m.v === pid) {
       const armorOnly = m.armor < P.armor && m.hp >= P.hp - 1e-6 && m.d > 0;
       P.hp = m.hp; P.armor = m.armor;
+      if (m.by && m.by !== pid && gi(m.gun) !== undefined) killGuns.set(m.by, gi(m.gun)); // for the killer card (burns carry no gun)
       if (!alive) return;
       youHitFx(!!m.head, armorOnly);
       wandFx(P, m);
@@ -433,8 +434,8 @@ net = (() => {
     } else if ((m.assists || []).includes(pid)) toast('+15 ASSIST', '#e8e8e8');
     if (m.v === pid) {
       alive = false; readySent = false; respawnAt = m.respawnAt || now() + 3000;
-      if (!m.drowned) { P.hp = 0; youDownFx(bodyOf(m.by)); }
-      else if (respawnT <= 0) youDownFx(null);
+      if (!m.drowned || respawnT <= 0) { P.hp = 0; youDownFx(bodyOf(m.by)); } // drowned too: whoever knocked you in shows
+      killerCard(killer, killGuns.get(m.by) ?? bodyOf(m.by)?.gun);
       return;
     }
     const r = remotes.get(m.v); if (!r) return;
@@ -623,7 +624,7 @@ net = (() => {
           wandBolt(W.wand, z.flashM.getWorldPosition(fv).clone(), yd < Infinity ? youHitP.clone() : L.end);
         }
       }
-      if (W.lance) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); showLance(z.flashM.getWorldPosition(fv).clone(), lanceLine(eyeV, dirV, W, [ground, ...crateMeshes]), W.lance, 1, scene, z.flashM); } // their beam, just for show
+      if (W.lance) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); const g = z.gun; showLance(z.flashM.getWorldPosition(fv).clone(), lanceLine(eyeV, dirV, W, [ground, ...crateMeshes]), W.lance, 1, scene, z.flashM, () => z.gun === g && !z.dead); } // their beam, just for show
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0;
     z.stab = Math.max(0, z.stab - dt); knifeChop(z);
@@ -645,7 +646,7 @@ net = (() => {
         if (!(z.fireOn > 0)) sfx(W.frost ? 'frostStart' : 'heatStart', { at: pos, far: 50 });
         z.fireOn = .2; z.fireEnd = W.frost ? 'frostEnd' : 'heatEnd';
         beamRay.set(eyeV, dirV); beamRay.far = W.range || 30;
-        const hit = beamRay.intersectObjects(targetsFor(z), false)[0];
+        const hit = beamRay.intersectObjects(targetsFor(z, beamRay), false)[0];
         showBeam(z, fv.clone(), hit ? hit.point : eyeV.clone().addScaledVector(dirV, beamRay.far), beamKind(W));
       }
     }
