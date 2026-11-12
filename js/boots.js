@@ -16,11 +16,12 @@ function bootFx(b) {
   const L = b.st - 1;
   return { spd: B.spd?.[L] ?? 0, dmg: B.dmg?.[L] ?? 0, dr: B.dr?.[L] ?? 0, dj: !!B.dj, rl: B.rl?.[L] ?? 0, heavy: B.heavy?.[L] ?? 0 };
 }
-// bots get random boots, never better than yours
+// bots get random boots, only ones your level unlocks, never better than yours
 const BOOT_BARE = .3;
 function botBoots() {
-  if (Math.random() < BOOT_BARE) return null;
-  const B = BOOTS[Math.random() * BOOTS.length | 0];
+  const list = BOOTS.filter(B => bootStars(B.id) || prof.lv >= B.unlock);
+  if (!list.length || Math.random() < BOOT_BARE) return null;
+  const B = list[Math.random() * list.length | 0];
   return { id: B.id, st: 1 + (Math.random() * Math.max(1, bootStars(B.id)) | 0) };
 }
 

@@ -347,7 +347,7 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave();
 
 // the play button brings up mode select, then map select
 const ALL_MAPS = ['roofs', 'forest', 'cove', 'resort', 'sky'];
-const V_MAPS = 11; // bump when the map pictures change
+const V_MAPS = 12; // bump when the map pictures change
 const MODES = [
   { id: 'zombies', name: 'ZOMBIE WAVES', desc: 'Test your loadout and strategy against endless zombie waves', maps: ['yard', 'graveyard', 'farm'] }, // zombie-only maps
   { id: 'dm', name: 'DEATHMATCH', desc: 'A 4 minute free-for-all, top score wins', maps: ALL_MAPS },
@@ -415,7 +415,7 @@ function showPick(on) {
   $('lobbyUI').style.display = on ? 'none' : '';
   if (on) { pickMode = null; pickPriv = false; renderPick(); }
 }
-$('playBtn').addEventListener('click', () => { showPick(true); net.probe?.(); sfx('ui'); });
+$('playBtn').addEventListener('click', () => { sfx('ui'); if (needStarter()) return startStarter(); showPick(true); net.probe?.(); }); // your first game skips the picker
 $('pickBack').addEventListener('click', () => {
   const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
   if (pickMode === 'private') pickMode = null;
@@ -567,8 +567,9 @@ showLobby(true);
 
 // reset the world for a new game (spot = where the server put you)
 function restart(spot) {
+  if (zLive || mode === 'zombies' && wave && !dead) saveBest(); // left a zombie run: it still counts
   boostStart();
-  zombies.forEach(z => scene.remove(z.g)); zombies.length = 0;
+  zombies.forEach(z => { scene.remove(z.g); if (z.rock) scene.remove(z.rock); }); zombies.length = 0;
   booms.forEach(b => scene.remove(b.m)); booms.length = 0;
   rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;
   flames.forEach(f => scene.remove(f.m)); flames.length = 0;

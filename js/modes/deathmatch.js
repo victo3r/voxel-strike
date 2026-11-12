@@ -9,13 +9,15 @@ const SKILLS = [
   { react: .26, turn: 11,  lead: 1,   self: 1,   aimErr: .012, moveErr: .018, spd: 1.35, flick: .6,  stand: 0,   strafeT: [.25, .6],  plant: false, jumpF: [.6, 1.1],  jumpR: [1, 2.2], chain: .5,  gaze: [.35, .9], rest: null,             idle: false },
 ];
 const SKILL_MID = 2, skillOf = b => SKILLS[b.rec.skill ?? SKILL_MID] ?? SKILLS[SKILL_MID];
-// skill levels for a lobby, shuffled so the best one isn't always first
-const CRACKED_P = .4;
+// skill levels for a lobby, shuffled so the best one isn't always first (no cracked ones while you're new)
+const CRACKED_P = .12, CRACKED_LV = 5;
+// online rooms take players up to LV_BAND levels over their first player, and bots' guns stop there too (offline: over you)
+const LV_BAND = 15, roomLv = () => net.on && net.lvBase || prof.lv, botTop = () => roomLv() + LV_BAND;
 function rollSkills(n) {
   const out = [], most = n <= 3 ? 1 : 2;
   const some = (lvl, p1, p2) => { const r = Math.random(); for (let c = Math.min(most, r < p2 ? 2 : r < p2 + p1 ? 1 : 0); c > 0; c--) out.push(lvl); };
-  if (Math.random() < CRACKED_P) out.push(4);
-  some(0, .45, .2); some(3, .3, .08); some(1, .35, .12);
+  if (roomLv() >= CRACKED_LV && Math.random() < CRACKED_P) out.push(4);
+  some(0, .45, .2); some(3, .18, .04); some(1, .45, .15);
   out.length = Math.min(out.length, Math.max(0, n >= 3 ? n - 1 : n));
   while (out.length < n) out.push(SKILL_MID);
   for (let i = out.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [out[i], out[j]] = [out[j], out[i]]; }
@@ -33,6 +35,15 @@ const RULES = {
   blitz:     { name: 'BLITZ',      t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: false, players: { small: 4, medium: 6, large: 8 } },
   blitzTeam: { name: 'TEAM BLITZ', t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: true,  players: { small: 4, medium: 6, large: 6 } },
 };
+// a new player's first game: short, easy bots in common gear, with tips
+const STARTER = { ...RULES.dm, t: 120, join: 30, starter: true }, STARTER_MAP = 'roofs', STARTER_SKILLS = [0, 1, 0, 1, 0, 1, 0];
+let starterNext = false;
+const needStarter = () => prof.lv === 1 && !prof.xp && !localStorage.getItem('voxelstrike-starter');
+function startStarter() {
+  try { localStorage.setItem('voxelstrike-starter', '1'); } catch {}
+  starterNext = true; mode = 'dm'; mapId = STARTER_MAP;
+  restart(); showLobby(false); lockMouse();
+}
 const DIE_T = 1.5; // how long a body stays
 let MR = RULES.dm, MATCH_T = 240, YOU_RESPAWN = 3, JOIN_T = 60;
 let BOT_COUNT = 3;
@@ -72,7 +83,7 @@ const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t
 // team modes: winners get 1st place pay
 const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res === 0 ? t[1] : t[t.length - 1]; };
 // bot loadouts: one gun per category, rarer guns less often
-const botGun = c => pickRare(BASE.filter(w => w.cat === c)).id;
+const botGun = c => pickRare(BASE.filter(w => w.cat === c && (w.unlock || 0) <= botTop())).id;
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
@@ -140,12 +151,12 @@ function botGearNet() {
   for (const id of load) { const top = Math.max(0, gunUse(gi(id)) - 1); stars[id] = Math.random() * (top + 1) | 0; }
   return { ...botWear(), stars, load };
 }
-function botLoadout() {
-  const load = CATS.map(([c]) => gi(botGun(c))), taste = tasteFor(load);
+function botLoadout(easy) {
+  const load = CATS.map(([c]) => gi(easy ? pickRare(BASE.filter(w => w.cat === c && rarOf(w) === 'common')).id : botGun(c))), taste = tasteFor(load);
   // stars: never more than you use on that gun
   const stars = {}, W = {};
-  for (const g of load) { const top = Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
-  const { armor, boots, hat } = botWear();
+  for (const g of load) { const top = easy ? 0 : Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
+  const { armor, boots, hat } = easy ? { armor: 0, boots: null, hat: null } : botWear();
   return { load, taste, stars, W, armor, boots, hat, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
 }
 
@@ -179,9 +190,9 @@ function makeRecs() {
   youRec = { name: myName, you: true, team: 0, css: '#8ff0b6', score: 0, kills: 0, deaths: 0, streak: 0 };
   recs = [youRec]; joins = [];
   // bot 1 starts with you, the others join over the first minute
-  const next = nameMaker([myName]), skills = rollSkills(BOT_COUNT);
+  const next = nameMaker([myName]), skills = MR.starter ? STARTER_SKILLS.slice(0, BOT_COUNT) : rollSkills(BOT_COUNT);
   for (let i = 0; i < BOT_COUNT; i++) {
-    const at = i === 0 ? 0 : Math.min(JOIN_T - 2, Math.max(JOIN_T / 12,JOIN_T * i / BOT_COUNT + (Math.random() - .5) * JOIN_T / 6));
+    const at = i === 0 ? (MR.starter ? 6 : 0) : Math.min(JOIN_T - 2, Math.max(JOIN_T / 12,JOIN_T * i / BOT_COUNT + (Math.random() - .5) * JOIN_T / 6));
     const nm = i === 0 ? { name: defaultBotName(myName), lang: 'en', quiet: true } : next();
     joins.push({ i, at, skill: skills[i], ...nm });
   }
@@ -194,7 +205,7 @@ function joinBot(j) {
   if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; }
   const [sr, sg, sb] = look.shirt;
   const r = { name: j.name, lang: j.lang, quiet: !!j.quiet, team, css: look.css, look: randomLook(j.name, sr << 16 | sg << 8 | sb), tag: tag.mat, tagW: tag.w,
-    score: 0, kills: 0, deaths: 0, streak: 0, b: null, wait: .5, skill: j.skill ?? SKILL_MID, ...botLoadout() };
+    score: 0, kills: 0, deaths: 0, streak: 0, b: null, wait: .5, skill: j.skill ?? SKILL_MID, ...botLoadout(MR.starter) };
   recs.push(r);
   if (MATCH_T - matchT > 1) { feed(`${nameTag(r)} joined`); sfx('join'); }
 }
@@ -902,7 +913,7 @@ function updateDM(dt) {
   if (matchOver) return; // don't pay out twice
   if (net.on) { net.matchTick(dt); return; } // online the server runs the match
   while (joins.length && MATCH_T - matchT >= joins[0].at) joinBot(joins.shift());
-  chatTick(dt); burnTick(dt);
+  chatTick(dt); burnTick(dt); tipTick(dt);
   for (const r of recs) if (!r.you && (!r.b || r.b.dead) && (r.wait -= dt) <= 0) makeBot(r);
   matchT -= dt;
   const sec = Math.max(0, Math.ceil(matchT));
@@ -918,9 +929,43 @@ function updateDM(dt) {
   if (show) { const h = boardHTML(); if (h !== lastBoard) $('board').innerHTML = lastBoard = h; }
   if (matchT <= 0) endMatch();
 }
+// first game tips, one at a time
+const kcap = a => { const c = binds[a][0] || binds[a][1]; return c ? `<span class="kc">${keyCap(c)}</span>` : ''; }, kic = n => `<span class="kc">${ico(n)}</span>`;
+const TIPS = [
+  { pc: () => ['fwd', 'left', 'back', 'right'].map(kcap).join('') + '<b>Move around</b>', touch: () => '<b>Drag the stick to move</b>', done: t => t.moved > 5 },
+  { pc: () => kic('mouse') + '<b>Look around</b>', touch: () => '<b>Drag on the right to look around</b>', done: t => t.turned > 2.5 },
+  { pc: () => kcap('jump') + '<b>Jump</b>', touch: () => kic('up') + '<b>Jump</b>', done: () => P.vy > 2 && !P.onGround },
+  { pc: () => kcap('shoot') + '<b>Shoot a bot</b>', touch: () => kic('bullet') + '<b>Shoot a bot</b>', done: () => youRec.kills > 0 },
+  { pc: () => kcap('next') + kcap('slot2') + '<b>Try another gun</b>', touch: () => '<b>Tap a gun below to switch</b>', done: t => cur !== t.gun },
+  { pc: () => '<b>Most points wins, go get them!</b>', done: t => t.t > 4 },
+];
+let tip = null;
+function tipStart() {
+  $('tip').classList.remove('on');
+  tip = MR.starter && !net.on ? { i: 0, t: 0, moved: 0, turned: 0, x: P.pos.x, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, gun: cur, shown: -1 } : null;
+}
+function tipTick(dt) {
+  if (!tip) return;
+  const el = $('tip'), T = TIPS[tip.i], d = Math.hypot(P.pos.x - tip.x, P.pos.z - tip.z), turn = Math.abs(P.yaw - tip.yaw) + Math.abs(P.pitch - tip.pitch);
+  if (d < 1) tip.moved += d; // respawns don't count
+  if (turn < 1) tip.turned += turn;
+  tip.x = P.pos.x; tip.z = P.pos.z; tip.yaw = P.yaw; tip.pitch = P.pitch;
+  if (respawnT > 0) { el.classList.remove('on'); return; }
+  tip.t += dt;
+  if (tip.shown === tip.i && !tip.ok) tip.ok = T.done(tip);
+  if (tip.ok && tip.t > 1) { // done: on to the next one
+    el.classList.remove('on'); if (tip.i < TIPS.length - 1) sfx('ui');
+    if (++tip.i >= TIPS.length) { tip = null; return; }
+    Object.assign(tip, { t: 0, moved: 0, turned: 0, gun: cur, ok: false });
+    return;
+  }
+  if (tip.t < .35) return;
+  if (tip.shown !== tip.i) { el.innerHTML = (TOUCH && T.touch || T.pc)(); tip.shown = tip.i; }
+  el.classList.add('on');
+}
 // match results (online they come from the server)
 function endMatch(results) {
-  matchOver = true; closeChat(); closeArmory(); $('board').style.display = 'none'; $('menu').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard();
+  matchOver = true; closeChat(); tip = null; $('tip').classList.remove('on'); closeArmory(); $('board').style.display = 'none'; $('menu').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard();
   const place = results ? results.place : ranked().indexOf(youRec) + 1, lead = results ? results.lead : teamLead();
   $('postSub').textContent = MR.name + ' OVER';
   $('postPlace').textContent = MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
@@ -935,7 +980,7 @@ function endMatch(results) {
     + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(won ? 'win' : 'lose'); musicEnd();
-  setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
+  if (!MR.starter) setTimeout(cgMidgame, 1500); // CrazyGames midgame ad, not after your first game
   if (ups) setTimeout(() => sfx('levelUp'), 700);
   unlockMouse();
 }
@@ -950,7 +995,7 @@ function giveGun(g) {
 // set up the mode you picked
 function setupMode() {
   matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = ''; youHelpers.clear(); killCam = null;
-  MR = RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join;
+  MR = starterNext && !net.on ? STARTER : RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join; starterNext = false;
   BOT_COUNT = net.on ? 0 : MR.players[MAP.size] - 1;
   $('post').style.display = 'none'; document.body.classList.remove('results'); $('board').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard(); // clears "KILLED BY"
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
@@ -967,4 +1012,5 @@ function setupMode() {
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
   musicMatch(mapId, pvp() ? 'dm' : mode); // bot matches use the deathmatch music
+  tipStart();
 }

@@ -26,11 +26,12 @@ function gearHit(fx, d, head) {
   if (fx.half && Math.random() < fx.half) d *= .5;
   return [d, head];
 }
-// bots get random hats, never better than yours
+// bots get random hats, only ones your level unlocks, never better than yours
 const HAT_BARE = .3;
 function botHat() {
-  if (Math.random() < HAT_BARE) return null;
-  const H = HATS[Math.random() * HATS.length | 0];
+  const list = HATS.filter(H => hatStars(H.id) || prof.lv >= H.unlock);
+  if (!list.length || Math.random() < HAT_BARE) return null;
+  const H = list[Math.random() * list.length | 0];
   return { id: H.id, st: 1 + (Math.random() * Math.max(1, hatStars(H.id)) | 0) };
 }
 

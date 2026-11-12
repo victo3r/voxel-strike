@@ -55,7 +55,7 @@ net = (() => {
   const remotes = new Map();
   let roster = { recs: [], youRec: null };
   let lastTop = '', lastBoard = '', lastSec = 0;
-  const api = { on: false, banner: '', wsOk: null, code: null, serverPads: false }; // serverPads: the server stocks the pads
+  const api = { on: false, banner: '', wsOk: null, code: null, serverPads: false, lvBase: 0 }; // serverPads: the server stocks the pads; lvBase: the room's level band
 
   function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
 
@@ -80,7 +80,7 @@ net = (() => {
     return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load };
   }
   function hello(rejoin = null) {
-    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookBase(), gear: myGear() }; // a drawn skin follows in its own message
+    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookBase(), gear: myGear(), lv: prof.lv }; // a drawn skin follows in its own message
     if (auth?.token) m.token = auth.token; else m.guest = guestId;
     if (rejoin) m.rejoin = rejoin;
     send(m);
@@ -130,7 +130,7 @@ net = (() => {
     } else if (o.room) { // a public room by name (a friend's, or PLAY AGAIN)
       r = { room: o.room };
     } else {
-      r = await fetchJson(`/play/find?mode=${encodeURIComponent(o.mode)}&map=${encodeURIComponent(o.map)}&not=${job.not.join(',')}&gen=${NET_GEN}`);
+      r = await fetchJson(`/play/find?mode=${encodeURIComponent(o.mode)}&map=${encodeURIComponent(o.map)}&not=${job.not.join(',')}&gen=${NET_GEN}&lv=${prof.lv}`);
       if (!r.room) throw new Error(r.error || 'No room found');
     }
     if (job.dead) return;
@@ -241,7 +241,7 @@ net = (() => {
     const rejoining = api.on;
     if (job) { job.dead = true; clearTimeout(job.timer); starting = null; }
     welcomed = true; pid = w.pid; key = w.key; room = w.room; code = w.code || null; myTeamRaw = w.me?.team ?? 0; hostPid = w.host | 0; skillPool = null;
-    phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8;
+    phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8; api.lvBase = w.lv | 0;
     rejoinInfo = { room, pid, key, until: 0 };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     mode = w.mode; mapId = w.map;

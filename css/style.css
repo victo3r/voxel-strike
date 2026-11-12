@@ -58,6 +58,12 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #kcard .kw{display:flex;flex-direction:column;align-items:center;gap:8px}
 #kcard .kr{display:flex;gap:8px}
 #kcard .ks{font-size:12px;letter-spacing:1px;color:#ffe27a;padding:2px 10px;background:rgba(0,0,0,.45);border:2px solid #ffe27a;box-shadow:3px 3px 0 rgba(0,0,0,.4)}
+#tip{position:absolute;left:50%;top:84px;transform:translate(-50%,-8px);display:flex;align-items:center;gap:5px;padding:7px 14px;background:rgba(10,14,16,.6);border:2px solid var(--line-dim);box-shadow:3px 3px 0 rgba(0,0,0,.4);font-size:18px;white-space:nowrap;opacity:0;transition:opacity .25s,transform .25s}
+#tip.on{opacity:1;transform:translate(-50%,0)}
+#tip b{margin-left:6px}
+#tip .kc{min-width:28px;height:28px;padding:0 6px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;background:#0b0e10;border:2px solid var(--line-dim);box-shadow:2px 2px 0 rgba(0,0,0,.45);font-size:13px;line-height:1;text-shadow:none}
+#tip .kc .ic{height:17px;width:calc(17px * var(--ar,1));filter:none;vertical-align:0}
+body.results #tip{display:none}
 #killNote{position:absolute;left:0;right:0;top:61%;display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;opacity:0;text-shadow:2px 2px 0 rgba(0,0,0,.6)}
 #killNote.show{opacity:1;animation:knPop .32s ease-out}#killNote.gone{opacity:0;transition:opacity .35s}
 #killNote .kt{font-size:20px;color:var(--acc-lt)}#killNote .kn{font-size:22px;font-weight:bold;letter-spacing:3px;color:#fff}#killNote .ki{font-size:46px;line-height:1;position:relative}
@@ -593,23 +599,36 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 #lbBox,#cardBox{display:flex;flex-direction:column;gap:10px;width:min(560px,94vw);max-height:92vh;box-sizing:border-box;padding:18px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #cardBox{width:min(460px,94vw)}
 #lbBox h1,#cardBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}
+@media (max-height:480px){#lbBox{padding:10px 14px;gap:6px}#lbBox h1{font-size:20px}#lbBox .lbBy button{padding:5px 4px;font-size:13px}#lbBox .lbFoot button{padding:5px 10px}.lbSub{font-size:11px}.lbList{max-height:none}.lr{padding:2px 8px}}
 #lbBox button,#cardBox button{font:bold 14px monospace;padding:7px 12px;color:#fff;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
 #lbBox button:hover,#cardBox button:hover{background:var(--hov)}
 #lbBox button.on,#cardBox button.on{border-color:#ffd75e;color:#ffd75e}
 .lbTabs{display:flex;gap:6px;flex-wrap:wrap}.lbTabs .sp{flex:1}
-.lbSub{margin:0;color:var(--muted);font-size:13px}
+.lbTop{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lbTop h1{flex:1;white-space:nowrap}
+.lbWhen{display:flex;gap:4px}#lbBox .lbWhen button{font-size:12px;padding:6px 10px}
+.lbBy{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#lbBox .lbBy button{display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 4px;font-size:15px}#lbBox .lbBy button .ic{height:1.1em;width:calc(1.1em * var(--ar,1))}
+#lbBox .lbBy button.on{background:rgba(255,215,94,.16)}
+.lbSub{margin:0;color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.lbClock{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;background:rgba(0,0,0,.3);border:2px solid rgba(255,215,94,.45);color:#ffd75e;font-size:12px;font-weight:bold;text-transform:uppercase;white-space:nowrap}
 .lbNote{margin:6px 0;color:var(--muted);font-size:14px;text-align:center}
 .lbHead,.lr{display:grid;grid-template-columns:34px 30px 1fr 70px;align-items:center;gap:8px}
-#lbBox.wk .lbHead,#lbBox.wk .lr{grid-template-columns:34px 30px 1fr 112px 70px}#lbBox.wk .lbHead span:nth-child(4){text-align:right}
-.lr .pz{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:13px;font-weight:bold;color:#ffcf3a;white-space:nowrap}.lr .pz .ch{position:relative;display:flex}.lr .pz .ch img{width:28px;height:auto;image-rendering:auto}.lr .pz .ch i{position:absolute;right:-3px;bottom:-3px;font:bold 12px/1 monospace;color:#fff;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000}.lr .pz .coin{margin-left:5px}
-.lbHead{font-size:12px;color:var(--muted);padding:0 8px}.lbHead span:last-child{text-align:right}
-.lbList{overflow-y:auto;min-height:120px;max-height:46vh;display:flex;flex-direction:column;gap:3px;padding-right:4px}
+#lbBox.wk .lbHead,#lbBox.wk .lr{grid-template-columns:34px 30px 1fr 112px 70px}
+.lr .pz{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:13px;font-weight:bold;color:#ffcf3a;white-space:nowrap}.lr .pz .ch{position:relative;display:flex}.lr .pz .ch img{width:28px;height:auto;image-rendering:auto}.lr .pz .ch i{position:absolute;right:-3px;bottom:-3px;font:bold 12px/1 monospace;color:#fff;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000}.lr .pz b{display:flex;align-items:center;margin-left:5px}.lr .pz .coin{margin:0 .18em 0 0}
+.lbHead{position:sticky;top:0;z-index:2;padding:6px 8px;border:2px solid transparent;background:#1c2624;font-size:12px;font-weight:bold;color:var(--muted);letter-spacing:1px;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.lbHead .rk{text-align:center}.lbHead .pz,.lbHead .v{text-align:right}.lbHead .v .ic{margin-right:5px;color:#ffd75e}
+.lbList{overflow-y:auto;min-height:120px;max-height:54vh;display:flex;flex-direction:column;gap:3px;padding-right:4px}
 .lr{padding:4px 8px;background:rgba(0,0,0,.25);border:2px solid transparent;cursor:pointer;font-size:15px}
-.lr:hover{background:var(--hov)}.lr.you{border-color:#5ee08a;background:rgba(36,170,98,.3)}
-.lr .rk{color:var(--muted);text-align:right}.lr img{width:26px;height:26px;image-rendering:pixelated}
+.lr.p1{border-left-color:#ffd75e;background:linear-gradient(90deg,rgba(255,215,94,.22),rgba(0,0,0,.25) 55%)}
+.lr.p2{border-left-color:#c5d3e8;background:linear-gradient(90deg,rgba(197,211,232,.18),rgba(0,0,0,.25) 55%)}
+.lr.p3{border-left-color:#e8975a;background:linear-gradient(90deg,rgba(232,151,90,.18),rgba(0,0,0,.25) 55%)}
+.lr:hover{background:var(--hov)}.lr.you{border-color:#5ee08a;background:rgba(36,170,98,.3)}.lr.pin{position:sticky;bottom:0;z-index:2;background:#1d4a33;box-shadow:0 -3px 0 rgba(0,0,0,.35)}
+.lr .rk{color:var(--muted);text-align:center}.lr .rk b{display:inline-block;min-width:24px;padding:1px 0;font-weight:normal}.lr img{width:26px;height:26px;image-rendering:pixelated}
 .lr .nm{display:flex;flex-direction:column;min-width:0;line-height:1.2}.lr .nm b,.lr .nm small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lr .nm small{color:var(--muted);font-size:11px}.lr .v{text-align:right;color:#ffd75e;font-weight:bold}
-.lr.p1 .rk,.lr.p1 .nm b{color:#ffd75e}.lr.p2 .rk,.lr.p2 .nm b{color:#c5d3e8}.lr.p3 .rk,.lr.p3 .nm b{color:#e8975a}.lr.p1 .rk,.lr.p2 .rk,.lr.p3 .rk{font-weight:bold}
-.lbPart{margin:10px 0 1px;padding:0 8px;font-size:12px;font-weight:bold;color:var(--muted);letter-spacing:1px}.lbPart:first-child{margin-top:0}
+.lr.p1 .nm b{color:#ffd75e}.lr.p2 .nm b{color:#c5d3e8}.lr.p3 .nm b{color:#e8975a}
+:is(.lr.p1,.lr.p2,.lr.p3) .rk b{color:#1a1206;text-shadow:none;font-weight:bold;border:2px solid #000;box-shadow:inset -2px -2px 0 rgba(0,0,0,.25),inset 2px 2px 0 rgba(255,255,255,.5)}
+.lr.p1 .rk b{background:#ffd75e}.lr.p2 .rk b{background:#c5d3e8}.lr.p3 .rk b{background:#e8975a}
+.lbPart{display:flex;align-items:center;gap:8px;margin:8px 0 1px;padding:0 8px;font-size:12px;font-weight:bold;color:var(--muted);letter-spacing:1px}.lbPart::after{content:'';flex:1;height:2px;background:rgba(255,255,255,.14)}.lbHead+.lbPart{margin-top:4px}
 .lbFoot{display:flex;gap:8px;justify-content:flex-end}
 .cTop{display:flex;gap:16px;align-items:center}.cSkin{height:150px;image-rendering:pixelated;filter:drop-shadow(4px 4px 0 rgba(0,0,0,.4))}
 .cWho{display:flex;flex-direction:column;gap:6px;min-width:0}.cWho h1{overflow:hidden;text-overflow:ellipsis}

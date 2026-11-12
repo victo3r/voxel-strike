@@ -201,7 +201,7 @@ const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: t
 const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), gust: new THREE.MeshBasicMaterial({ color: 0xd8f4ff }), flare: new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
   beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }),
   shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), frost: new THREE.MeshBasicMaterial({ color: 0xc8f4ff, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
-const heroLive = () => inLobby && (armOpen ? armPage === 'weapons' : lob.on);
+const heroLive = () => inLobby && (armOpen ? armPage !== 'wear' : lob.on);
 const heroCan = () => heroLive() && hf.i >= 0 && holdK > .9;
 const hv = () => armOpen ? 1 : .55; // quieter when he plays with it in the lobby
 function heroFireStop() {
@@ -210,7 +210,7 @@ function heroFireStop() {
 // held before the gun is out, it fires once it is
 function heroTrigger(down) {
   if (!down) { heroFireStop(); return; }
-  if (!armOpen || !inLobby || armPage !== 'weapons') return;
+  if (!armOpen || !inLobby || armPage === 'wear') return;
   hf.held = true; hf.pend = true;
   if (heroCan()) { hf.pend = false; if (!autoFire(hf.st)) heroShot(); }
 }

@@ -135,34 +135,37 @@ function gunSpecs(i) {
   else if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }
-const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
+const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat && !BASE[i].chest).sort((a, b) => (BASE[a].unlock ?? 0) - (BASE[b].unlock ?? 0));
+const exclList = () => BASE.map((w, i) => i).filter(i => BASE[i].chest); // only from chests: the EXCLUSIVE page
 const isLocked = i => !hasGun(i) && prof.lv < (BASE[i].unlock ?? 0);
 const chestOnly = i => BASE[i].chest && !hasGun(i); // not for sale, only in golden chests
 const starTxt = i => BASE[i].start ? '' : starRow(gunUse(i), gunStars(i), 3);
 // star picker under your character
 const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>${ico('left')}</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>${ico('right')}</button></div>`;
 // armory pages and their sections
-const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR']];
+const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIVE']];
 const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS']];
 let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1, suitSel = '';
 const myArmor = () => Math.min(ARMOR_MAX, prof.armor | 0);
-const pageIcon = p => p === 'weapons' ? gunPic(loadoutGun('primary')) : armorPic(Math.max(0, wornArmor() - 1));
+const pageIcon = p => p === 'weapons' ? gunPic(loadoutGun('primary')) : p === 'exclusive' ? gunPic(exclList()[0]) : armorPic(Math.max(0, wornArmor() - 1));
+const EXCL_DESC = 'Rare finds from golden chests, never for sale';
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
   $('armPages').innerHTML = PAGES.map(([p, label]) =>
-    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}"><img class="ai" src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
+    `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}${p === 'exclusive' && !exclList().some(hasGun) ? ' dim' : ''}"><img class="ai" src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
+  $('armTabs').style.display = armPage === 'exclusive' ? 'none' : '';
   if (armPage === 'wear') { renderWear(); return; }
   heroArmor(wornArmor()); wearGear();
-  $('armTabs').innerHTML = CATS.map(([c, label], s) =>
+  const excl = armPage === 'exclusive', list = excl ? exclList() : catList(), on = i => loadoutGun(BASE[i].cat) === i;
+  if (!excl) $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img class="ai" src="${gunPic(loadoutGun(c))}"><span>${label}</span></button>`).join('');
-  const eq = loadoutGun(armCat);
-  if (BASE[armSel]?.cat !== armCat) { armSel = eq; armPick = false; }
+  if (!list.includes(armSel)) { armSel = list.find(on) ?? list[0]; armPick = false; }
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
-  else $('armList').innerHTML = catList().map(i => {
-    const w = BASE[i], tag = chestOnly(i) ? `${ico('lock')} GOLDEN CHEST` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : i === eq ? 'EQUIPPED' : '';
-    return `<div class="card rr${isLocked(i) || chestOnly(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${i === eq ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
+  else $('armList').innerHTML = (excl ? `<p class="wd">${EXCL_DESC}</p>` : '') + list.map(i => {
+    const w = BASE[i], tag = chestOnly(i) ? `${ico('lock')} GOLDEN CHEST` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : on(i) ? 'EQUIPPED' : '';
+    return `<div class="card rr${isLocked(i) || chestOnly(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${on(i) ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${gunPic(i)}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
   }).join('');
@@ -172,10 +175,10 @@ function renderArmory() {
 // ---- the item card in the corner
 const actCard = (name, stars, body, pick, btns) => `<div class="an"><span>${name} <span class="st">${stars}</span></span>` +
   (armDetOk() ? `<button class="more" data-det="1">${armDet ? ico('left') + ' LIST' : 'DETAILS ' + ico('right')}</button>` : '') + `</div>${body}${pick}<div class="ab">${btns}</div>`;
-const armDetOk = () => armPage === 'weapons' || (wearCat !== 'skins' && (wearCat !== 'armor' || armorCard || !!suitSel));
+const armDetOk = () => armPage !== 'wear' || (wearCat !== 'skins' && (wearCat !== 'armor' || armorCard || !!suitSel));
 function renderAct() {
   if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
-  const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(armCat);
+  const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(w.cat);
   let btns;
   if (chestOnly(i)) btns = `<button disabled>${ico('lock')} FOUND IN GOLDEN CHESTS</button>`;
   else if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
@@ -191,7 +194,7 @@ function renderAct() {
 // SHOOT and RELOAD buttons
 function placeAct() {
   if (!armOpen) return;
-  const h = $('heroAct'), on = inLobby && armPage === 'weapons' && innerWidth > 700;
+  const h = $('heroAct'), on = inLobby && armPage !== 'wear' && innerWidth > 700;
   h.style.display = on ? 'flex' : 'none';
   $('heroReload').style.display = BASE[armSel]?.inf || BASE[armSel]?.pool ? 'none' : ''; // nothing to reload: melee, wands
   if (on) { const edge = $('armory').getBoundingClientRect().right; h.style.left = Math.max(edge, heroScreen.x - innerHeight * .2 - 50) + 'px'; h.style.top = heroScreen.y + 'px'; }

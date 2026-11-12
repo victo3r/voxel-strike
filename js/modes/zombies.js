@@ -20,6 +20,7 @@ const ZTYPES = {
 };
 const FUSE = .7, BLAST = 3.5; // exploder fuse and blast radius
 const WIND = .8, CHARGE_T = 1.6, CHARGE_SPD = 12; // boss charge (you run at 6)
+const LEAP_G = 30, LEAP_CD = 5, LEAP_UP = 2.2, LEAP_R = 12, ROCK_CD = 2.8, ROCK_G = 9; // bosses jump up after you, or throw rocks
 function pickType() { // tougher types show up in later waves
   const r = Math.random(); let c = 0;
   if (horde) return r < .4 ? 'runner' : 'walker';
@@ -226,20 +227,23 @@ function drownZombie(z) {
 // high score: best wave, then kills
 let best = { wave: 0, kills: 0 }, newBest = false;
 try { best = JSON.parse(localStorage.getItem('voxelstrike-best')) ?? best; } catch {}
-function saveBest() {
-  if (mode !== 'zombies') return;
+function saveBest(gone) {
+  if (mode !== 'zombies' && !zLive) return;
   newBest = wave > best.wave || (wave === best.wave && kills > best.kills);
   if (newBest) { best = { wave, kills }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} onSave(); }
-  zRunScore();
+  if (gone) zRunWave(true); else zRunScore();
 }
-// the zombie board (signed in): the server times each run from its first wave
-let zRun = 0, zRank = null;
+// the zombie board (signed in): the server times each run from its first wave; leaving counts the same as dying
+let zRun = 0, zRank = null, zLive = false;
 function zRunNew() { zRun++; zRank = null; }
-function zRunStart() { if (auth) api('POST', '/zombies/start').catch(() => {}); }
+function zRunStart() { zLive = !!auth; if (auth) api('POST', '/zombies/start').catch(() => {}); }
+function zRunWave(keep = false) { if (zLive && auth && wave > 1) api('POST', '/zombies/score', { wave, kills, live: true }, keep).catch(() => {}); } // the run so far
 function zRunScore() {
-  const run = zRun; if (!auth || !wave) return;
+  const run = zRun; if (!zLive || !auth || !wave) return;
+  zLive = false;
   api('POST', '/zombies/score', { wave, kills }).then(r => { if (run === zRun && r.status === 200 && r.week && r.all) { zRank = r; zRankRow(); } }).catch(() => {});
 }
+addEventListener('pagehide', () => { if (zLive) saveBest(true); }); // closing the tab mid-run
 function zRankRow() {
   if (!zRank || !matchOver || $('zRk')) return;
   $('postBoard').insertAdjacentHTML('beforeend', `<div class="r" id="zRk"><span>TOP PLAYERS</span><span>#${zRank.week.rank} this week · #${zRank.all.rank} all time</span></div>`);
@@ -465,13 +469,174 @@ function spit(z) {
 }
 function globTick(dt) {
   for (let i = globs.length - 1; i >= 0; i--) {
-    const g = globs[i], p = g.m.position; g.life -= dt; g.v.y -= GLOB_G * dt;
+    const g = globs[i], p = g.m.position, w = g.rock ? .7 : .55; g.life -= dt; g.v.y -= (g.grav ?? GLOB_G) * dt;
     p.addScaledVector(g.v, dt); g.m.rotation.x += dt * 6; g.m.rotation.z += dt * 4;
-    const hitYou = !dead && Math.abs(p.x - P.pos.x) < .55 && Math.abs(p.z - P.pos.z) < .55 && p.y > P.pos.y - .2 && p.y < P.pos.y + 1.9;
+    const hitYou = !dead && Math.abs(p.x - P.pos.x) < w && Math.abs(p.z - P.pos.z) < w && p.y > P.pos.y - .2 && p.y < P.pos.y + 1.9;
     if (hitYou) hurtPlayer(g.dmg);
-    if (hitYou || g.life <= 0 || p.y < (MAP.floor?.(p.x, p.z) ?? 0) || blocked(p.x, p.z, .14, p.y - .14)) { burst(p.clone(), 0x9ad84a, hitYou ? 8 : 5); scene.remove(g.m); globs.splice(i, 1); }
+    if (hitYou || g.life <= 0 || p.y < (MAP.floor?.(p.x, p.z) ?? 0) || solidAt(p.x, p.y, p.z, .14)) {
+      burst(p.clone(), g.rock ? 0x8a8070 : 0x9ad84a, hitYou ? 8 : g.rock ? 10 : 5); if (g.rock) sfx('smash', { at: p, far: 40, v: .5 });
+      scene.remove(g.m); globs.splice(i, 1);
+    }
   }
 }
 function clearGlobs() { for (const g of globs) scene.remove(g.m); globs.length = 0; }
+
+// bosses are too big for stairs: when you're up out of reach they jump up beside you, or throw rocks if there's no room to land
+const rockGeo = new THREE.BoxGeometry(.7, .6, .7), rockMat = lam({ color: 0xa39a8c, emissive: 0x24211c });
+const bossTall = z => 1.9 * z.scale, bA = new THREE.Vector3(), bB = new THREE.Vector3();
+// room for all of it: ground under its middle, and nothing over its head or shoulders
+const bossFits = (z, x, y, zz) => Math.abs(x) < MAP.half - 1 && Math.abs(zz) < MAP.half - 1 && !blocked(x, zz, z.r, y) && !blocked(x, zz, z.r, y + 2)
+  && groundAt(x, zz, z.r * .4, y + .1) > y - .3 && !overWater(x, zz, y)
+  && [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].every(([a, b]) => clearLine(bA.set(x + a * z.r * .8, y + .4, zz + b * z.r * .8), bB.set(x + a * z.r * .8, y + bossTall(z), zz + b * z.r * .8)));
+// a jump from s to l peaking h over the higher end, clear all the way for its body (middle, head and both shoulders)
+function leapArc(z, s, l, h) {
+  const len = Math.hypot(l.x - s.x, l.z - s.z); if (len > LEAP_R) return null;
+  const top = Math.max(s.y, l.y) + h, v0 = Math.sqrt(2 * LEAP_G * (top - s.y)), T = v0 / LEAP_G + Math.sqrt(2 * (top - l.y) / LEAP_G), H = bossTall(z) - .2, N = 12;
+  const sx = -(l.z - s.z) / (len || 1) * z.r, sz = (l.x - s.x) / (len || 1) * z.r, line = (a, b, ox, oz, dy) => clearLine(bA.set(a[0] + ox, a[1] + dy, a[2] + oz), bB.set(b[0] + ox, b[1] + dy, b[2] + oz));
+  let q = [s.x, s.y, s.z];
+  for (let k = 1; k <= N; k++) {
+    const t = T * k / N, x = s.x + (l.x - s.x) * k / N, zz = s.z + (l.z - s.z) * k / N, y = s.y + v0 * t - LEAP_G * t * t / 2, n = [x, y, zz];
+    if (k < N && (blocked(x, zz, z.r * .8, y) || blocked(x, zz, z.r * .8, y + 2))) return null;
+    if (!line(q, n, 0, 0, 1) || !line(q, n, 0, 0, H) || !line(q, n, sx, sz, H * .6) || !line(q, n, -sx, -sz, H * .6)) return null;
+    q = n;
+  }
+  return { T, v0 };
+}
+const leapFrom = (z, s, l) => leapArc(z, s, l, 2) || leapArc(z, s, l, 1) || leapArc(z, s, l, 4); // a low one under a roof
+// somewhere beside you with room for it
+function landNear(z) {
+  const g0 = groundAt(P.pos.x, P.pos.z, .3, P.pos.y + .1), p = z.g.position, a0 = Math.atan2(p.x - P.pos.x, p.z - P.pos.z);
+  for (const d of [1.8, 2.8]) for (const a of [0, .8, -.8, 1.6, -1.6, 2.4, -2.4, Math.PI]) {
+    const x = P.pos.x + Math.sin(a0 + a) * d, zz = P.pos.z + Math.cos(a0 + a) * d, y = groundAt(x, zz, z.r, g0 + .6);
+    if (Math.abs(y - g0) < 1 && bossFits(z, x, y, zz)) return new THREE.Vector3(x, y, zz);
+  }
+  return null;
+}
+// you're down somewhere it can't fit (the crypt): the ground right over you
+function overYou(z) {
+  const p = z.g.position, y = groundAt(P.pos.x, P.pos.z, z.r, p.y + .6), h = y - P.pos.y;
+  return Math.abs(y - p.y) < .8 && h > 1.5 && h < 4.5 && bossFits(z, P.pos.x, y, P.pos.z) ? new THREE.Vector3(P.pos.x, y, P.pos.z) : null;
+}
+// stuck among things too tight for it (rows of graves): a hop a few metres on along its way
+function hopOn(z, way) {
+  const p = z.g.position, t = way || P.pos, a0 = Math.atan2(t.x - p.x, t.z - p.z);
+  for (const d of [4, 3]) for (const a of [0, .5, -.5, 1, -1]) {
+    const x = p.x + Math.sin(a0 + a) * d, zz = p.z + Math.cos(a0 + a) * d, y = groundAt(x, zz, z.r, p.y + .6);
+    if (Math.abs(y - p.y) < .8 && bossFits(z, x, y, zz)) return new THREE.Vector3(x, y, zz);
+  }
+  return null;
+}
+// a throw from `from` that gets to you clear
+function lobAt(from) {
+  const to = new THREE.Vector3(P.pos.x, P.pos.y + 1.1, P.pos.z), d = Math.hypot(to.x - from.x, to.z - from.z), q = new THREE.Vector3(), n = new THREE.Vector3();
+  for (const T of [.45 + d / 14, .7 + d / 10, 1 + d / 8]) {
+    const v = new THREE.Vector3((to.x - from.x) / T, (to.y - from.y) / T + ROCK_G * T / 2, (to.z - from.z) / T);
+    let ok = true; q.copy(from);
+    for (let k = 1; k <= 10 && ok; k++) { const t = T * k / 10; n.set(from.x + v.x * t, from.y + v.y * t - ROCK_G * t * t / 2, from.z + v.z * t); ok = clearLine(q, n) && (k === 10 || !solidAt(n.x, n.y, n.z, .25)); q.copy(n); }
+    if (ok) return v;
+  }
+  return null;
+}
+const bossHand = (z, x = z.g.position.x, y = z.g.position.y, zz = z.g.position.z) => { // a rock in its hands, facing you
+  const d = Math.hypot(P.pos.x - x, P.pos.z - zz) || 1, f = .62 * z.scale;
+  return new THREE.Vector3(x + (P.pos.x - x) / d * f, y + 1.32 * z.scale, zz + (P.pos.z - zz) / d * f);
+};
+// spots on its own level to jump from (round where it would land), then to throw from (round you), nearest first
+function bossSpots(z, L) {
+  const p = z.g.position, list = [];
+  for (const l of L ? [L, null] : [null]) {
+    const c = l || P.pos, ring = [];
+    for (const r of [4, 6.5, 9]) for (let k = 0; k < 10; k++) {
+      const a = (k + r) / 10 * Math.PI * 2, x = c.x + Math.sin(a) * r, zz = c.z + Math.cos(a) * r;
+      if (!z.bad?.some(b => Math.hypot(b.x - x, b.z - zz) < 2)) ring.push({ d: Math.hypot(x - p.x, zz - p.z), x, zz, l }); // not one it couldn't get to
+    }
+    list.push(...ring.sort((a, b) => a.d - b.d));
+  }
+  return { list, i: 0 };
+}
+// try a few a frame: the spot, null when none will do, undefined while still looking
+function bossSpotStep(z, n) {
+  const p = z.g.position, H = z.hunt;
+  while (n-- > 0 && H.i < H.list.length) {
+    const { x, zz, l } = H.list[H.i++], y = groundAt(x, zz, z.r, p.y + .6);
+    if (Math.abs(y - p.y) > .6 || !bossFits(z, x, y, zz)) continue;
+    const s = new THREE.Vector3(x, y, zz);
+    if (l ? leapFrom(z, s, l) : lobAt(bossHand(z, x, y, zz))) return s;
+  }
+  return H.i < H.list.length ? undefined : null;
+}
+// where a boss heads: the usual way, or when you're up out of reach (or it's stuck) a spot to jump or throw from
+function bossWay(z, dt, way, dist) {
+  const p = z.g.position, busy = z.wind > 0 || z.charging > 0 || z.stun > 0 || z.windS > 0 || z.throwW > 0 || z.landT > 0 || z.stunT > 0, dy = P.pos.y - p.y;
+  if ((z.stuckT = (z.stuckT ?? 1) - dt) <= 0) { // walked for a while and got nowhere: the path is too tight for it
+    if (z.walkT > .7 && dist > z.reach + .5 && Math.hypot(p.x - z.sx, p.y - z.sy, p.z - z.sz) < .3) {
+      z.stuckOut = 4; z.bee = !z.bee;
+      if (z.go && (z.stuckN = (z.stuckN || 0) + 1) >= 3) { (z.bad ||= []).push(z.go); z.go = null; z.goT = 0; } // can't get there either way: pick another spot
+    } else z.stuckN = 0;
+    z.stuckT = 1; z.walkT = 0; z.sx = p.x; z.sy = p.y; z.sz = p.z;
+  }
+  if (dist <= z.reach && dy > -1 && dy < 3.5) return null; // close enough to hit you
+  if (z.stuckOut > 0) { z.stuckOut -= dt; if (dy < -1.5) z.downT = 8; } // stuck getting down to you: stomp from above instead
+  if (z.downT > 0) z.downT -= dt;
+  const pg = groundAt(P.pos.x, P.pos.z, .3, P.pos.y + .1), tight = !!way && blocked(way.x, way.z, z.r * .9, way.y);
+  z.up = !dead && pg - p.y > LEAP_UP; z.out = z.up || !dead && (z.stuckOut > 0 || z.downT > 0);
+  if (!z.out) { z.go = z.hunt = z.bad = null; return way; }
+  z.leapCD = (z.leapCD ?? 2) - dt; z.rockCD = (z.rockCD ?? 1.5) - dt;
+  if (!busy && (z.tryT = (z.tryT ?? 0) - dt) <= 0) {
+    z.tryT = .2; z.tryK = !z.tryK; // a jump one go, a throw the next
+    const L = z.tryK ? z.L = landNear(z) : z.L, arc = z.tryK && L && z.leapCD <= 0 && leapFrom(z, p, L);
+    if (arc) { z.leap = { w: .6, s: p.clone(), l: L, ...arc }; z.go = null; sfx('bossRoar', { at: p, far: 80, rate: 1.15 }); return null; }
+    const over = z.tryK && z.downT > 0 && overYou(z);
+    if (over && Math.hypot(over.x - p.x, over.z - p.z) < 1.3) {
+      const st = z.leapCD <= 0 && leapArc(z, p, p.clone(), 1.2);
+      if (st) { z.leap = { w: .5, s: p.clone(), l: p.clone(), stomp: true, ...st }; z.go = null; sfx('bossRoar', { at: p, far: 80, rate: .9 }); return null; }
+    } else if (over) { z.go = over; z.hunt = null; }
+    const hop = z.tryK && !z.up && z.stuckOut > 0 && z.leapCD <= 0 && hopOn(z, z.go ? MAP.nav?.(p, z.go) || z.go : way), harc = hop && leapFrom(z, p, hop);
+    if (harc) { z.leap = { w: .45, s: p.clone(), l: hop, ...harc }; z.go = null; z.stuckOut = 0; return null; }
+    if (!z.tryK && z.rockCD <= 0 && dist < 20 && lobAt(bossHand(z))) {
+      z.throwW = .55; z.rock = new THREE.Mesh(z.hive ? globGeo : rockGeo, z.hive ? globMat : rockMat); if (z.hive) z.rock.scale.setScalar(1.8);
+      z.rock.position.copy(bossHand(z)); scene.add(z.rock); return null;
+    }
+    if (!z.hunt && ((z.goT = (z.goT ?? 0) - .3) <= 0 || z.go && Math.hypot(P.pos.x - z.goP.x, P.pos.z - z.goP.z) > 2)) { z.hunt = bossSpots(z, L); z.goT = 2.5; z.goP = P.pos.clone(); }
+  }
+  if (z.hunt) { const s = bossSpotStep(z, 2); if (s !== undefined) { z.go = s; z.hunt = null; z.bee = false; } }
+  if (z.go) return (!z.bee && MAP.nav?.(p, z.go)) || z.go; // snagged on a corner: straight there for a bit
+  return z.up ? (tight || way && way.y > p.y + .05 ? null : way) : z.bee ? null : way; // no climbing after you; just stuck: the path, or straight at you
+}
+// winding up a throw, or getting up after a landing
+function bossBusy(z, dt) {
+  if (z.landT > 0) { z.landT -= dt; return true; }
+  if (!(z.throwW > 0)) return false;
+  const r = z.rock; r.position.copy(bossHand(z)).y += (.55 - z.throwW) * .8; r.rotation.y += dt * 3; // lifted to throw
+  if ((z.throwW -= dt) <= 0) {
+    const v = lobAt(r.position);
+    if (v) { globs.push({ m: r, v, life: 4, dmg: z.dmg, grav: ROCK_G, rock: !z.hive }); sfx('swing', { at: r.position, far: 50, rate: .5 }); }
+    else scene.remove(r);
+    z.rock = null; z.rockCD = ROCK_CD;
+  }
+  return true;
+}
+// a boss in the air: crouch, jump, then the landing shakes the ground and throws you back (or stomps down on you underground)
+function leapTick(z, dt) {
+  const L = z.leap, p = z.g.position;
+  if (L.w > 0) {
+    L.w -= dt; z.g.scale.set(z.scale * 1.06, z.scale * .86, z.scale * 1.06);
+    z.mats.forEach(m => m.emissive.setHex(Math.sin(L.w * 30) > 0 ? 0x662200 : 0x220800));
+    if (L.w <= 0) { z.g.scale.setScalar(z.scale); z.mats.forEach(m => m.emissive.setHex(0)); L.t = 0; sfx('bossCharge', { at: p, far: 70 }); }
+    return;
+  }
+  L.t = Math.min(L.t + dt, L.T);
+  const f = L.t / L.T;
+  p.set(L.s.x + (L.l.x - L.s.x) * f, L.s.y + L.v0 * L.t - LEAP_G * L.t * L.t / 2, L.s.z + (L.l.z - L.s.z) * f);
+  z.g.rotation.y = Math.atan2(L.l.x - L.s.x, L.l.z - L.s.z); z.pivL.rotation.x = -.9; z.pivR.rotation.x = .4;
+  if (L.t < L.T) return;
+  p.copy(L.l); z.leap = null; z.vy = 0; z.onRamp = false; z.landT = .7; z.leapCD = LEAP_CD; z.go = null; z.pivL.rotation.x = z.pivR.rotation.x = 0;
+  sfx('boom', { at: p, far: 90 }); burst(p.clone().setY(p.y + .3), 0x8a7a66, 22);
+  const dx = P.pos.x - p.x, dz = P.pos.z - p.z, d = Math.hypot(dx, dz);
+  if (L.stomp) { // the ceiling comes down on you
+    z.downT = 8; burst(new THREE.Vector3(P.pos.x, P.pos.y + 2.2, P.pos.z), 0x6a5a48, 16);
+    if (!dead && d < 2.8 && P.pos.y < p.y - 1 && p.y - P.pos.y < 4.5) { hurtPlayer(Math.round(z.dmg * 1.2)); sfx('smash'); }
+  } else if (!dead && d < 3.4 && Math.abs(P.pos.y - p.y) < 2) { hurtPlayer(Math.round(z.dmg * 1.2)); P.kx = dx / (d || 1) * 13; P.kz = dz / (d || 1) * 13; P.vy = Math.max(P.vy, 7); P.onGround = false; }
+}
 function resetRun() { perk.spd = perk.dmg = perk.hp = 0; runCoins = runXp = bossKills = 0; deadT = 0; horde = false; countShown = 0; shopOffer = []; clearGlobs(); }
 function banner(text, html = false) { const b = $('banner'); b[html ? 'innerHTML' : 'textContent'] = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }

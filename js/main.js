@@ -221,7 +221,7 @@ function update(dt) {
       banner(`WAVE ${wave}` + (horde ? '\nHORDE!' : news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
       sfx('waveStart');
       if (wave % 5 === 0) { spawnZombie(wave % 10 === 0 ? 'hive' : 'boss'); sfx('bossRoar', { v: .7 }); }
-      if (wave === 1) zRunStart(); // the zombie board's clock
+      if (wave === 1) zRunStart(); else zRunWave(); // the zombie board's clock, then the run so far
     } else if (wave > 0) { // countdown between waves
       const n = Math.ceil(waveWait);
       if (n !== countShown && n <= 3) { countShown = n; banner(`WAVE ${wave + 1} IN ${n}`); sfx('tick', { v: .5 }); }
@@ -236,6 +236,7 @@ function update(dt) {
       if (z.angel) angelTick(z, z.dead); // bots float up
       else z.g.rotation.x = -Math.min(z.dead * 4, Math.PI / 2); // zombies fall over
       if (z.drowned) { const p = z.g.position; p.y = Math.max(MAP.floor?.(p.x, p.z) ?? 0, p.y - (MAP.sink ?? 1.8) * dt); }
+      if (z.leap || z.rock) { const p = z.g.position; p.y = Math.max(groundAt(p.x, p.z, z.r, p.y), p.y - 12 * dt); if (z.rock) { scene.remove(z.rock); z.rock = null; } } // shot down mid-jump
       if (z.dead > 1.5) { if (z.angel) angelGone(z); scene.remove(z.g); zombies.splice(i, 1); }
       continue;
     }
@@ -252,10 +253,12 @@ function update(dt) {
     }
     if (z.type === 'bot') { updateBot(z, dt); continue; }
     if (z.rise > 0) { riseTick(z, dt); continue; } // still climbing out of a grave
+    if (z.leap) { leapTick(z, dt); continue; } // a boss jumping up to you
     settle(z, dt);
     if (inSea(z.g.position.x, z.g.position.z, z.g.position.y)) { drownZombie(z); continue; } // zombies drown in the sea
     const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = P.pos.y - z.g.position.y;
-    const way = MAP.nav?.(z.g.position, P.pos); // head for the stairs
+    let way = MAP.nav?.(z.g.position, P.pos); // head for the stairs
+    if (z.boss) way = bossWay(z, dt, way, dist); // too big for stairs: it jumps or throws
     const wx = way ? way.x - z.g.position.x : dx, wz = way ? way.z - z.g.position.z : dz, wd = Math.hypot(wx, wz) || .001;
     const zapped = stunTick(z, dt, !z.vy); // a stun wand froze it
     if (!zapped) z.g.rotation.y = Math.atan2(wx, wz);
@@ -275,6 +278,7 @@ function update(dt) {
     let spd = z.speed * slowMul(z), hold = false;
     z.glow = 0;
     if (zapped) { hold = true; z.glow = Math.sin(performance.now() * .04) > 0 ? 0x5a5000 : 0x1a1800; }
+    else if (z.boss && bossBusy(z, dt)) hold = true;
     else if (z.type === 'boss') {
       if (z.stun > 0) {
         z.stun -= dt; hold = true;
@@ -306,7 +310,7 @@ function update(dt) {
         }
         hold = true;
         if (z.charging <= 0) z.atk = .6;
-      } else if ((z.chargeT -= dt) <= 0 && dist > 4 && dist < 22 && !way) {
+      } else if ((z.chargeT -= dt) <= 0 && dist > 4 && dist < 22 && !way && !z.out) {
         z.wind = WIND; z.chargeT = Math.max(2.5, 5 - wave * .1) + Math.random() * 1.5;
         sfx('bossRoar', { at: z.g.position, far: 80 });
       }
@@ -340,8 +344,10 @@ function update(dt) {
       }
       const s = spd * dt, nx = z.g.position.x + vx * s, nz = z.g.position.z + vz * s;
       const into = !!MAP.trapped?.(P.pos);
-      walkDry(z.g.position, nx, z.g.position.z, z.r, !z.vy, into);
-      walkDry(z.g.position, z.g.position.x, nz, z.r, !z.vy, into);
+      const step = z.up ? .3 : STEP; // a boss after you up high doesn't climb, it jumps
+      walkDry(z.g.position, nx, z.g.position.z, z.r, !z.vy, into, step);
+      walkDry(z.g.position, z.g.position.x, nz, z.r, !z.vy, into, step);
+      z.walkT = (z.walkT || 0) + dt;
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
     } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.boss || z.type === 'brute' ? 3.5 : 2.2)) { // bosses and brutes reach higher

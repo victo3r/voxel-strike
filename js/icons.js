@@ -41,6 +41,8 @@ ICON_ART.up = ICON_ART.left[0].split('').map((_, x) => ICON_ART.left.map(r => r[
 ICON_ART.down = [...ICON_ART.up].reverse();
 ICON_ART.plus = ['..###..', '..###..', '#######', '#######', '#######', '..###..', '..###..']; // medkit
 ICON_ART.fast = ['#...#...', '##..##..', '###.###.', '########', '###.###.', '##..##..', '#...#...']; // speed
+ICON_ART.crown = ['#....#....#', '##..###..##', '###.###.###', '###########', '###########', '.#########.', '...........', '.#########.'];
+ICON_ART.clock = ['...#####...', '.#########.', '.####.####.', '#####.#####', '#####.#####', '#####...###', '###########', '###########', '.#########.', '.#########.', '...#####...'];
 // mouse buttons and the wheel, for key labels
 {
   const M = ['..#####..', '.#..#..#.', '#...#...#', '#...#...#', '#...#...#', '#########', '#.......#', '#.......#', '#.......#', '#.......#', '.#.....#.', '..#####..'];
@@ -76,6 +78,9 @@ const outlined = (rows, pal) => {
 // XP gem
 ICON_PIX.xp = outlined(['..lllgggddd..', '.llllgggdddd.', 'lllllgggddddd', 'ggggggggggggg', '.gggggggggdd.', '..ggggggggd..', '...gggggdd...', '....ggggd....', '.....ggd.....', '......g......'],
   { l: '#c8ffe0', g: '#2fbf71', d: '#16804a' });
+// zombie head, for the zombie board
+ICON_PIX.zombie = outlined(['ggggggggg', 'ggdgggggg', 'ggggggdgg', 'geegggeeg', 'gergggerg', 'ggggmgggg', 'ggmmmmmgg', 'gdgggggdg', 'ggggggggg'],
+  { g: '#62b043', d: '#3f7d28', e: '#16200f', r: '#d8433b', m: '#2a160e' });
 // kill streak badges
 {
   const SK = ['.bbbbbbb.', 'bbbbbbbbs', 'bbbbbbbbs', 'bbeebeebs', 'bbeebeebs', 'bbbbkbbbs', '.bbbbbbs.', '..bkbks..', '..bbbss..'];

@@ -415,35 +415,116 @@ const SX = -11.5, SW = 3, SZ0 = 12, SZ1 = 31, DECK = 2.25, QD = 4.05, FC = 3.15,
   bridge(X0, 19, Y, SX + SW, 19, DECK, 1.1, false); // the gangplank
 }
 // --- the ship: moored in the bay, bow to the beach ---
-const halfW = z => z >= 15.5 ? SW : .5 + (SW - .5) * Math.sqrt(clamp((z - SZ0) / (15.5 - SZ0), 0, 1));
+const hullWood = surf(lam({ map: tex(g => { noise(g, [92, 62, 40], 14); g.fillStyle = 'rgba(25,14,6,.55)'; for (const y of [0, 4, 8, 12]) g.fillRect(0, y, 16, 1); g.fillStyle = 'rgba(25,14,6,.35)'; for (const [x, y] of [[3, 1], [11, 5], [6, 9], [14, 13]]) g.fillRect(x, y, 1, 3); }, .5) }), 'wood'); // long planks
+const tarWood = surf(lam({ map: tex(g => { noise(g, [48, 37, 30], 10); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(0, 8, 16, 1); }) }), 'wood');
+const deckWood = surf(lam({ map: tex(g => { noise(g, [140, 102, 64], 18); g.fillStyle = 'rgba(50,30,15,.5)'; for (const x of [0, 4, 8, 12]) g.fillRect(x, 0, 1, 16); for (const [x, y] of [[1, 6], [5, 12], [9, 3], [13, 10]]) g.fillRect(x, y, 3, 1); }, 1, .5) }), 'wood'); // planks running fore and aft
+const grate = surf(lam({ map: tex(g => { g.fillStyle = '#1c140e'; g.fillRect(0, 0, 16, 16); g.fillStyle = '#7a5838'; for (let k = 0; k < 16; k += 4) { g.fillRect(k, 0, 2, 16); g.fillRect(0, k, 16, 2); } }) }), 'wood');
+const portMat = lam({ color: 0x100c0a });
+const BOW = 15.5, TIP = .18, DEEP = FC + SEA_D;
+const bowZ = y => SZ0 + 1.5 * clamp((FC - y) / DEEP, 0, 1) ** 1.5; // the stem leans out going up
+const bowT = k => (k / 16) ** 1.6;
+const halfW = (z, y = FC) => { const z0 = bowZ(y), t = clamp((z - z0) / (BOW - z0), 0, 1); return TIP + (SW - TIP) * (1 - (1 - t) ** (1.55 - .45 * clamp((FC - y) / DEEP, 0, 1))); }; // full at the deck, finer below
+// a smooth surface through rows of points, facing away from `from`
+const V3 = (...a) => new THREE.Vector3(...a);
+function skin(rows, m, from, cover = true) {
+  const C = rows[0].length, pos = rows.flat(2), idx = [];
+  for (let i = 0; i < rows.length - 1; i++) for (let j = 0; j < C - 1; j++) { const a = i * C + j, b = a + C; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  const k = idx.length / 2 - idx.length / 2 % 6, p = n => V3(pos[idx[k + n] * 3], pos[idx[k + n] * 3 + 1], pos[idx[k + n] * 3 + 2]);
+  if (p(1).sub(p(0)).cross(p(2).sub(p(0))).dot(p(0).sub(V3(...from))) < 0) for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2));
+  g.setIndex(idx); g.computeVertexNormals();
+  const o = new THREE.Mesh(g, m); o.userData.uvk = 1; add(o); if (cover) building.cover.push(o); return o;
+}
+// outward normals along a path of [x, z] points (outward is to the left of travel), mitred at the corners
+const outN = P => P.map((p, i) => {
+  const seg = (u, w) => { const dx = w[0] - u[0], dz = w[1] - u[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; };
+  const a = i > 0 && seg(P[i - 1], p), b = i < P.length - 1 && seg(p, P[i + 1]);
+  if (!a || !b) return a || b;
+  let mx = a[0] + b[0], mz = a[1] + b[1]; const l = Math.hypot(mx, mz) || 1, k = 1 / Math.max(.4, (mx * a[0] + mz * a[1]) / l);
+  return [mx / l * k, mz / l * k];
+});
+// a strip along a path from y to y + h, from `a` to `b` out from it
+function band(P, y, h, a, b, m, inner = true, cover = false) {
+  const N = outN(P), at = (u, v) => P.map((p, i) => [p[0] + N[i][0] * u, v, p[1] + N[i][1] * u]);
+  const ib = at(a, y), it = at(a, y + h), ob = at(b, y), ot = at(b, y + h), c = P.length >> 1, mid = (u, v) => [P[c][0] + N[c][0] * u, v, P[c][1] + N[c][1] * u];
+  skin([ob, ot], m, mid(a - 5, y), cover); skin([it, ot], m, mid(a, y - 5), cover); skin([ib, ob], m, mid(a, y + h + 5), cover);
+  if (inner) skin([ib, it], m, mid(b + 5, y), cover);
+  for (const [e, f] of [[0, 1], [P.length - 1, P.length - 2]]) skin([[ib[e], ob[e]], [it[e], ot[e]]], m, [(P[f][0] + N[f][0] * (a + b) / 2), y + h / 2, P[f][1] + N[f][1] * (a + b) / 2], cover);
+}
+// a box that tiles its texture, no collision
+const panel = (x0, x1, z0, z1, bot, top, m, cover = true) => { const b = tbox(x1 - x0, top - bot, z1 - z0, m); b.position.set((x0 + x1) / 2, (bot + top) / 2, (z0 + z1) / 2); add(b); if (cover) building.cover.push(b); return b; };
+const along = (a, d, s) => a.map((v, i) => v + d[i] * s);
 {
-  for (let z = SZ0; z < 15.49; z += .5) { const hw = halfW(z + .25); rect(SX - hw, SX + hw, z, z + .5, -SEA_D, FC, darkWood); } // the bow narrows
-  rect(SX - SW, SX + SW, 15.5, FZ, -SEA_D, FC, darkWood);
-  rect(SX - SW, SX + SW, FZ, QZ, -SEA_D, DECK, darkWood);
-  rect(SX - SW, SX + SW, QZ, SZ1, -SEA_D, QD, darkWood); // the stern cabin, the quarterdeck on top
-  // a gold stripe and gun ports along the sides
-  for (const s of [-1, 1]) {
-    deco(.04, .22, SZ1 - 15.5, trim, SX + s * (SW + .02), 1.45, (15.5 + SZ1) / 2);
-    for (const z of [17.6, 20.6, 23.4]) deco(.06, .42, .5, iron, SX + s * (SW + .03), 1.05, z);
+  // the hull: a curved bow (walked on as steps), then plain sides
+  const YS = [-SEA_D, -2, -1, -.4, .2, .8, 1.4, 2, 2.6, FC];
+  for (const s of [-1, 1]) skin(YS.map(y => { const z0 = bowZ(y); return Array.from({ length: 17 }, (_, k) => { const z = z0 + bowT(k) * (BOW - z0); return [SX + s * halfW(z, y), y, z]; }); }), hullWood, [SX, 0, 20]);
+  skin(YS.map(y => [[SX - TIP, y, bowZ(y)], [SX + TIP, y, bowZ(y)]]), hullWood, [SX, 0, 20]);
+  for (let z = SZ0; z < BOW - .01; z += .5) { const w = halfW(z + .25); solid(SX - w, SX + w, z, z + .5, -SEA_D, FC, 'wood'); }
+  rect(SX - SW, SX + SW, BOW, FZ, -SEA_D, FC, hullWood);
+  rect(SX - SW, SX + SW, FZ, QZ, -SEA_D, DECK, hullWood);
+  rect(SX - SW, SX + SW, QZ, SZ1, -SEA_D, QD, hullWood); // the stern cabin, the quarterdeck on top
+  // the bow's bulwark, cap rail and deck
+  const top = [];
+  for (let k = 16; k >= 0; k--) { const z = SZ0 + bowT(k) * (BOW - SZ0); top.push([SX + halfW(z), z]); }
+  top.unshift([SX + SW, FZ]); const bulwark = [...top, ...top.map(([x, z]) => [2 * SX - x, z]).reverse()];
+  band(bulwark, FC, .8, -.16, 0, hullWood, true, true);
+  band(bulwark, FC + .8, .08, -.22, .05, deckWood);
+  band(bulwark, FC - .1, .12, -.02, .045, trim, false);
+  const BN = outN(bulwark), IN = bulwark.map((p, i) => [p[0] - BN[i][0] * .16, FC + .02, p[1] - BN[i][1] * .16]), n = IN.length >> 1;
+  skin([IN.slice(0, n).reverse(), IN.slice(n)], deckWood, [SX, FC - 5, 14]);
+  for (let z = SZ0; z < FZ - .01; z += .5) { const w = halfW(z + .25); for (const s of [-1, 1]) solid(Math.min(SX + s * w, SX + s * (w - .2)), Math.max(SX + s * w, SX + s * (w - .2)), z, z + .5, FC, FC + .8, 'wood'); }
+  solid(SX - halfW(SZ0 + .25), SX + halfW(SZ0 + .25), SZ0 - .1, SZ0 + .2, FC, FC + .8, 'wood'); // the very front
+  // wales and a gold stripe all the way round, the stem up the front
+  const around = y => { const L = []; for (let k = 0; k <= 16; k++) { const z = bowZ(y) + bowT(k) * (BOW - bowZ(y)); L.push([SX - halfW(z, y), z]); } L.push([SX - SW, SZ1], [SX + SW, SZ1]); return [...L, ...L.slice(0, 17).reverse().map(([x, z]) => [2 * SX - x, z])]; };
+  band(around(.3), .3, .2, -.03, .09, tarWood, false); band(around(1.9), 1.9, .2, -.03, .09, tarWood, false); band(around(1.42), 1.42, .14, -.03, .05, trim, false);
+  band([[SX - SW, QZ], [SX - SW, SZ1], [SX + SW, SZ1], [SX + SW, QZ]], QD - .12, .12, -.02, .045, trim, false);
+  const stem = y => [SX, y, bowZ(y) - .1], SY = [-SEA_D, -1.8, -.8, .2, 1.1, 1.9, 2.6, FC, FC + .8];
+  for (let k = 0; k < SY.length - 1; k++) { const a = stem(SY[k]), b = stem(SY[k + 1]), l = Math.hypot(b[1] - a[1], b[2] - a[2]), d = [0, (b[1] - a[1]) / l, (b[2] - a[2]) / l]; line(along(a, d, -.16), along(b, d, .16), tarWood, .38); }
+  deco(.46, .55, .5, postMat, SX, FC + .78, SZ0 + .1); deco(.52, .06, .56, trim, SX, FC + 1.08, SZ0 + .1); // the knighthead the bowsprit runs through
+  // gun ports with their lids up and guns run out
+  const muzzle = new THREE.CylinderGeometry(.1, .12, .5, 8), ring = new THREE.CylinderGeometry(.15, .15, .08, 8);
+  for (const s of [-1, 1]) for (const z of [17.6, 20.6, 23.4]) {
+    const x = SX + s * SW;
+    deco(.04, .46, .56, portMat, x + s * .01, 1.05, z); deco(.06, .07, .7, tarWood, x + s * .02, 1.31, z); deco(.06, .07, .7, tarWood, x + s * .02, .79, z);
+    const lid = deco(.06, .5, .62, hullWood, x + s * .23, 1.2, z); lid.rotation.z = s * 1.15;
+    for (const [g, o] of [[muzzle, .2], [ring, .42]]) { const m = new THREE.Mesh(g, iron); m.rotation.z = Math.PI / 2; m.position.set(x + s * o, 1, z); add(m); }
   }
-  for (let z = SZ0; z < 15.49; z += .5) { const hw = halfW(z + .25); for (const s of [-1, 1]) deco(.04, .22, .5, trim, SX + s * (hw + .02), 2.35, z + .25); }
-  // rails, open where the bridge and gangplank come aboard
-  const rail = (x0, x1, z0, z1, y) => rect(x0, x1, z0, z1, y, y + .9, darkWood);
-  rail(SX - SW, SX - SW + .2, FZ, 16.2, DECK); rail(SX - SW, SX - SW + .2, 17.8, QZ, DECK);
-  rail(SX + SW - .2, SX + SW, FZ, 18.4, DECK); rail(SX + SW - .2, SX + SW, 19.6, QZ, DECK);
-  rail(SX - SW, SX - SW + .2, QZ, SZ1, QD); rail(SX + SW - .2, SX + SW, QZ, SZ1, QD); rail(SX - SW + .2, SX + SW - .2, SZ1 - .2, SZ1, QD);
-  rail(SX - 1.4, SX + 1.4, QZ, QZ + .2, QD); // along the front of the quarterdeck, between the stairs
-  for (let z = SZ0; z < 15.99; z += .5) { const hw = halfW(z + .25); for (const s of [-1, 1]) rect(SX + s * hw - (s > 0 ? .2 : 0), SX + s * hw + (s < 0 ? .2 : 0), z, z + .5, FC, FC + .8, darkWood); }
-  rect(SX - .7, SX + .7, FZ, FZ + .9, DECK, DECK + LV, planks); // a step up to the forecastle
+  // rails: a planked wall with a cap and posts inside, open at the gangway and for the deck guns
+  const rail = (s, z0, z1, y, ports = [], skip = []) => {
+    const x = SX + s * (SW - .1);
+    solid(x - .1, x + .1, z0, z1, y, y + .9, 'wood');
+    panel(x - .1, x + .1, z0, z1, y, y + .42, hullWood);
+    let z = z0; for (const p of [...ports, z1 + .35]) { if (p - .35 > z) panel(x - .1, x + .1, z, p - .35, y + .42, y + .9, hullWood); z = p + .35; }
+    panel(x - .15, x + .15, z0, z1, y + .9, y + .98, deckWood);
+    for (let p = z0 + .25; p < z1 - .15; p += 1.4) if (![...ports, ...skip].some(q => Math.abs(q - p) < .55)) deco(.07, .9, .1, postMat, x - s * .135, y + .45, p);
+  };
+  rail(-1, FZ, 16.2, DECK); rail(-1, 17.8, QZ, DECK, [20.6], [17.9, 18.6, 22, 23, 24]); rail(1, FZ, 18.4, DECK, [], [16.8, 17.7]); rail(1, 19.6, QZ, DECK, [20.6], [19.7, 22, 23, 24]);
+  rail(-1, QZ, SZ1, QD); rail(1, QZ, SZ1, QD);
+  solid(SX - SW + .2, SX + SW - .2, SZ1 - .2, SZ1, QD, QD + .9, 'wood'); panel(SX - SW + .2, SX + SW - .2, SZ1 - .2, SZ1, QD, QD + .9, hullWood); panel(SX - SW + .15, SX + SW - .15, SZ1 - .25, SZ1 + .05, QD + .9, QD + .984, planks);
+  for (const [s, z] of [[-1, 16.1], [-1, 17.9], [1, 18.3], [1, 19.7]]) { deco(.22, 1.3, .22, postMat, SX + s * (SW - .1), DECK + .65, z); deco(.26, .08, .26, trim, SX + s * (SW - .1), DECK + 1.34, z); } // gangway posts
+  // along the front of the quarterdeck, between the stairs: posts and a cap
+  solid(SX - 1.4, SX + 1.4, QZ, QZ + .2, QD, QD + .9, 'wood');
+  panel(SX - 1.4, SX + 1.4, QZ, QZ + .2, QD, QD + .1, hullWood); panel(SX - 1.45, SX + 1.45, QZ - .03, QZ + .23, QD + .9, QD + .98, planks);
+  for (let k = 0; k < 10; k++) deco(.08, .8, .08, postMat, SX - 1.26 + k * .28, QD + .5, QZ + .1);
+  for (const s of [-1, 1]) deco(.16, .9, .16, postMat, SX + s * 1.36, QD + .45, QZ + .1);
+  // decks: light planks, a hatch, a step up to the forecastle and stairs to the quarterdeck
+  panel(SX - SW + .2, SX + SW - .2, FZ, QZ, DECK, DECK + .02, deckWood, false); panel(SX - SW + .2, SX + SW - .2, QZ, SZ1 - .2, QD, QD + .02, deckWood, false);
+  panel(SX - .7, SX + .7, 21.1, 22.4, DECK, DECK + .04, grate, false); for (const z of [21.1, 22.4]) deco(1.5, .06, .1, tarWood, SX, DECK + .03, z); for (const s of [-1, 1]) deco(.1, .06, 1.4, tarWood, SX + s * .75, DECK + .03, 21.75);
+  rect(SX - .7, SX + .7, FZ, FZ + .9, DECK, DECK + LV, planks);
   stairs(SX - SW + .2 + .65, QZ - 3.6, 'z', 1, DECK, QD, 4, .9); stairs(SX + SW - .2 - .65, QZ - 3.6, 'z', 1, DECK, QD, 4, .9);
-  // the cabin's front: a door and two windows; the stern windows and lamps
-  deco(1, 1.5, .06, postMat, SX, DECK + .75, QZ - .03);
+  // the cabin's front: a door and two windows; the stern: windows in gold frames, mouldings, corner posts and the rudder
+  deco(1, 1.5, .06, postMat, SX, DECK + .75, QZ - .03); deco(1.16, .08, .08, trim, SX, DECK + 1.54, QZ - .04);
   for (const s of [-1, 1]) deco(.5, .4, .06, lanternMat, SX + s * 1.7, DECK + 1.1, QZ - .03);
-  for (const x of [-1.6, 0, 1.6]) deco(.55, .45, .06, lanternMat, SX + x, 3.05, SZ1 + .03);
-  for (const s of [-1, 1]) lantern(SX + s * 2.6, QD + 1.3, SZ1 - .1);
-  // masts, yards and sails
+  for (const x of [-1.6, 0, 1.6]) { deco(.72, .6, .04, trim, SX + x, 3.05, SZ1 + .02); deco(.55, .45, .06, lanternMat, SX + x, 3.05, SZ1 + .03); }
+  for (const y of [2.6, 3.5]) deco(SW * 2 - .2, .1, .1, trim, SX, y, SZ1 + .05);
+  for (const s of [-1, 1]) { deco(.22, QD + .3, .22, postMat, SX + s * (SW - .08), QD / 2 + .75, SZ1 + .04); deco(.1, .36, .1, postMat, SX + s * 2.6, QD + 1.16, SZ1 - .1); lantern(SX + s * 2.6, QD + 1.3, SZ1 - .1); }
+  panel(SX - .15, SX + .15, SZ1, SZ1 + .12, -SEA_D, 2.5, postMat); panel(SX - .12, SX + .12, SZ1 + .12, SZ1 + .95, -2.8, 1.7, hullWood);
+  for (const y of [-.5, .4, 1.3]) deco(.3, .08, .5, iron, SX, y, SZ1 + .3);
+  // masts with iron bands, a crow's nest, yards and sails
   const MASTS = [[13.6, FC, 12], [19.6, DECK, 14], [30.2, QD, 11.5]];
-  for (const [z, y, t] of MASTS) rect(SX - .22, SX + .22, z - .22, z + .22, y, t, postMat);
+  for (const [z, y, t] of MASTS) { rect(SX - .22, SX + .22, z - .22, z + .22, y, t, postMat); for (const h of [y + 1.4, y + 2.6, t - 2]) deco(.5, .08, .5, iron, SX, h, z); }
+  deco(1.4, .1, 1.4, planks, SX, 12.95, 19.6);
+  for (const s of [-1, 1]) { deco(1.4, .5, .08, darkWood, SX, 13.25, 19.6 + s * .66); deco(.08, .5, 1.24, darkWood, SX + s * .66, 13.25, 19.6); }
   const sail = (z, y0, y1, w) => {
     const g = new THREE.PlaneGeometry(w, y1 - y0, 6, 4), p = g.attributes.position;
     for (let i = 0; i < p.count; i++) { const u = p.getX(i) / (w / 2), v = p.getY(i) / ((y1 - y0) / 2); p.setZ(i, -.5 * (1 - u * u) * (1 - .4 * v * v)); }
@@ -451,10 +532,35 @@ const halfW = z => z >= 15.5 ? SW : .5 + (SW - .5) * Math.sqrt(clamp((z - SZ0) /
     deco(w + .6, .16, .16, postMat, SX, y1 + .06, z - .3);
   };
   sail(19.6, 6.4, 9.4, 5.2); sail(19.6, 9.9, 12.5, 4.2); sail(13.6, 5.6, 8.6, 4.6); sail(30.2, 6.4, 9.2, 3.4);
-  for (const [mz, y, t] of MASTS) for (const s of [-1, 1]) for (const dz of [-.8, 0, .8]) line([SX, t - 1.4, mz], [SX + s * (halfW(mz + dz) - .1), y + .9, mz + dz]);
-  line([SX, 11.6, 13.6], [SX, FC + 1.6, SZ0 - 3.4]); line([SX, 13.6, 19.6], [SX, 11.6, 13.6]); line([SX, 11, 30.2], [SX, 13.4, 19.6]);
-  line([SX, FC + .3, SZ0 + .4], [SX, FC + 1.6, SZ0 - 3.5], postMat, .2); // the bowsprit
-  line([SX + .9, FC, SZ0 + .9], [SX + 1.5, -1.5, SZ0 - .6], iron, .07); // the anchor chain
+  // shrouds: the foremast's to the bow's rail, the mainmast's to channels on the hull, the mizzen's to the quarterdeck rail
+  for (const s of [-1, 1]) {
+    for (const z of [13.6, 14.2, 14.8]) line([SX, 10.6, 13.6], [SX + s * (halfW(z) - .08), FC + .88, z]);
+    const cx = SX + s * (SW + .18); deco(.36, .1, 1.7, darkWood, cx, DECK + .45, 20.5);
+    for (const z of [19.8, 20.2, 21.1]) { deco(.16, .18, .12, tarWood, cx + s * .04, DECK + .6, z); line([cx + s * .04, DECK + .5, z], [SX + s * (SW + .01), 1.7, z], iron, .04); line([SX, 12.6, 19.6], [cx + s * .04, DECK + .68, z]); }
+    for (const z of [29.6, 30.2, 30.8]) line([SX, 10.1, 30.2], [SX + s * (SW - .1), QD + .98, z]);
+  }
+  line([SX, 13.6, 19.6], [SX, 11.6, 13.6]); line([SX, 11, 30.2], [SX, 13.4, 19.6]);
+  // the bowsprit: its heel on deck, through the knighthead, lashed down to the stem, a jib boom and a jib
+  const heel = [SX, FC + .16, 13.3], dir = [0, .3536, -.9354], upD = [0, .9354, .3536], cap = along(heel, dir, 4.28);
+  for (const s of [-1, 1]) deco(.12, .55, .14, postMat, SX + s * .21, FC + .27, 13.2); deco(.6, .1, .18, postMat, SX, FC + .58, 13.2); // bitts
+  line(heel, cap, postMat, .26); line(cap, along(cap, dir, .22), postMat, .38);
+  for (const k of [1.6, 2.7]) line(along(heel, dir, k), along(heel, dir, k + .07), iron, .32);
+  const j0 = along(along(heel, dir, 2.9), upD, .2), j1 = along(j0, dir, 4);
+  line(j0, j1, postMat, .15);
+  for (const k of [1.55, 1.75]) line(along(heel, dir, k), [SX, FC - .6, bowZ(FC - .6) - .3], darkRope, .08); // lashed to the stem
+  line(along(along(heel, dir, 3.9), upD, -.1), [SX, .7, bowZ(.7) - .22], iron, .05); // the bobstay
+  const foreTop = [SX, 11.95, 13.6];
+  line([SX, 11.6, 13.6], along(cap, upD, .18)); line(foreTop, j1);
+  { const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t), A = lerp(j1, foreTop, .08), B = lerp(j1, foreTop, .42), C = [SX, FC + 1.9, 11], n = 5, pos = [], uv = [], idx = [], id = [];
+    for (let i = 0; i <= n; i++) { id.push([]); for (let j = 0; j <= n - i; j++) { const u = i / n, v = j / n, p = [0, 1, 2].map(a => A[a] + (B[a] - A[a]) * u + (C[a] - A[a]) * v); p[0] += 3 * u * v * (1 - u - v); id[i].push(pos.length / 3); pos.push(...p); uv.push(p[2], p[1]); } }
+    for (let i = 0; i < n; i++) for (let j = 0; j < n - i; j++) { idx.push(id[i][j], id[i + 1][j], id[i][j + 1]); if (j < n - i - 1) idx.push(id[i + 1][j], id[i + 1][j + 1], id[i][j + 1]); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals(); add(new THREE.Mesh(g, sailMat)); } // the jib
+  // the anchors: one down through the hawse, one stowed under the cathead
+  { const y = 2.45, z = 12.9, x = SX + halfW(z, y); deco(.1, .24, .24, iron, x + .02, y, z); line([x + .05, y, z], [SX + 2.4, -1.2, 11.4], iron, .07); }
+  { const z = 12.7, x = SX - halfW(z) - .5; line([SX - halfW(z) + .3, FC + .55, z + .05], [x - .1, FC + .55, z], postMat, .2);
+    line([x, FC + .5, z], [x, 2.85, z], darkRope, .05); deco(.1, 1.3, .1, iron, x, 2.2, z); deco(.08, .08, .8, iron, x, 2.85, z);
+    for (const s of [-1, 1]) line([x, 1.58, z], [x, 1.86, z + s * .42], iron, .1); }
   // on deck
   cannon(SX - SW + .9, 20.6, DECK, -Math.PI / 2); cannon(SX + SW - .9, 20.6, DECK, Math.PI / 2);
   barrel(SX + SW - .7, 16.8, DECK); barrel(SX + SW - .7, 17.7, DECK); barrel(SX - SW + .7, 18.6, DECK);

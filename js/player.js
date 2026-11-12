@@ -29,6 +29,8 @@ function solidsNear(x, z, r) {
 }
 const hits = (s, x, z, r, feet) => overlaps(s, x, z, r) && feet < topAt(s, x, z, r) - 0.05 && feet + BODY > (s.bot || 0);
 const depth = (s, x, z, r) => Math.min(x + r - s.minX, s.maxX - x + r, z + r - s.minZ, s.maxZ - z + r);
+// a small thing (a rock, a glob) inside something solid
+const solidAt = (x, y, z, r) => solidsNear(x, z, r).some(s => overlaps(s, x, z, r) && y < topAt(s, x, z, r) && y > (s.bot || 0));
 // if you're stuck inside something, let moves that don't go deeper
 function blocked(x, z, r, feet, from) {
   return solidsNear(x, z, r).some(s => hits(s, x, z, r, feet) && !(from && hits(s, from.x, from.z, r, from.y) && depth(s, x, z, r) <= depth(s, from.x, from.z, r) + 1e-6));
@@ -52,14 +54,14 @@ const sticks = (drop, wasRamp) => drop <= STEP && (groundRamp || wasRamp || drop
 function easeLag(pos, dt) { if (pos.lag) { pos.lag *= Math.exp(-14 * dt); if (pos.lag < .005) pos.lag = 0; } }
 function ceilingAt(x, z, r, feet, rise) { let c = Infinity; for (const s of solidsNear(x, z, r)) { const b = s.bot || 0; if (b > feet + BODY - .1 && b < feet + BODY + rise && overlaps(s, x, z, r)) c = Math.min(c, b); } return c; }
 // move a player, bot or zombie, stepping up small ledges
-function walkTo(pos, nx, nz, r, grounded) {
+function walkTo(pos, nx, nz, r, grounded, step = STEP) {
   if (!blocked(nx, nz, r, pos.y, pos)) {
     const g = groundAt(nx, nz, r, pos.y);
     if (g <= pos.y || !blocked(nx, nz, r, g, pos)) { pos.x = nx; pos.z = nz; return true; }
     return slideOut(pos, nx, nz, r, g);
   }
   if (!grounded) return false;
-  const up = groundAt(nx, nz, r, pos.y + STEP);
+  const up = groundAt(nx, nz, r, pos.y + step);
   if (up > pos.y && !blocked(nx, nz, r, up, pos)) { if (!groundRamp) pos.lag = Math.min(STEP * 1.5, (pos.lag || 0) + up - pos.y); pos.x = nx; pos.z = nz; pos.y = up; return true; }
   return up > pos.y && slideOut(pos, nx, nz, r, up);
 }
@@ -90,9 +92,9 @@ function wetCheck(o, p) {
 }
 const dropsIn = (x, z, r, feet) => MAP.trapped({ x, y: groundAt(x, z, r, feet), z });
 // walkTo for bots and zombies, keeping them out of the water
-function walkDry(pos, nx, nz, r, grounded, into) {
+function walkDry(pos, nx, nz, r, grounded, into, step) {
   const ox = pos.x, oy = pos.y, oz = pos.z, lag = pos.lag, wasIn = !into && MAP.trapped?.(pos);
-  if (!walkTo(pos, nx, nz, r, grounded)) return false;
+  if (!walkTo(pos, nx, nz, r, grounded, step)) return false;
   const sea = overWater(pos.x, pos.z, pos.y) && !overWater(ox, oz, oy) || overDeep(pos.x, pos.z, pos.y) && !overDeep(ox, oz, oy);
   if (!sea && (into || !MAP.trapped || wasIn || !dropsIn(pos.x, pos.z, r, pos.y))) return true;
   pos.x = ox; pos.y = oy; pos.z = oz; pos.lag = lag; return false;
