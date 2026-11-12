@@ -144,7 +144,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
   // hit marker: red kill, gold headshot, white body
   if (!by && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
   if (dies) {
-    if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); if (zz.boss) bossKills++; }
+    if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); if (zz.boss) bossKills++; if (zz.type !== 'bot') missionKill(head); }
     if (zz.type === 'bot') botDown(zz, by, head);
     else {
       if (!by && zz.boss) sfx('killSpecial'); // walkers die too often for a kill sound
@@ -443,9 +443,9 @@ function zombiesOver() {
   const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
   $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`)
     + (auth ? '' : row('TOP PLAYERS', cg.on ? 'Log in to get on the board' : 'Sign in to get on the board'));
-  zRankRow();
+  zRankRow(); missionEnd(false);
   $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
-    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '');
+    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad

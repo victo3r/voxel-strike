@@ -341,7 +341,7 @@ function showLobby(on) {
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
   vm.visible = !on;
-  if (on) { $('menu').style.display = 'none'; showAway(false); camera.fov = fovBase; camera.updateProjectionMatrix(); musicLobby(); armIcon(); }
+  if (on) { $('menu').style.display = 'none'; showAway(false); camera.fov = fovBase; camera.updateProjectionMatrix(); musicLobby(); armIcon(); if (typeof renderMissions === 'function') renderMissions(); } // missions.js loads later
 }
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); restart(); showLobby(true); });
 

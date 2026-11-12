@@ -222,6 +222,7 @@ function update(dt) {
       sfx('waveStart');
       if (wave % 5 === 0) { spawnZombie(wave % 10 === 0 ? 'hive' : 'boss'); sfx('bossRoar', { v: .7 }); }
       if (wave === 1) zRunStart(); else zRunWave(); // the zombie board's clock, then the run so far
+      missionWave(wave);
     } else if (wave > 0) { // countdown between waves
       const n = Math.ceil(waveWait);
       if (n !== countShown && n <= 3) { countShown = n; banner(`WAVE ${wave + 1} IN ${n}`); sfx('tick', { v: .5 }); }
