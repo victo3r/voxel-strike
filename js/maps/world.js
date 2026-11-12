@@ -141,7 +141,7 @@ function bakeMap(m) {
   const seen = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
   const live = o => { for (let p = o; p; p = p.parent) if (p.userData.live) return true; return false; };
   // the black copy of the map for the enemy glow's mask: whatever can hide an enemy (not glass, water, wire fences or the sky), in 40 m chunks
-  const solid = mt => !mt.transparent && !mt.alphaTest && !mt.vertexColors && mt.depthWrite && mt.visible, side = mt => mt.side === THREE.FrontSide ? 1 : 2;
+  const solid = mt => !mt.transparent && !mt.alphaTest && mt.depthWrite && mt.visible, side = mt => mt.side === THREE.FrontSide ? 1 : 2;
   const occ = new Map(), occAdd = (g, w, f) => { // f: 1 front faces, 2 both sides, or one of those per triangle
     if (!g.boundingBox) g.computeBoundingBox();
     bb.copy(g.boundingBox); if (w) bb.applyMatrix4(w); bb.getCenter(c);
