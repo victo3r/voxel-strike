@@ -5,7 +5,7 @@
 <!-- added to a phone's home screen it opens fullscreen, like an app -->
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Voxel Strike"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
-<link id="css" rel="stylesheet" href="css/style.css?v=150">
+<link id="css" rel="stylesheet" href="css/style.css?v=151">
 </head>
 <body class="boot">
 <!-- phones and tablets: this note while held upright -->
@@ -42,6 +42,7 @@
       <i class="brk"></i><div id="missions"></div>
     </div>
     <div id="coinRow"><button id="dailyBtn" title="Daily reward"></button><button id="keyBtn" title="Chests"></button><div id="lobbyCoins" class="pc"></div></div>
+    <div id="event"></div>
     <button id="lobbySet" class="sq small" title="Settings"><img id="setIcon"></button>
     <button id="boostBtn" title="2× Booster"></button>
     <button id="lobbyArm" class="sq"><img id="armIcon" class="ai"><b>ARMORY</b></button>
@@ -65,6 +66,7 @@
 </div>
 <div id="boost"><div id="boostBox"></div></div>
 <div id="daily"><div id="dailyBox"></div></div>
+<div id="evCard"><div id="evBox"></div></div>
 <div id="chests"><div id="chestBox"></div></div>
 <div id="lb"><div id="lbBox"></div></div>
 <div id="prize"><div id="prizeBox"></div></div>
@@ -213,9 +215,9 @@
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
 // bump V (and the css ?v=) on every update to skip old caches
-const V = 201;
+const V = 202;
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js', 'js/touch.js'];
+  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/friends.js', 'js/boards.js', 'js/touch.js'];
 // crazy.js first, so CrazyGames saves are in place before the rest
 await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });
 await (window.cgReady || Promise.resolve());

@@ -247,7 +247,7 @@ function scoreKill(killer, victim, head, helpers) {
     killer.score += pts;
     if (killer.you) {
       missionKill(head, killer.streak);
-      killNotice(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' · HEADSHOT' : ''}`, killer.streak, head);
+      killNotice(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' · HEADSHOT' : ''}`, killer.streak, head, eventKill(head));
     }
   }
   feed(killer && killer !== victim ? `${nameTag(killer)} ${head ? ico('head') : ico('skull')} ${nameTag(victim)}` : `${nameTag(victim)} ${ico('skull')}`);
@@ -985,7 +985,8 @@ function endMatch(results) {
   if (key) prof.keys = (prof.keys | 0) + 1;
   missionEnd(won);
   const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp } = grant(xp, gold); // doubled with a booster
-  $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile()])
+  eventEnd(xp, won);
+  $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile(), ...eventTiles()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
     + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + missionsRow() + dailyRow();
@@ -1023,5 +1024,5 @@ function setupMode() {
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
   musicMatch(mapId, pvp() ? 'dm' : mode); // bot matches use the deathmatch music
-  tipStart(); missionMark();
+  tipStart(); missionMark(); eventMark();
 }

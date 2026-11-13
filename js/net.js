@@ -438,7 +438,7 @@ net = (() => {
       const st = killer && STREAKS[m.streak]; if (st) feed(`${nameTag(killer)} <b style="color:#8ff0b6">${st[1]}!</b>`);
     }
     if (m.by === pid && m.v !== pid) {
-      killNotice(`KILL${m.head ? ' · HEADSHOT' : ''}`, m.streak, m.head); hitMarker('kill'); missionKill(m.head, m.streak);
+      killNotice(`KILL${m.head ? ' · HEADSHOT' : ''}`, m.streak, m.head, eventKill(m.head)); hitMarker('kill'); missionKill(m.head, m.streak);
     } else if ((m.assists || []).includes(pid)) toast('+15 ASSIST', '#e8e8e8');
     if (m.v === pid) {
       alive = false; readySent = false; respawnAt = m.respawnAt || now() + 3000;

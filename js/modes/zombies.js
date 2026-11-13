@@ -448,7 +448,7 @@ function zombiesOver() {
   $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`)
     + (auth ? '' : row('TOP PLAYERS', cg.on ? 'Log in to get on the board' : 'Sign in to get on the board'));
   zRankRow(); missionEnd(false);
-  $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
+  $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');

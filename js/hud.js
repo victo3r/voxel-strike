@@ -131,9 +131,9 @@ function hitMarker(kind) {
 const STREAK_ICON = { 2: 'k2', 3: 'k3', 4: 'k4', 5: 'ace', 10: 'fury', 20: 'rampage', 50: 'violence' };
 const STREAK_SND = { 5: 'streak_ace', 10: 'streak_fury', 20: 'streak_rampage', 50: 'streak_violence' };
 let killNoteT;
-function killNotice(text, streak, head) {
+function killNotice(text, streak, head, ev = 0) {
   const el = $('killNote'), st = STREAKS[streak], k = st && STREAK_ICON[streak];
-  el.innerHTML = (st ? `<div class="ki">${ico('s_' + k)}</div><div class="kn">${st[1]}</div>` : '') + `<div class="kt">${text}</div>`;
+  el.innerHTML = (st ? `<div class="ki">${ico('s_' + k)}</div><div class="kn">${st[1]}</div>` : '') + `<div class="kt">${text}</div>` + (ev ? `<div class="kev">+${ev} EVENT</div>` : '');
   el.className = ''; void el.offsetWidth; el.className = 'show' + (k ? ' k-' + k : '');
   clearTimeout(killNoteT); killNoteT = setTimeout(() => el.className = el.className.replace('show', 'gone'), streak >= 10 && st ? 2600 : 1500);
   const big = st && STREAK_SND[streak];

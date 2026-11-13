@@ -49,5 +49,6 @@ function showProf() { // lobby level badge and coins
   $('lobbyCoins').innerHTML = COIN + prof.coins;
   if (typeof renderBoost === 'function') renderBoost();
   if (typeof renderChests === 'function') renderChests();
+  if (typeof renderEvent === 'function') renderEvent();
 }
 showProf();

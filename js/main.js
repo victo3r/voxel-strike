@@ -216,7 +216,7 @@ function update(dt) {
       shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
       // wave rewards, only up to PAY_WAVES
       const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 1 + (bossW ? 5 : 0) : 0), r = grant(xp, gold); // boosters double it
-      runXp += xp; runCoins += gold + r.bonus;
+      runXp += xp; runCoins += gold + r.bonus; eventWave(xp);
       waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp };
       openShop(); return;
     }

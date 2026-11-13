@@ -17,7 +17,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   play at another server (the tests use `?srv=http://127.0.0.1:9` to force offline).
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
   under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
-  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
+  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
   keeps your score and `node test/band.mjs` checks the level bands for matchmaking (both run the server's code directly, no servers or browser); `node test/measure-bots.mjs ladder` measures bot hit rates per
   skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards, `test/zboard.mjs` for the zombie board, `test/prizes.mjs` for the weekly prizes) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
@@ -47,7 +47,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   and streams them. Protocol and server rules are in the server repo's `docs/` (spec-v2.md, spec-b.md, spec-c.md, spec-friends.md).
 - **Stats** are counted by the server only (room.js `saveStats`): signed-in players in public online rooms, into D1 `stats`,
   `stats_week` and `stats_guns`; `GET /stats/<id>` (a player card) and `GET /boards`
-  (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`) and daily missions (`js/missions.js`) are client-side, in `prof.daily` and `prof.missions`.
+  (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`), daily missions (`js/missions.js`) and weekly events (`js/events.js`) are client-side, in `prof.daily`, `prof.missions` and `prof.event`.
 - **Account** (`js/profile.js`, synced by `js/cloud.js`): level, coins, owned guns and stars, loadout, armor, boots and hats in
   `prof`, saved to localStorage and to the server when signed in. Zombie-wave shop coins are separate from account coins.
 - **Maps** (`js/maps/*.js`) register with `startMap`, build meshes plus collision `solids` (`addBlock`/`addSlab`/`addSolid` in

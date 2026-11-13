@@ -430,7 +430,31 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #dailyBox button:hover:not(:disabled){background:var(--hov)}#dailyBox button:disabled{opacity:.5;cursor:default}
 #dailyBox button.go{background:rgba(36,170,98,.85);font-size:18px}
 #boostBtn.on{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.6),4px 4px 0 rgba(0,0,0,.4)}
-#boost,#daily,#chests,#lb,#card,#prize{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
+/* weekly event: the lobby panel, the prize card, results tiles */
+#event{position:absolute;right:20px;top:calc(46px + clamp(48px,7vmin,64px));width:clamp(230px,38vmin,310px);box-sizing:border-box;padding:6px 9px 8px;background:var(--glass);border:3px solid var(--ev,var(--line-dim));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);color:#fff;text-shadow:2px 2px 0 #000;font:bold clamp(11px,1.9vmin,14px) monospace;cursor:pointer}
+#event:hover{background:var(--hov)}#event:empty{display:none}
+#event .eh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#event .eh b{display:flex;align-items:center;gap:5px;color:var(--ev);letter-spacing:1px;white-space:nowrap}#event .eh small{font-size:.8em;color:var(--silver);white-space:nowrap}
+#event .el{margin:3px 0 7px;font-size:.85em;color:var(--silver)}
+#event .ep{display:flex;align-items:center;gap:8px}#event .ep u{flex:1;height:5px;background:rgba(0,0,0,.45);border:2px solid var(--line-dim)}#event .ep u i{display:block;height:100%;background:var(--ev)}
+#event .ep span{font-size:.9em;color:var(--silver);white-space:nowrap}
+#event .en{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.9em;color:#ffd75e}#event .en img{height:1.9em;margin:-.3em 0}
+@media (max-height:420px){#event{padding:4px 8px 5px}#event .el{margin:2px 0 5px}#event .en{margin-top:4px}}
+#evBox{display:flex;flex-direction:column;gap:12px;width:min(640px,94vw);padding:20px;background:var(--glass);border:4px solid var(--ev,var(--line));color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
+#evBox h1{display:flex;align-items:center;gap:10px;margin:0;font-size:26px;color:var(--ev);text-shadow:3px 3px 0 #000}#evBox p{margin:0;color:var(--muted);font-size:15px;line-height:1.4}
+#evBox .tiers{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+#evBox .tier{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px;border:3px solid var(--line-dim);background:rgba(0,0,0,.25);font-size:13px}
+#evBox .tier b{color:var(--muted)}#evBox .tier.big{background:rgba(160,120,20,.35)}
+#evBox .tier .gift{display:flex;align-items:center;justify-content:center;gap:3px;min-height:40px;font:bold 18px monospace;color:#ffd75e}#evBox .tier .gift img{height:40px}
+#evBox .tier.now{border-color:var(--ev);box-shadow:0 0 10px var(--ev)}#evBox .tier.now b{color:var(--ev)}
+#evBox .tier.done{opacity:.55}#evBox .tier .ck{position:absolute;inset:auto 4px 4px auto;color:#5ee08a;font-size:18px}
+#evBox .ebar{display:flex;align-items:center;gap:10px}#evBox .ebar u{flex:1;height:10px;background:rgba(0,0,0,.45);border:2px solid var(--line-dim)}#evBox .ebar u i{display:block;height:100%;background:var(--ev)}#evBox .ebar span{color:var(--ev);white-space:nowrap}
+#evBox p.eleft{text-align:center;color:var(--silver);font-size:13px}
+#evBox button{font:bold 16px monospace;padding:10px;color:#fff;background:var(--glass);border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}#evBox button:hover{background:var(--hov)}
+.rt.tev{border-color:var(--ev)}.rt.tev .ri,.rt.tev b{color:var(--ev)}
+.rt.tpz{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.5)}.rt .ri img{height:42px}
+#killNote .kev{font-size:15px;color:var(--ev,#ffd75e)}
+#boost,#daily,#evCard,#chests,#lb,#card,#prize{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
 #boostBox{display:flex;flex-direction:column;gap:10px;width:min(360px,90vw);padding:20px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #boostBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}#boostBox p{margin:0;color:var(--muted);font-size:15px}
 #boostBox .bn{font-size:17px}#boostBox p.be{text-align:center;color:#ffd75e;font-size:14px}#boostBox .bn b{color:#ffd75e;font-size:22px}
@@ -473,7 +497,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 /* xp and rewards */
 .xpbar{height:10px;margin-top:6px;background:rgba(0,0,0,.45);border:2px solid var(--line-dim)}
 .xpbar>div{height:100%;background:var(--acc);box-shadow:inset 0 -3px 0 var(--acc-dk)}
-.rw{display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
+.rw{display:flex;justify-content:center;gap:10px}
 .rt{width:100px;box-sizing:border-box;padding:6px 4px;background:rgba(0,0,0,.35);border:2px solid var(--line-dim);display:flex;flex-direction:column;align-items:center;gap:4px}
 .rt small{font-size:11px;letter-spacing:2px;color:var(--silver)}.rt .ri{font-size:38px;height:42px;display:flex;align-items:center;line-height:1}
 .rt b{font-size:20px;white-space:nowrap;color:#ffd75e}.rt.tx b{color:var(--acc-lt)}
@@ -764,7 +788,7 @@ body.touchOnly #chat{bottom:auto;top:72px;width:min(300px,36vw);font-size:13px}
 body.touchOnly .kb{display:none!important}
 /* phones: menus zoom to fit (--uw/--uh stand in for vw/vh inside them) */
 body.touchOnly :is(#armory,#armAct,#chests,#custPanel,#drawPanel,#board,#post){zoom:var(--z,1)}
-body.touchOnly :is(#lobbyUI,#pick,#binds,#boost,#daily,#lb,#card,#prize,#menu,#shop,#finding,#netToast,#away){zoom:var(--z2,1)}
+body.touchOnly :is(#lobbyUI,#pick,#binds,#boost,#daily,#evCard,#lb,#card,#prize,#menu,#shop,#finding,#netToast,#away){zoom:var(--z2,1)}
 body.touchOnly:not(.tcOn) #hud{visibility:hidden}
 body.touchOnly :is(#chestBox,#cardBox){overflow-y:auto}body.touchOnly .cSkin{height:120px}body.touchOnly #shop h1{font-size:30px}body.touchOnly #chestBox .chest img{width:90px}
 body.touchOnly #armory{width:min(720px,calc(var(--uw) * 60))}
