@@ -104,7 +104,8 @@ function settle(o, dt) {
   const p = o.g.position, gy = groundAt(p.x, p.z, o.r, p.y);
   if (!o.vy && sticks(p.y - gy, o.onRamp)) { p.y = gy; o.onRamp = groundRamp; wetCheck(o, p); return; }
   const prev = p.y;
-  o.vy = (o.vy || 0) - 25 * dt; p.y = Math.max(gy, p.y + o.vy * dt);
+  o.vy = (o.vy || 0) - 25 * dt; if (o.glide && o.vy < -GLIDE_FALL) o.vy = -GLIDE_FALL; // a Skyrunner bot floats down
+  p.y = Math.max(gy, p.y + o.vy * dt);
   if (o.vy > 0) { const c = ceilingAt(p.x, p.z, o.r, prev, p.y - prev); if (p.y + BODY > c) { p.y = c - BODY; o.vy = -.01; } }
   if (p.y === gy) { o.vy = 0; o.onRamp = groundRamp; }
   wetCheck(o, p);

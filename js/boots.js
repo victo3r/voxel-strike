@@ -4,17 +4,19 @@ const BOOTS = [
   { id: 'raider', rar: 'rare', name: 'Raider Boots', unlock: 7, price: 120, spd: [.08, .11, .14], dj: true },
   { id: 'ironclad', rar: 'epic', name: 'Ironclad Boots', unlock: 16, price: 240, dr: [.05, .07, .09], heavy: [.3, .45, .6] },
   { id: 'arcane', rar: 'epic', name: 'Arcane Boots', unlock: 19, price: 280, spd: [.04, .06, .08], rl: [.1, .15, .2] },
+  { id: 'thornwood', rar: 'epic', name: 'Thornwood Boots', unlock: 13, price: 220, heal: [2, 3, 4] },
+  { id: 'skyrunner', rar: 'legend', name: 'Skyrunner Boots', unlock: 25, price: 340, spd: [.06, .09, .12], jmp: [.1, .15, .2] },
 ];
 const BOOT_I = Object.fromEntries(BOOTS.map((B, i) => [B.id, i]));
 const bootOf = id => BOOTS[BOOT_I[id]] ?? null;
 const bootStars = id => prof.boots?.[id] | 0; // 0 = not bought
 const bootUse = id => { const st = bootStars(id), u = prof.bootUse?.[id] | 0; return u ? Math.max(1, Math.min(st, u)) : st; };
 const wornBoots = () => { const id = prof.bootOn; return id && bootStars(id) ? { id, st: bootUse(id) } : null; };
-const FX_NONE = { spd: 0, dmg: 0, dr: 0, dj: false, rl: 0, heavy: 0 };
+const FX_NONE = { spd: 0, dmg: 0, dr: 0, dj: false, rl: 0, heavy: 0, heal: 0, jmp: 0 };
 function bootFx(b) {
   const B = b && bootOf(b.id); if (!B) return FX_NONE;
   const L = b.st - 1;
-  return { spd: B.spd?.[L] ?? 0, dmg: B.dmg?.[L] ?? 0, dr: B.dr?.[L] ?? 0, dj: !!B.dj, rl: B.rl?.[L] ?? 0, heavy: B.heavy?.[L] ?? 0 };
+  return { spd: B.spd?.[L] ?? 0, dmg: B.dmg?.[L] ?? 0, dr: B.dr?.[L] ?? 0, dj: !!B.dj, rl: B.rl?.[L] ?? 0, heavy: B.heavy?.[L] ?? 0, heal: B.heal?.[L] ?? 0, jmp: B.jmp?.[L] ?? 0 };
 }
 // bots get random boots, only ones your level unlocks, never better than yours
 const BOOT_BARE = .3;
@@ -69,6 +71,24 @@ function bootPieces(id, st, s = 1) {
     B(-5, 5, -21, -20, 8, 9, DK); // a seam over the toes
     B(-5, 6, -17, -14, -6, 6, HI); B(-5, 6, -17, -16, -6, 6, TRIM); // folded cuff with a gold edge
     if (st >= 2) B(4, 5, -21, -18, -2, 2, TRIM); // a gold clasp on the side
+  } else if (id === 'thornwood') {
+    // bark boots wrapped in roots with a mossy cuff, leaves at 2 stars, amber at 3
+    const C = hex([112, 78, 46]), HI = hex([150, 110, 66]), DK = hex([70, 46, 26]), MOSS = hex([82, 140, 52]), SOLE = hex([52, 36, 22]);
+    B(-5, 5, -24, -14, -5, 5, C); B(-5, 5, -24, -19, 5, 9, C);
+    B(-5, 5, -24, -22, -5, 9, SOLE);
+    for (const [y, z0, z1] of [[-21, -5, 9], [-18, -5, 5]]) B(-5, 5, y, y + 1, z0, z1, DK); // roots round the foot
+    B(-5, 5, -20, -19, 8, 9, HI); // toe
+    B(-5, 6, -16, -13, -6, 6, MOSS); // mossy cuff
+    if (st >= 2) { B(-4, -1, -13, -11, 4, 7, hex([118, 184, 70])); B(1, 4, -13, -11, -7, -4, hex([118, 184, 70])); } // leaves
+    if (st >= 3) B(4, 5, -21, -18, -2, 2, hex([255, 186, 50])); // amber on the side
+  } else if (id === 'skyrunner') {
+    // sleek white runners with a teal sole and a heel fin, gold at 3 stars
+    const C = hex([222, 228, 236]), DK = hex([146, 160, 178]), TEAL = st >= 3 ? hex([240, 196, 64]) : hex([40, 200, 210]), SOLE = hex([60, 70, 84]);
+    B(-5, 5, -24, -14, -5, 5, C); B(-5, 5, -24, -19, 5, 9, C);
+    B(-5, 5, -24, -22, -5, 9, SOLE); B(-5, 5, -22, -21, -5, 9, TEAL);
+    B(-5, 5, -16, -14, -5, 5, TEAL); B(-5, 5, -20, -19, 7, 9, DK);
+    B(-1, 2, -22, -15, -8, -5, TEAL); // heel fin
+    if (st >= 2) B(4, 5, -20, -17, -3, 5, TEAL); // a stripe on the side
   } else {
     // steel greaves, fancier with each star
     const C = hex([150, 156, 166]), HI = hex([204, 210, 220]), DK = hex([90, 96, 108]), SOLE = hex([52, 52, 58]);
@@ -81,7 +101,7 @@ function bootPieces(id, st, s = 1) {
     if (st >= 3) B(-1, 1, -17, -13, 7, 8, DK);
   }
   // hollow inside so it looks wearable in the armory
-  const [top, floor] = { raider: [-14, -22], ironclad: [-11, -22], arcane: [-14, -22] }[id] ?? [-10, -21];
+  const [top, floor] = { raider: [-14, -22], ironclad: [-11, -22], arcane: [-14, -22], thornwood: [-13, -22], skyrunner: [-14, -22] }[id] ?? [-10, -21];
   B(-4, 4, floor, top, -4, 4, 0); B(-4, 4, floor, floor + 1, -4, 4, hex([40, 40, 46]));
   if (s < 0) for (const p of out) p[4] = -p[4];
   return out;

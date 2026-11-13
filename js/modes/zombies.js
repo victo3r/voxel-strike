@@ -124,12 +124,14 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
     return;
   }
   if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // hats can block or soften headshots
-  // damage boots, the Sharpshooter perk, the Arcane set on wands
+  // damage boots, the Sharpshooter perk, the Arcane set on wands (not thorns)
   const fx = by ? by.rec?.fx : youFx(), wand = !quiet && (by ? BASE[by.gun] : BASE[cur])?.wand;
-  dmg *= 1 + (fx?.dmg ?? 0) + (by ? 0 : perk.dmg * .1) + (wand ? fx?.wand ?? 0 : 0);
-  if (zz.type === 'bot') { // bot armor works like yours
-    dmg *= 1 - zz.dr - zz.rec.fx.dr;
-    const soak = Math.min(zz.armor, dmg); zz.armor -= soak; zz.hp -= dmg - soak;
+  if (kind !== 8) dmg *= 1 + (fx?.dmg ?? 0) + (by ? 0 : perk.dmg * .1) + (wand ? fx?.wand ?? 0 : 0);
+  if (zz.type === 'bot') { // bot armor works like yours (the Skyrunner Helm cuts more in the air)
+    dmg *= 1 - zz.dr - zz.rec.fx.dr - (zz.vy ? zz.rec.fx.sky : 0);
+    const soak = Math.min(zz.armor, dmg); zz.armor -= soak; zz.hp -= dmg - soak; zz.calm = 0;
+    const t = kind === 1 && zz.rec.fx.thorns; // the Thornwood Crown stings back
+    if (t && by !== zz) { if (by) { if (!by.dead) { stingFx(by.g.position); hurtZombie(by, dmg * t, by.g.position.clone().setY(by.g.position.y + 1), false, true, zz, 8); } } else { stingFx(P.pos); hurtPlayer(dmg * t, false, zz, false, 8); } }
   } else zz.hp -= dmg;
   const dies = zz.hp <= 0 && !zz.dead;
   if (dies) zz.dead = .0001; // mark dead first so a broken effect can't make it unkillable
@@ -168,16 +170,18 @@ function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0
     net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
   }
-  if (by?.rec) d *= 1 + by.rec.fx.dmg + (kind !== 7 && BASE[by.gun]?.wand ? by.rec.fx.wand ?? 0 : 0);
+  if (by?.rec && kind !== 8) d *= 1 + by.rec.fx.dmg + (kind !== 7 && BASE[by.gun]?.wand ? by.rec.fx.wand ?? 0 : 0);
   if (by?.rec) { youHelpers.add(by.rec); P.hitBy = by; P.hitAt = performance.now(); } // for assists, and knock-off kills
-  if (by?.rec && kind !== 7) killGuns.set(by.rec, by.gun); // a burn keeps the gun that lit it
-  const wasHead = head; [d, head] = gearHit(youFx(), d, head); // hats can block or soften headshots
-  d *= 1 - P.dr - youFx().dr; // armor and boots cut every hit
+  if (by?.rec && kind < 7) killGuns.set(by.rec, by.gun); // a burn keeps the gun that lit it
+  const wasHead = head, fx = youFx(); if (kind !== 8) [d, head] = gearHit(fx, d, head); // hats can block or soften headshots
+  d *= 1 - P.dr - fx.dr - (P.onGround ? 0 : fx.sky); // armor and boots cut every hit (the Skyrunner Helm more in the air)
   const soak = pierce ? 0 : Math.min(P.armor, d);
-  P.armor -= soak; P.hp -= d - soak;
+  P.armor -= soak; P.hp -= d - soak; P.calm = 0;
   youHitFx(head, soak === d || wasHead && !head, soak === d);
-  if (P.hp <= 0 && pvp()) { P.hp = 0; youDown(by); return; }
+  if (kind === 1 && fx.thorns && by?.rec && !by.dead) { stingFx(by.g.position); hurtZombie(by, d * fx.thorns, by.g.position.clone().setY(by.g.position.y + 1), false, true, null, 8); } // the Thornwood Crown
+  if (P.hp <= 0 && pvp()) { P.hp = 0; youDown(by); return d; }
   if (P.hp <= 0 && !dead) { P.hp = 0; zombiesDead(); }
+  return d;
 }
 // set someone on fire
 function applyBurn(victim, t, dmgPerTick, by, gunId, max = false, pj = 0) {
@@ -193,7 +197,7 @@ function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 
 function drownYou() {
   if (respawnT > 0 || matchOver || dead || P.drowned) return;
   if (!MAP.void) { sfx('splash'); splash(P.pos); }
-  P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = 0; P.drowned = true;
+  P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = P.dx = P.dz = 0; P.drowned = true;
   if (net.on) { P.drownFlag = true; return; } // online the server calls it
   if (pvp()) { youDown(P.hitBy && performance.now() - P.hitAt < PUSH_KILL * 1000 ? P.hitBy : null); return; } // knocked in: whoever hurt you last gets the kill
   zombiesDead();
@@ -445,7 +449,7 @@ function zombiesOver() {
     + (auth ? '' : row('TOP PLAYERS', cg.on ? 'Log in to get on the board' : 'Sign in to get on the board'));
   zRankRow(); missionEnd(false);
   $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
-    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow();
+    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
@@ -635,8 +639,8 @@ function leapTick(z, dt) {
   const dx = P.pos.x - p.x, dz = P.pos.z - p.z, d = Math.hypot(dx, dz);
   if (L.stomp) { // the ceiling comes down on you
     z.downT = 8; burst(new THREE.Vector3(P.pos.x, P.pos.y + 2.2, P.pos.z), 0x6a5a48, 16);
-    if (!dead && d < 2.8 && P.pos.y < p.y - 1 && p.y - P.pos.y < 4.5) { hurtPlayer(Math.round(z.dmg * 1.2)); sfx('smash'); }
-  } else if (!dead && d < 3.4 && Math.abs(P.pos.y - p.y) < 2) { hurtPlayer(Math.round(z.dmg * 1.2)); P.kx = dx / (d || 1) * 13; P.kz = dz / (d || 1) * 13; P.vy = Math.max(P.vy, 7); P.onGround = false; }
+    if (!dead && d < 2.8 && P.pos.y < p.y - 1 && p.y - P.pos.y < 4.5) { stingYou(z, hurtPlayer(Math.round(z.dmg * 1.2))); sfx('smash'); }
+  } else if (!dead && d < 3.4 && Math.abs(P.pos.y - p.y) < 2) { stingYou(z, hurtPlayer(Math.round(z.dmg * 1.2))); P.kx = dx / (d || 1) * 13; P.kz = dz / (d || 1) * 13; P.vy = Math.max(P.vy, 7); P.onGround = false; }
 }
 function resetRun() { perk.spd = perk.dmg = perk.hp = 0; runCoins = runXp = bossKills = 0; deadT = 0; horde = false; countShown = 0; shopOffer = []; clearGlobs(); }
 function banner(text, html = false) { const b = $('banner'); b[html ? 'innerHTML' : 'textContent'] = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }

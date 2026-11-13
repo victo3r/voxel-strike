@@ -21,6 +21,7 @@ function devAll() {
   for (const S of SUITS) prof.suits[S.id] ||= 1;
   for (const b of BOOTS) prof.boots[b.id] ||= 1;
   for (const h of HATS) prof.hats[h.id] ||= 1;
+  prof.secrets = Object.keys(SECRETS);
   saveProf(); showProf(); renderChests();
 }
 

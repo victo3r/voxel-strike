@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 3; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 4; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -231,6 +231,7 @@ net = (() => {
       case 'fill': return fill(m.n | 0);
       case 'chat': if (chatHidden(cleanName(m.name))) return; return chatSay({ name: cleanName(m.name) || '?', css: safeCss(m.css) }, String(m.text ?? '').slice(0, 80));
       case 'heal': return healed(m);
+      case 'grow': return grew(m);
       case 'shrug': if (m.pid === pid && alive) { toast('SHOOK IT OFF', '#c8b0ff'); sfx('shrug'); } return; // the Arcane Hat shook off a burn
       case 'over': return over(m);
       case 'kick': return;
@@ -387,7 +388,7 @@ net = (() => {
       P.hp = m.hp; P.armor = m.armor;
       if (m.by && m.by !== pid && gi(m.gun) !== undefined) killGuns.set(m.by, gi(m.gun)); // for the killer card (burns carry no gun)
       if (!alive) return;
-      youHitFx(!!m.head, armorOnly);
+      youHitFx(!!m.head, armorOnly); if (m.kind === 'thorns') sfx('thorns');
       wandFx(P, m);
       if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false, BASE[gi(m.gun)]?.launch); // someone else's blast throws you
       return;
@@ -402,6 +403,7 @@ net = (() => {
       const who = m.by === pid ? YOU_T : bodyOf(m.by);
       if (who) { if (b.hitBy !== who || b.hitByT <= 0) b.hitDmg = 0; b.hitBy = who; b.hitByT = 2; b.hitDmg += m.d; }
     }
+    if (m.kind === 'thorns') stingFx(b.g.position);
     if (m.by === pid) return; // your own hits already showed
     hitFx(b, pt ? pt.clone() : b.g.position.clone().setY(b.g.position.y + 1.1), !!m.head, m.kind === 'burn');
   }
@@ -410,6 +412,12 @@ net = (() => {
     const W = BASE[gi(m.gun)], k = 1 + (+m.long || 0);
     if (slows(W) || m.el === 1) shockHit(o, m.el === 1 ? FROST : W, k);
     if (m.stun > 0) stunHit(o, Math.min(3, m.stun * k));
+  }
+  // Thornwood grew someone's armor (or health) back
+  function grew(m) {
+    if (m.pid === pid) { if (alive) { growBars((m.armor > P.armor) + 2 * (m.hp > P.hp)); P.growA *= 2.5; P.growH *= 2.5; P.hp = m.hp; P.armor = m.armor; } return; }
+    const b = remotes.get(m.pid)?.body; if (!b || b.dead) return;
+    b.hp = Math.max(m.hp, .01); b.armor = m.armor; growFx(b.g.position);
   }
   // the Soul Wand: a kill gave someone health back
   function healed(m) {
@@ -486,7 +494,7 @@ net = (() => {
   function warped(m) {
     if (m.by) { const b = remotes.get(m.by)?.body; if (b && !b.dead) { b.g.position.set(m.x, m.y, m.z); b.g.position.lag = 0; b.vy = 0; b.lx = b.lz = 0; } return; }
     if (!alive) return;
-    P.pos.set(m.x, m.y, m.z); P.pos.lag = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = P.mvx = P.mvz = 0;
+    P.pos.set(m.x, m.y, m.z); P.pos.lag = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = P.mvx = P.mvz = P.dx = P.dz = 0;
   }
   // room bots: one player hosts their AI, the server owns their health
   const hostedOf = by => { const r = by && by.pid ? remotes.get(by.pid) : null; return r && r.rec.hostBot && r.body ? r : null; };
@@ -566,7 +574,7 @@ net = (() => {
       while (buf.length > 2 && buf[1].ts < st - NET_HIST) buf.shift();
       r.fired += fd | 0; r.burn = burn | 0;
       const rl = !!(flags & 2); if (rl && !r.reloadWas) r.q |= 2; r.reloadWas = rl;
-      if (flags & 64) r.q |= 64;
+      if (flags & 64) r.q |= 64; if (flags & 256) r.q |= 256;
     }
   }
   const dirV = new THREE.Vector3(), fv = new THREE.Vector3(), eyeV = new THREE.Vector3(), beamRay = new THREE.Raycaster();
@@ -608,6 +616,8 @@ net = (() => {
     holdReload(z, z.rlLeft, rlT); wandHold(z, dt); z.wandT = (z.wandT || 0) - dt;
     stunTick(z, dt, grounded); // just for the stars, they move themselves
     if (r.q & 64) { sfx('djump', { at: pos, far: 20, v: .7 }); burst(fv.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
+    if (r.q & 256) { sfx('dash', { at: pos, far: 25, v: .8 }); burst(fv.set(pos.x, pos.y + .8, pos.z), 0xbff6fa, 6); }
+    wingTick(z, !!(cur.flags & 16), dt); // Skyrunner wings while they glide
     r.q = 0;
     if (r.fired) {
       const n = Math.min(r.fired, 3); r.fired = 0;
@@ -661,7 +671,7 @@ net = (() => {
     if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby || document.hidden) return; // hidden tab sends nothing, the server marks you afk
     if (ws.bufferedAmount > 8192) return; // the connection is stuck: don't pile up moves behind it
     let flags = evFlags; evFlags = 0;
-    if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8;
+    if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8; if (P.gliding) flags |= 16;
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
     const h = hits; hits = [];
     const f = fired; fired = 0;
@@ -673,7 +683,8 @@ net = (() => {
       if (!r.rec.hostBot) continue;
       const b = r.body;
       if (!b || b.dead) { r.fired = 0; r.hits = []; continue; }
-      let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (b.aimT > 0) bf |= 1;
+      let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (b.aimT > 0) bf |= 1; if (b.gliding) bf |= 16;
+      if (b.dashFlag) { bf |= 256; b.dashFlag = false; }
       if (b.drownFlag) { bf |= 128; b.drownFlag = false; }
       const q = b.g.position;
       botRows.push([r.rec.pid, r3(q.x), r3(q.y), r3(q.z), r3(wrapAng(b.aimYaw - Math.PI)), r3(b.aimPitch), BASE[b.gun].id, bf, r.fired, r.hits]);
@@ -787,7 +798,7 @@ net = (() => {
   setTimeout(probe, 300);
 
   Object.assign(api, {
-    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : 32; },
+    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
   Object.defineProperties(api, { // read live

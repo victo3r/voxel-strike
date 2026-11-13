@@ -30,6 +30,11 @@ const PRESETS = [
   { name: 'GLASSES', look: { skin: 1, girl: true, eyes: 'blue', hair: 'curly', hairC: 'auburn', top: 'hoodie', topC: 0x4f8a5a, top2: 0xf2f2f2, bottom: 'shorts', bottomC: 0x2f3440, shoes: 'sneakers', shoeC: 0xe8e8e8, extra: 'glasses' } },
   { name: 'BEARD', look: { skin: 2, eyes: 'green', hair: 'buzz', hairC: 'ginger', top: 'long', topC: 0x8a2e2e, bottom: 'pants', bottomC: 0x4b4033, shoes: 'boots', shoeC: 0x3a2618, extra: 'beard' } },
 ];
+// secret skins, only from codes
+const SECRETS = {
+  creature: { name: "VICTOR'S CREATURE", sk: [204, 192, 128], sleeve: 8, eye: 0xb4ecff, zap: 0xcdf3ff, paint: paintCreature,
+    look: { skin: 2, eyes: 'blue', hair: 'long', hairC: 'black', top: 'jacket', topC: 0x3a3630, top2: 0xb3a88e, bottom: 'pants', bottomC: 0x2f2b27, shoes: 'boots', shoeC: 0x2a2119, secret: 'creature' } },
+};
 
 // seeded random so a look always paints the same
 function charRng(seed) {
@@ -103,7 +108,7 @@ function skinTexture(look) {
 const bigEyesFit = L => L.extra !== 'glasses' && [1, 2, 5, 6].every(x => (HAIRSTYLES[L.hair] ?? HAIRSTYLES.short).front[x] <= 3);
 
 function paintSkin(g, L, rnd) {
-  const SK = SKIN_TONES[L.skin ?? 2], HC = HAIR_COLS[L.hairC] ?? HAIR_COLS.dark, EYE = EYE_COLS[L.eyes] ?? EYE_COLS.blue;
+  const S = SECRETS[L.secret], SK = S?.sk ?? SKIN_TONES[L.skin ?? 2], HC = HAIR_COLS[L.hairC] ?? HAIR_COLS.dark, EYE = EYE_COLS[L.eyes] ?? EYE_COLS.blue;
   const TOP = hexRGB(L.topC ?? 0x1c9e98), TOP2 = hexRGB(L.top2 ?? 0xe6e6e6), BOT = hexRGB(L.bottomC ?? 0x2c3e80), SHOE = hexRGB(L.shoeC ?? 0x3a3a40);
   const H = HAIRSTYLES[L.hair] ?? HAIRSTYLES.short;
   const px = (x, y, col, v = 0) => { const k = (rnd() - .5) * v; g.fillStyle = `rgb(${col[0] + k | 0},${col[1] + k | 0},${col[2] + k | 0})`; g.fillRect(x, y, 1, 1); };
@@ -210,7 +215,7 @@ function paintSkin(g, L, rnd) {
   else if (L.top === 'hoodie') { for (let x = 0; x < 4; x++) at(neck.back, x, 0, shadeC(TOP, 18), 12); at(neck.left, 3, 0, shadeC(TOP, 18), 12); at(neck.right, 0, 0, shadeC(TOP, 18), 12); }
 
   // ---- arms ----
-  const sleeve = { tee: 4, long: 11, tank: 0, hoodie: 11, jacket: 11 }[L.top] ?? 4;
+  const sleeve = S?.sleeve ?? { tee: 4, long: 11, tank: 0, hoodie: 11, jacket: 11 }[L.top] ?? 4;
   for (const p of ['armR', 'armL']) {
     const r = regions(PARTS[p][0], PARTS[p][1], 4, 12, 4);
     for (const f of ['front', 'back', 'left', 'right']) for (let y = 0; y < 12; y++) for (let x = 0; x < r[f][2]; x++) {
@@ -274,6 +279,49 @@ function paintSkin(g, L, rnd) {
     for (let x = 0; x < 8; x++) { at(F, x, 2, band, 10); at(head.back, x, 2, band, 10); }
     for (let c = 0; c < 8; c++) sideFront(c, 2, band, 10);
   }
+  S?.paint({ at, F, head, body, neck, limb: p => regions(PARTS[p][0], PARTS[p][1], 4, 12, 4), SK, TOP, BOT, SHOE, rnd });
+}
+
+// the Creature: patched yellow skin, stitches, black lips, a ragged coat
+function paintCreature({ at, F, head, body, neck, limb, SK, TOP, BOT, SHOE, rnd }) {
+  const ST = [50, 34, 32], SC = [150, 98, 84], seam = (r, x, y) => at(r, x, y, (x + y) % 2 ? SC : ST, 6);
+  for (let x = 2; x < 6; x++) seam(F, x, 2); // forehead
+  for (const x of [1, 6]) at(F, x, 4, [208, 198, 162], 4); // dun sockets
+  for (const x of [2, 5]) at(F, x, 4, [180, 236, 255]);
+  for (const x of [1, 2, 5, 6]) at(F, x, 5, [158, 140, 100], 6); // sunken
+  for (let x = 2; x < 6; x++) at(F, x, 6, x === 2 || x === 5 ? [96, 74, 62] : [32, 24, 26]); // black lips
+  seam(F, 6, 6); seam(F, 6, 7);
+  // lustrous hair
+  for (const r of [head.top, head.back, head.left, head.right]) for (let k = 0; k < 4; k++) at(r, rnd() * 8 | 0, rnd() * 8 | 0, [54, 56, 72], 8);
+  for (const f of ['front', 'left', 'right']) for (let x = 0; x < 4; x++) seam(neck[f], x, 0);
+  // open collar and a rope belt
+  const B = body;
+  for (let y = 0; y < 3; y++) for (const x of [3, 4]) at(B.front, x, y, y === 1 ? (x === 3 ? ST : SC) : SK, 8);
+  for (let x = 2; x < 6; x++) at(B.front, x, 8, x % 2 ? [150, 120, 74] : [118, 92, 56], 6);
+  // ragged hem, tears and a patch
+  for (const f of ['front', 'back', 'left', 'right']) for (let x = 0; x < B[f][2]; x++) {
+    if (rnd() < .45) at(B[f], x, 10, shadeC(BOT, -8), 8);
+    if (rnd() < .15) at(B[f], x, 6 + (rnd() * 3 | 0), shadeC(TOP, -30), 6);
+  }
+  for (let y = 3; y < 6; y++) for (let x = 1; x < 4; x++) at(B.back, x, y, y === 3 || x === 1 ? [60, 48, 34] : [96, 78, 54], 8);
+  // sleeves torn short, stitched wrists, a grafted hand
+  for (const p of ['armR', 'armL']) {
+    const r = limb(p);
+    for (const f of ['front', 'back', 'left', 'right']) for (let x = 0; x < 4; x++) {
+      if ((x + (p === 'armL')) % 2) at(r[f], x, 7, SK, 8);
+      seam(r[f], x, 9);
+      if (p === 'armL') for (const y of [10, 11]) at(r[f], x, y, mixC(SK, [168, 150, 118], .45), 8);
+    }
+  }
+  // patched trousers, scuffed boots
+  for (const p of ['legR', 'legL']) {
+    const r = limb(p);
+    if (p === 'legR') for (const [x, y] of [[1, 4], [2, 4], [1, 5], [2, 5]]) at(r.front, x, y, [78, 64, 48], 6);
+    for (const f of ['front', 'back', 'left', 'right']) for (let x = 0; x < 4; x++) {
+      if (rnd() < .3) at(r[f], x, 7, shadeC(BOT, -16), 6);
+      if (rnd() < .3) at(r[f], x, 9 + (rnd() * 3 | 0), shadeC(SHOE, 18), 6);
+    }
+  }
 }
 
 // a box textured with parts of the skin
@@ -307,8 +355,78 @@ function buildChar(look, U = 1 / 16, own = false) {
   const legRM = mesh(partBox(4, 12, 4, 0, 16, U), legR, 0, -6, 0), legLM = mesh(partBox(4, 12, 4, 16, 48, U), legL, 0, -6, 0);
   const parts = [head, neck, body, armRM, armLM, legRM, legLM];
   const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null, boots: null, hat: null };
+  const S = !pxShown(look) && SECRETS[look.secret];
+  if (S) secretFx(ch, S);
   ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); ch.hat?.mat.dispose(); };
   return ch;
+}
+
+// secret skin effects: glowing eyes and sparks off the stitches
+const EYE_GEO = new THREE.PlaneGeometry(1, 1), ZAP_BOX = new THREE.BoxGeometry(1, 1, 1), ZUP = new THREE.Vector3(0, 0, 1);
+let haloTex = null;
+function secretMats(S) {
+  if (S.mats) return S.mats;
+  if (!haloTex) {
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.35, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 32, 32); haloTex = new THREE.CanvasTexture(c);
+  }
+  return S.mats = { eye: new THREE.MeshBasicMaterial({ color: S.eye }), zap: new THREE.MeshBasicMaterial({ color: S.zap }),
+    halo: new THREE.SpriteMaterial({ map: haloTex, color: S.eye, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .55 }) };
+}
+function secretFx(ch, S) {
+  const M = secretMats(S), U = ch.U, eyes = new THREE.Group();
+  for (const x of [-1.5, 1.5]) {
+    const e = new THREE.Mesh(EYE_GEO, M.eye); e.position.set(x * U, -.5 * U, 4.02 * U); e.scale.setScalar(U); eyes.add(e);
+    const h = new THREE.Sprite(M.halo); h.position.set(x * U, -.5 * U, 4.3 * U); h.scale.set(3 * U, 3 * U, 1); eyes.add(h);
+  }
+  ch.head.add(eyes);
+  ch.zap = { parts: ch.parts, eyes, U, mat: M.zap, segs: null, t: .4 + Math.random() * 2, on: 0, k: 0, site: [] };
+}
+// part, height and ring size in skin pixels (0: along the forehead seam)
+const ZAP_SITES = [[1, 0, 2.6], [3, -3.5, 2.6], [4, -3.5, 2.6], [0, 1.5, 0]], ZAP_N = 6;
+const zapPts = Array.from({ length: ZAP_N + 1 }, () => new THREE.Vector3()), _zd = new THREE.Vector3();
+function zapArc(z, site, from) {
+  const [pi, y, r] = site, part = z.parts[pi], U = z.U, a0 = Math.random() * 6.3, da = 1 + Math.random() * 1.6;
+  zapPts.forEach((p, i) => {
+    if (!r) { p.set(-2.5 + 5 * i / ZAP_N, y + (Math.random() - .5) * 1.2, 4.2 + Math.random() * .6); return; }
+    const a = a0 + da * i / ZAP_N, rr = r + Math.random() * .9;
+    p.set(Math.cos(a) * rr, y + (Math.random() - .5) * 1.4, Math.sin(a) * rr);
+  });
+  for (let i = 0; i < ZAP_N; i++) {
+    const s = z.segs[from + i], a = zapPts[i], b = zapPts[i + 1];
+    if (s.parent !== part) part.add(s);
+    _zd.subVectors(b, a); const len = _zd.length();
+    s.position.addVectors(a, b).multiplyScalar(U / 2);
+    s.quaternion.setFromUnitVectors(ZUP, _zd.divideScalar(len));
+    s.scale.set(.5 * U, .5 * U, (len + .4) * U);
+    s.visible = true;
+  }
+}
+const zapOff = z => z.segs?.forEach(s => s.visible = false);
+function zapTick(z, dt) {
+  if (z.on > 0) {
+    if ((z.on -= dt) <= 0) { zapOff(z); return; }
+    if ((z.k -= dt) > 0) return;
+    z.k = .045; zapOff(z);
+    z.site.forEach((s, i) => zapArc(z, s, i * ZAP_N));
+    return;
+  }
+  if ((z.t -= dt) > 0) return;
+  z.segs ??= Array.from({ length: ZAP_N * 2 }, () => { const m = new THREE.Mesh(ZAP_BOX, z.mat); m.visible = false; return m; });
+  const pick = () => ZAP_SITES[Math.random() * ZAP_SITES.length | 0];
+  z.t = .7 + Math.random() * 2.8; z.on = .1 + Math.random() * .14; z.k = 0;
+  z.site = Math.random() < .35 ? [pick(), pick()] : [pick()];
+}
+// yours in the lobby, and everyone else's in a match
+function secretTick(dt) {
+  if (heroCh?.zap) zapTick(heroCh.zap, dt);
+  if (inLobby) return;
+  for (const z of zombies) if (z.zap) {
+    const on = !z.dead; z.zap.eyes.visible = on;
+    if (on) zapTick(z.zap, dt); else zapOff(z.zap);
+  }
 }
 
 // random look from a name, so a bot always looks the same

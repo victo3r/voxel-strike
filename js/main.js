@@ -105,18 +105,24 @@ function update(dt) {
     if (Math.abs(P.kx) + Math.abs(P.kz) < .2) P.kx = P.kz = 0;
   }
   launchMove(P, P.pos, .35, P.onGround, dt); // rocket blast push
-  const jumpKey = !stunned && held('jump');
-  const jumpV = 9 * Math.sqrt(Math.max(.2, 1 + jumpOf(cur) + youFx().jump)); // height grows with v squared
+  const jumpKey = !stunned && held('jump'), fx = youFx();
+  const jumpV = 9 * Math.sqrt(Math.max(.2, 1 + jumpOf(cur) + fx.jump)); // height grows with v squared
   if (jumpKey && P.onGround) { P.vy = jumpV; P.onGround = false; net.ev('jump'); }
-  else if (jumpKey && !jumpWas && !P.onGround && (P.dj | 0) < youFx().air) { // Raider Boots jump again in the air, twice with the full set
+  else if (jumpKey && !jumpWas && !P.onGround && (P.dj | 0) < fx.air) { // Raider Boots jump again in the air, twice with the full set
     P.dj = (P.dj | 0) + 1; P.vy = Math.max(P.vy, jumpV); sfx('djump'); burst(tmp.set(P.pos.x, P.pos.y + .1, P.pos.z), 0xe8eef2, 6); net.ev('djump');
-  }
+  } else if (jumpKey && !jumpWas && !P.onGround && !P.dashed && canDash(fx, cur)) dashYou();
   jumpWas = jumpKey;
-  const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt; P.pos.y += P.vy * dt;
+  dashMove(P, P.pos, .35, dt);
+  const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt;
+  const glide = fx.glide && jumpKey && wasAir && P.vy < -GLIDE_FALL; // Skyrunner: hold jump to float down
+  if (glide) { P.vy = -GLIDE_FALL; if (!P.gliding) sfx('glide'); }
+  P.gliding = glide;
+  P.pos.y += P.vy * dt;
   if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } }
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
   if (!wasAir && P.vy <= 0 && sticks(prevY - gy, P.onRamp)) P.pos.y = gy; // stick to stairs going down
-  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; P.dj = 0; } else P.onGround = false;
+  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; P.dj = 0; P.dashed = false; } else P.onGround = false;
+  if (!net.on && P.hp > 0) growBars(regrow(P, fx, dt, P.max)); // Thornwood grows back
   if (inWater(P.pos.x, P.pos.z, P.pos.y)) drownYou();
   wetCheck(P, P.pos);
   easeLag(P.pos, dt);
@@ -247,6 +253,7 @@ function update(dt) {
       continue;
     }
     launchMove(z, z.g.position, z.r, !z.vy, dt); // rocket blast push
+    dashMove(z, z.g.position, z.r, dt); // a Skyrunner bot's dash
     if (z.burn > 0) { // burning
       z.burn -= dt;
       if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true, z.burnBy ?? null); }
@@ -305,7 +312,7 @@ function update(dt) {
         }
         const pd = Math.hypot(P.pos.x - z.g.position.x, P.pos.z - z.g.position.z);
         if (!z.hitP && pd < z.reach && dy > -1 && dy < 3.5) {
-          z.hitP = true; hurtPlayer(Math.round(z.dmg * 1.5));
+          z.hitP = true; stingYou(z, hurtPlayer(Math.round(z.dmg * 1.5)));
           P.kx = z.cdx * 16; P.kz = z.cdz * 16; P.vy = Math.max(P.vy, 6); P.onGround = false;
           sfx('smash');
         }
@@ -352,7 +359,7 @@ function update(dt) {
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
     } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.boss || z.type === 'brute' ? 3.5 : 2.2)) { // bosses and brutes reach higher
-      z.atk = z.atkRate; sfx('zAttack', { at: z.g.position, far: 30, rate: z.type === 'brute' || z.type === 'boss' ? .7 : 1 }); hurtPlayer(z.dmg);
+      z.atk = z.atkRate; sfx('zAttack', { at: z.g.position, far: 30, rate: z.type === 'brute' || z.type === 'boss' ? .7 : 1 }); stingYou(z, hurtPlayer(z.dmg));
     }
     z.flash -= dt;
     const e = z.flash > 0 ? 0x880000 : z.burn > 0 ? (Math.sin(performance.now() * .03 + i) > 0 ? 0x993300 : 0x441100) : z.glow;
@@ -417,6 +424,7 @@ function update(dt) {
   }
 
   vitBar('hp', P.hp, P.max, 'heart'); vitBar('arm', P.armor, P.maxArmor, 'shield');
+  $('arm').classList.toggle('grow', (P.growA = (P.growA || 0) - dt) > 0); $('hp').classList.toggle('grow', (P.growH = (P.growH || 0) - dt) > 0);
   const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
   setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : w.pool ? ammo[cur] : ammo[cur] + ' / ' + spare}`);
   if (!pvp()) setHTML($('top'), `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead).length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`);
@@ -471,7 +479,7 @@ function autoGfx(raw, playing) {
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // dropped mags
-  starTick(dt); boltTick(dt);
+  starTick(dt); boltTick(dt); secretTick(dt);
   if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pause in the menu, matches don't

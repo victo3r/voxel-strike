@@ -162,7 +162,9 @@ const lookKey = l => JSON.stringify(Object.keys(l).sort().filter(k => l[k] != nu
 const isPreset = l => PRESETS.some(p => lookKey(p.look) === lookKey(l));
 // your look without a drawn skin (what CrazyGames players see you in)
 const lookBase = () => { const { px, ...b } = prof.look; return b; };
+const ownSecret = id => Array.isArray(prof.secrets) && prof.secrets.includes(id);
 const lookChoices = () => [...PRESETS, ...(prof.myLook && !isPreset(prof.myLook) ? [{ name: 'CUSTOM', look: prof.myLook }] : []),
+  ...Object.keys(SECRETS).filter(ownSecret).map(id => ({ name: SECRETS[id].name, look: SECRETS[id].look, secret: id })),
   ...(prof.draws || []).map((d, i) => ({ name: d.n, look: { ...lookBase(), px: d.px }, drawn: i }))];
 const lookIndex = () => { const k = lookKey(prof.look); return lookChoices().findIndex(p => lookKey(p.look) === k); };
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
@@ -432,6 +434,7 @@ $('custRand').onclick = () => {
 };
 const custOpen = () => $('custPanel').style.display === 'flex';
 function showCust(on) {
+  if (on && prof.look.secret) { prof.look = { ...(prof.myLook ?? PRESETS[0].look) }; saveProf(); dressHero(); }
   if (on && prof.look.px) { prof.look = lookBase(); saveProf(); dressHero(); }
   $('custPanel').style.display = on ? 'flex' : 'none';
   $('lobbyUI').style.display = on ? 'none' : '';

@@ -371,7 +371,7 @@ function makeBot(rec, spot) {
   const yaw = spot?.yaw ?? Math.atan2(-x, -z);
   g.rotation.y = yaw;
   const mags = {}; for (const i of rec.load) mags[i] = rec.W[i].mag; // full ammo on respawn
-  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, rec, pid: rec.pid, remote: !!rec.remote,
+  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, wings: ch.wings, zap: ch.zap, rec, pid: rec.pid, remote: !!rec.remote,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, armor: arm ? arm.hp : 0, maxArmor: arm ? arm.hp : 0, dr: arm ? arm.dr : 0, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, fireEnd: 'flameEnd', leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
@@ -437,6 +437,11 @@ function youDownFx(by) {
   respawnT = YOU_RESPAWN; killedBy = by ? by.rec.name : ''; P.burn = 0; P.hp = 0;
   killCam = by && !friendly(by, YOU_T) ? { b: by, at: by.g.position.clone(), yaw: P.yaw, pitch: P.pitch } : null;
 }
+function botDash(b, tp, d) {
+  const pos = b.g.position, s = DASH_SPD * .9 / d;
+  b.dashed = true; b.dx = (tp.x - pos.x) * s; b.dz = (tp.z - pos.z) * s; b.vy = DASH_UP; b.dashFlag = true;
+  sfx('dash', { at: pos, far: 25, v: .8 }); burst(tmp.set(pos.x, pos.y + .8, pos.z), 0xbff6fa, 6);
+}
 // you died in a bot match
 function youDown(by) {
   youDownFx(by);
@@ -470,7 +475,7 @@ function hideKillerCard() { kcTok++; killGuns.clear(); $('kcard').classList.remo
 function respawnYou(x, z, yaw) {
   gunSpinV = 0;
   if (x == null) [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { drowned: false, hitBy: null, drownFlag: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, hitBy: null, drownFlag: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, dx: 0, dz: 0, dashed: false, calm: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   youHelpers.clear(); killCam = null; hideKillerCard();
   cancelReload(); recoilReset(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
@@ -854,9 +859,11 @@ function updateBot(b, dt) {
       if (!b.vy && Math.random() < .4) b.jumpT = 0; // stuck: try a hop
     }
     // hop now and then like a player
-    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? S.jumpF[0] + Math.random() * S.jumpF[1] : Math.random() < S.chain ? .5 + Math.random() * .4 : S.jumpR[0] + Math.random() * S.jumpR[1]; b.vy = 9 * Math.sqrt(1 + (b.rec.fx.jump ?? 0)); b.dj = b.rec.fx.air && Math.random() < .6 ? b.rec.fx.air : 0; }
+    if (!b.vy && !(sniper && b.aimT > 0) && (b.jumpT -= dt) <= 0) { b.jumpT = sees ? S.jumpF[0] + Math.random() * S.jumpF[1] : Math.random() < S.chain ? .5 + Math.random() * .4 : S.jumpR[0] + Math.random() * S.jumpR[1]; b.vy = 9 * Math.sqrt(1 + (b.rec.fx.jump ?? 0)); b.dj = b.rec.fx.air && Math.random() < .6 ? b.rec.fx.air : 0; b.glide = b.rec.fx.glide && Math.random() < .6; b.dashed = false; }
     // Raider Boots jump again in the air (twice with the set)
     if (b.dj > 0 && b.vy && b.vy > -2 && b.vy < 2) { b.dj--; b.vy = 9 * Math.sqrt(1 + (b.rec.fx.jump ?? 0)); sfx('djump', { at: pos, far: 20, v: .7 }); burst(tmp.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
+    // the Skyrunner set with a saber: dash at who it's chasing
+    if (sees && !b.dashed && b.vy && b.vy < 3 && canDash(b.rec.fx, b.gun)) { const d = Math.hypot(tp.x - pos.x, tp.z - pos.z); if (d > 3 && d < 12) botDash(b, tp, d); }
     b.t += dt * BOT.speed * 2.2;
     b.pivL.rotation.x = Math.sin(b.t) * .6; b.pivR.rotation.x = -Math.sin(b.t) * .6;
     const ph = Math.sin(b.t) > 0; // footsteps
@@ -864,6 +871,8 @@ function updateBot(b, dt) {
   } else { b.pivL.rotation.x *= .8; b.pivR.rotation.x *= .8; b.vx = b.vz = b.mvx = b.mvz = 0; }
   const air = b.vy < -6;
   settle(b, dt);
+  b.gliding = b.glide && b.vy < 0 && b.vy >= -GLIDE_FALL - .01; wingTick(b, b.gliding, dt);
+  if (!net.on && regrow(b, b.rec.fx, dt, b.maxHp) && (b.growT = (b.growT || 0) - dt) <= 0) { b.growT = .5; growFx(pos); } // Thornwood
   if (inWater(pos.x, pos.z, pos.y)) { drownZombie(b); return; }
   if (air && !b.vy) sfx('land_' + FOOT_OK(surfaceAt(pos.x, pos.z, b.r, pos.y)), { at: pos, far: 22, v: .7 });
 
@@ -979,7 +988,7 @@ function endMatch(results) {
   $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
-    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + missionsRow();
+    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(won ? 'win' : 'lose'); musicEnd();
   if (!MR.starter) setTimeout(cgMidgame, 1500); // CrazyGames midgame ad, not after your first game

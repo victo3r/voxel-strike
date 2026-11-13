@@ -339,6 +339,40 @@ function launchMove(o, pos, r, grounded, dt) {
   const k = Math.exp(-(grounded ? GROUND_DRAG : AIR_DRAG) * dt); o.lx *= k; o.lz *= k;
   if (Math.abs(o.lx) + Math.abs(o.lz) < .1) o.lx = o.lz = 0;
 }
+// ---- Thornwood and Skyrunner
+const GLIDE_FALL = 2.2, DASH_SPD = 22, DASH_UP = 3, DASH_DRAG = 5;
+// armor (and health, with the boots) grows back after a while without a hit; online the server does it. 1 = armor grew, 2 = health
+function regrow(o, fx, dt, maxHp) {
+  if (!fx || !fx.grow && !fx.heal) return 0;
+  if ((o.calm = (o.calm || 0) + dt) < fx.wait) return 0;
+  const a = o.armor, h = o.hp;
+  if (fx.grow) o.armor = Math.min(o.maxArmor, o.armor + fx.grow * dt);
+  if (fx.heal) o.hp = Math.min(maxHp, o.hp + fx.heal * dt);
+  return (o.armor > a) + 2 * (o.hp > h);
+}
+// the bars glow while they grow
+function growBars(k) { if (k & 1) P.growA = .3; if (k & 2) P.growH = .3; }
+const growFx = p => burst(tmp.set(p.x, p.y + 1.1, p.z), 0x6fcf4a, 4);
+// the Thornwood Crown: melee hits sting whoever made them
+const stingFx = p => { burst(tmp.set(p.x, p.y + 1.1, p.z), 0x5a3a1e, 5); sfx('thorns', { at: p, far: 20 }); };
+function stingYou(z, d) { // a zombie clawed you
+  const t = youFx().thorns; if (!t || !(d > 0) || z.dead) return;
+  stingFx(z.g.position); hurtZombie(z, d * t, z.g.position.clone().setY(z.g.position.y + 1), false, true, null, 8);
+}
+// the full Skyrunner set with a saber in hand: a dash in the air toward where you look
+const canDash = (fx, g) => fx.dash && BASE[g]?.swing === 'saber';
+function dashYou() {
+  const h = DASH_SPD * Math.max(.5, Math.cos(P.pitch));
+  P.dashed = true; P.dx = -Math.sin(P.yaw) * h; P.dz = -Math.cos(P.yaw) * h; P.vy = DASH_UP + Math.sin(P.pitch) * DASH_SPD * .6;
+  sfx('dash'); burst(tmp.set(P.pos.x, P.pos.y + .8, P.pos.z), 0xbff6fa, 8); net.ev('dash');
+}
+function dashMove(o, pos, r, dt) {
+  if (!o.dx && !o.dz) return;
+  if (!walkTo(pos, pos.x + o.dx * dt, pos.z, r, false)) o.dx = 0;
+  if (!walkTo(pos, pos.x, pos.z + o.dz * dt, r, false)) o.dz = 0;
+  const k = Math.exp(-DASH_DRAG * dt); o.dx *= k; o.dz *= k;
+  if (Math.abs(o.dx) + Math.abs(o.dz) < .3) o.dx = o.dz = 0;
+}
 // ghost = someone else's rocket online, the server says what it hit
 function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }

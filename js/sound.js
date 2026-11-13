@@ -442,6 +442,9 @@ const SOUNDS = {
     }
   })],
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
+  dash: [.4, .55, s => { s.hiss({ ft: 'bandpass', f: 600, f2: 3200, q: 1.3, a: .01, d: .3, v: .9, sweep: .25 }); s.tone({ type: 'triangle', f: 520, f2: 1040, d: .15, v: .2 }); }], // Skyrunner dash
+  glide: [.6, .3, s => s.hiss({ ft: 'bandpass', f: 900, f2: 500, q: .9, a: .12, d: .45, v: .7, sweep: .45 })], // wings open
+  thorns: [.25, .45, s => { s.clack({ f: 1800, d: .015, v: .7, body: .4 }); s.hiss({ ft: 'highpass', f: 3500, d: .06, v: .35 }); }], // the Thornwood Crown stings
   djump: [.25, .4, s => { s.hiss({ ft: 'bandpass', f: 350, f2: 1500, q: 2, a: .03, d: .14, v: .8, sweep: .16 }); s.tone({ f: 260, f2: 560, d: .1, v: .22 }); }], // double jump
   swing: [.25, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 2800, q: 3, a: .06, d: .12, v: 1, sweep: .14 }); }], // knife
   saber: [.85, .75, s => { // a humming blade: a buzz that swells and falls as it swings
