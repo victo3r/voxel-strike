@@ -148,7 +148,27 @@ $('gfxFps').addEventListener('change', e => { gfx.fps = e.target.checked; saveGf
 renderGfx();
 // touch buttons press 'T:<action>'
 const held = a => keys['T:' + a] || binds[a].some(c => c && keys[c]);
-const isBind = (a, code) => code === 'T:' + a || binds[a].includes(code);
+const isBind = (a, code) => !!code && (code === 'T:' + a || binds[a].includes(code)); // '' is an empty slot
+// letter keys are named by what the player's keyboard says on them (Z Q S D on a French one)
+const keyAs = {}, AZERTY = { KeyA: 'Q', KeyQ: 'A', KeyW: 'Z', KeyZ: 'W' };
+let keyLv = 0;
+function keyIs(code, key) { // learned from a key press
+  const L = /^Key[A-Z]$/.test(code) && /^[a-z]$/i.test(key) && key.toUpperCase(), was = keyAs[code] || code.slice(3);
+  if (!L || L === was) return false;
+  if (AZERTY[code]) for (const c in AZERTY) keyAs[c] = AZERTY[code] === L ? AZERTY[c] : c.slice(3); // A/Q and W/Z swap together
+  for (let i = 65; i < 91; i++) { const c = 'Key' + String.fromCharCode(i); if (c !== code && (keyAs[c] || c.slice(3)) === L) keyAs[c] = was; }
+  keyAs[code] = L;
+  return true;
+}
+function relabel() { keyLv++; renderHelp(); if ($('binds').style.display === 'flex') renderBinds(); }
+addEventListener('keydown', e => { if (keyIs(e.code, e.key)) relabel(); }, true);
+// the whole layout up front where the browser shares it
+if ((document.permissionsPolicy || document.featurePolicy)?.allowsFeature?.('keyboard-map') !== false)
+  navigator.keyboard?.getLayoutMap?.().then(m => {
+    let n = 0;
+    m.forEach((k, c) => { if (/^Key[A-Z]$/.test(c) && /^[a-z]$/.test(k) && k.toUpperCase() !== c.slice(3)) { keyAs[c] = k.toUpperCase(); n++; } });
+    if (n) relabel();
+  }).catch(() => {});
 // key names: mouse buttons as pictures, punctuation as itself
 const MOUSE_IC = { Mouse0: 'mL', Mouse1: 'mM', Mouse2: 'mR', Mouse3: 'm4', Mouse4: 'm5', WheelUp: 'mUp', WheelDown: 'mDown' };
 const KEY_SYM = { Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
@@ -158,7 +178,7 @@ function nice(code) {
   const named = { Mouse0: 'Left Click', Mouse1: 'Middle Click', Mouse2: 'Right Click', WheelUp: 'Scroll Up', WheelDown: 'Scroll Down',
     ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl', AltLeft: 'L Alt', AltRight: 'R Alt', CapsLock: 'Caps Lock', ...KEY_SYM };
   const m = /^Mouse(\d+)$/.exec(code), pic = MOUSE_IC[code] || (m ? 'mouse' : '');
-  return (pic ? ico(pic) + ' ' : '') + (named[code] ?? (m ? 'Mouse ' + (+m[1] + 1) : code.replace(/^Key|^Digit|^Numpad/, '')));
+  return (pic ? ico(pic) + ' ' : '') + (named[code] ?? keyAs[code] ?? (m ? 'Mouse ' + (+m[1] + 1) : code.replace(/^Key|^Digit|^Numpad/, '')));
 }
 // short label for a hotbar key cap
 function keyCap(code) {
@@ -167,7 +187,7 @@ function keyCap(code) {
   if (MOUSE_IC[code] || m) return ico(MOUSE_IC[code] || 'mouse') + (m && +m[1] > 2 ? '<small>' + (+m[1] + 1) + '</small>' : '');
   const short = { ShiftLeft: 'SHIFT', ShiftRight: 'SHIFT', ControlLeft: 'CTRL', ControlRight: 'CTRL', AltLeft: 'ALT', AltRight: 'ALT', Space: 'SPACE', CapsLock: 'CAPS',
     Backspace: 'BKSP', Escape: 'ESC', Enter: 'ENTER', Tab: 'TAB', ...KEY_SYM };
-  return short[code] ?? code.replace(/^Key|^Digit/, '').replace(/^Numpad/, 'N').toUpperCase().slice(0, 6);
+  return short[code] ?? keyAs[code] ?? code.replace(/^Key|^Digit/, '').replace(/^Numpad/, 'N').toUpperCase().slice(0, 6);
 }
 const renderHelp = () => renderHotbar();
 let rebinding = null;
@@ -220,15 +240,24 @@ function press(code) {
   for (let s = 0; s < CATS.length; s++) if (sw && isBind('slot' + (s + 1), code)) selectSlot(s);
   if (cur !== before) aimOn = false;
 }
+// typing tools like Unikey swap keys for letters with no key code (W comes in as ư)
+let typedAt = -1e9;
+function typedHint(key) {
+  if (key?.length !== 1 || key < '\x80' || performance.now() - typedAt < 15000) return;
+  typedAt = performance.now();
+  netToast('Your typing tool is changing your keys, switch it to English to play\nBộ gõ tiếng Việt đang bật, hãy chuyển sang E để chơi', 6000);
+}
 addEventListener('keydown', e => {
   if (rebinding) {
     e.preventDefault();
+    if (!e.code) { typedHint(e.key); return; }
     assign(e.code === 'Escape' ? null : (e.code === 'Backspace' || e.code === 'Delete') ? '' : e.code);
     return;
   }
   if (chatting) return;
   if (locked && (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab' || isBind('chat', e.code))) e.preventDefault();
   if (e.target.tagName === 'INPUT') return;
+  if (!e.code) { if (locked) typedHint(e.key); return; }
   if (e.repeat) return;
   keys[e.code] = true;
   press(e.code);

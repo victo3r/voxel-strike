@@ -620,7 +620,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #findingMsg{font-size:34px;margin:0;letter-spacing:2px}
 #findingX{font:bold 16px monospace;padding:8px 18px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
 #findingX:hover{background:var(--hov)}
-#netToast{position:fixed;left:50%;top:14%;transform:translateX(-50%);max-width:90vw;padding:10px 18px;background:rgba(20,26,30,.92);color:#fff;border:3px solid var(--line-dim);font:bold 16px monospace;text-shadow:2px 2px 0 #000;opacity:0;pointer-events:none;transition:opacity .25s;z-index:30}
+#netToast{position:fixed;left:50%;top:14%;transform:translateX(-50%);width:max-content;max-width:90vw;box-sizing:border-box;text-align:center;white-space:pre-line;padding:10px 18px;background:rgba(20,26,30,.92);color:#fff;border:3px solid var(--line-dim);font:bold 16px monospace;text-shadow:2px 2px 0 #000;opacity:0;pointer-events:none;transition:opacity .25s;z-index:30}
 #netToast.show{opacity:1}
 @media (max-height:620px){#findingMsg{font-size:24px}#joinBtn{bottom:10vmin}}
 

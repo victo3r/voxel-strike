@@ -970,7 +970,7 @@ function tipTick(dt) {
     return;
   }
   if (tip.t < .35) return;
-  if (tip.shown !== tip.i) { el.innerHTML = (TOUCH && T.touch || T.pc)(); tip.shown = tip.i; }
+  if (tip.shown !== tip.i || tip.lv !== keyLv) { el.innerHTML = (TOUCH && T.touch || T.pc)(); tip.shown = tip.i; tip.lv = keyLv; } // again when key names change
   el.classList.add('on');
 }
 // match results (online they come from the server)
