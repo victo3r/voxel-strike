@@ -54,7 +54,7 @@ const TEAMS = [
 ];
 const teamOf = t => t === YOU_T || t?.you ? 0 : t?.rec ? t.rec.team : t?.team;
 // are a and c on the same team
-function friendly(a, c) { a ??= YOU_T; c ??= YOU_T; return teamMode() && a !== c && teamOf(a) === teamOf(c); }
+function friendly(a, c) { a ??= YOU_T; c ??= YOU_T; return (teamMode() || net.coop) && a !== c && teamOf(a) === teamOf(c); } // co-op: every player's on one team
 // scoring: kills, headshots and streaks
 const KILL_PTS = 50, HEAD_PTS = 50, STREAK_PTS = 15, STREAK_PTS_AFTER = 5;
 const STREAKS = {
@@ -475,7 +475,7 @@ function hideKillerCard() { kcTok++; killGuns.clear(); $('kcard').classList.remo
 function respawnYou(x, z, yaw) {
   gunSpinV = 0;
   if (x == null) [x, z] = spawnSpot(YOU_T);
-  Object.assign(P, { drowned: false, hitBy: null, drownFlag: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, dx: 0, dz: 0, dashed: false, calm: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
+  Object.assign(P, { drowned: false, swim: false, hitBy: null, drownFlag: false, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, kx: 0, kz: 0, lx: 0, lz: 0, dx: 0, dz: 0, dashed: false, calm: 0, hp: P.max, armor: P.maxArmor, yaw: yaw ?? Math.atan2(x, z), pitch: 0, onRamp: false }); P.pos.set(x, groundAt(x, z, .35, floorY(x, z)), z); P.pos.lag = 0;
   WEAPONS.forEach((w, i) => { if (owned[i]) { ammo[i] = w.mag; if (!BASE[i].inf) reserve[i] = resMax(i); } });
   youHelpers.clear(); killCam = null; hideKillerCard();
   cancelReload(); recoilReset(); vm.visible = true; $('cross').style.display = ''; $('banner').style.opacity = 0;
@@ -839,7 +839,7 @@ function updateBot(b, dt) {
     mx = Math.sin(b.mvYaw) * m0; mz = Math.cos(b.mvYaw) * m0;
   } else if (Math.hypot(mx, mz) > .05) b.mvYaw = Math.atan2(mx, mz);
   if (b.leap) { if (!b.vy || (b.leap.t -= dt) <= 0) b.leap = null; else { mx = b.leap.x; mz = b.leap.z; } } // mid-jump over a gap
-  const ml = Math.hypot(mx, mz), spd = b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd) * slowMul(b);
+  const ml = Math.hypot(mx, mz), spd = b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd) * slowMul(b) * (b.vy && swimAt(pos.x, pos.z, pos.y) ? SWIM_MUL : 1);
   const tx = ml > .05 ? mx / ml * spd : 0, tz = ml > .05 ? mz / ml * spd : 0;
   if (b.leap) { b.mvx = tx; b.mvz = tz; } // a jump keeps its line
   else { const e = 1 - Math.exp(-MOVE_EASE * dt); b.mvx += (tx - b.mvx) * e; b.mvz += (tz - b.mvz) * e; } // eases into a new direction like a player
@@ -1011,7 +1011,7 @@ function setupMode() {
   BOT_COUNT = net.on ? 0 : MR.players[MAP.size] - 1;
   $('post').style.display = 'none'; document.body.classList.remove('results'); $('board').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard(); // clears "KILLED BY"
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
-  $('chat').style.display = pvp() ? '' : 'none';
+  $('chat').style.display = pvp() || net.coop ? '' : 'none';
   if (pvp()) {
     if (net.on) { net.roster(); joins = []; } else makeRecs(); // online the roster is the room's players
     matchT = MATCH_T; wearArmor();
@@ -1019,6 +1019,7 @@ function setupMode() {
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
     cur = slotGun[0]; buildGun(); renderHotbar();
   } else { // zombie waves: bring your loadout and armor
+    if (net.coop) net.roster(); // co-op: the room's players
     wearArmor();
     CATS.forEach(([c], s) => { const g = loadoutGun(c); giveGun(g); slotGun[s] = g; });
     cur = slotGun[0]; buildGun(); renderHotbar();

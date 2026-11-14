@@ -73,7 +73,8 @@ drawScope('scope'); drawHolo(2);
 addEventListener('resize', () => { drawScope(scopeKind); drawHolo(holoZoom, holoCol); });
 function update(dt) {
   if (P.slowT > 0) P.slowT -= dt;
-  const down = pvp() && dmDown(dt);
+  if (net.coop) coopTick(dt);
+  const down = pvp() ? dmDown(dt) : net.coop && coopDown(dt); // co-op: joining, waiting for the next wave, or down
   const w = WEAPONS[cur];
   if (down) aimOn = false;
   if (!down) {
@@ -88,7 +89,7 @@ function update(dt) {
   }
   let tx = 0, tz = 0; // the speed you want, which your actual speed eases to (quick, but not an instant flip)
   if (mx || mz) {
-    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) * Math.min(1, len) / len; // a half-pushed stick walks
+    const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) * (P.swim ? SWIM_MUL : 1) * Math.min(1, len) / len; // a half-pushed stick walks
     tx = (mx * c + mz * s) * sp; tz = (-mx * s + mz * c) * sp;
   }
   const ease = 1 - Math.exp(-MOVE_EASE * dt);
@@ -114,15 +115,18 @@ function update(dt) {
   jumpWas = jumpKey;
   dashMove(P, P.pos, .35, dt);
   const prevY = P.pos.y, wasAir = !P.onGround; P.vy -= 25 * dt;
-  const glide = fx.glide && jumpKey && wasAir && P.vy < -GLIDE_FALL; // Skyrunner: hold jump to float down
+  const glide = fx.glide && jumpKey && wasAir && P.vy < -GLIDE_FALL && !P.swim; // Skyrunner: hold jump to float down
   if (glide) { P.vy = -GLIDE_FALL; if (!P.gliding) sfx('glide'); }
   P.gliding = glide;
+  if (swimAt(P.pos.x, P.pos.z, P.pos.y)) P.vy = Math.max(P.vy, jumpKey ? -SINK_KICK : -SINK); // sinking in the sea
   P.pos.y += P.vy * dt;
   if (P.vy > 0) { const c = ceilingAt(P.pos.x, P.pos.z, .35, prevY, P.pos.y - prevY); if (P.pos.y + BODY > c) { P.pos.y = c - BODY; P.vy = 0; } }
   const gy = groundAt(P.pos.x, P.pos.z, .35, prevY);
   if (!wasAir && P.vy <= 0 && sticks(prevY - gy, P.onRamp)) P.pos.y = gy; // stick to stairs going down
-  if (P.pos.y <= gy) { if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; P.dj = 0; P.dashed = false; } else P.onGround = false;
-  if (!net.on && P.hp > 0) growBars(regrow(P, fx, dt, P.max)); // Thornwood grows back
+  if (P.pos.y <= gy) { if (P.swim && gy - P.pos.y > .3) P.pos.lag = Math.min(1.5, (P.pos.lag || 0) + gy - P.pos.y); // swam onto a shallower step
+    if (wasAir && P.vy < -6) { sfx('land_' + FOOT_OK(surfaceAt(P.pos.x, P.pos.z, .35, gy))); stepT = .25; } P.pos.y = gy; P.vy = 0; P.onGround = true; P.onRamp = groundRamp; P.dj = 0; P.dashed = false; } else P.onGround = false;
+  if (!net.pvp && P.hp > 0) growBars(regrow(P, fx, dt, P.max)); // Thornwood grows back
+  P.swim = !P.onGround && swimAt(P.pos.x, P.pos.z, P.pos.y);
   if (inWater(P.pos.x, P.pos.z, P.pos.y)) drownYou();
   wetCheck(P, P.pos);
   easeLag(P.pos, dt);
@@ -210,22 +214,14 @@ function update(dt) {
 
   if (pvp()) { updateDM(dt); if (matchOver) return; }
 
-  if (mode === 'zombies' && !dead && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = spawnGap(wave); }
-  if (mode === 'zombies' && !dead && toSpawn === 0 && zombies.length === 0) {
-    if (wave > 0 && shopWave < wave) {
-      shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
-      // wave rewards, only up to PAY_WAVES
-      const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 1 + (bossW ? 5 : 0) : 0), r = grant(xp, gold); // boosters double it
-      runXp += xp; runCoins += gold + r.bonus; eventWave(xp);
-      waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp };
-      openShop(); return;
-    }
+  const solo = mode === 'zombies' && !net.coop && !dead; // co-op waves are the host's (coop.js)
+  if (solo && toSpawn > 0 && (spawnT -= dt) <= 0) { spawnZombie(); toSpawn--; spawnT = spawnGap(wave); }
+  if (solo && toSpawn === 0 && zombies.length === 0) {
+    if (wave > 0 && shopWave < wave) { wavePay(); openShop(); return; }
     if ((waveWait -= dt) <= 0) {
       // hordes and boss waves
       wave++; horde = isHorde(wave); toSpawn = waveSize(wave); spawnT = 0; waveWait = 3; countShown = 0;
-      const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };
-      banner(`WAVE ${wave}` + (horde ? '\nHORDE!' : news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
-      sfx('waveStart');
+      waveStartFx();
       if (wave % 5 === 0) { spawnZombie(wave % 10 === 0 ? 'hive' : 'boss'); sfx('bossRoar', { v: .7 }); }
       if (wave === 1) zRunStart(); else zRunWave(); // the zombie board's clock, then the run so far
       missionWave(wave);
@@ -235,6 +231,7 @@ function update(dt) {
     }
   }
 
+  zTs = zTargets();
   for (let i = zombies.length - 1; i >= 0; i--) {
     const z = zombies[i];
     easeLag(z.g.position, dt);
@@ -248,6 +245,7 @@ function update(dt) {
       continue;
     }
     if (z.remote) { net.applyRemote(z, dt); continue; } // online players move from server updates
+    if (z.mirror) { if (mirrorTick(z, dt)) { zMap.delete(z.zid); scene.remove(z.g); zombies.splice(i, 1); } continue; } // co-op: the host's zombie
     if (!(z.hp > 0)) { // broken health, finish it off
       z.hp = 0; hurtZombie(z, 1, z.g.position.clone().setY(z.g.position.y + 1), false, true, z.hitBy && z.hitBy !== YOU_T ? z.hitBy : null);
       continue;
@@ -256,16 +254,17 @@ function update(dt) {
     dashMove(z, z.g.position, z.r, dt); // a Skyrunner bot's dash
     if (z.burn > 0) { // burning
       z.burn -= dt;
-      if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true, z.burnBy ?? null); }
+      if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; zFrom = z.burnPid | 0; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true, z.burnBy ?? null); zFrom = 0; } // co-op: a teammate's fire pays them
       if (z.dead) continue;
     }
     if (z.type === 'bot') { updateBot(z, dt); continue; }
+    ZT = net.coop && zTarget(z) || YOU_Z; // co-op: the nearest of you
     if (z.rise > 0) { riseTick(z, dt); continue; } // still climbing out of a grave
     if (z.leap) { leapTick(z, dt); continue; } // a boss jumping up to you
     settle(z, dt);
     if (inSea(z.g.position.x, z.g.position.z, z.g.position.y)) { drownZombie(z); continue; } // zombies drown in the sea
-    const dx = P.pos.x - z.g.position.x, dz = P.pos.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = P.pos.y - z.g.position.y;
-    let way = MAP.nav?.(z.g.position, P.pos); // head for the stairs
+    const T = ZT.pos, dx = T.x - z.g.position.x, dz = T.z - z.g.position.z, dist = Math.hypot(dx, dz), dy = T.y - z.g.position.y;
+    let way = MAP.nav?.(z.g.position, T); // head for the stairs
     if (z.boss) way = bossWay(z, dt, way, dist); // too big for stairs: it jumps or throws
     const wx = way ? way.x - z.g.position.x : dx, wz = way ? way.z - z.g.position.z : dz, wd = Math.hypot(wx, wz) || .001;
     const zapped = stunTick(z, dt, !z.vy); // a stun wand froze it
@@ -310,11 +309,10 @@ function update(dt) {
           z.t += dt * CHARGE_SPD * 1.5;
           z.pivL.rotation.x = Math.sin(z.t) * .8; z.pivR.rotation.x = -Math.sin(z.t) * .8;
         }
-        const pd = Math.hypot(P.pos.x - z.g.position.x, P.pos.z - z.g.position.z);
+        const pd = Math.hypot(T.x - z.g.position.x, T.z - z.g.position.z);
         if (!z.hitP && pd < z.reach && dy > -1 && dy < 3.5) {
-          z.hitP = true; stingYou(z, hurtPlayer(Math.round(z.dmg * 1.5)));
-          P.kx = z.cdx * 16; P.kz = z.cdz * 16; P.vy = Math.max(P.vy, 6); P.onGround = false;
-          sfx('smash');
+          z.hitP = true; zHurtT(z, Math.round(z.dmg * 1.5), [z.cdx * 16, z.cdz * 16, 6]);
+          if (ZT.me) sfx('smash');
         }
         hold = true;
         if (z.charging <= 0) z.atk = .6;
@@ -328,7 +326,7 @@ function update(dt) {
       if (z.windS > 0) { // winding up a spit
         z.windS -= dt; hold = true; z.glow = Math.sin(z.windS * 40) > 0 ? 0x335500 : 0x112200;
         if (z.windS <= 0) { spit(z); z.spitT = z.hive ? 2.4 : 2.8 + Math.random(); }
-      } else if (dist > 4 && dist < (z.hive ? 18 : 13) && Math.abs(dy) < 3 && !way && clearLine(spitFrom.set(z.g.position.x, z.g.position.y + 1.45 * z.scale, z.g.position.z), spitTo.set(P.pos.x, P.pos.y + 1, P.pos.z))) {
+      } else if (dist > 4 && dist < (z.hive ? 18 : 13) && Math.abs(dy) < 3 && !way && clearLine(spitFrom.set(z.g.position.x, z.g.position.y + 1.45 * z.scale, z.g.position.z), spitTo.set(T.x, T.y + 1, T.z))) {
         hold = true;
         if ((z.spitT -= dt) <= 0) { z.windS = .5; sfx('fuse', { at: z.g.position, far: 40, rate: .5 }); }
       }
@@ -346,12 +344,12 @@ function update(dt) {
     else if (way || dist > z.reach) {
       let vx = wx / wd, vz = wz / wd;
       for (const o of zombies) { // don't stack up
-        if (o === z || o.dead) continue;
+        if (o === z || o.dead || o.type === 'bot') continue;
         const ox = z.g.position.x - o.g.position.x, oz = z.g.position.z - o.g.position.z, od = Math.hypot(ox, oz);
         if (od < (z.r + o.r) * 1.15 && od > 0) { vx += ox / od; vz += oz / od; }
       }
       const s = spd * dt, nx = z.g.position.x + vx * s, nz = z.g.position.z + vz * s;
-      const into = !!MAP.trapped?.(P.pos);
+      const into = !!MAP.trapped?.(T);
       const step = z.up ? .3 : STEP; // a boss after you up high doesn't climb, it jumps
       walkDry(z.g.position, nx, z.g.position.z, z.r, !z.vy, into, step);
       walkDry(z.g.position, z.g.position.x, nz, z.r, !z.vy, into, step);
@@ -359,7 +357,7 @@ function update(dt) {
       z.t += dt * spd * 3;
       z.pivL.rotation.x = Math.sin(z.t) * .6; z.pivR.rotation.x = -Math.sin(z.t) * .6;
     } else if ((z.atk -= dt) <= 0 && dy > -1 && dy < (z.boss || z.type === 'brute' ? 3.5 : 2.2)) { // bosses and brutes reach higher
-      z.atk = z.atkRate; sfx('zAttack', { at: z.g.position, far: 30, rate: z.type === 'brute' || z.type === 'boss' ? .7 : 1 }); stingYou(z, hurtPlayer(z.dmg));
+      z.atk = z.atkRate; sfx('zAttack', { at: z.g.position, far: 30, rate: z.type === 'brute' || z.type === 'boss' ? .7 : 1 }); zHurtT(z, z.dmg);
     }
     z.flash -= dt;
     const e = z.flash > 0 ? 0x880000 : z.burn > 0 ? (Math.sin(performance.now() * .03 + i) > 0 ? 0x993300 : 0x441100) : z.glow;
@@ -374,7 +372,7 @@ function update(dt) {
     if (!p.item) { if ((p.t -= dt) <= 0) spawnPickup(p); continue; }
     p.item.rotation.y += dt * 2; p.item.position.y = p.y + .6 + Math.sin(now * .003 + p.x) * .1;
     if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 1 && P.pos.y < p.y + 1.5 && !down) {
-      if (net.on) net.pick(p); // online the server decides
+      if (net.pvp) net.pick(p); // online the server decides
       else if (usePickup(p.type)) { clearPad(p); p.t = RESPAWN + Math.random() * 10; }
     }
   }
@@ -427,7 +425,7 @@ function update(dt) {
   $('arm').classList.toggle('grow', (P.growA = (P.growA || 0) - dt) > 0); $('hp').classList.toggle('grow', (P.growH = (P.growH || 0) - dt) > 0);
   const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
   setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : w.pool ? ammo[cur] : ammo[cur] + ' / ' + spare}`);
-  if (!pvp()) setHTML($('top'), `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead).length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`);
+  if (!pvp()) setHTML($('top'), net.coop && coopTop() || `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead && z.type !== 'bot').length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`);
 }
 
 // knife swing curve
@@ -482,8 +480,8 @@ function autoGfx(raw, playing) {
   starTick(dt); boltTick(dt); secretTick(dt);
   if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
-  // zombie waves pause in the menu, matches don't
-  const isLive = () => !dead && !shopOpen && !matchOver && (pvp() || locked);
+  // zombie waves pause in the menu, matches and co-op don't
+  const isLive = () => !dead && !matchOver && (net.coop || !shopOpen && (pvp() || locked));
   const live = isLive();
   cgPlay(live && locked && !inLobby); // tell CrazyGames you're playing
   autoGfx(raw, live && locked);

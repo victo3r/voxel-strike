@@ -71,7 +71,7 @@ function shrugs(o, key, t) {
 function wandHit(w, o, from, by) {
   if (o === P ? respawnT > 0 : o.dead) return;
   if (w.burn) applyBurn(o, w.burnT * longOf(by ? by.rec?.fx : youFx(), w), w.burn, by, w.id, true);
-  if (w.knock && !net.on) launch(o, o === P ? new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z) : o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); // online the server sends the push
+  if (w.knock && !net.pvp) launch(o, o === P ? new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z) : o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); // online the server sends the push
 }
 
 // the Stun Wand's swing throws a little crackling blast, as far as it reaches
@@ -92,6 +92,7 @@ function stunZap(from, to, sc = scene, size = 1) {
 // stuns: frozen in place until a moment after landing, then a short spell where it can't happen again
 const STUN_CD = 2;
 function stunHit(o, t) {
+  if (o?.mirror) { if (!o.dead) net.zHit(o, { st: t }); return; } // co-op: the host stuns it
   if (!o || o.stunT > 0 || o.stunCD > 0 || o.dead || fxOf(o)?.steady || shrugs(o, 'stun', t)) return;
   o.stunT = o.boss ? t / 2 : t;
   if (o === P) { toast('STUNNED', '#ffd23a'); sfx('stunned'); }

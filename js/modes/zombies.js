@@ -7,6 +7,26 @@ const perk = { spd: 0, dmg: 0, hp: 0 }, PAY_WAVES = 30, DEAD_T = .9;
 const ZHP = .56;
 // wave size and spawn gap (the server's tables.js has the same, to time runs for the zombie board)
 const isHorde = w => w >= 12 && w % 10 === 2, waveSize = w => Math.round((8 + w * 2.5) * (isHorde(w) ? 1.6 : 1)), spawnGap = w => Math.max(.3, 1.5 - w * .1);
+// co-op: up to 4 of you, and each extra player makes a wave half as big again (tables.js too)
+const COOP_CAP = 4, COOP_GROW = .5, coopSize = (w, n) => Math.round(waveSize(w) * (1 + COOP_GROW * (Math.max(1, n) - 1)));
+// co-op (js/coop.js): zFrom = whose hit the host is applying, ZT = who the zombie being moved is after
+let zFrom = 0, coopRun = false, zTs = [];
+const YOU_Z = { me: true, pos: P.pos };
+let ZT = YOU_Z;
+function zTargets() {
+  const out = [];
+  if (!dead && !P.downed && !P.waiting && (!net.coop || net.alive)) out.push(YOU_Z);
+  if (net.coop) for (const m of net.mates()) if (m.up) out.push(m);
+  return out;
+}
+// the nearest player still up, sticking with the one it's after unless another's clearly closer
+function zTarget(z) {
+  const p = z.g.position, far = t => Math.hypot(t.pos.x - p.x, t.pos.z - p.z) + Math.abs(t.pos.y - p.y) * 2;
+  let best = null, bd = Infinity;
+  for (const t of zTs) { const d = far(t) - (t === z.tg ? 3 : 0); if (d < bd) { bd = d; best = t; } }
+  return z.tg = best;
+}
+const farFrom = (x, z, d) => Math.hypot(x - P.pos.x, z - P.pos.z) > d && (!net.coop || net.mates().every(m => !m.body || Math.hypot(x - m.pos.x, z - m.pos.z) > d));
 // zombie types (hp is a multiplier on the wave base)
 const ZTYPES = {
   walker: { hp: 1,   speed: () => Math.min(1.8 + wave * .15, 4.5), scale: 1,    dmg: 10, atk: 1,   coins: 2, shirt: shirtTex },
@@ -67,7 +87,7 @@ const RISE_T = 1.1; // climbing out of a grave
 function spawnZombie(type = pickType()) {
   const r0 = .3 * ZTYPES[type].scale;
   if (MAP.graves && Math.random() < .8) { // out of an open grave, not right beside you
-    const ok = MAP.graves.filter(([x, z]) => Math.hypot(x - P.pos.x, z - P.pos.z) > 9 && !zombies.some(o => !o.dead && Math.hypot(o.g.position.x - x, o.g.position.z - z) < 1.2));
+    const ok = MAP.graves.filter(([x, z]) => farFrom(x, z, 9) && !zombies.some(o => !o.dead && Math.hypot(o.g.position.x - x, o.g.position.z - z) < 1.2));
     if (ok.length) {
       const [x, z] = ok[Math.random() * ok.length | 0], zz = makeZombie(x, z, type);
       zz.rise = RISE_T; zz.g.position.y = -1.9 * zz.scale; zz.g.rotation.y = Math.atan2(P.pos.x - x, P.pos.z - z);
@@ -76,7 +96,7 @@ function spawnZombie(type = pickType()) {
     }
   }
   if (MAP.spawns && Math.random() < .8) { // out of the corn, not right beside you
-    const ok = MAP.spawns.filter(([x, z]) => Math.hypot(x - P.pos.x, z - P.pos.z) > 9 && !zombies.some(o => !o.dead && Math.hypot(o.g.position.x - x, o.g.position.z - z) < 1.2));
+    const ok = MAP.spawns.filter(([x, z]) => farFrom(x, z, 9) && !zombies.some(o => !o.dead && Math.hypot(o.g.position.x - x, o.g.position.z - z) < 1.2));
     if (ok.length) {
       const [x, z] = ok[Math.random() * ok.length | 0], zz = makeZombie(x, z, type);
       zz.g.rotation.y = Math.atan2(P.pos.x - x, P.pos.z - z);
@@ -89,7 +109,7 @@ function spawnZombie(type = pickType()) {
     let x, z;
     if (MAP.water) { x = (Math.random() * 2 - 1) * (A - 2); z = (Math.random() * 2 - 1) * (A - 2); } // anywhere on dry land
     else { const side = Math.random() * 4 | 0, r = (Math.random() * 2 - 1) * (A - 2), e = A - 1.5; x = side === 0 ? -e : side === 1 ? e : r; z = side === 2 ? -e : side === 3 ? e : r; }
-    if (!blocked(x, z, r0, floorY(x, z)) && !overWater(x, z, floorY(x, z)) && !poolAt(x, z) && Math.hypot(x - P.pos.x, z - P.pos.z) > (MAP.water ? 14 : 10)) {
+    if (!blocked(x, z, r0, floorY(x, z)) && !overWater(x, z, floorY(x, z)) && !poolAt(x, z) && farFrom(x, z, MAP.water ? 14 : 10)) {
       const zz = makeZombie(x, z, type);
       if (!zz.boss) sfx('zDie', { at: zz.g.position, far: 45, rate: .5, v: .45 }); // a groan so you know where it came up
       return zz;
@@ -118,7 +138,7 @@ function hitFx(zz, point, head, quiet) {
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0, thru = 0) {
   if (!Number.isFinite(dmg)) return; // a bad number would make it unkillable
   if (zz.type === 'bot' && friendly(by, zz)) return; // no friendly fire
-  if (net.on && (zz.remote || zz.pid)) { // online the server owns its health
+  if (net.pvp && (zz.remote || zz.pid)) { // online the server owns its health
     if (!quiet) { hitFx(zz, point, head, false); if (!by) hitMarker(head ? 'head' : 'body'); }
     net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
@@ -126,7 +146,12 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
   if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // hats can block or soften headshots
   // damage boots, the Sharpshooter perk, the Arcane set on wands (not thorns)
   const fx = by ? by.rec?.fx : youFx(), wand = !quiet && (by ? BASE[by.gun] : BASE[cur])?.wand;
-  if (kind !== 8) dmg *= 1 + (fx?.dmg ?? 0) + (by ? 0 : perk.dmg * .1) + (wand ? fx?.wand ?? 0 : 0);
+  if (kind !== 8 && !zFrom) dmg *= 1 + (fx?.dmg ?? 0) + (by ? 0 : perk.dmg * .1) + (wand ? fx?.wand ?? 0 : 0);
+  if (zz.mirror) { // co-op: the host's zombie, so the hit goes to the host
+    if (!quiet) { hitFx(zz, point, head, false); hitMarker(head ? 'head' : 'body'); }
+    net.zHit(zz, { d: dmg, h: head ? 1 : 0, q: quiet ? 1 : 0 });
+    return;
+  }
   if (zz.type === 'bot') { // bot armor works like yours (the Skyrunner Helm cuts more in the air)
     dmg *= 1 - zz.dr - zz.rec.fx.dr - (zz.vy ? zz.rec.fx.sky : 0);
     const soak = Math.min(zz.armor, dmg); zz.armor -= soak; zz.hp -= dmg - soak; zz.calm = 0;
@@ -134,7 +159,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
     if (t && by !== zz) { if (by) { if (!by.dead) { stingFx(by.g.position); hurtZombie(by, dmg * t, by.g.position.clone().setY(by.g.position.y + 1), false, true, zz, 8); } } else { stingFx(P.pos); hurtPlayer(dmg * t, false, zz, false, 8); } }
   } else zz.hp -= dmg;
   const dies = zz.hp <= 0 && !zz.dead;
-  if (dies) zz.dead = .0001; // mark dead first so a broken effect can't make it unkillable
+  if (dies) { zz.dead = .0001; zz.killBy = by ? 0 : zFrom || net.pid; zz.killHead = head; } // mark dead first so a broken effect can't make it unkillable
   if (zz.type === 'bot' && by !== zz) { // recent damage, for kill credit
     const who = by ?? YOU_T;
     if (zz.hitBy !== who || zz.hitByT <= 0) zz.hitDmg = 0;
@@ -144,14 +169,16 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
   const big = zz.type === 'brute' || zz.boss;
   hitFx(zz, point, head, quiet);
   // hit marker: red kill, gold headshot, white body
-  if (!by && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
+  const mine = !by && !zFrom; // a teammate's hit on the host's zombie pays them
+  if (mine && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
   if (dies) {
-    if (!by) { kills++; coins += zz.coins + (head ? 2 : 0); if (zz.boss) bossKills++; if (zz.type !== 'bot') missionKill(head); }
+    if (mine) { kills++; coins += zz.coins + (head ? 2 : 0); if (zz.boss) bossKills++; if (zz.type !== 'bot') missionKill(head); }
+    else if (zFrom) { const r = net.recOf(zFrom); if (r) r.kills++; }
     if (zz.type === 'bot') botDown(zz, by, head);
     else {
-      if (!by && zz.boss) sfx('killSpecial'); // walkers die too often for a kill sound
+      if (mine && zz.boss) sfx('killSpecial'); // walkers die too often for a kill sound
       if (zz.type === 'exploder') explode(zz);
-      else if (zz.boss) { sfx('bossRoar', { at: zz.g.position, far: 80, rate: .75 }); banner(`BOSS DOWN!\n+${zz.coins} ${COIN}`, true); }
+      else if (zz.boss) { sfx('bossRoar', { at: zz.g.position, far: 80, rate: .75 }); banner(mine ? `BOSS DOWN!\n+${zz.coins} ${COIN}` : 'BOSS DOWN!', true); }
       else sfx('zDie', { at: zz.g.position, far: 35, rate: big ? .7 : 1 });
     }
   }
@@ -165,8 +192,8 @@ function youHitFx(head, armorOnly, silver = armorOnly) {
 }
 // pierce skips armor, by = the bot that shot you
 function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0, thru = 0) {
-  if (respawnT > 0 || matchOver || !pvp() && dead || by && friendly(by, YOU_T)) return; // your own rocket still hurts
-  if (net.on) { // online the server decides the damage
+  if (respawnT > 0 || matchOver || !pvp() && dead || P.downed || P.waiting || by && friendly(by, YOU_T)) return; // your own rocket still hurts
+  if (net.pvp) { // online the server decides the damage
     net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
   }
@@ -180,25 +207,28 @@ function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0
   youHitFx(head, soak === d || wasHead && !head, soak === d);
   if (kind === 1 && fx.thorns && by?.rec && !by.dead) { stingFx(by.g.position); hurtZombie(by, d * fx.thorns, by.g.position.clone().setY(by.g.position.y + 1), false, true, null, 8); } // the Thornwood Crown
   if (P.hp <= 0 && pvp()) { P.hp = 0; youDown(by); return d; }
+  if (P.hp <= 0 && net.coop) { coopDowned(); return d; }
   if (P.hp <= 0 && !dead) { P.hp = 0; zombiesDead(); }
   return d;
 }
 // set someone on fire
 function applyBurn(victim, t, dmgPerTick, by, gunId, max = false, pj = 0) {
-  if (net.on) { net.burn(victim, gunId, by, pj); return; } // online the server runs the burn
+  if (net.pvp) { net.burn(victim, gunId, by, pj); return; } // online the server runs the burn
   if (shrugs(victim, 'burn', t)) return;
-  if (victim === P) { burnYou(t, dmgPerTick, by); return; }
+  if (victim === P) { if (!P.downed) burnYou(t, dmgPerTick, by); return; }
+  if (victim.mirror) { net.zHit(victim, { b: [t, dmgPerTick] }); return; } // co-op: the host burns it
   if (max) { victim.burn = Math.max(victim.burn || 0, t); victim.burnDmg = Math.max(victim.burnDmg || 0, dmgPerTick); }
   else { victim.burn = t; victim.burnDmg = dmgPerTick; }
-  victim.burnBy = by;
+  victim.burnBy = by; victim.burnPid = zFrom;
 }
 // drowning
 function splash(at) { burst(at.clone().setY(Math.max(at.y + .5, .3)), 0xd8f2fa, 14); }
 function drownYou() {
   if (respawnT > 0 || matchOver || dead || P.drowned) return;
-  if (!MAP.void) { sfx('splash'); splash(P.pos); }
+  if (!MAP.void && !P.wet) { sfx('splash'); splash(P.pos); } // no second splash after sinking
   P.hp = 0; P.armor = 0; P.vy = 0; P.kx = P.kz = P.lx = P.lz = P.dx = P.dz = 0; P.drowned = true;
-  if (net.on) { P.drownFlag = true; return; } // online the server calls it
+  if (net.pvp) { P.drownFlag = true; return; } // online the server calls it
+  if (net.coop) { coopDowned(); return; }
   if (pvp()) { youDown(P.hitBy && performance.now() - P.hitAt < PUSH_KILL * 1000 ? P.hitBy : null); return; } // knocked in: whoever hurt you last gets the kill
   zombiesDead();
 }
@@ -217,10 +247,10 @@ function drownTick(dt) {
 // a bot or zombie drowned (a zombie counts as your kill)
 function drownZombie(z) {
   if (z.dead || z.drownFlag) return;
-  if (!MAP.void) { sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position); }
+  if (!MAP.void && !z.wet) { sfx('splash', { at: z.g.position, far: 40 }); splash(z.g.position); }
   z.drowned = true;
   if (z.type === 'bot') {
-    if (net.on && z.pid) { z.drownFlag = true; return; } // online the server calls it
+    if (net.pvp && z.pid) { z.drownFlag = true; return; } // online the server calls it
     const by = z.hitBy && z.hitByT > 2 - PUSH_KILL ? z.hitBy : null; // knocked in: whoever hurt it last gets the kill
     z.hp = 0; z.dead = .0001; if (by === YOU_T) hitMarker('kill');
     botDown(z, by === YOU_T ? null : by, false, !by); return;
@@ -232,7 +262,7 @@ function drownZombie(z) {
 let best = { wave: 0, kills: 0 }, newBest = false;
 try { best = JSON.parse(localStorage.getItem('voxelstrike-best')) ?? best; } catch {}
 function saveBest(gone) {
-  if (mode !== 'zombies' && !zLive) return;
+  if (coopRun || mode !== 'zombies' && !zLive) return; // co-op has its own board, kept by the room
   newBest = wave > best.wave || (wave === best.wave && kills > best.kills);
   if (newBest) { best = { wave, kills }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} onSave(); }
   if (gone) zRunWave(true); else zRunScore();
@@ -270,9 +300,9 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -
   const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', W = BASE[gi(gun)], lk = W?.launch ?? 1, spell = !!W?.spell;
   if (spell) spellFx(p, el); else blastFx(p, R, !!W?.gust);
   const k = spell ? longOf(by ? by.rec?.fx : youFx(), W) : 1, push = self => !self && spell && el === 2 ? SPELL_GUST : 1;
-  const hex = o => { if (el === 0) applyBurn(o, W.burnT * k, W.burn, by, W.id, true, pj); else if (el === 1 && !net.on) shockHit(o, FROST, k); }; // online the server sends the ice
+  const hex = o => { if (el === 0) applyBurn(o, W.burnT * k, W.burn, by, W.id, true, pj); else if (el === 1 && !net.pvp) shockHit(o, FROST, k); }; // online the server sends the ice
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
-  if (net.on) { // online the server works out who got hurt
+  if (net.pvp) { // online the server works out who got hurt
     const kind = rocket ? 4 : 6;
     if (pd < R && !dead && respawnT <= 0) {
       if (pDmg) { net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by }); if (spell) hex(P); }
@@ -285,7 +315,7 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -
     }
     return;
   }
-  if (pd < R && !dead && respawnT <= 0 && !(by && friendly(by, YOU_T))) {
+  if (pd < R && !dead && respawnT <= 0 && !P.downed && !P.waiting && !(by && friendly(by, YOU_T))) {
     if (pDmg) { hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by); if (spell) hex(P); }
     if (rocket && respawnT <= 0 && !dead) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, (1 - pd / R) * push(!by), !by, lk);
   }
@@ -401,7 +431,7 @@ function shopRow(it, i) {
     `<span class="sc">${upg && !done ? '<small>UPGRADE</small>' : ''}${cost}</span></button>`;
 }
 function renderShop() {
-  $('shopH').textContent = `WAVE ${wave} CLEARED`;
+  $('shopH').textContent = `WAVE ${wave} CLEARED`; $('next').textContent = net.coop ? 'READY' : 'NEXT WAVE';
   $('shopInfo').innerHTML = shopTop();
   // this visit: supplies and perks always, a few gun offers, upgrades for guns you rented
   const rows = f => SHOP.map((it, i) => [it, i]).filter(([it, i]) => f(it, i)).map(([it, i]) => shopRow(it, i)).join('');
@@ -435,19 +465,36 @@ $('items').addEventListener('click', e => { const b = e.target.closest('button')
 $('next').addEventListener('click', () => {
   shopOpen = false; showShop(false); waveWait = 3;
   rerollPads(); // so pickups match what you own now
+  if (net.coop) coopReadyUp();
   lockMouse();
 });
+// what clearing a wave pays: shop coins, then XP and coins up to PAY_WAVES (boosters double it)
+function wavePay() {
+  shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
+  const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 1 + (bossW ? 5 : 0) : 0), r = grant(xp, gold);
+  runXp += xp; runCoins += gold + r.bonus; eventWave(xp);
+  waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp };
+}
+function waveStartFx() { // hordes and boss waves get a heads up
+  const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };
+  banner(`WAVE ${wave}` + (horde ? '\nHORDE!' : news[wave] ? '\n' + news[wave] : '') + (wave % 5 === 0 ? '\nBOSS INCOMING!' : ''));
+  sfx('waveStart');
+}
 // end of a run
 function zombiesDead() { dead = true; deadT = 0; saveBest(); }
 function zombiesOver() {
   matchOver = true; $('menu').style.display = 'none'; $('banner').style.opacity = 0;
-  $('postSub').textContent = 'ZOMBIE WAVES OVER';
+  const co = net.coop || coopRun;
+  $('postSub').textContent = co ? 'CO-OP RUN OVER' : 'ZOMBIE WAVES OVER';
   $('postPlace').textContent = `WAVE ${wave}` + (newBest ? ' · NEW BEST!' : '');
   $('postBoard').className = 'lb z';
-  const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
-  $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`)
-    + (auth ? '' : row('TOP PLAYERS', cg.on ? 'Log in to get on the board' : 'Sign in to get on the board'));
-  zRankRow(); missionEnd(false);
+  const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`, sign = cg.on ? 'Log in to get on the board' : 'Sign in to get on the board';
+  if (co) $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('BOSSES DOWN', bossKills) + coopTeam().map(r => `<div class="r"><span style="color:${safeCss(r.css)}"${r.fid ? ` data-fid="${r.fid}"` : r.you && myId() ? ` data-fid="${myId()}"` : ''}>${esc(r.name)}</span><span>${r.kills} kills</span></div>`).join('')
+    + (auth ? '' : row('CO-OP BOARD', sign));
+  else $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`)
+    + (auth ? '' : row('TOP PLAYERS', sign));
+  if (co) { coopRank(); if (typeof frPostButtons === 'function') frPostButtons(); } else zRankRow();
+  missionEnd(false);
   $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
@@ -460,14 +507,14 @@ const GLOB_SPD = 13, GLOB_G = 5, globs = [];
 const globGeo = new THREE.BoxGeometry(.28, .28, .28), globMat = lam({ color: 0x8fd83a, emissive: 0x2a5a00 });
 const spitFrom = new THREE.Vector3(), spitTo = new THREE.Vector3();
 function spit(z) {
-  const from = spitFrom.set(z.g.position.x, z.g.position.y + 1.45 * z.scale, z.g.position.z), to = spitTo.set(P.pos.x, P.pos.y + 1, P.pos.z);
+  const from = spitFrom.set(z.g.position.x, z.g.position.y + 1.45 * z.scale, z.g.position.z), to = spitTo.set(ZT.pos.x, ZT.pos.y + 1, ZT.pos.z);
   const n = z.type === 'hive' ? 3 : 1; // the hive spits three
   for (let k = 0; k < n; k++) {
     const v = to.clone().sub(from), d = Math.max(1, v.length()); v.normalize();
     if (n > 1) { const a = (k - 1) * .2, c = Math.cos(a), sn = Math.sin(a), x = v.x * c - v.z * sn, zz = v.x * sn + v.z * c; v.x = x; v.z = zz; }
     v.multiplyScalar(GLOB_SPD); v.y += d * GLOB_G / GLOB_SPD * .5; // aim a bit high to make up for the drop
     const m = new THREE.Mesh(globGeo, globMat); m.position.copy(from); scene.add(m);
-    globs.push({ m, v, life: 3, dmg: z.dmg });
+    globs.push({ m, v, life: 3, dmg: z.dmg }); zGlobEv(from, v, z.dmg, 0);
   }
   sfx('swing', { at: from, far: 40, rate: .7 });
 }
@@ -475,7 +522,7 @@ function globTick(dt) {
   for (let i = globs.length - 1; i >= 0; i--) {
     const g = globs[i], p = g.m.position, w = g.rock ? .7 : .55; g.life -= dt; g.v.y -= (g.grav ?? GLOB_G) * dt;
     p.addScaledVector(g.v, dt); g.m.rotation.x += dt * 6; g.m.rotation.z += dt * 4;
-    const hitYou = !dead && Math.abs(p.x - P.pos.x) < w && Math.abs(p.z - P.pos.z) < w && p.y > P.pos.y - .2 && p.y < P.pos.y + 1.9;
+    const hitYou = !dead && !P.downed && !P.waiting && Math.abs(p.x - P.pos.x) < w && Math.abs(p.z - P.pos.z) < w && p.y > P.pos.y - .2 && p.y < P.pos.y + 1.9;
     if (hitYou) hurtPlayer(g.dmg);
     if (hitYou || g.life <= 0 || p.y < (MAP.floor?.(p.x, p.z) ?? 0) || solidAt(p.x, p.y, p.z, .14)) {
       burst(p.clone(), g.rock ? 0x8a8070 : 0x9ad84a, hitYou ? 8 : g.rock ? 10 : 5); if (g.rock) sfx('smash', { at: p, far: 40, v: .5 });
@@ -484,6 +531,7 @@ function globTick(dt) {
   }
 }
 function clearGlobs() { for (const g of globs) scene.remove(g.m); globs.length = 0; }
+const zGlobEv = (p, v, dmg, k) => { if (net.coop) net.zEvent(['g', r2(p.x), r2(p.y), r2(p.z), r2(v.x), r2(v.y), r2(v.z), dmg, k]); }; // the others see it and only it can hurt them
 
 // bosses are too big for stairs: when you're up out of reach they jump up beside you, or throw rocks if there's no room to land
 const rockGeo = new THREE.BoxGeometry(.7, .6, .7), rockMat = lam({ color: 0xa39a8c, emissive: 0x24211c });
@@ -509,21 +557,21 @@ function leapArc(z, s, l, h) {
 const leapFrom = (z, s, l) => leapArc(z, s, l, 2) || leapArc(z, s, l, 1) || leapArc(z, s, l, 4); // a low one under a roof
 // somewhere beside you with room for it
 function landNear(z) {
-  const g0 = groundAt(P.pos.x, P.pos.z, .3, P.pos.y + .1), p = z.g.position, a0 = Math.atan2(p.x - P.pos.x, p.z - P.pos.z);
+  const T = ZT.pos, g0 = groundAt(T.x, T.z, .3, T.y + .1), p = z.g.position, a0 = Math.atan2(p.x - T.x, p.z - T.z);
   for (const d of [1.8, 2.8]) for (const a of [0, .8, -.8, 1.6, -1.6, 2.4, -2.4, Math.PI]) {
-    const x = P.pos.x + Math.sin(a0 + a) * d, zz = P.pos.z + Math.cos(a0 + a) * d, y = groundAt(x, zz, z.r, g0 + .6);
+    const x = T.x + Math.sin(a0 + a) * d, zz = T.z + Math.cos(a0 + a) * d, y = groundAt(x, zz, z.r, g0 + .6);
     if (Math.abs(y - g0) < 1 && bossFits(z, x, y, zz)) return new THREE.Vector3(x, y, zz);
   }
   return null;
 }
 // you're down somewhere it can't fit (the crypt): the ground right over you
 function overYou(z) {
-  const p = z.g.position, y = groundAt(P.pos.x, P.pos.z, z.r, p.y + .6), h = y - P.pos.y;
-  return Math.abs(y - p.y) < .8 && h > 1.5 && h < 4.5 && bossFits(z, P.pos.x, y, P.pos.z) ? new THREE.Vector3(P.pos.x, y, P.pos.z) : null;
+  const p = z.g.position, T = ZT.pos, y = groundAt(T.x, T.z, z.r, p.y + .6), h = y - T.y;
+  return Math.abs(y - p.y) < .8 && h > 1.5 && h < 4.5 && bossFits(z, T.x, y, T.z) ? new THREE.Vector3(T.x, y, T.z) : null;
 }
 // stuck among things too tight for it (rows of graves): a hop a few metres on along its way
 function hopOn(z, way) {
-  const p = z.g.position, t = way || P.pos, a0 = Math.atan2(t.x - p.x, t.z - p.z);
+  const p = z.g.position, t = way || ZT.pos, a0 = Math.atan2(t.x - p.x, t.z - p.z);
   for (const d of [4, 3]) for (const a of [0, .5, -.5, 1, -1]) {
     const x = p.x + Math.sin(a0 + a) * d, zz = p.z + Math.cos(a0 + a) * d, y = groundAt(x, zz, z.r, p.y + .6);
     if (Math.abs(y - p.y) < .8 && bossFits(z, x, y, zz)) return new THREE.Vector3(x, y, zz);
@@ -532,7 +580,7 @@ function hopOn(z, way) {
 }
 // a throw from `from` that gets to you clear
 function lobAt(from) {
-  const to = new THREE.Vector3(P.pos.x, P.pos.y + 1.1, P.pos.z), d = Math.hypot(to.x - from.x, to.z - from.z), q = new THREE.Vector3(), n = new THREE.Vector3();
+  const to = new THREE.Vector3(ZT.pos.x, ZT.pos.y + 1.1, ZT.pos.z), d = Math.hypot(to.x - from.x, to.z - from.z), q = new THREE.Vector3(), n = new THREE.Vector3();
   for (const T of [.45 + d / 14, .7 + d / 10, 1 + d / 8]) {
     const v = new THREE.Vector3((to.x - from.x) / T, (to.y - from.y) / T + ROCK_G * T / 2, (to.z - from.z) / T);
     let ok = true; q.copy(from);
@@ -542,14 +590,14 @@ function lobAt(from) {
   return null;
 }
 const bossHand = (z, x = z.g.position.x, y = z.g.position.y, zz = z.g.position.z) => { // a rock in its hands, facing you
-  const d = Math.hypot(P.pos.x - x, P.pos.z - zz) || 1, f = .62 * z.scale;
-  return new THREE.Vector3(x + (P.pos.x - x) / d * f, y + 1.32 * z.scale, zz + (P.pos.z - zz) / d * f);
+  const T = ZT.pos, d = Math.hypot(T.x - x, T.z - zz) || 1, f = .62 * z.scale;
+  return new THREE.Vector3(x + (T.x - x) / d * f, y + 1.32 * z.scale, zz + (T.z - zz) / d * f);
 };
 // spots on its own level to jump from (round where it would land), then to throw from (round you), nearest first
 function bossSpots(z, L) {
   const p = z.g.position, list = [];
   for (const l of L ? [L, null] : [null]) {
-    const c = l || P.pos, ring = [];
+    const c = l || ZT.pos, ring = [];
     for (const r of [4, 6.5, 9]) for (let k = 0; k < 10; k++) {
       const a = (k + r) / 10 * Math.PI * 2, x = c.x + Math.sin(a) * r, zz = c.z + Math.cos(a) * r;
       if (!z.bad?.some(b => Math.hypot(b.x - x, b.z - zz) < 2)) ring.push({ d: Math.hypot(x - p.x, zz - p.z), x, zz, l }); // not one it couldn't get to
@@ -571,7 +619,7 @@ function bossSpotStep(z, n) {
 }
 // where a boss heads: the usual way, or when you're up out of reach (or it's stuck) a spot to jump or throw from
 function bossWay(z, dt, way, dist) {
-  const p = z.g.position, busy = z.wind > 0 || z.charging > 0 || z.stun > 0 || z.windS > 0 || z.throwW > 0 || z.landT > 0 || z.stunT > 0, dy = P.pos.y - p.y;
+  const p = z.g.position, busy = z.wind > 0 || z.charging > 0 || z.stun > 0 || z.windS > 0 || z.throwW > 0 || z.landT > 0 || z.stunT > 0, dy = ZT.pos.y - p.y;
   if ((z.stuckT = (z.stuckT ?? 1) - dt) <= 0) { // walked for a while and got nowhere: the path is too tight for it
     if (z.walkT > .7 && dist > z.reach + .5 && Math.hypot(p.x - z.sx, p.y - z.sy, p.z - z.sz) < .3) {
       z.stuckOut = 4; z.bee = !z.bee;
@@ -582,7 +630,7 @@ function bossWay(z, dt, way, dist) {
   if (dist <= z.reach && dy > -1 && dy < 3.5) return null; // close enough to hit you
   if (z.stuckOut > 0) { z.stuckOut -= dt; if (dy < -1.5) z.downT = 8; } // stuck getting down to you: stomp from above instead
   if (z.downT > 0) z.downT -= dt;
-  const pg = groundAt(P.pos.x, P.pos.z, .3, P.pos.y + .1), tight = !!way && blocked(way.x, way.z, z.r * .9, way.y);
+  const pg = groundAt(ZT.pos.x, ZT.pos.z, .3, ZT.pos.y + .1), tight = !!way && blocked(way.x, way.z, z.r * .9, way.y);
   z.up = !dead && pg - p.y > LEAP_UP; z.out = z.up || !dead && (z.stuckOut > 0 || z.downT > 0);
   if (!z.out) { z.go = z.hunt = z.bad = null; return way; }
   z.leapCD = (z.leapCD ?? 2) - dt; z.rockCD = (z.rockCD ?? 1.5) - dt;
@@ -601,7 +649,7 @@ function bossWay(z, dt, way, dist) {
       z.throwW = .55; z.rock = new THREE.Mesh(z.hive ? globGeo : rockGeo, z.hive ? globMat : rockMat); if (z.hive) z.rock.scale.setScalar(1.8);
       z.rock.position.copy(bossHand(z)); scene.add(z.rock); return null;
     }
-    if (!z.hunt && ((z.goT = (z.goT ?? 0) - .3) <= 0 || z.go && Math.hypot(P.pos.x - z.goP.x, P.pos.z - z.goP.z) > 2)) { z.hunt = bossSpots(z, L); z.goT = 2.5; z.goP = P.pos.clone(); }
+    if (!z.hunt && ((z.goT = (z.goT ?? 0) - .3) <= 0 || z.go && Math.hypot(ZT.pos.x - z.goP.x, ZT.pos.z - z.goP.z) > 2)) { z.hunt = bossSpots(z, L); z.goT = 2.5; z.goP = ZT.pos.clone(); }
   }
   if (z.hunt) { const s = bossSpotStep(z, 2); if (s !== undefined) { z.go = s; z.hunt = null; z.bee = false; } }
   if (z.go) return (!z.bee && MAP.nav?.(p, z.go)) || z.go; // snagged on a corner: straight there for a bit
@@ -614,7 +662,7 @@ function bossBusy(z, dt) {
   const r = z.rock; r.position.copy(bossHand(z)).y += (.55 - z.throwW) * .8; r.rotation.y += dt * 3; // lifted to throw
   if ((z.throwW -= dt) <= 0) {
     const v = lobAt(r.position);
-    if (v) { globs.push({ m: r, v, life: 4, dmg: z.dmg, grav: ROCK_G, rock: !z.hive }); sfx('swing', { at: r.position, far: 50, rate: .5 }); }
+    if (v) { globs.push({ m: r, v, life: 4, dmg: z.dmg, grav: ROCK_G, rock: !z.hive }); zGlobEv(r.position, v, z.dmg, z.hive ? 2 : 1); sfx('swing', { at: r.position, far: 50, rate: .5 }); }
     else scene.remove(r);
     z.rock = null; z.rockCD = ROCK_CD;
   }
@@ -635,12 +683,19 @@ function leapTick(z, dt) {
   z.g.rotation.y = Math.atan2(L.l.x - L.s.x, L.l.z - L.s.z); z.pivL.rotation.x = -.9; z.pivR.rotation.x = .4;
   if (L.t < L.T) return;
   p.copy(L.l); z.leap = null; z.vy = 0; z.onRamp = false; z.landT = .7; z.leapCD = LEAP_CD; z.go = null; z.pivL.rotation.x = z.pivR.rotation.x = 0;
+  if (L.stomp) z.downT = 8;
+  const dmg = Math.round(z.dmg * 1.2);
+  bossLanded(z, p, L.stomp, dmg);
+  if (net.coop) net.zEvent(['l', z.zid, r2(p.x), r2(p.y), r2(p.z), L.stomp ? 1 : 0, dmg]); // everyone checks whether it got them
+}
+// the landing shakes the ground and throws you back, or the ceiling comes down on you underground
+function bossLanded(z, p, stomp, dmg) {
   sfx('boom', { at: p, far: 90 }); burst(p.clone().setY(p.y + .3), 0x8a7a66, 22);
-  const dx = P.pos.x - p.x, dz = P.pos.z - p.z, d = Math.hypot(dx, dz);
-  if (L.stomp) { // the ceiling comes down on you
-    z.downT = 8; burst(new THREE.Vector3(P.pos.x, P.pos.y + 2.2, P.pos.z), 0x6a5a48, 16);
-    if (!dead && d < 2.8 && P.pos.y < p.y - 1 && p.y - P.pos.y < 4.5) { stingYou(z, hurtPlayer(Math.round(z.dmg * 1.2))); sfx('smash'); }
-  } else if (!dead && d < 3.4 && Math.abs(P.pos.y - p.y) < 2) { stingYou(z, hurtPlayer(Math.round(z.dmg * 1.2))); P.kx = dx / (d || 1) * 13; P.kz = dz / (d || 1) * 13; P.vy = Math.max(P.vy, 7); P.onGround = false; }
+  const dx = P.pos.x - p.x, dz = P.pos.z - p.z, d = Math.hypot(dx, dz), up = !dead && !P.downed && !P.waiting && respawnT <= 0;
+  if (stomp) {
+    if (d < 4) burst(new THREE.Vector3(P.pos.x, P.pos.y + 2.2, P.pos.z), 0x6a5a48, 16);
+    if (up && d < 2.8 && P.pos.y < p.y - 1 && p.y - P.pos.y < 4.5) { const h = hurtPlayer(dmg); if (z) stingYou(z, h); sfx('smash'); }
+  } else if (up && d < 3.4 && Math.abs(P.pos.y - p.y) < 2) { const h = hurtPlayer(dmg); if (z) stingYou(z, h); P.kx = dx / (d || 1) * 13; P.kz = dz / (d || 1) * 13; P.vy = Math.max(P.vy, 7); P.onGround = false; }
 }
 function resetRun() { perk.spd = perk.dmg = perk.hp = 0; runCoins = runXp = bossKills = 0; deadT = 0; horde = false; countShown = 0; shopOffer = []; clearGlobs(); }
 function banner(text, html = false) { const b = $('banner'); b[html ? 'innerHTML' : 'textContent'] = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }

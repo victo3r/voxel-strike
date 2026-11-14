@@ -1,6 +1,6 @@
 // leaderboards and player cards (stats only count online public matches; the zombie board counts signed-in zombie runs)
 const BOARD_BY = [['xp', 'XP', 'xp'], ['wins', 'WINS', 'crown'], ['kills', 'KILLS', 'skull'], ['zombies', 'ZOMBIES', 'zombie']]; // id, label, icon
-let lbB = 'week', lbBy = 'xp', lbData = null, lbErr = '', lbAt = 0, lbKey = '';
+let lbB = 'week', lbBy = 'xp', lbZ = 'solo', lbData = null, lbErr = '', lbAt = 0, lbKey = ''; // lbZ: the zombie board's solo or co-op runs
 let cardData = null, cardWeek = false, cardErr = '';
 // weekly prizes, by your best place on last week's online boards, and the zombie board's own (the server's tables.js has the same): [down to place, golden, iron, wooden chests, coins]
 const WEEK_PRIZES = [[1, 2, 1, 0, 100], [2, 1, 1, 0, 50], [3, 1, 0, 0, 25], [10, 0, 2, 0, 25], [50, 0, 0, 1, 20]];
@@ -28,11 +28,11 @@ function weekLeft() { // time until Monday 00:00 UTC
   return s > 86400 ? `${Math.floor(s / 86400)}D ${Math.floor(s / 3600) % 24}H` : `${Math.floor(s / 3600)}H ${Math.floor(s / 60) % 60}M`;
 }
 async function loadBoard(force = false) {
-  const key = `${lbB}:${lbBy}:${myId()}`;
+  const by = lbBy === 'zombies' && lbZ === 'coop' ? 'coop' : lbBy, key = `${lbB}:${by}:${myId()}`;
   if (!force && key === lbKey && performance.now() - lbAt < 30000) return renderBoard();
   lbKey = key; lbData = null; lbErr = ''; renderBoard();
   try {
-    const r = await api('GET', `/boards?b=${lbB}&by=${lbBy}${myId() ? '&me=' + myId() : ''}`);
+    const r = await api('GET', `/boards?b=${lbB}&by=${by}${myId() ? '&me=' + myId() : ''}`);
     if (key !== lbKey) return;
     if (r.status !== 200) throw 0;
     lbData = r; lbAt = performance.now();
@@ -42,7 +42,7 @@ async function loadBoard(force = false) {
 function renderBoard() {
   if ($('lb').style.display !== 'flex') return;
   const tab = (k, id, label, on, icon = '') => `<button data-${k}="${id}" class="${on ? 'on' : ''}">${icon && ico(icon)}<span>${label}</span></button>`;
-  const zb = lbBy === 'zombies', me = myId(), by = BOARD_BY.find(b => b[0] === lbBy), unit = zb ? 'WAVE' : by[1]; lbHeads.length = 0;
+  const zb = lbBy === 'zombies', co = zb && lbZ === 'coop', me = myId(), by = BOARD_BY.find(b => b[0] === lbBy), unit = zb ? 'WAVE' : by[1]; lbHeads.length = 0;
   const wk = lbB === 'week', pzOn = wk;
   const val = r => zb ? `${r.v}<small>${lbNum(r.k)} KILLS</small>` : lbNum(r.v);
   const row = (r, look = r.look, lv = r.lv, cls = '') => `<div class="lr${r.id === me ? ' you' : ''}${r.rank <= 3 ? ' p' + r.rank : ''}${cls}" data-card="${r.id}"><span class="rk"><b>${r.rank}</b></span>${lazyHead(look)}` +
@@ -53,11 +53,12 @@ function renderBoard() {
   const list = lbErr ? `<p class="lbNote">${lbErr}</p>` : !lbData ? '<p class="lbNote">Loading…</p>'
     : lbData.rows.length ? `<div class="lbList">${head}${lbData.rows.map((r, i, a) => part(r, i, a) + row(r)).join('')}${pin}</div>` : `<p class="lbNote">${wk ? 'Nobody yet this week, be the first' : 'Nobody here yet, be the first'}</p>`;
   const signIn = cg.on ? 'Log in to CrazyGames to get on the board' : 'Sign in to get on the board';
-  const note = !auth ? `<p class="lbNote">${signIn}</p>` : lbData && !lbData.me ? `<p class="lbNote">${zb ? 'Play zombie waves to get on the board' : 'Play online to get on the board'}</p>` : '';
-  const sub = (zb ? 'Zombie waves · best runs' : 'Online matches') + (wk ? ` · the top ${zb ? 3 : 50} win prizes` : '');
+  const note = !auth ? `<p class="lbNote">${signIn}</p>` : lbData && !lbData.me ? `<p class="lbNote">${co ? 'Play co-op zombie waves to get on the board' : zb ? 'Play zombie waves to get on the board' : 'Play online to get on the board'}</p>` : '';
+  const sub = (co ? 'Co-op zombie waves · best runs' : zb ? 'Zombie waves · best runs' : 'Online matches') + (wk ? ` · the top ${zb ? 3 : 50} win prizes` : '');
   $('lbBox').className = pzOn ? 'wk' : '';
   $('lbBox').innerHTML = `<div class="lbTop"><h1>${ico('trophy')} TOP PLAYERS</h1><div class="lbWhen">${tab('b', 'week', 'THIS WEEK', wk)}${tab('b', 'all', 'ALL TIME', !wk)}</div></div>` +
     `<div class="lbTabs lbBy">${BOARD_BY.map(b => tab('by', b[0], b[1], lbBy === b[0], b[2])).join('')}</div>` +
+    (zb ? `<div class="lbTabs lbZm">${tab('zm', 'solo', 'SOLO', !co)}${tab('zm', 'coop', 'CO-OP', co)}</div>` : '') +
     `<p class="lbSub"><span>${sub}</span>${wk ? `<span class="lbClock">${ico('clock')}new week in ${weekLeft()}</span>` : ''}</p>` +
     list + note +
     `<div class="lbFoot">${auth && me ? `<button data-card="${me}">MY CARD</button>` : ''}<button id="lbX">${ico('close')} CLOSE</button></div>`;
@@ -73,6 +74,7 @@ $('lb').addEventListener('click', e => {
   if (c) return openCard(+c.dataset.card);
   if (b?.dataset.b && b.dataset.b !== lbB) { lbB = b.dataset.b; sfx('ui'); loadBoard(); }
   if (b?.dataset.by && b.dataset.by !== lbBy) { lbBy = b.dataset.by; sfx('ui'); loadBoard(); }
+  if (b?.dataset.zm && b.dataset.zm !== lbZ) { lbZ = b.dataset.zm; sfx('ui'); loadBoard(); }
 });
 
 // player card
@@ -90,7 +92,7 @@ function renderCard() {
   if ($('card').style.display !== 'flex') return;
   const c = cardData;
   if (!c) { $('cardBox').innerHTML = `<p class="lbNote">${cardErr || 'Loading…'}</p><div class="lbFoot"><button id="cardX">CLOSE</button></div>`; return; }
-  const s = cardWeek ? c.week : c.all, z = c.zombies?.[cardWeek ? 'week' : 'all'], pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
+  const s = cardWeek ? c.week : c.all, z = c.zombies?.[cardWeek ? 'week' : 'all'], zc = c.coop?.[cardWeek ? 'week' : 'all'], pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
   const fi = BASE.findIndex(w => w.id === c.fav), g = c.gear || {};
   const gear = [
     g.hat && HATS.find(h => h.id === g.hat.id) ? `<img class="ai" title="${HATS.find(h => h.id === g.hat.id).name}" src="${hatPic(g.hat.id, g.hat.st)}">` : '',
@@ -106,6 +108,7 @@ function renderCard() {
       (!cardWeek && fi >= 0 ? `<div class="cFav"><span>FAVORITE GUN</span><img class="ai" src="${gunPic(fi)}"><b>${BASE[fi].name}</b></div>` : '')
       : `<p class="lbNote">${cardWeek ? 'No online matches this week yet' : 'No online matches yet'}</p>`) +
     (z ? `<div class="cZom"><span>BEST ZOMBIE RUN</span><b>WAVE ${z.wave}</b><span>${lbNum(z.kills)} KILLS</span></div>` : '') +
+    (zc ? `<div class="cZom"><span>BEST CO-OP RUN</span><b>WAVE ${zc.wave}</b><span>${lbNum(zc.kills)} KILLS</span></div>` : '') +
     `<div class="lbFoot"><button id="cardX">CLOSE</button></div>`;
 }
 $('card').addEventListener('click', e => {
@@ -123,7 +126,7 @@ let prizeQ = [], prizeChk = -1e9;
 async function checkPrizes(force = false) {
   if (!auth || (!force && performance.now() - prizeChk < 600e3)) return;
   prizeChk = performance.now();
-  try { const r = await api('GET', '/prizes?z=1'); if (r.status === 200 && Array.isArray(r.prizes)) { prizeQ = r.prizes; showPrize(); } } catch {}
+  try { const r = await api('GET', '/prizes?z=2'); if (r.status === 200 && Array.isArray(r.prizes)) { prizeQ = r.prizes; showPrize(); } } catch {}
 }
 function showPrize(force = false) {
   const p = prizeQ[0]; if (!p || $('prize').style.display === 'flex') return;
@@ -135,7 +138,7 @@ function renderPrize(msg = '') {
   const p = prizeQ[0]; if (!p) return;
   const tile = (pic, n, name, c) => `<div class="loot" style="--rc:${c}"><div class="pic">${pic}</div><b>${name}</b><small>×${n}</small></div>`;
   const tiles = PRIZE_BOX.map(([i, id], k) => p.prize[k] ? tile(`<img class="ai" src="${chestPic(i)}">`, p.prize[k], CHESTS[i].name, ['#ffd75e', '#b5bfcc', '#c48a4e'][k]) : '').join('') + (p.prize[3] ? tile(`<span class="lc">${COIN}</span>`, p.prize[3], 'COINS', '#ffcf3a') : '');
-  $('prizeBox').innerHTML = `<h1>${ico('trophy')} WEEKLY PRIZE</h1><p>You finished <b>#${p.rank}</b> on last week's ${p.by === 'xp' ? 'XP' : p.by === 'zombies' ? 'ZOMBIE' : p.by.toUpperCase()} board!</p>` +
+  $('prizeBox').innerHTML = `<h1>${ico('trophy')} WEEKLY PRIZE</h1><p>You finished <b>#${p.rank}</b> on last week's ${p.by === 'xp' ? 'XP' : p.by === 'zombies' ? 'ZOMBIE' : p.by === 'coop' ? 'CO-OP ZOMBIE' : p.by.toUpperCase()} board!</p>` +
     `<div class="lootRow">${tiles}</div>${msg ? `<p class="err">${msg}</p>` : ''}<button id="prizeGo" class="go">CLAIM</button>`;
 }
 async function claimPrize() {

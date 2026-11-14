@@ -68,7 +68,7 @@ function botsHear(text) {
 }
 
 function openChat() {
-  if (chatting || !pvp() || matchOver && !net.on || !chatOn()) return;
+  if (chatting || !pvp() && !net.coop || matchOver && !net.on || !chatOn()) return;
   chatting = true; for (const k in keys) keys[k] = false;
   $('chat').classList.add('open'); $('chatIn').value = ''; $('chatIn').focus();
 }

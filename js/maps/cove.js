@@ -730,7 +730,7 @@ const gulls = [];
 // --- water and footsteps ---
 M.floor = (x, z) => { const c = cellAt(x, z); return c >= 0 && kind[c] === SEA ? SF[c] : 0; };
 M.sea = (x, z, feet) => kindAt(x, z) === SEA && feet < WATER_Y - .5; // the shallows by the sand are walkable
-M.water = (x, z, feet) => M.sea(x, z, feet) && SF[cellAt(x, z)] <= -SEA_D; // only the deep water drowns you
+M.water = (x, z, feet) => M.sea(x, z, feet) && SF[cellAt(x, z)] <= -SEA_D && feet < .3 - SEA_D; // sinking to the bottom of the deep water drowns you
 M.wet = (x, z, y) => kindAt(x, z) === SEA && y < WATER_Y && !M.water(x, z, y);
 M.surfAt = (x, z, y, b, s) => { if (s) return b; const c = cellAt(x, z); return c < 0 ? 'sand' : cave[c] ? 'stone' : kind[c] === SAND || kind[c] === SEA ? 'sand' : kind[c] === ROCK ? 'stone' : 'grass'; };
 

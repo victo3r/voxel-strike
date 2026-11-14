@@ -1,7 +1,7 @@
 const ray = new THREE.Raycaster(), ray2 = new THREE.Raycaster(), ndc = new THREE.Vector2(), fwd = new THREE.Vector3(), tmp = new THREE.Vector3();
 // what bullets can hit
 const headMul = w => w.headMul ?? HEAD_MUL; // the crossbow hits heads harder
-function shotTargets(rc) { const t = [ground, ...(rc ? coverAlong(rc.ray.origin, rc.ray.direction, rc.far) : crateMeshes)]; for (const zz of zombies) if (!zz.dead) t.push(...zz.parts); return t; } // rc: only the cover along that ray
+function shotTargets(rc) { const t = [ground, ...(rc ? coverAlong(rc.ray.origin, rc.ray.direction, rc.far) : crateMeshes)]; for (const zz of zombies) if (!zz.dead && !(net.coop && zz.type === 'bot')) t.push(...zz.parts); return t; } // rc: only the cover along that ray; co-op: shots go past teammates
 // recoil only moves the camera, your real aim stays put
 function recoilKick(w) {
   const r = RECOIL[w.id]; if (!r) return;
@@ -71,7 +71,7 @@ function shoot() {
         if (zz && !zz.dead) {
           const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? headMul(w) : 1), hit.point, head, false, null, 0);
           if (w.wand) wandHit(w, zz, camera.position, null);
-          if (w.soul && !net.on && zz.dead) soulHeal(null, zz.g.position.clone().setY(zz.g.position.y + 1), mode === 'zombies' ? SOUL_Z : w.soul); // online the server heals you
+          if (w.soul && !net.pvp && zz.dead) soulHeal(null, zz.g.position.clone().setY(zz.g.position.y + 1), mode === 'zombies' ? SOUL_Z : w.soul); // online the server heals you
         }
         else if (!w.wand) burst(hit.point, 0x999999, 2);
       }
@@ -147,7 +147,7 @@ function fireLance(w) {
 function stab(w) {
   cd = w.rate; kick = 1; sfx(w.swing || 'swing'); crossKick(kickFor(w)); net.shot(w);
   const zap = p => { if (w.wand) stunZap(flashMesh.getWorldPosition(new THREE.Vector3()), p); }; // the Stun Wand throws a little blast
-  const knock = (o, from) => { if (w.knock && !net.on && !o.dead) launch(o, o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); }; // online the server sends the push
+  const knock = (o, from) => { if (w.knock && !net.pvp && !o.dead) launch(o, o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); }; // online the server sends the push
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
     const hit = ray2.intersectObjects(shotTargets(ray2), false)[0], zz = hit?.object.userData.zombie;
@@ -155,7 +155,7 @@ function stab(w) {
       const head = !!hit.object.userData.head; sfx(w.hit || 'slash', { at: hit.point, far: 20 }); hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 1);
       if (w.burn && !zz.dead) applyBurn(zz, w.burnT, w.burn, null, w.id, true);
       knock(zz, camera.position);
-      if (w.stun && !net.on && !zz.dead) stunHit(zz, w.stun * longOf(youFx(), w)); // online the server says
+      if (w.stun && !net.pvp && !zz.dead) stunHit(zz, w.stun * longOf(youFx(), w)); // online the server says
       zap(hit.point); return;
     }
     if (hit) { zap(hit.point); return; }
@@ -275,7 +275,9 @@ const slowMul = o => (o?.slowT || 0) > 0 ? o.slowK || SLOW_K : 1;
 const slows = w => !!(w?.shock || w?.frost);
 function shockHit(o, w, k = 1) { // k: how much longer it lasts
   if (fxOf(o)?.steady || shrugs(o, 'slow', SLOW_T * k)) return;
-  const m = w?.frost ? FROST_K : SLOW_K; o.slowK = o.slowT > 0 ? Math.min(o.slowK || SLOW_K, m) : m; o.slowT = Math.max(o.slowT || 0, SLOW_T * k);
+  const m = w?.frost ? FROST_K : SLOW_K;
+  if (o.mirror) { net.zHit(o, { sl: [m, SLOW_T * k] }); return; } // co-op: the host slows it
+  o.slowK = o.slowT > 0 ? Math.min(o.slowK || SLOW_K, m) : m; o.slowT = Math.max(o.slowT || 0, SLOW_T * k);
 }
 function showBeam(by, from, to, shock = false) {
   let b = beams.get(by);
@@ -327,6 +329,7 @@ function launch(o, center, p, f, self, k = 1) {
   const you = o === P, jumping = you && (P.vy > 0 || held('jump'));
   let s = LAUNCH * f * k * (self ? 1 : LAUNCH_OTHER) * (jumping ? LAUNCH_JUMP : 1);
   if (!you) s /= o.scale || 1; // bigger zombies are heavier
+  if (o.mirror) { net.zHit(o, { ln: [r2(launchV.x * s), r2(launchV.y * s), r2(launchV.z * s), k] }); return; } // co-op: the host throws it
   o.vy = Math.min(LAUNCH_MAX * k, Math.max(o.vy || 0, 0) + launchV.y * s);
   o.lx = (o.lx || 0) + launchV.x * s; o.lz = (o.lz || 0) + launchV.z * s;
   if (you) P.onGround = false;

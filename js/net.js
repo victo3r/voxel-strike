@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 4; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 5; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -50,6 +50,8 @@ net = (() => {
   let alive = false, respawnAt = 0, readySent = false, readyT = 0;
   let seq = 0, fired = 0, hits = [], evFlags = 0, pjSeq = 0, renderT = 0, shotN = 0; // shotN counts every shot, yours and your bots'
   let last = null; // for PLAY AGAIN
+  let roomMode = ''; // the room's mode: 'coop' plays zombie waves
+  let zhits = [], zev = [], zhurts = [], zPk = 0, mateList = []; // co-op: hits for the host, the host's events and who its zombies hurt
   let starting = null;
   let rejoinInfo = null; // to get back in after a dropped connection
   const remotes = new Map();
@@ -97,7 +99,7 @@ net = (() => {
   }
   // the public match you were last in (this tab), so a drop or a reload can take you back to it
   const BACK = 'voxelstrike-back';
-  function markBack() { if (api.on && room && !code && phase !== 'over') try { sessionStorage.setItem(BACK, JSON.stringify({ room, mode, map: mapId, gen: NET_GEN, t: Date.now() })); } catch {} }
+  function markBack() { if (api.on && room && !code && phase !== 'over') try { sessionStorage.setItem(BACK, JSON.stringify({ room, mode: roomMode, map: mapId, gen: NET_GEN, t: Date.now() })); } catch {} }
   function forgetBack() { try { sessionStorage.removeItem(BACK); } catch {} }
   function backRoom(o) {
     let b = null; try { b = JSON.parse(sessionStorage.getItem(BACK)); } catch {}
@@ -155,8 +157,8 @@ net = (() => {
       const err = $('codeErr'); if (err) err.textContent = why; else netToast(why);
       return;
     }
-    netToast(`${why}, playing against bots`, 4000);
-    mode = o.mode; mapId = o.map;
+    netToast(`${why}, ${o.mode === 'coop' ? 'playing solo' : 'playing against bots'}`, 4000);
+    mode = o.mode === 'coop' ? 'zombies' : o.mode; mapId = o.map;
     showPick(false); restart(); showLobby(false); lockMouse();
   }
   function cancelStart() {
@@ -194,7 +196,7 @@ net = (() => {
   function endOnline() {
     api.on = false; api.banner = ''; api.code = null; api.serverPads = false; rejoinInfo = null; alive = false; respawnAt = 0; readySent = false; hostPid = 0;
     for (const r of remotes.values()) dropBody(r);
-    remotes.clear(); hits = []; fired = 0; evFlags = 0;
+    remotes.clear(); hits = []; fired = 0; evFlags = 0; roomMode = ''; zhits = []; zev = []; zhurts = []; mateList = [];
     $('roomRow').style.display = 'none';
     cgRoom();
   }
@@ -234,6 +236,11 @@ net = (() => {
       case 'grow': return grew(m);
       case 'shrug': if (m.pid === pid && alive) { toast('SHOOK IT OFF', '#c8b0ff'); sfx('shrug'); } return; // the Arcane Hat shook off a burn
       case 'over': return over(m);
+      case 'zm': return coopZm(m); // co-op: the host's zombies
+      case 'zh': if (hostPid === pid) coopHits(m[1], m[2]); return; // a teammate's hits on them
+      case 'zx': return coopHurt(m); // one got me
+      case 'zr': return coopReadyMsg(m);
+      case 'zup': return coopUpMsg(m);
       case 'kick': return;
       case 'probe': return;
     }
@@ -245,8 +252,8 @@ net = (() => {
     phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8; api.lvBase = w.lv | 0;
     rejoinInfo = { room, pid, key, until: 0 };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
-    mode = w.mode; mapId = w.map;
-    api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads);
+    roomMode = w.mode; mode = w.mode === 'coop' ? 'zombies' : w.mode; mapId = w.map;
+    api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads) && roomMode !== 'coop';
     if (prof.look.px) send({ t: 'skin', px: prof.look.px }); // older servers just ignore it
     if (last && !code && !rejoining) last.room = room; // PLAY AGAIN keeps a group together
     // the roster, as bot-shaped records
@@ -277,7 +284,7 @@ net = (() => {
   }
   // CrazyGames: report our room so friends can join and invite links work
   let cgInRoom = false;
-  const roomParams = () => code ? { join: code } : { room, mode, map: mapId };
+  const roomParams = () => code ? { join: code } : { room, mode: roomMode, map: mapId };
   const humansIn = () => 1 + [...remotes.values()].filter(r => !r.rec.bot).length; // bots make room for people
   function cgRoom() {
     if (!cg.on) return;
@@ -308,19 +315,19 @@ net = (() => {
     const r = remotes.get(m.pid); if (r) Object.assign(r.rec, gearFields(m.gear));
   }
   function lookMsg(m) { // someone's drawn skin arrived
-    const r = remotes.get(m.pid); if (!r || r.rec.team !== undefined || (typeof m.px !== 'string' && m.px !== null)) return; // teams keep their shirts
+    const r = remotes.get(m.pid); if (!r || r.rec.team !== undefined && roomMode !== 'coop' || (typeof m.px !== 'string' && m.px !== null)) return; // teams keep their shirts
     const L = { ...r.rec.look }; if (m.px) L.px = m.px; else delete L.px;
     r.rec.look = L;
     if (r.body?.mats?.[0]) { r.body.mats[0].map = skinTexture(L); r.body.mats[0].needsUpdate = true; }
   }
   function makeRemoteRec(p) {
     const name = cleanName(p.name) || 'Player';
-    const team = teamMode() ? (p.team === myTeamRaw ? 0 : 1) : undefined;
-    const css = team !== undefined ? TEAMS[team].css : safeCss(p.css);
+    const co = roomMode === 'coop', team = co ? 0 : teamMode() ? (p.team === myTeamRaw ? 0 : 1) : undefined; // co-op: one team, in their own clothes
+    const css = team !== undefined && !co ? TEAMS[team].css : safeCss(p.css);
     let look = p.look && typeof p.look === 'object' ? { ...p.look } : null;
     if (!look || typeof look.hair !== 'string' || typeof look.top !== 'string') look = randomLook(name, 0x6a6a72);
-    if (team !== undefined) delete look.px;
-    if (team !== undefined) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team shirt colour
+    if (team !== undefined && !co) delete look.px;
+    if (team !== undefined && !co) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team shirt colour
     const tag = tagMat(name, css);
     if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; } // teammates' tags show through walls
     return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, bot: !!p.bot, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {},
@@ -502,9 +509,11 @@ net = (() => {
   let skillPool = null;
   function hostRec(rec) { rec.hostBot = true; rec.remote = false; rec.taste = tasteFor(rec.load); rec.wait = Infinity; skillPool ??= rollSkills(7); rec.skill = skillPool.length ? skillPool.pop() : SKILL_MID; }
   function setHost(h) {
+    const was = hostPid === pid;
     hostPid = h | 0;
     const mine = hostPid === pid;
     if (mine) skillPool = null;
+    if (roomMode === 'coop' && mine !== was) coopHost(mine); // the zombies change hands
     for (const r of remotes.values()) {
       if (!r.rec.bot || mine === !!r.rec.hostBot) continue;
       const b = r.body, live = !!b && !b.dead;
@@ -566,7 +575,7 @@ net = (() => {
       const [who, ts, x, y, z, yaw, pitch, gun, flags, fd, burn] = m[i];
       if (who === pid) continue;
       const r = remotes.get(who); if (!r || r.rec.hostBot) continue; // my own bots don't come back to me
-      r.rec.alive = true;
+      r.rec.alive = true; r.seen = localNow();
       if (!r.body) spawnBody(r, x, y, z, yaw); // joined before their spawn reached us
       const buf = r.buf;
       if (buf.length && ts <= buf[buf.length - 1].ts) continue; // out of order
@@ -575,6 +584,10 @@ net = (() => {
       r.fired += fd | 0; r.burn = burn | 0;
       const rl = !!(flags & 2); if (rl && !r.reloadWas) r.q |= 2; r.reloadWas = rl;
       if (flags & 64) r.q |= 64; if (flags & 256) r.q |= 256;
+      if (roomMode === 'coop') { // down, or waiting for the next wave
+        const dn = !!(flags & 512); if (dn && !r.down) { feed(`${nameTag(r.rec)} is down`); sfx('die', { at: r.body?.g.position, far: 40, v: .6 }); }
+        r.down = dn; r.wait = !!(flags & 1024);
+      }
     }
   }
   const dirV = new THREE.Vector3(), fv = new THREE.Vector3(), eyeV = new THREE.Vector3(), beamRay = new THREE.Raycaster();
@@ -598,6 +611,7 @@ net = (() => {
     r.lastX = x; r.lastZ = zz;
     pos.set(x, y, zz); pos.lag = 0;
     z.aimYaw = yaw; z.aimPitch = pitch;
+    r.lie = (r.lie || 0) + ((r.down ? 1 : 0) - (r.lie || 0)) * Math.min(1, dt * 8); z.g.rotation.x = -1.45 * r.lie; z.g.visible = !r.wait; // co-op: down on the ground
     z.g.rotation.y = yaw - z.holdTurn; z.headPiv.rotation.y = z.holdTurn; z.headPiv.rotation.x = z.aim.rotation.x = -pitch;
     const grounded = !!(cur.flags & 8);
     if (sp > .4) { // legs and footsteps
@@ -669,10 +683,11 @@ net = (() => {
   // send your position 20 times a second, with shots and hits
   function sendState() {
     if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby || document.hidden) return; // hidden tab sends nothing, the server marks you afk
-    if (ws.bufferedAmount > 8192) return; // the connection is stuck: don't pile up moves behind it
+    if (ws.bufferedAmount > (roomMode === 'coop' && hostPid === pid ? 32768 : 8192)) return; // the connection is stuck: don't pile up moves behind it
     let flags = evFlags; evFlags = 0;
     if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8; if (P.gliding) flags |= 16;
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
+    if (P.downed) flags |= 512; if (P.waiting) flags |= 1024;
     const h = hits; hits = [];
     const f = fired; fired = 0;
     clock.off += Math.max(-3, Math.min(3, clock.target - clock.off)); // slide, don't jump
@@ -690,7 +705,13 @@ net = (() => {
       botRows.push([r.rec.pid, r3(q.x), r3(q.y), r3(q.z), r3(wrapAng(b.aimYaw - Math.PI)), r3(b.aimPitch), BASE[b.gun].id, bf, r.fired, r.hits]);
       r.fired = 0; r.hits = [];
     }
-    send(['s', ++seq, tc, r3(P.pos.x), r3(P.pos.y), r3(P.pos.z), r3(P.yaw), r3(P.pitch), BASE[cur].id, flags, f, h, botRows]);
+    const out = ['s', ++seq, tc, r3(P.pos.x), r3(P.pos.y), r3(P.pos.z), r3(P.yaw), r3(P.pitch), BASE[cur].id, flags, f, h, botRows];
+    if (roomMode === 'coop') { // my hits for the host; the host's zombies (every other packet), what happened to them and who they hurt
+      const zs = hostPid === pid ? coopRows(++zPk % 2 === 0) : 0;
+      out.push(zhits.length ? zhits : 0, zs || 0, zev.length ? zev : 0, zhurts.length ? zhurts : 0);
+      zhits = []; zev = []; zhurts = [];
+    }
+    send(out);
   }
   setInterval(sendState, NET_RATE);
   // armory changes mid-match get sent to the server
@@ -733,7 +754,7 @@ net = (() => {
     if (!api.on || alive || readySent && localNow() - readyT < 3000 || !welcomed) return;
     if (respawnAt && now() < respawnAt - 150) return;
     // a few free spots, the server picks the farthest from enemies
-    const spots = spawnSpots(YOU_T, 5).map(([x, z]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(groundAt(x, z, .35, floorY(x, z)))]);
+    const spots = (roomMode === 'coop' ? coopSpots() : spawnSpots(YOU_T, 5)).map(([x, z, y]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(y ?? groundAt(x, z, .35, floorY(x, z)))]);
     send({ t: 'ready', spots, x: spots[0][0], z: spots[0][1], yaw: spots[0][2], y: spots[0][3] });
     readySent = true; readyT = localNow(); api.banner = 'SPAWNING…';
   }
@@ -777,7 +798,7 @@ net = (() => {
     const go = () => {
       if (document.body.classList.contains('boot')) return setTimeout(go, 300);
       if (inv) return start(inv);
-      const m = PLAY_MODES.find(m => m.id === mode && m.id !== 'zombies') || PLAY_MODES.find(m => m.id !== 'zombies'); // instant multiplayer: a private room of your usual mode
+      const m = PLAY_MODES.find(m => m.id === (mode === 'zombies' ? 'coop' : mode)) || PLAY_MODES.find(m => m.id === 'dm'); // instant multiplayer: a private room of your usual mode (zombies: co-op)
       start({ mode: m.id, map: m.maps?.includes(mapId) ? mapId : m.maps?.[0] || mapId, create: true });
     };
     if (inv || instant) setTimeout(go, 300);
@@ -797,11 +818,34 @@ net = (() => {
   $('roomRow').addEventListener('click', e => e.stopPropagation());
   setTimeout(probe, 300);
 
+  // co-op: the teammates (persistent, so a zombie can stick with one), refreshed each frame
+  function coopTick() {
+    renderT = now() - interpDelay();
+    mateList = [];
+    for (const r of remotes.values()) {
+      if (r.rec.bot) continue;
+      const m = r.mate ??= { pid: r.rec.pid, rec: r.rec, pos: null, body: null, here: false, down: false, wait: false, up: false, rv: 0 };
+      m.body = r.body && !r.body.dead ? r.body : null; m.pos = m.body ? m.body.g.position : null;
+      m.here = !!m.body && localNow() - (r.seen || 0) < 2500; // dropped out (their place is held a while) or tabbed away: not playing
+      m.down = !!r.down; m.wait = !!r.wait; m.up = m.here && !m.down && !m.wait;
+      mateList.push(m);
+    }
+    if (!alive) { if (!readySent) api.banner = locked ? 'JOINING…' : TAP.toUpperCase() + ' TO PLAY'; if (respawnT <= 0) respawnT = .01; if (locked) tryReady(); }
+  }
+  function zHit(z, o) { // a hit on the host's zombie, added up per zombie until the next packet
+    const id = z.zid; if (!id || !api.on) return;
+    const same = o.d && zhits.find(h => h.i === id && h.d !== undefined && !h.b && !h.sl && !h.st && !h.ln);
+    if (same) { same.d = r2(same.d + o.d); if (o.h) same.h = 1; if (!o.q) same.q = 0; return; }
+    if (zhits.length < 40) zhits.push({ i: id, ...o, ...(o.d ? { d: r2(o.d) } : {}) });
+  }
+
   Object.assign(api, {
+    coopTick, mates: () => mateList, recOf, zHit, zEvent: e => { if (zev.length < 60) zev.push(e); }, zHurt: h => { if (zhurts.length < 20) zhurts.push(h); }, zSend: send,
     now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
   Object.defineProperties(api, { // read live
+    pvp: { get: () => api.on && roomMode !== 'coop' }, coop: { get: () => api.on && roomMode === 'coop' }, renderT: { get: () => renderT },
     pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' }, host: { get: () => api.on && hostPid === pid },
   });
   return api;

@@ -1002,7 +1002,7 @@ addSky(rnd, [12, 17, -32], 16, 50, 160, 40, 58);
 M.floor = (x, z) => inPool(x, z) ? POOL_F : kindAt(x, z) === SEA ? seaFloor(ci(x), ci(z)) : 0;
 // only the deep sea drowns you
 M.sea = (x, z, feet) => !inPool(x, z) && kindAt(x, z) === SEA && feet < WATER_Y - .5;
-M.water = (x, z, feet) => M.sea(x, z, feet) && seaFloor(ci(x), ci(z)) <= -SEA_D;
+M.water = (x, z, feet) => M.sea(x, z, feet) && seaFloor(ci(x), ci(z)) <= -SEA_D && feet < .3 - SEA_D; // once you sink to the bottom
 // underwater, for the splash and blue tint
 M.wet = (x, z, y) => inPool(x, z) ? y < POOL_Y : kindAt(x, z) === SEA && y < WATER_Y && !M.water(x, z, y);
 M.trapped = POOL_LOW; // bots use the steps to get out

@@ -78,9 +78,11 @@ function slideOut(pos, nx, nz, r, h) {
   if (blocked(tx, tz, r, pos.y, pos) || groundAt(tx, tz, r, pos.y) > pos.y + .001) return false;
   pos.x = tx; pos.z = tz; return true;
 }
-// water
+// water: in the sea you sink slowly (slower holding jump) and swim slower, deep water drowns you near the bottom
+const SINK = 1.9, SINK_KICK = .7, SWIM_MUL = .6;
 const inWater = (x, z, feet) => !!MAP.water?.(x, z, feet);
 const inSea = (x, z, feet) => !!(MAP.sea ?? MAP.water)?.(x, z, feet);
+const swimAt = (x, z, feet) => !MAP.void && inSea(x, z, feet);
 const overWater = (x, z, feet) => MAP.water && inSea(x, z, groundAt(x, z, MAP.edgeR ?? 0, feet));
 const overDeep = (x, z, feet) => MAP.water && inWater(x, z, groundAt(x, z, MAP.edgeR ?? 0, feet));
 const poolAt = (x, z) => !!MAP.wet?.(x, z, groundAt(x, z, 0, floorY(x, z)));
@@ -105,6 +107,7 @@ function settle(o, dt) {
   if (!o.vy && sticks(p.y - gy, o.onRamp)) { p.y = gy; o.onRamp = groundRamp; wetCheck(o, p); return; }
   const prev = p.y;
   o.vy = (o.vy || 0) - 25 * dt; if (o.glide && o.vy < -GLIDE_FALL) o.vy = -GLIDE_FALL; // a Skyrunner bot floats down
+  if (swimAt(p.x, p.z, p.y)) o.vy = Math.max(o.vy, -SINK);
   p.y = Math.max(gy, p.y + o.vy * dt);
   if (o.vy > 0) { const c = ceilingAt(p.x, p.z, o.r, prev, p.y - prev); if (p.y + BODY > c) { p.y = c - BODY; o.vy = -.01; } }
   if (p.y === gy) { o.vy = 0; o.onRamp = groundRamp; }
@@ -116,7 +119,7 @@ const ARMOR_CAP = 150; // max armor with zombie shop plates
 const P = { pos: new THREE.Vector3(), vy: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, onGround: true, kx: 0, kz: 0, mvx: 0, mvz: 0 };
 const MOVE_EASE = 15; // how fast your speed catches up with the keys
 // offline stand-in for online play (net.js replaces it)
-let net = { on: false, host: false, serverPads: false, claim() {}, burn() {}, shot() {}, launch() { return 0; }, boom() {}, ev() {}, matchTick() {}, banner: '', again() {}, leave() {}, roster() {}, applyRemote() {}, pick() {} };
+let net = { on: false, pvp: false, coop: false, host: false, serverPads: false, claim() {}, burn() {}, shot() {}, launch() { return 0; }, boom() {}, ev() {}, matchTick() {}, banner: '', again() {}, leave() {}, roster() {}, applyRemote() {}, pick() {} };
 const keys = {};
 let locked = false, dead = false, inLobby = true;
 // game mode: zombies, dm, team, blitz or blitzTeam
