@@ -368,6 +368,11 @@ const SHOP = [
   { gun: 'flamewand', price: 380, desc: 'fireballs that leave them burning' },
   { gun: 'soulwand', price: 400, desc: 'every kill gives you a little health' },
   { gun: 'ancientwand', price: 520, desc: 'fire, ice or wind, never the same twice' },
+  { gun: 'hornet', price: 130, desc: 'stings in bursts of three' },
+  { gun: 'salvo', price: 520, desc: 'four rockets before a reload' },
+  { gun: 'apex', price: 440, desc: `${BASE[gi('apex')].dmg} dmg, top of the food chain` },
+  { gun: 'tracker', price: 200, desc: 'darts that show them through walls' },
+  { gun: 'tempest', price: 460, desc: 'lightning that jumps from one to the next' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
 // gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often (chest odds)
@@ -471,7 +476,7 @@ $('next').addEventListener('click', () => {
 // what clearing a wave pays: shop coins, then XP and coins up to PAY_WAVES (boosters double it)
 function wavePay() {
   shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
-  const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 1 + (bossW ? 5 : 0) : 0), r = grant(xp, gold);
+  const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 2 + (bossW ? 5 : 0) : 0), r = grant(xp, gold);
   runXp += xp; runCoins += gold + r.bonus; eventWave(xp);
   waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp };
 }

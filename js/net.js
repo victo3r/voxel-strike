@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 5; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 6; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -183,7 +183,7 @@ net = (() => {
     }
     ws = null;
     if (!wasOn) return;
-    if (codeNum === 4010) return; // match ended normally
+    if (codeNum === 4010) { if (!matchOver) { matchOver = true; again(); } return; } // match ended normally (or you got in as it ended: the room starts over, so in again)
     if (codeNum === 1012 || codeNum === 1006 || codeNum === 1001 || codeNum === 1011) { // dropped: keep trying to get back in while your place is held
       if (rejoinInfo && !matchOver && localNow() < (rejoinInfo.until ||= localNow() + REJOIN_FOR)) { netToast('Reconnecting…', 2500); setTimeout(() => { if (!api.on || !rejoinInfo) return; connect(rejoinInfo.room, null, { pid: rejoinInfo.pid, key: rejoinInfo.key }); }, 2000); return; }
     }
@@ -253,7 +253,7 @@ net = (() => {
     rejoinInfo = { room, pid, key, until: 0 };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     roomMode = w.mode; mode = w.mode === 'coop' ? 'zombies' : w.mode; mapId = w.map;
-    api.on = true; api.code = code; api.serverPads = Array.isArray(w.pads) && roomMode !== 'coop';
+    api.on = true; api.code = code; api.room = room; api.serverPads = Array.isArray(w.pads) && roomMode !== 'coop';
     if (prof.look.px) send({ t: 'skin', px: prof.look.px }); // older servers just ignore it
     if (last && !code && !rejoining) last.room = room; // PLAY AGAIN keeps a group together
     // the roster, as bot-shaped records
@@ -306,12 +306,12 @@ net = (() => {
     BASE.forEach((w, i) => { stars[i] = Math.max(0, Math.min(2, gear.stars?.[w.id] | 0)); W[i] = statsAt(i, stars[i]); });
     const load = CATS.map(([c], k) => { const i = gi(gear.load?.[k]); return i !== undefined && BASE[i].cat === c ? i : BASE.findIndex(w => w.cat === c && w.start); });
     const boots = gear.boots && bootOf(gear.boots.id) ? { id: gear.boots.id, st: Math.max(1, Math.min(3, gear.boots.st | 0)) } : null;
-    const hat = gear.hat && hatOf(gear.hat.id) ? { id: gear.hat.id, st: Math.max(1, Math.min(3, gear.hat.st | 0)) } : null;
+    const hat = gear.hat && hatOf(gear.hat.id) ? { id: gear.hat.id, st: Math.max(1, Math.min(3, gear.hat.st | 0)), ...(hatSkinOf(gear.hat.skin) ? { skin: gear.hat.skin } : {}) } : null;
     const armor = Math.max(0, Math.min(ARMOR_ALL, gear.armor | 0));
     return { stars, load, W, boots, hat, armor, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
   }
   function gearMsg(m) { // someone changed gear mid-match
-    if (m.pid === undefined) { P.maxArmor = m.maxArmor; P.armor = m.armor; return; } // the server's answer to your own change
+    if (m.pid === undefined) { if (roomMode !== 'coop') { P.maxArmor = m.maxArmor; P.armor = m.armor; } return; } // the server's answer to your own change (co-op: your armor's yours, shop plates and all)
     const r = remotes.get(m.pid); if (r) Object.assign(r.rec, gearFields(m.gear));
   }
   function lookMsg(m) { // someone's drawn skin arrived
@@ -419,6 +419,7 @@ net = (() => {
     const W = BASE[gi(m.gun)], k = 1 + (+m.long || 0);
     if (slows(W) || m.el === 1) shockHit(o, m.el === 1 ? FROST : W, k);
     if (m.stun > 0) stunHit(o, Math.min(3, m.stun * k));
+    if (W?.track && o === P) youTracked(W.track);
   }
   // Thornwood grew someone's armor (or health) back
   function grew(m) {
@@ -620,13 +621,13 @@ net = (() => {
       const ph = Math.sin(z.t) > 0;
       if (ph !== z.stepPh) { z.stepPh = ph; if (grounded) sfx('step_' + FOOT_OK(surfaceAt(pos.x, pos.z, z.r, pos.y)) + (ph ? '' : '2'), { at: pos, far: 22, v: .8 }); }
     } else { z.pivL.rotation.x *= .8; z.pivR.rotation.x *= .8; }
-    if (cur.gun !== BASE[z.gun].id) { const i = gi(cur.gun); if (i !== undefined) { z.gun = i; z.ammo = 1; holdGun(z); sfx('equip', { at: pos, far: 15, v: .7 }); } }
+    if (cur.gun !== BASE[z.gun].id) { const i = gi(cur.gun); if (i !== undefined) { z.gun = i; z.ammo = BASE[i].mag; holdGun(z); sfx('equip', { at: pos, far: 15, v: .7 }); } }
     const W = BASE[z.gun];
     // their reload animation and sound
     const rlT = rlOf(z.rec.W?.[z.gun] ?? W, z.rec.fx);
     if (r.q & 2) { if (!W.inf) sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); z.rlLeft = W.inf || W.melee ? 0 : rlT; }
     if (!r.reloadWas) z.rlLeft = 0;
-    if (z.rlLeft > 0) z.rlLeft = Math.max(0, z.rlLeft - dt);
+    if (z.rlLeft > 0 && (z.rlLeft = Math.max(0, z.rlLeft - dt)) === 0) z.ammo = (z.rec.W?.[z.gun] ?? W).mag;
     holdReload(z, z.rlLeft, rlT); wandHold(z, dt); z.wandT = (z.wandT || 0) - dt;
     stunTick(z, dt, grounded); // just for the stars, they move themselves
     if (r.q & 64) { sfx('djump', { at: pos, far: 20, v: .7 }); burst(fv.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
@@ -634,18 +635,18 @@ net = (() => {
     wingTick(z, !!(cur.flags & 16), dt); // Skyrunner wings while they glide
     r.q = 0;
     if (r.fired) {
-      const n = Math.min(r.fired, 3); r.fired = 0;
+      const n = Math.min(r.fired, 3); r.fired = 0; z.ammo = Math.max(0, z.ammo - n); // just for the rockets in a Salvo's tubes
       if (W.melee) {
         sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING;
         if (W.wand && z.flashM) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); stunZap(z.flashM.getWorldPosition(fv).clone(), zapEnd(W, eyeV, dirV, z)); } // their stun blast, just for show
       }
-      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); for (let k = 0; k < n; k++) sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (z.flashM) muzzleBits(W, z.flashM); }
-      if (W.wand && !W.melee && !W.beam) { // a wand flicks and throws a bolt (a spell comes in its own message)
-        z.wandT = .15;
+      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
+      if ((W.wand || W.bolt) && !W.melee && !W.beam) { // a wand flicks and throws a bolt, a dart just flies (a spell comes in its own message)
+        if (W.wand) z.wandT = .15;
         if (!W.spell && z.flashM) { // where it lands, just for show: the first wall or body, you included
           eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV);
           const L = lanceLine(eyeV, dirV, W, targetsFor(z)), yd = rayHitsYou(lanceRay.ray, eyeV.distanceTo(L.end));
-          wandBolt(W.wand, z.flashM.getWorldPosition(fv).clone(), yd < Infinity ? youHitP.clone() : L.end);
+          wandBolt(W.wand || W.bolt, z.flashM.getWorldPosition(fv).clone(), yd < Infinity ? youHitP.clone() : L.end);
         }
       }
       if (W.lance) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); const g = z.gun; showLance(z.flashM.getWorldPosition(fv).clone(), lanceLine(eyeV, dirV, W, [ground, ...crateMeshes]), W.lance, 1, scene, z.flashM, () => z.gun === g && !z.dead); } // their beam, just for show
@@ -667,11 +668,16 @@ net = (() => {
           flames.push({ m, v, life: .45 });
         }
       } else {
-        if (!(z.fireOn > 0)) sfx(W.frost ? 'frostStart' : 'heatStart', { at: pos, far: 50 });
-        z.fireOn = .2; z.fireEnd = W.frost ? 'frostEnd' : 'heatEnd';
+        if (!(z.fireOn > 0)) sfx(beamSnd(W) + 'Start', { at: pos, far: 50 });
+        z.fireOn = .2; z.fireEnd = beamSnd(W) + 'End';
         beamRay.set(eyeV, dirV); beamRay.far = W.range || 30;
         const hit = beamRay.intersectObjects(targetsFor(z, beamRay), false)[0];
-        showBeam(z, fv.clone(), hit ? hit.point : eyeV.clone().addScaledVector(dirV, beamRay.far), beamKind(W));
+        const end = hit ? hit.point : eyeV.clone().addScaledVector(dirV, beamRay.far);
+        if (!W.chain) showBeam(z, fv.clone(), end, beamKind(W));
+        else if ((z.arcT = (z.arcT || 0) - dt) <= 0) { // their lightning and where it jumps, just for show
+          z.arcT = 1 / 15; arc(z, fv, end, .1, scene, a => z.flashM.getWorldPosition(a));
+          const hz = hit?.object.userData.zombie; if (hz && !hz.dead) chainJumps(hz, W, z, z.rec.stars?.[z.gun] | 0, false);
+        }
       }
     }
     if (z.fireOn > 0 && (z.fireOn -= dt) <= 0) sfx(z.fireEnd, { at: pos, far: 50 });

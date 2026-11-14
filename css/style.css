@@ -288,6 +288,15 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #armDet p{margin:0;font-size:14px;line-height:1.45;color:var(--silver)}
 #armDet .ds{display:grid;grid-template-columns:auto 1fr;gap:5px 18px;margin-top:6px;font-size:14px}
 #armDet .ds span{color:var(--muted)}
+#armDet .dt{display:flex;align-items:flex-end;gap:10px}#armDet .dt .dn{flex:1;min-width:0}
+#armDet .hsk{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:13px;text-align:right}#armDet .hsk span{color:var(--muted)}#armDet .hsk b{color:#fff}
+#armDet .hsk button{font:bold 14px monospace;padding:6px 16px}
+#armDet .hsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+#armDet .hsc{display:grid;grid-template-columns:40px minmax(0,1fr);grid-template-rows:1fr auto auto 1fr;column-gap:6px;min-width:0;padding:4px 6px;font:bold 11px monospace;color:#fff;text-align:left;background:rgba(0,0,0,.22);border:2px solid var(--line);box-shadow:none;cursor:pointer}
+#armDet .hsc img{grid-row:1/5;align-self:center;width:40px;aspect-ratio:200/180;object-fit:contain}#armDet .hsc b{grid-row:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#armDet .hsc small{grid-row:3;font-size:10px;color:var(--muted)}#armDet .hsc.on small{color:#5ee08a}
+#armDet .hsc.sel{border-color:var(--acc);background:rgba(47,191,113,.18)}#armDet .hsc.locked img{filter:grayscale(.5) brightness(.75)}
+#armDet p.hsa{font-style:italic}
 /* main stats */
 #armDet .ms,#armAct .ms{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 #armDet .ms div,#armAct .ms div{display:flex;flex-direction:column;align-items:center;min-width:0;padding:6px 2px;background:rgba(0,0,0,.22);border:2px solid var(--line)}
@@ -443,7 +452,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 @media (max-height:420px){#event{padding:4px 8px 5px}#event .el{margin:2px 0 5px}#event .en{margin-top:4px}}
 #evBox{display:flex;flex-direction:column;gap:12px;width:min(640px,94vw);padding:20px;background:var(--glass);border:4px solid var(--ev,var(--line));color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #evBox h1{display:flex;align-items:center;gap:10px;margin:0;font-size:26px;color:var(--ev);text-shadow:3px 3px 0 #000}#evBox p{margin:0;color:var(--muted);font-size:15px;line-height:1.4}
-#evBox .tiers{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+#evBox .tiers{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 #evBox .tier{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px;border:3px solid var(--line-dim);background:rgba(0,0,0,.25);font-size:13px}
 #evBox .tier b{color:var(--muted)}#evBox .tier.big{background:rgba(160,120,20,.35)}
 #evBox .tier .gift{display:flex;align-items:center;justify-content:center;gap:3px;min-height:40px;font:bold 18px monospace;color:#ffd75e}#evBox .tier .gift img{height:40px}
@@ -474,7 +483,8 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #pickList{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;max-width:96vw}
 #pickList button{width:clamp(160px,24vmin,240px);aspect-ratio:1;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:14px;text-align:left;font:bold clamp(16px,2.6vmin,22px) monospace;color:#fff;text-shadow:2px 2px 0 #000;cursor:pointer;background:var(--glass);border:4px solid var(--line);box-shadow:inset 0 -6px 0 rgba(0,0,0,.25),5px 5px 0 rgba(0,0,0,.45)}
 #pickList button:hover{filter:brightness(1.18)}
-#pickList [data-mode=zombies]{background:linear-gradient(160deg,rgba(70,120,40,.85),rgba(18,40,20,.88))}
+#pickList :is([data-mode=zombies],[data-mode=zombiesMenu]){background:linear-gradient(160deg,rgba(70,120,40,.85),rgba(18,40,20,.88))}
+#pickList [data-mode=coop]{background:linear-gradient(160deg,rgba(50,140,105,.85),rgba(12,42,34,.88))}
 #pickList [data-mode=dm]{background:linear-gradient(160deg,rgba(150,45,40,.85),rgba(40,14,14,.88))}
 #pickList [data-mode=team]{background:linear-gradient(135deg,rgba(40,90,190,.85) 0%,rgba(20,30,70,.88) 49%,rgba(70,16,16,.88) 51%,rgba(170,45,40,.85) 100%)}
 #pickList [data-mode=blitzMenu]{background:linear-gradient(160deg,rgba(235,160,30,.86),rgba(90,30,10,.88))}

@@ -41,8 +41,8 @@ function shoot() {
   const w = WEAPONS[cur];
   if (cd > 0 || reloading > 0 || respawnT > 0) return;
   if (w.melee) return stab(w);
-  if (ammo[cur] <= 0) { if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
-  ammo[cur]--; cd = w.rate; net.shot(w); botHear(P.pos.x, P.pos.z, YOU_T, w.quiet); // bots hear it
+  if (ammo[cur] <= 0) { myBurst.bn = 0; if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
+  ammo[cur]--; cd = burstCd(w, myBurst); net.shot(w); botHear(P.pos.x, P.pos.z, YOU_T, w.quiet); // bots hear it
   if (gunSpin) gunSpinV = 30;
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);
@@ -65,12 +65,13 @@ function shoot() {
         ray.setFromCamera(ndc, camera);
         const hit = ray.intersectObjects(shotTargets(ray), false)[0];
         const end = hit ? hit.point : ray.ray.at(60, trTo);
-        if (w.wand) wandBolt(w.wand, trFrom, end); else if (tracerOk(w, i)) tracer(trFrom, end, w.laser); // wands throw a bolt
+        if (w.wand || w.bolt) wandBolt(w.wand || w.bolt, trFrom, end); else if (tracerOk(w, i)) tracer(trFrom, end, w.laser); // wands and darts throw a bolt
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
         if (zz && !zz.dead) {
           const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? headMul(w) : 1), hit.point, head, false, null, 0);
           if (w.wand) wandHit(w, zz, camera.position, null);
+          if (w.track) trackHit(zz, w.track);
           if (w.soul && !net.pvp && zz.dead) soulHeal(null, zz.g.position.clone().setY(zz.g.position.y + 1), mode === 'zombies' ? SOUL_Z : w.soul); // online the server heals you
         }
         else if (!w.wand) burst(hit.point, 0x999999, 2);
@@ -168,13 +169,50 @@ const starBits = [], STAR_MATS = [0xffe27a, 0xffffff, 0xffc84a].map(color => new
   for (let k = 0; k < 10; k++) { const r = k % 2 ? 3 : 8, a = k * Math.PI / 5 - Math.PI / 2; g.lineTo(8 + Math.cos(a) * r, 8 + Math.sin(a) * r); }
   g.fill(); const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
 })() }));
-const _sq = new THREE.Quaternion(), _sd = new THREE.Vector3();
-function starPuff(from, sc = scene, size = 1) { // from: the muzzle object
-  from.getWorldQuaternion(_sq); _sd.set(0, 0, -1).applyQuaternion(_sq);
-  for (let k = 0; k < 4; k++) {
-    const s = new THREE.Sprite(STAR_MATS[Math.random() * 3 | 0]); from.getWorldPosition(s.position); s.scale.setScalar((.07 + Math.random() * .06) * size); sc.add(s);
-    starBits.push({ s, sc, v: _sd.clone().multiplyScalar(2 + Math.random() * 2).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(2.2)), life: .35 + Math.random() * .15, k: s.scale.x });
+// effect bits (sparks, puffs, shards, stars) are drawn in batches: one draw call per look and scene instead of one each
+const FX_CAP = 2048, fxLayers = new Map(), _fxV = new THREE.Vector4();
+const FX_VS = `attribute float size; attribute float rot; attribute vec3 tint; uniform float halfH; varying vec3 vT; varying float vR;
+  void main() { vT = tint; vR = rot; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = size * projectionMatrix[1][1] * halfH / -mv.z; }`;
+const FX_FS = `uniform sampler2D map; varying vec3 vT; varying float vR;
+  void main() {
+    vec2 p = gl_PointCoord - .5; float c = cos(vR), s = sin(vR); p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) + .5;
+    if (p.x < 0. || p.y < 0. || p.x > 1. || p.y > 1.) discard;
+    vec4 t = texture2D(map, vec2(p.x, 1. - p.y)); if (t.a < .01) discard;
+    gl_FragColor = vec4(t.rgb * vT, t.a);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+function fxLayer(sc, map) {
+  let byMap = fxLayers.get(sc); if (!byMap) fxLayers.set(sc, byMap = new Map());
+  let L = byMap.get(map); if (L) return L;
+  const g = new THREE.BufferGeometry(), at = (k, n) => { const a = new THREE.BufferAttribute(new Float32Array(FX_CAP * n), n).setUsage(THREE.DynamicDrawUsage); g.setAttribute(k, a); return a; };
+  L = { pos: at('position', 3), tint: at('tint', 3), size: at('size', 1), rot: at('rot', 1), n: 0, was: 0 };
+  const mat = new THREE.ShaderMaterial({ uniforms: { map: { value: map }, halfH: { value: 300 } }, vertexShader: FX_VS, fragmentShader: FX_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  L.m = new THREE.Points(g, mat); L.m.frustumCulled = false; L.m.userData.shared = true;
+  L.m.onBeforeRender = r => { r.getCurrentViewport(_fxV); mat.uniforms.halfH.value = _fxV.w / 2; };
+  sc.add(L.m); byMap.set(map, L);
+  return L;
+}
+// a bit flying off from `at` (mat: a SpriteMaterial for its colour and look, k: its size)
+function fxBit(mat, sc, at, k, v, life, g) { starBits.push({ p: at.clone(), mat, sc, k, v, life, g, rot: Math.random() * 6.28 }); }
+function fxDraw() {
+  for (const byMap of fxLayers.values()) for (const L of byMap.values()) L.n = 0;
+  for (const b of starBits) {
+    const L = fxLayer(b.sc, b.mat.map); if (L.n >= FX_CAP) continue;
+    const i = L.n++, c = b.mat.color;
+    L.pos.setXYZ(i, b.p.x, b.p.y, b.p.z); L.tint.setXYZ(i, c.r, c.g, c.b);
+    L.size.setX(i, b.k * Math.max(0, Math.min(1, b.life * 4))); L.rot.setX(i, b.rot);
   }
+  for (const byMap of fxLayers.values()) for (const L of byMap.values()) {
+    L.m.geometry.setDrawRange(0, L.n);
+    if (L.n) for (const a of [L.pos, L.tint, L.size, L.rot]) { a.clearUpdateRanges(); a.addUpdateRange(0, L.n * a.itemSize); a.needsUpdate = true; }
+    L.m.visible = L.n > 0;
+  }
+}
+const _sq = new THREE.Quaternion(), _sd = new THREE.Vector3(), _sp = new THREE.Vector3();
+function starPuff(from, sc = scene, size = 1) { // from: the muzzle object
+  from.getWorldQuaternion(_sq); _sd.set(0, 0, -1).applyQuaternion(_sq); from.getWorldPosition(_sp);
+  for (let k = fxN(4); k > 0; k--) fxBit(STAR_MATS[Math.random() * 3 | 0], sc, _sp, (.07 + Math.random() * .06) * size, _sd.clone().multiplyScalar(2 + Math.random() * 2).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(2.2)), .35 + Math.random() * .15);
 }
 // ruby shards (Ruby Pierce) and short lines of energy shooting off the tip (Paragon)
 const SHARD_TEX = (() => {
@@ -192,10 +230,10 @@ function muzzleBits(w, from, sc = scene, size = 1) {
   if (w.starFx) starPuff(from, sc, size);
   const k = FLASH_FX[w.id]?.bits; if (!k) return;
   from.getWorldQuaternion(_sq); _sd.set(0, 0, -1).applyQuaternion(_sq);
-  const bit = (mats, n, spd, spread, life, sz, g) => { for (let i = 0; i < n; i++) {
-    const s = new THREE.Sprite(mats[Math.random() * mats.length | 0]); from.getWorldPosition(s.position); s.scale.setScalar(sz * (.7 + Math.random() * .6) * size); sc.add(s);
-    starBits.push({ s, sc, v: _sd.clone().multiplyScalar(spd * (.6 + Math.random() * .6)).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread)), life: life * (.8 + Math.random() * .4), k: s.scale.x, g });
-  } };
+  from.getWorldPosition(_sp);
+  const bit = (mats, n, spd, spread, life, sz, g) => { for (let i = fxN(n); i > 0; i--)
+    fxBit(mats[Math.random() * mats.length | 0], sc, _sp, sz * (.7 + Math.random() * .6) * size, _sd.clone().multiplyScalar(spd * (.6 + Math.random() * .6)).add(new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread)), life * (.8 + Math.random() * .4), g);
+  };
   if (k === 'gem') bit(SHARD_MATS, 9, 4, 2.8, .5, .11, 5);
   else if (WAND_BITS[k]) bit(...WAND_BITS[k]);
   else if (k === 'energy') { // short lines of energy shooting out of the tip, riding with the gun
@@ -212,10 +250,10 @@ function muzzleBits(w, from, sc = scene, size = 1) {
 }
 function starTick(dt) {
   for (let i = starBits.length - 1; i >= 0; i--) {
-    const b = starBits[i]; b.life -= dt; b.s.position.addScaledVector(b.v, dt); b.v.multiplyScalar(Math.exp(-3 * dt)); if (b.g) b.v.y -= b.g * dt;
-    b.s.scale.setScalar(b.k * Math.max(0, Math.min(1, b.life * 4))); b.s.material.rotation += dt * 4;
-    if (b.life <= 0) { b.sc.remove(b.s); starBits.splice(i, 1); }
+    const b = starBits[i]; b.life -= dt; b.p.addScaledVector(b.v, dt); b.v.multiplyScalar(Math.exp(-3 * dt)); if (b.g) b.v.y -= b.g * dt; b.rot += dt * 4;
+    if (b.life <= 0) { starBits[i] = starBits[starBits.length - 1]; starBits.pop(); }
   }
+  fxDraw();
   for (let i = streaks.length - 1; i >= 0; i--) { // each grows out of the tip, lets go, then thins away
     const g = streaks[i]; if ((g.age += dt) < 0) continue;
     if (g.age >= g.t) { g.ms.forEach(m => g.sc.remove(m)); streaks.splice(i, 1); continue; }
@@ -249,7 +287,7 @@ function flame(w) {
 }
 // heat ray beam
 function heatBeam(w) {
-  if (w.frost) frostHeld = .12; else beamHeld = .12; // keeps the hum going
+  if (w.frost) frostHeld = .12; else if (w.chain) stormHeld = .12; else beamHeld = .12; // keeps the hum going
   if (w.wand) wandOn = .15;
   crossKick(.4, 1.5); recoilKick(w);
   camera.getWorldDirection(fwd);
@@ -257,16 +295,20 @@ function heatBeam(w) {
   const hit = ray2.intersectObjects(shotTargets(ray2), false)[0];
   const end = hit ? hit.point : tmp.copy(camera.position).addScaledVector(fwd, w.range);
   const zz = hit?.object.userData.zombie;
-  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (slows(w)) shockHit(zz, w); }
-  if (w.shock && Math.random() < .25) sfx('zap', { v: .6 });
+  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (slows(w)) shockHit(zz, w); if (w.chain) chainJumps(zz, w, null, lvl[cur]); }
+  if ((w.shock || w.chain) && Math.random() < .25) sfx('zap', { v: .6 });
   if (w.frost && Math.random() < .2) sfx('chill', { v: .6 });
-  if (hit && Math.random() < .35) burst(end, w.frost ? (Math.random() < .5 ? 0xcff4ff : 0xffffff) : w.shock ? (Math.random() < .5 ? 0x8fe9ff : 0xffffff) : Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
-  showBeam(null, flashMesh.getWorldPosition(beamFrom), end, beamKind(w));
+  if (hit && Math.random() < .35) burst(end, w.frost ? (Math.random() < .5 ? 0xcff4ff : 0xffffff) : w.shock ? (Math.random() < .5 ? 0x8fe9ff : 0xffffff) : w.chain ? (Math.random() < .5 ? 0xc8b4ff : 0xffffff) : Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
+  flashMesh.getWorldPosition(beamFrom);
+  if (!w.chain) return showBeam(null, beamFrom, end, beamKind(w));
+  const d = camera.position.distanceTo(end); // stays on the muzzle and the crosshair between shots
+  arc('you', beamFrom, end, .1, scene, (a, b) => { flashMesh.getWorldPosition(a); camera.getWorldDirection(b).multiplyScalar(d).add(camera.position); });
 }
 // beams on screen, one per shooter (null = you)
 const beamGeo = new THREE.BoxGeometry(1, 1, 1), beamFrom = new THREE.Vector3(), beams = new Map();
 const beamMats = [new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xfff4d0 })];
 const beamKind = w => w.frost ? 'frost' : !!w.shock;
+const beamSnd = w => w.frost ? 'frost' : w.chain ? 'storm' : 'heat'; // its start and end sounds
 const frostMats = [new THREE.MeshBasicMaterial({ color: 0xa8ecff, transparent: true, opacity: .6, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
 const shockMats = [new THREE.MeshBasicMaterial({ color: 0x4fc8ff, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xeefcff })];
 // shock beam: slows whoever it hits
@@ -303,7 +345,74 @@ function beamTick(dt) {
     b.g.position.lerpVectors(beamA, beamB, .5); b.g.lookAt(beamB); b.g.scale.z = beamA.distanceTo(beamB);
   }
 }
-function clearBeams() { for (const b of beams.values()) scene.remove(b.g); beams.clear(); }
+function clearBeams() { for (const b of beams.values()) scene.remove(b.g); beams.clear(); arcs.length = 0; }
+
+// lightning: jagged bolts of thin boxes, drawn as two instanced meshes per scene (glow and core)
+const ARC_SEG = 7, ARC_CAP = 192, arcLayers = new Map(), arcs = [];
+const arcMats = [new THREE.MeshBasicMaterial({ color: 0x8a6bff, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), new THREE.MeshBasicMaterial({ color: 0xf4f0ff, fog: false })];
+function arcLayer(sc) {
+  let L = arcLayers.get(sc);
+  if (!L) { L = arcMats.map(m => { const im = new THREE.InstancedMesh(beamGeo, m, ARC_CAP); im.count = 0; im.frustumCulled = false; sc.add(im); return im; }); arcLayers.set(sc, L); }
+  return L;
+}
+// a bolt from a to b with new jags; one per key (null: a new one), aim(a, b) moves its ends every frame
+function arc(key, a, b, life = .08, sc = scene, aim = null) {
+  let z = key === null ? null : arcs.find(o => o.key === key);
+  if (!z) arcs.push(z = { key, a: new THREE.Vector3(), b: new THREE.Vector3(), jag: new Float32Array(ARC_SEG * 2 - 2) });
+  z.a.copy(a); z.b.copy(b); z.life = life; z.sc = sc; z.aim = aim;
+  for (let i = 0; i < z.jag.length; i++) z.jag[i] = Math.random() * 2 - 1;
+}
+const _lza = new THREE.Vector3(), _lzu = new THREE.Vector3(), _lzv = new THREE.Vector3(), _lzd = new THREE.Vector3(), _lzc = new THREE.Vector3(), _lzs = new THREE.Vector3(), _lzf = new THREE.Vector3(0, 0, 1);
+const _lzm = new THREE.Matrix4(), _lzq = new THREE.Quaternion(), _lzj = Array.from({ length: ARC_SEG + 1 }, () => new THREE.Vector3());
+function arcTick(dt) {
+  let drawn = arcs.length > 0;
+  for (const L of arcLayers.values()) { drawn ||= L[0].count > 0; L[0].count = L[1].count = 0; }
+  for (let i = arcs.length - 1; i >= 0; i--) {
+    const z = arcs[i];
+    if ((z.life -= dt) <= 0) { arcs.splice(i, 1); continue; }
+    if (z.aim) z.aim(z.a, z.b);
+    const len = z.a.distanceTo(z.b); if (len < .05) continue;
+    _lzd.subVectors(z.b, z.a).divideScalar(len);
+    _lzu.set(0, 1, 0).cross(_lzd); if (_lzu.lengthSq() < 1e-4) _lzu.set(1, 0, 0); _lzu.normalize(); _lzv.crossVectors(_lzd, _lzu);
+    const amp = Math.min(.35, len * .06), L = arcLayer(z.sc);
+    for (let k = 0; k <= ARC_SEG; k++) {
+      const j = _lzj[k].copy(z.a).addScaledVector(_lzd, len * k / ARC_SEG);
+      if (k > 0 && k < ARC_SEG) j.addScaledVector(_lzu, z.jag[k * 2 - 2] * amp).addScaledVector(_lzv, z.jag[k * 2 - 1] * amp);
+    }
+    for (let k = 0; k < ARC_SEG; k++) {
+      const p0 = _lzj[k], p1 = _lzj[k + 1], l = p0.distanceTo(p1) || .001;
+      _lzc.lerpVectors(p0, p1, .5); _lzq.setFromUnitVectors(_lzf, _lza.subVectors(p1, p0).divideScalar(l));
+      for (let m = 0; m < 2; m++) { const im = L[m], w = m ? .02 : .07; if (im.count < ARC_CAP) im.setMatrixAt(im.count++, _lzm.compose(_lzc, _lzq, _lzs.set(w, w, l + w * .5))); }
+    }
+  }
+  if (drawn) for (const L of arcLayers.values()) for (const im of L) im.instanceMatrix.needsUpdate = true;
+}
+// Tempest Coil: from whoever the beam hits, the lightning jumps to the nearest enemy in reach, then on once more, weaker each jump
+const CHAIN_FALL = .6, CHAIN_N = 2, _ch0 = new THREE.Vector3(), _ch1 = new THREE.Vector3();
+const chestOf = (o, v) => o === YOU_T ? v.set(P.pos.x, P.pos.y + 1, P.pos.z) : v.copy(o.g.position).setY(o.g.position.y + o.g.scale.y);
+function chainJumps(first, w, by, L, deal = true) {
+  const reach = w.chain[L] ?? w.chain[0], done = new Set([first]);
+  let at = first;
+  for (let n = 1; n <= CHAIN_N; n++) {
+    chestOf(at, _ch0);
+    let best = null, bd = reach;
+    const look = o => { if (done.has(o) || o === by || friendly(by, o)) return; const d = chestOf(o, _ch1).distanceTo(_ch0); if (d < bd && clearLine(_ch0, _ch1)) { bd = d; best = o; } };
+    for (const z of zombies) if (!z.dead && z.g.visible) look(z);
+    if (by && respawnT <= 0 && !dead && !P.downed) look(YOU_T);
+    if (!best) break;
+    arc(null, _ch0, chestOf(best, _ch1), .09);
+    if (Math.random() < .2) sfx('zap', { at: _ch1, far: 30, v: .5 });
+    if (deal) {
+      const d = w.dmg * CHAIN_FALL ** n * (by ? BOT.dmgMul : 1), from = at === YOU_T ? net.pid : at.pid | 0;
+      if (best === YOU_T) hurtPlayer(Math.max(1, Math.round(d)), false, by, false, 9, from, n);
+      else hurtZombie(best, d, _ch1.clone(), false, false, by, 9, from, n);
+    }
+    done.add(best); at = best;
+  }
+}
+// the Tracker: a dart hit shows them to you through walls for a while, and whoever it hit gets a warning
+function trackHit(o, t) { const now = performance.now(); if (!(o.trackAt > now)) sfx('trackOn', { v: .8 }); o.trackAt = now + t * 1000; }
+function youTracked(t) { const now = performance.now(); if (!(P.trackAt > now)) { toast('TRACKED', '#ffd23a'); sfx('tracked'); } P.trackAt = now + t * 1000; }
 
 // bot rockets, flares and grenades can hit you, yours can't
 const youBox = new THREE.Box3(), youHitP = new THREE.Vector3();
@@ -382,11 +491,12 @@ function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
   const m = new THREE.Group();
   if (w.gust) { m.add(box(.18, .18, .18, GUST_MATS[0])); for (const r of [0, Math.PI / 2]) { const b = box(.42, .06, .06, GUST_MATS[1]); b.rotation.z = r; m.add(b); } } // a ball of wind
-  else { const body = box(.1, .1, .4, lam({ color: 0x4b5b3b })), tip = box(.12, .12, .12, lam({ color: 0xaa3333 })); tip.position.z = .24; m.add(body, tip); }
+  else { const [bc, tc] = ROCKET_COLS[w.id] ?? ROCKET_COLS.rocket, body = box(.1, .1, .4, lam({ color: bc })), tip = box(.12, .12, .12, lam({ color: tc })); tip.position.z = .24; m.add(body, tip); }
   m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
   rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust });
 }
 const GUST_MATS = [new THREE.MeshBasicMaterial({ color: 0xc8f0ff }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
+const ROCKET_COLS = { rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c] }; // body, tip
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, drop
 const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and damage
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });

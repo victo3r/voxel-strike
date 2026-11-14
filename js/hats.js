@@ -11,7 +11,18 @@ const HAT_I = Object.fromEntries(HATS.map((H, i) => [H.id, i]));
 const hatOf = id => HATS[HAT_I[id]] ?? null;
 const hatStars = id => prof.hats?.[id] | 0; // 0 = not bought
 const hatUse = id => { const st = hatStars(id), u = prof.hatUse?.[id] | 0; return u ? Math.max(1, Math.min(st, u)) : st; };
-const wornHat = () => { const id = prof.hatOn; return id && hatStars(id) ? { id, st: hatUse(id) } : null; };
+const wornHat = () => { const id = prof.hatOn; if (!id || !hatStars(id)) return null; const skin = hatSkin(id); return skin ? { id, st: hatUse(id), skin } : { id, st: hatUse(id) }; };
+// hat skins: a new look for a hat you own, it keeps its stats (ids are used in saves, don't rename them). Each is a weekly event's top prize (EVENTS skin)
+const HAT_SKINS = [
+  { id: 'brainjar', name: 'Brain Jar', about: 'A brain in a jar of glowing goo, still thinking about lunch' },
+  { id: 'hunter', name: "Hunter's Cap", about: 'Blaze orange with a bullseye that never stops pinging' },
+  { id: 'circlet', name: 'Blade Circlet', about: 'Polished silver with a blade on the brow that catches the light' },
+  { id: 'ghillie', name: 'Ghillie Hood', about: 'A hood of leaves and rags that sheds a leaf now and then' },
+  { id: 'laurel', name: 'Golden Laurel', about: 'Gold leaves for a champion, sparkling wherever you go' },
+];
+const HSKIN_I = Object.fromEntries(HAT_SKINS.map((S, i) => [S.id, i]));
+const hatSkinOf = id => HAT_SKINS[HSKIN_I[id]] ?? null;
+const hatSkin = id => { const s = prof.hatSkin?.[id]; return s && prof.skins?.[s] && hatSkinOf(s) ? s : ''; }; // '' = the hat's own look
 // boots and hat effects combined
 function gearFx(b, h) {
   const f = { ...bootFx(b), hs: 0, half: 0, stealth: 0, shrug: 0, thorns: 0, sky: 0 }, H = h && hatOf(h.id);
@@ -124,17 +135,153 @@ function hatPieces(id, st) {
   }
   return out;
 }
+// ---- hat skin models, in hat pixels like the hats
+function skinPieces(id) {
+  const out = [], B = pieceBox(out), hex = (a, g) => palIdx(rgbHex(a), g);
+  const head = () => B(-8, 8, 0, 16, -8, 8, 0), X = (sx, a, c) => sx > 0 ? [a, c] : [-c, -a];
+  if (id === 'brainjar') {
+    // a metal collar and lid, a brain sitting in glowing goo between them (the glass is its own mesh)
+    const M = hex([128, 136, 150]), MH = hex([176, 184, 198]), MD = hex([80, 86, 100]), PK = hex([242, 164, 186]), PD = hex([206, 108, 142]), GOO = hex([110, 224, 90], true), LT = hex([150, 255, 120], true);
+    B(-9, 9, 12, 16, -9, 9, M); B(-9, 9, 15, 16, -9, 9, MH);
+    head();
+    B(-8, 8, 16, 18, -8, 8, GOO);
+    B(-7, 7, 16, 22, -6, 6, PK); B(-6, 6, 16, 22, -7, 7, PK); B(-6, 6, 22, 24, -5, 5, PK); B(-5, 5, 22, 24, -6, 6, PK); // the brain
+    for (const [a, b, y] of [[-5, -2, 19], [-2, 0, 18], [0, 3, 19], [3, 5, 18]]) { B(a, b, y, y + 1, 6, 7, PD); B(-b, -a, y, y + 1, -7, -6, PD); B(-7, -6, y, y + 1, a, b, PD); B(6, 7, y, y + 1, -b, -a, PD); } // its folds
+    B(-1, 1, 23, 24, -6, 6, PD); B(-5, -2, 23, 24, -3, -2, PD); B(-4, -2, 23, 24, 2, 3, PD); B(2, 5, 23, 24, -2, -1, PD); B(2, 4, 23, 24, 3, 4, PD);
+    for (const [x, z] of [[-9, -9], [8, -9], [-9, 8], [8, 8]]) B(x, x + 1, 16, 26, z, z + 1, MD); // corner posts
+    B(-9, 9, 26, 28, -9, 9, M); B(-9, 9, 27, 28, -9, 9, MH); B(-3, 3, 28, 30, -3, 3, MD); // lid and cap
+    B(-1, 1, 26, 27, 9, 10, LT); // a light on the lid
+  } else if (id === 'hunter') {
+    // a blaze orange cap, ear flaps folded up, a bullseye on the front
+    const C = hex([255, 116, 28]), HI = hex([255, 156, 76]), DK = hex([204, 80, 14]), FL = hex([240, 228, 204]), RD = hex([214, 30, 38]), WH = hex([250, 246, 238]), CEN = hex([255, 50, 50], true);
+    B(-9, 9, 12, 20, -9, 9, C); B(-8, 8, 20, 21, -8, 9, C); B(-8, 8, 20, 21, -8, -6, HI);
+    B(-9, 9, 12, 14, -9, 9, DK); // band
+    head();
+    B(-7, 7, 12, 13, 9, 14, DK); // bill
+    B(-3, 3, 14, 20, 8, 9, RD); B(-2, 2, 15, 19, 8, 9, WH); B(-1, 1, 16, 18, 8, 9, CEN); // bullseye
+    for (const sx of [-1, 1]) { B(...X(sx, 9, 11), 13, 19, -5, 5, C); B(...X(sx, 9, 11), 13, 15, -5, 5, FL); } // ear flaps, fleece showing
+    B(-1, 1, 21, 22, -1, 1, DK); // a button on top
+  } else if (id === 'circlet') {
+    // a slim silver circlet, a blade crest over a small guard, a violet gem, fins swept back at the temples
+    const S = hex([200, 208, 222]), SH = hex([240, 244, 252]), SD = hex([130, 138, 156]), GEM = hex([196, 150, 255], true);
+    B(-9, 9, 11, 15, -9, 9, S); B(-9, 9, 14, 15, -9, 9, SH);
+    head();
+    B(-4, 4, 15, 17, 8, 10, SD); // guard
+    B(-2, 2, 17, 26, 8, 10, S); B(-1, 1, 17, 26, 9, 10, SH); B(-1, 1, 26, 28, 8, 10, S); // blade
+    B(-1, 1, 12, 14, 9, 10, GEM); // gem
+    for (const sx of [-1, 1]) { B(...X(sx, 9, 10), 13, 16, -4, 3, S); B(...X(sx, 9, 10), 16, 19, -8, -1, SH); } // fins swept back
+  } else if (id === 'ghillie') {
+    // a shaggy hood of leaves and rags, patched in greens and browns, ragged round the edge
+    const pal = [[62, 92, 40], [86, 118, 52], [110, 100, 60], [76, 70, 42], [124, 144, 68]].map(c => hex(c)), r = charRng(77), pick = () => pal[r() * pal.length | 0], at = s => -10 + (r() * (21 - s) | 0);
+    B(-10, 10, 1, 19, -10, 10, pal[0]); B(-10, 10, -1, 1, -10, -6, pal[0]); // the hood, down over the neck at the back
+    for (let k = 0; k < 40; k++) { // patches
+      const s = 3 + (r() * 3 | 0), a = at(s), y = 1 + (r() * (19 - s) | 0), f = r() * 4 | 0, c = pick();
+      if (f === 0) B(-10, -9, y, y + s, a, a + s, c); else if (f === 1) B(9, 10, y, y + s, a, a + s, c);
+      else if (f === 2) B(a, a + s, y, y + s, -10, -9, c); else { const b = at(s); B(a, a + s, 18, 19, b, b + s, c); }
+    }
+    for (let k = 0; k < 24; k++) { // clumps sticking out
+      const s = 4 + (r() * 2 | 0), a = at(s), y = 2 + (r() * (17 - s) | 0), f = k % 4, c = pick();
+      if (f === 0) B(-11, -10, y, y + s, a, a + s, c); else if (f === 1) B(10, 11, y, y + s, a, a + s, c);
+      else if (f === 2) B(a, a + s, y, y + s, -11, -10, c); else { const b = at(s); B(a, a + s, 19, 20 + (r() * 3 | 0), b, b + s, c); }
+    }
+    for (const sx of [-1, 1]) { B(...X(sx, 7, 11), 15, 19, 10, 11, pick()); B(...X(sx, 8, 11), 5, 10, 10, 11, pick()); } // round the face
+    for (const [a, y] of [[-9, -3], [-2, -2], [5, -4]]) B(a, a + 4, y, 3, -11, -9, pick()); // strips down the back
+    for (let a = -9; a < 9; a += 4) { B(-10, -8, 0, 1, a, a + 2, pick()); B(8, 10, 0, 1, -a - 2, -a, pick()); } // a ragged edge
+    head();
+    B(-7, 7, 1, 14, 8, 11, 0); // face opening
+    B(-10, 10, 14, 19, 9, 10, pick()); B(-7, -3, 12, 14, 8, 10, pick()); B(3, 7, 12, 14, 8, 10, pick()); // a shaggy brow
+  } else if (id === 'laurel') {
+    // a golden laurel wreath, leaves along both sides, a smooth band over the brow, tied with a red ribbon at the back
+    const G = hex([240, 192, 52]), GH = hex([255, 228, 124]), GD = hex([188, 134, 28]), RB = hex([204, 38, 46]), RD = hex([150, 24, 34]);
+    B(-9, 9, 11, 15, -9, 9, G); B(-9, 9, 12, 13, -9, 9, GD);
+    head();
+    for (const sx of [-1, 1]) {
+      for (const z of [-9, -4, 1]) B(...X(sx, 8, 9), 15, 17, z, z + 4, GH); // leaves along the sides
+      for (const z of [-7, -2, 3]) B(...X(sx, 8, 9), 9, 11, z, z + 4, G);
+      B(...X(sx, 5, 9), 15, 17, 8, 9, GH); // and round the front corners
+    }
+    for (const x of [-8, 4]) B(x, x + 4, 15, 17, -9, -8, GH); // round the back
+    B(-2, 2, 10, 16, -10, -9, RB); B(-4, -1, 4, 10, -10, -9, RB); B(1, 4, 3, 10, -10, -9, RD); // ribbon
+  }
+  return out;
+}
+// the jar's glass, in pictures too
+const SKIN_GLASS = new THREE.MeshLambertMaterial({ color: 0xd2ffcc, transparent: true, opacity: .24, depthWrite: false });
+function skinExtras(id, g, hp) {
+  if (id !== 'brainjar') return;
+  const m = new THREE.Mesh(ZAP_BOX, SKIN_GLASS); m.scale.set(17.6 * hp, 10 * hp, 17.6 * hp); m.position.y = 21 * hp; m.renderOrder = 2; g.add(m);
+}
+// what moves on a worn skin: bubbles in the jar, the bullseye pings, a glint runs up the blade, leaves fall off the hood, the laurel sparkles
+const skinMats = {};
+const skinMat = (c, o = 1) => skinMats[c + ':' + o] ??= new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+const skinSprite = c => skinMats['s' + c] ??= new THREE.SpriteMaterial({ map: haloMap(), color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false });
+let skinRingGeo = null, skinLeafMat = null;
+function skinFx(id, g, hp) { // { tick, own: a material of its own to dispose }, or null
+  const few = gfx.q === 'low', R = Math.random, at = (m, x, y, z) => m.position.set(x * hp, y * hp, z * hp);
+  const box = mat => { const m = new THREE.Mesh(ZAP_BOX, mat); m.scale.setScalar(1e-4); g.add(m); return m; }; // tiny till its first tick
+  if (id === 'brainjar') {
+    const spot = b => { const e = R() < .5 ? -7.8 : 7.8, w = (R() - .5) * 14; [b.x, b.z] = R() < .5 ? [e, w] : [w, e]; return b; }; // round the brain
+    const n = few ? 2 : 4, bs = Array.from({ length: n }, (_, i) => spot({ m: box(skinMat(0xd2ffb8, .8)), t: i / n, x: 0, z: 0 }));
+    return { tick: dt => { for (const b of bs) {
+      if ((b.t += dt * .4) >= 1) { b.t -= 1; spot(b); }
+      at(b.m, b.x, 18 + b.t * 7.6, b.z + Math.sin(b.t * 9) * .5); b.m.scale.setScalar(hp * (b.t > .88 ? (1 - b.t) * 10 : 1.2));
+    } } };
+  }
+  if (id === 'hunter') {
+    const own = new THREE.MeshBasicMaterial({ color: 0xff3a3a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+    const ring = new THREE.Mesh(skinRingGeo ??= new THREE.RingGeometry(.8, 1, 20), own); at(ring, 0, 17, 9.3); g.add(ring);
+    let t = R() * 2;
+    return { own, tick: dt => { t += dt; const k = t % 2.6 / .7; ring.visible = k < 1; if (k < 1) { ring.scale.setScalar(hp * (1.5 + k * 4)); own.opacity = .7 * (1 - k); } } };
+  }
+  if (id === 'circlet') {
+    const glint = new THREE.Sprite(skinSprite(0xffffff)), gem = new THREE.Sprite(skinSprite(0xb98aff));
+    at(gem, 0, 13, 10.4); g.add(glint, gem);
+    let t = R() * 3;
+    return { tick: dt => {
+      t += dt; const k = t % 3.2 / .45; glint.visible = k < 1;
+      if (k < 1) { at(glint, 0, 17 + k * 10, 10.4); glint.scale.setScalar(hp * 5 * Math.sin(k * Math.PI)); }
+      gem.scale.setScalar(hp * (3.6 + Math.sin(t * 3) * .8));
+    } };
+  }
+  if (id === 'ghillie') {
+    skinLeafMat ??= new THREE.MeshLambertMaterial({ color: 0x6f9a3a });
+    const ls = Array.from({ length: few ? 1 : 2 }, () => ({ m: box(skinLeafMat), t: 1.6, p: 1.6 + R() * 3, x: 0, y: 0, z: 0 }));
+    return { tick: dt => { for (const l of ls) {
+      if ((l.t += dt) >= l.p) { l.t = 0; l.p = 2.5 + R() * 3; l.x = (R() - .5) * 18; l.y = 6 + R() * 10; l.z = -2 - R() * 7; }
+      const k = l.t / 1.6; l.m.visible = k < 1;
+      if (k < 1) { at(l.m, l.x + Math.sin(k * 7) * 2, l.y - k * 16, l.z - k * 3); l.m.rotation.set(k * 5, k * 3, 0); l.m.scale.set(1.8 * hp, .4 * hp, 1.2 * hp); }
+    } } };
+  }
+  if (id === 'laurel') {
+    const ss = Array.from({ length: few ? 2 : 3 }, () => ({ s: new THREE.Sprite(skinSprite(0xffe9a0)), t: 1 + R() * 2, wait: 0 }));
+    for (const o of ss) { o.s.visible = false; g.add(o.s); }
+    return { tick: dt => { for (const o of ss) {
+      if ((o.t += dt * 1.6) < 1) { o.s.visible = true; o.s.scale.setScalar(hp * 4 * Math.sin(o.t * Math.PI)); continue; }
+      o.s.visible = false;
+      if ((o.wait -= dt) <= 0) { o.wait = .3 + R() * 1.5; o.t = 0; const a = R() * 6.28; at(o.s, Math.sin(a) * 10, 12 + R() * 5, Math.cos(a) * 10); }
+    } } };
+  }
+  return null;
+}
 const HAT_PX = ARMOR_PX;
 const hatGeoCache = {};
-const hatGeo = (id, st, U) => hatGeoCache[id + ':' + st + ':' + U] ??= voxelGeos(hatPieces(id, st), U / HAT_PX).lit;
+const hatGeos = (id, st, U, skin) => hatGeoCache[(skin ? 'skin:' + skin : id + ':' + st) + ':' + U] ??= voxelGeos(skin ? skinPieces(skin) : hatPieces(id, st), U / HAT_PX);
+// a hat (with its skin) as meshes on g
+function hatMeshes(id, st, U, skin, mat, g) {
+  const geos = hatGeos(id, st, U, skin), m = new THREE.Mesh(geos.lit, mat);
+  if (geos.glow) m.add(new THREE.Mesh(geos.glow, gunGlow));
+  if (skin) skinExtras(skin, m, U / HAT_PX);
+  g.add(m); return m;
+}
 // put a hat on a character (null takes it off)
 function dressHat(ch, h) {
-  if (ch.hat) { ch.hat.mesh.parent.remove(ch.hat.mesh); ch.mats.splice(ch.mats.indexOf(ch.hat.mat), 1); ch.hat.mat.dispose(); ch.hat = null; }
+  if (ch.hat) { ch.hat.mesh.parent.remove(ch.hat.mesh); ch.mats.splice(ch.mats.indexOf(ch.hat.mat), 1); ch.hat.mat.dispose(); ch.hat.fx?.own?.dispose(); ch.hat = null; }
   if (!h || !hatOf(h.id)) return;
-  const mat = armorMat(), mesh = new THREE.Mesh(hatGeo(h.id, h.st, ch.U), mat);
-  ch.headPiv.add(mesh); ch.mats.push(mat); ch.hat = { mat, mesh };
+  const skin = hatSkinOf(h.skin) ? h.skin : '', mat = armorMat(), mesh = hatMeshes(h.id, h.st, ch.U, skin, mat, ch.headPiv);
+  ch.mats.push(mat); ch.hat = { mat, mesh, fx: skin ? skinFx(skin, mesh, ch.U / HAT_PX) : null };
 }
 // armory preview
-function hatModel(id, st, g) { g.add(new THREE.Mesh(hatGeo(id, st, 1 / 16), gunLit)); }
-// hat pictures, at their 3-star size
-const hatPic = (id, st) => modelPic('hat:' + id + st, g => hatModel(id, st, g), { yaw: .4, tilt: .3, w: 200, h: 180, ref: ['hat:' + id, g => hatModel(id, 3, g)] });
+function hatModel(id, st, g, skin = '') { hatMeshes(id, st, 1 / 16, hatSkinOf(skin) ? skin : '', gunLit, g); }
+// hat pictures, at their 3-star size (a skin is its own picture)
+const hatPic = (id, st, skin = '') => hatSkinOf(skin) ? modelPic('hat:' + skin, g => hatModel(id, st, g, skin), { yaw: .4, tilt: .3, w: 200, h: 180 })
+  : modelPic('hat:' + id + st, g => hatModel(id, st, g), { yaw: .4, tilt: .3, w: 200, h: 180, ref: ['hat:' + id, g => hatModel(id, 3, g)] });

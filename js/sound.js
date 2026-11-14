@@ -107,6 +107,21 @@ function kit(c, seed) {
         for (let i = 0; i < o.length; i++) { const x = i / SR; a += (r() * 2 - 1 - a) * k; b += (a - b) * k; o[i] = b * Math.min(1, x / .002) * Math.exp(-x / d); }
       }, v);
     },
+    // an electric arc: a snap, then a crackle of uneven little discharges over a buzz
+    arc({ t = 0, d = .15, rate = 140, buzz = 110, snap = 1, v = .8 }) {
+      const hp = 1 - Math.exp(-6.2832 * 400 / SR), lp = 1 - Math.exp(-6.2832 * 6500 / SR), tick = Math.exp(-1 / (.0007 * SR)), hum = Math.exp(-1 / (.004 * SR));
+      s.draw(t, d + .03, o => {
+        let next = 0, kick = 0, amp = 0, lo = 0, a1 = 0, a2 = 0;
+        for (let i = 0; i < o.length; i++) {
+          const x = i / SR;
+          if (i >= next) { amp = .3 + r() * .7; kick = amp; next = i + Math.round(SR * (.5 + r()) / rate); }
+          kick *= tick; amp *= hum;
+          const y = (r() * 2 - 1) * kick + ((x * buzz % 1) * 2 - 1) * amp * .35 + (r() * 2 - 1) * snap * 1.6 * Math.exp(-x / .0015);
+          a1 += (y - a1) * lp; a2 += (a1 - a2) * lp; lo += (a2 - lo) * hp; // no fizz up top, no rumble down low
+          o[i] = (a2 - lo) * Math.min(1, x / .002) * Math.exp(-x / (d * .45)) * Math.min(1, (d + .03 - x) / .01);
+        }
+      }, v);
+    },
     // crunchy grass, sand or gravel
     crunch({ t = 0, a = .003, d = .08, dens = .05, lo = 900, hi = 5000, v = .6 }) {
       const kh = 1 - Math.exp(-6.2832 * hi / SR), kl = 1 - Math.exp(-6.2832 * lo / SR);
@@ -254,6 +269,13 @@ const SOUNDS = {
     s.tone({ type: 'sawtooth', f: 115, f2: 70, d: .04, v: .2, lp: 1400 });
     s.click({ f: 4800, v: .4 });
   }],
+  hornet: [.22, .42, s => { // a sharp crack with a little buzz in it
+    s.hiss({ ft: 'bandpass', f: 2900, f2: 1200, q: .8, d: .06, v: .9 });
+    s.tone({ f: 210, f2: 70, d: .05, v: .85 });
+    s.tone({ type: 'square', f: 260, f2: 110, d: .045, v: .3, lp: 2400 });
+    s.tone({ type: 'sawtooth', f: 330, f2: 250, t: .01, d: .07, v: .14, lp: 2600 });
+    s.click({ f: 5200, v: .4 });
+  }],
   trex: [.9, 1, s => {
     s.hiss({ f: 3800, f2: 150, d: .55, v: 1 }); // the blast
     s.hiss({ ft: 'bandpass', f: 1100, f2: 260, q: .7, d: .35, v: .85 }); // its body
@@ -288,6 +310,13 @@ const SOUNDS = {
     s.tone({ f: 90, f2: 28, d: .5, v: 1 });
     s.tone({ type: 'sawtooth', f: 160, f2: 70, d: .22, v: .3, lp: 700 }); // a growl under the crack
     s.clack({ t: .12, f: 2000, d: .014, v: .5, body: .4 });
+  }],
+  apex: [1.05, 1, s => { // a heavy crack with a snarl under it
+    s.hiss({ ft: 'highpass', f: 2600, d: .035, v: 1 });
+    s.hiss({ f: 3600, f2: 130, d: .6, v: .95 });
+    s.tone({ f: 85, f2: 26, d: .55, v: 1 }); s.thud({ d: .06, f: 90, v: .8 });
+    s.tone({ type: 'sawtooth', f: 150, f2: 55, d: .3, v: .34, lp: 650 }); s.tone({ type: 'sawtooth', f: 157, f2: 58, d: .3, v: .22, lp: 650 });
+    s.clack({ t: .13, f: 1900, d: .014, v: .5, body: .4 });
   }],
   executioner: [.4, .5, s => {
     s.tone({ type: 'square', f: 2600, f2: 380, d: .16, v: .32, lp: 5000 });
@@ -325,6 +354,11 @@ const SOUNDS = {
     s.tone({ f: 90, f2: 40, d: .2, v: 1 });
     s.hiss({ ft: 'bandpass', f: 300, f2: 2500, q: 2, a: .05, d: .55, v: .8 });
     s.click({ f: 900, v: .5 });
+  }],
+  salvo: [.85, .9, s => { // a hard thump and a rocket hissing away
+    s.tone({ f: 95, f2: 38, d: .22, v: 1 }); s.thud({ d: .05, f: 120, v: .7 });
+    s.hiss({ ft: 'bandpass', f: 350, f2: 3000, q: 2, a: .03, d: .6, v: .85 });
+    s.click({ f: 800, v: .5 });
   }],
   boom: [1.6, 1, s => {
     s.hiss({ f: 1800, f2: 80, a: .004, d: 1.3, v: 1 });
@@ -382,18 +416,37 @@ const SOUNDS = {
     for (let k = 0; k < 5; k++) s.tone({ f: 1400 + k * 330, t: .05 + k * .05, d: .2, v: .06 });
     s.hiss({ ft: 'bandpass', f: 400, f2: 2400, q: 1.5, a: .02, d: .3, v: .6, sweep: .3 });
   }],
-  zapSwing: [.35, .5, s => { // a crackling blast leaves the tip: a rising buzz, a snap and sparks
-    s.tone({ type: 'sawtooth', f: 180, f2: 720, a: .005, d: .13, v: .2, lp: 2400 });
-    s.tone({ type: 'square', f: 1500, f2: 700, t: .02, d: .09, v: .08, lp: 5000 });
-    s.hiss({ ft: 'bandpass', f: 1400, f2: 3800, q: 2, a: .01, d: .12, v: .7, sweep: .1 });
-    for (let k = 0; k < 6; k++) s.click({ t: .015 + k * .022 + s.r() * .01, f: 3000 + s.r() * 3500, v: .24 });
+  zapSwing: [.3, .6, s => { // a short crackle off the tip with a glassy rising chime in it
+    s.arc({ d: .14, rate: 110, buzz: 120, v: 1 });
+    s.hiss({ ft: 'highpass', f: 5000, d: .04, v: .25 });
+    s.tone({ type: 'triangle', f: 880, f2: 1320, a: .006, d: .17, v: .13, glide: .08 }); s.tone({ type: 'triangle', f: 886, f2: 1328, a: .006, d: .17, v: .09, glide: .08 });
+    for (let k = 0; k < 3; k++) s.tone({ f: [1760, 2217, 2637][k], t: .04 + k * .028, d: .1, v: .05 });
   }],
-  zapHit: [.4, .65, s => { // a hard zap
-    s.tone({ type: 'square', f: 1800, f2: 200, d: .12, v: .3, lp: 4000 });
-    s.tone({ type: 'sawtooth', f: 120, f2: 60, d: .2, v: .4, lp: 900 });
-    for (let k = 0; k < 6; k++) s.click({ t: k * .025 + s.r() * .02, f: 2500 + s.r() * 3500, v: .4 });
-    s.thud({ d: .04, f: 160, v: .6 });
+  zapHit: [.45, .65, s => { // a hard zap with a thump and a bright magic ting
+    s.arc({ d: .24, rate: 170, buzz: 90, v: 1 });
+    s.thud({ d: .04, f: 160, v: .55 });
+    s.tone({ type: 'triangle', f: 660, f2: 1320, a: .01, d: .2, v: .1, glide: .12 });
+    s.tone({ f: 1760, t: .015, a: .003, d: .32, v: .09 }); s.tone({ f: 1769, t: .015, a: .003, d: .32, v: .07 }); s.tone({ f: 3520, t: .015, d: .14, v: .03 });
   }],
+  tracker: [.32, .5, s => { // a pneumatic dart and a little chirp
+    s.hiss({ ft: 'bandpass', f: 2600, f2: 900, q: 1.3, d: .05, v: .9 }); s.thud({ d: .02, f: 260, v: .45 }); s.clack({ t: .004, f: 3600, d: .006, v: .4 });
+    s.tone({ type: 'square', f: 2093, t: .07, d: .025, v: .05, lp: 5000 });
+  }],
+  trackOn: [.3, .45, s => { s.tone({ type: 'square', f: 1568, d: .045, v: .2, lp: 5000 }); s.tone({ type: 'square', f: 2093, t: .08, d: .07, v: .2, lp: 5000 }); }], // locked on
+  tracked: [.5, .5, s => { for (let k = 0; k < 3; k++) s.tone({ type: 'square', f: 1760, t: k * .12, d: .06, v: .22, lp: 4000 }); s.tone({ type: 'triangle', f: 440, f2: 330, t: .02, d: .3, v: .2 }); }], // someone's tracking you
+  stormStart: [.45, .5, s => { s.arc({ d: .2, rate: 140, buzz: 70, v: .9 }); s.tone({ type: 'sawtooth', f: 55, f2: 110, d: .3, v: .3, lp: 800, glide: .2 }); }],
+  stormEnd: [.35, .35, s => { s.arc({ d: .1, rate: 80, buzz: 50, v: .6 }); s.tone({ f: 900, f2: 200, d: .2, v: .2 }); }],
+  stormLoop: [2, .32, s => s.draw(0, 2, o => { // the Tempest Coil's beam: a buzzing hum and crackles, made to loop
+    const N = o.length, kh = 1 - Math.exp(-6.2832 * 2600 / SR), kl = 1 - Math.exp(-6.2832 * 300 / SR);
+    let g = 0, p = 0, q = 0;
+    for (let k = 0; k < 2 * N; k++) { // twice round so the filters are settled where it loops
+      if (s.r() < .006) g += (s.r() * 2 - 1) * (.4 + s.r());
+      g *= .8; p += (g - p) * kh; q += (p - q) * kl;
+      if (k < N) continue;
+      const t = (k - N) / SR, w = 6.2832 * 60 * t; // whole cycles in 2 s, so the hum loops too
+      o[k - N] = (p - q) * 1.3 + .07 * (Math.sin(w) + .5 * Math.sin(2 * w) + .33 * Math.sin(3 * w) + .25 * Math.sin(4 * w)) * (1 + .4 * Math.sin(6.2832 * 6 * t));
+    }
+  })],
   stunned: [.6, .35, s => { for (let k = 0; k < 4; k++) s.tone({ type: 'triangle', f: k % 2 ? 1568 : 1319, t: k * .11, d: .12, v: .3 }); }], // seeing stars
   soulHeal: [.6, .4, s => s.arp(0, [523, 659, 784, 1047], { gap: .06, d: .3, v: .3 })],
   shrug: [.3, .35, s => { s.tone({ f: 1200, f2: 2400, d: .12, v: .2 }); s.hiss({ ft: 'highpass', f: 5000, d: .12, v: .3 }); }],
@@ -549,6 +602,24 @@ const SOUNDS = {
     s.hiss({ ft: 'bandpass', f: 1200, f2: 420, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
     s.clack({ t: .1, f: 1200, d: .012, v: .3, body: .3 });
   }],
+  zin_hornet: [.3, .4, s => {
+    s.hiss({ ft: 'bandpass', f: 650, f2: 1900, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 });
+    s.clack({ t: .05, f: 1900, d: .012, v: .55, body: .4 });
+    s.tone({ type: 'square', f: 1200, f2: 1800, t: .07, a: .004, d: .05, v: .15, lp: 2700, glide: .04 });
+  }],
+  zout_hornet: [.25, .34, s => {
+    s.tone({ type: 'square', f: 1600, f2: 950, a: .004, d: .045, v: .13, lp: 2500, glide: .04 });
+    s.hiss({ ft: 'bandpass', f: 1650, f2: 560, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
+  }],
+  zin_apex: [.45, .44, s => { // the scope slides in with a low growl
+    s.hiss({ ft: 'bandpass', f: 420, f2: 1250, q: 1.5, a: .03, d: .07, v: .6, sweep: .09 });
+    s.thud({ t: .07, d: .03, f: 110, v: .9 }); s.clack({ t: .08, f: 1300, d: .014, v: .5, body: .5 });
+    s.tone({ type: 'sawtooth', f: 95, f2: 120, t: .04, a: .04, d: .2, v: .12, lp: 500, glide: .2 });
+  }],
+  zout_apex: [.3, .36, s => {
+    s.hiss({ ft: 'bandpass', f: 1150, f2: 400, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
+    s.clack({ t: .1, f: 1150, d: .012, v: .3, body: .3 });
+  }],
   zin_soulwand: [.3, .34, s => { s.tone({ type: 'triangle', f: 440, f2: 880, a: .01, d: .14, v: .16, glide: .1 }); s.hiss({ ft: 'bandpass', f: 1200, f2: 2600, q: 2, a: .01, d: .06, v: .3 }); }],
   zout_soulwand: [.25, .3, s => { s.tone({ type: 'triangle', f: 880, f2: 440, a: .01, d: .12, v: .14, glide: .1 }); }],
   dry: [.1, .5, s => { s.clack({ f: 2800, d: .01, v: .8 }); }],
@@ -594,6 +665,15 @@ const SOUNDS = {
   r_soulwand: [2, .45, s => { s.latch(.2); s.thunk(.9); s.tone({ type: 'triangle', f: 330, f2: 660, t: 1.25, a: .15, d: .35, v: .2, glide: .4 }); s.tone({ type: 'triangle', f: 334, f2: 668, t: 1.25, a: .15, d: .35, v: .14, glide: .4 }); }],
   r_ancientwand: [2.2, .45, s => { s.latch(.22); s.thunk(.95); s.tone({ f: 110, f2: 220, t: 1.3, a: .2, d: .4, v: .4, glide: .5 }); for (let k = 0; k < 4; k++) s.tone({ f: 1200 + k * 300, t: 1.5 + k * .08, d: .2, v: .07 }); }],
   r_tigerbite: [2, .45, s => { s.magOut(.2); s.magIn(1.0); s.clack({ t: 1.1, f: 1500, d: .015, v: .5, body: .3 }); s.rack(1.55); }],
+  r_apex: [1.9, .45, s => { s.magOut(.18); s.magIn(.92); s.clack({ t: 1.02, f: 1450, d: .015, v: .5, body: .3 }); s.rack(1.44); }],
+  r_hornet: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.clack({ t: .82, f: 1900, d: .015, v: .5, body: .3 }); s.rack(1.12); }],
+  r_tracker: [1.4, .45, s => { s.magOut(.1); s.magIn(.6); s.rack(.95); s.tone({ type: 'square', f: 1568, t: 1.2, d: .04, v: .12, lp: 5000 }); }],
+  r_tempest: [2.4, .45, s => {
+    s.latch(.15); s.magOut(.8); s.magIn(1.35);
+    for (let k = 0; k < 6; k++) s.clack({ t: 1.75 + k * .035, f: 2400 + k * 500, d: .008, v: .35 });
+    s.tone({ type: 'sawtooth', f: 80, f2: 320, t: 1.85, a: .15, d: .25, v: .2, lp: 1500, glide: .3 }); s.tone({ f: 600, f2: 2800, t: 1.85, a: .2, d: .12, v: .22, glide: .3 });
+  }],
+  r_salvo: [2.8, .45, s => { s.latch(.15); for (const t of [.65, 1.1, 1.55, 1.99]) s.thunk(t); s.latch(2.4); }], // a rocket into each tube
   r_shockbeam: [2, .45, s => {
     s.latch(.12); s.magOut(.7); s.magIn(1.15);
     for (let k = 0; k < 5; k++) s.clack({ t: 1.5 + k * .04, f: 2500 + k * 400, d: .008, v: .35 });
@@ -816,7 +896,7 @@ function hurtSfx(who, name, at, opts = {}) {
 
 // looping sounds: flamethrower, eradicator motor, heat ray
 let flameHeld = 0, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null, spinBp = null, spinLfo = null;
-let beamHeld = 0, beamOn = false, beamGain = null, frostHeld = 0, frostOn = false, frostGain = null;
+let beamHeld = 0, beamOn = false, beamGain = null, frostHeld = 0, frostOn = false, frostGain = null, stormHeld = 0, stormOn = false, stormGain = null;
 function flameBuffer() { // fire loop
   const n = SR * 2, x = SR / 10, r = rng(99), raw = new Float32Array(n + x);
   let lo = 0, lo2 = 0;
@@ -878,5 +958,14 @@ function soundTick(dt, live) {
     ice.connect(frostGain).connect(bus); ice.start();
   }
   if (fzOn !== frostOn) { frostOn = fzOn; sfx(fzOn ? 'frostStart' : 'frostEnd'); frostGain?.gain.setTargetAtTime(fzOn ? BUF.iceLoop.v : 0, t, fzOn ? .03 : .06); }
+  // tempest coil: a buzzing storm
+  stormHeld = live || inLobby ? stormHeld - dt : 0;
+  const stOn = stormHeld > 0;
+  if (stOn && !stormGain && BUF.stormLoop) {
+    stormGain = ac.createGain(); stormGain.gain.value = 0;
+    const st = ac.createBufferSource(); st.buffer = BUF.stormLoop.buf; st.loop = true;
+    st.connect(stormGain).connect(bus); st.start();
+  }
+  if (stOn !== stormOn) { stormOn = stOn; sfx(stOn ? 'stormStart' : 'stormEnd'); stormGain?.gain.setTargetAtTime(stOn ? BUF.stormLoop.v : 0, t, stOn ? .03 : .06); }
 }
-function soundsOff() { flameHeld = 0; if (flameGain) flameGain.gain.value = 0; flameOn = false; if (spinGain) spinGain.gain.value = 0; beamHeld = 0; beamOn = false; if (beamGain) beamGain.gain.value = 0; frostHeld = 0; frostOn = false; if (frostGain) frostGain.gain.value = 0; }
+function soundsOff() { flameHeld = 0; if (flameGain) flameGain.gain.value = 0; flameOn = false; if (spinGain) spinGain.gain.value = 0; beamHeld = 0; beamOn = false; if (beamGain) beamGain.gain.value = 0; frostHeld = 0; frostOn = false; if (frostGain) frostGain.gain.value = 0; stormHeld = 0; stormOn = false; if (stormGain) stormGain.gain.value = 0; }

@@ -13,6 +13,7 @@ const tStick = { x: 0, y: 0 }; // move stick, -1 to 1
 const gfx = { q: TOUCH ? 'low' : /CrOS/.test(navigator.userAgent) ? 'medium' : 'high', res: 1, fps: false, auto: true }; // auto: turns itself down when the game runs slow
 try { const s = JSON.parse(localStorage.getItem('voxelstrike-gfx')); if (s) { if (GFX_Q[s.q]) gfx.q = s.q; if (s.res >= .5 && s.res <= 1) gfx.res = s.res; gfx.fps = !!s.fps; gfx.auto = s.auto !== false; } } catch {}
 const gfxQ = () => GFX_Q[gfx.q];
+const fxN = n => gfx.q === 'low' ? Math.floor(n / 2 + Math.random()) : n; // effect bits: half as many on low
 const renderer = new THREE.WebGLRenderer({ antialias: gfxQ().aa, powerPreference: 'high-performance' });
 const gfxAA = gfxQ().aa; // antialias only changes on reload
 const pixelRatio = () => Math.min(devicePixelRatio, gfxQ().maxRatio) * gfx.res;

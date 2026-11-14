@@ -34,6 +34,8 @@ const PRESETS = [
 const SECRETS = {
   creature: { name: "VICTOR'S CREATURE", sk: [204, 192, 128], sleeve: 8, eye: 0xb4ecff, zap: 0xcdf3ff, paint: paintCreature,
     look: { skin: 2, eyes: 'blue', hair: 'long', hairC: 'black', top: 'jacket', topC: 0x3a3630, top2: 0xb3a88e, bottom: 'pants', bottomC: 0x2f2b27, shoes: 'boots', shoeC: 0x2a2119, secret: 'creature' } },
+  evergreen: { name: 'EVERGREEN', sk: [178, 130, 106], eye: 0x3dff6a, halo: 0x2eff5e, eyes: [[2, 4, 1], [5, 4, 1]], whites: [[1, 4], [6, 4]], glint: 0xffcc33, star: [0, 3.5, 2], paint: paintEvergreen,
+    look: { skin: 2, eyes: 'green', brows: 'none', hair: 'side', hairC: 'dark', top: 'long', topC: 0x19a020, top2: 0xebebeb, bottom: 'pants', bottomC: 0x4d4d4d, shoes: 'plain', shoeC: 0x3d3d3d, secret: 'evergreen' } },
 };
 
 // seeded random so a look always paints the same
@@ -279,7 +281,7 @@ function paintSkin(g, L, rnd) {
     for (let x = 0; x < 8; x++) { at(F, x, 2, band, 10); at(head.back, x, 2, band, 10); }
     for (let c = 0; c < 8; c++) sideFront(c, 2, band, 10);
   }
-  S?.paint({ at, F, head, body, neck, limb: p => regions(PARTS[p][0], PARTS[p][1], 4, 12, 4), SK, TOP, BOT, SHOE, rnd });
+  S?.paint({ at, px, F, head, body, neck, limb: p => regions(PARTS[p][0], PARTS[p][1], 4, 12, 4), SK, TOP, BOT, SHOE, rnd });
 }
 
 // the Creature: patched yellow skin, stitches, black lips, a ragged coat
@@ -324,6 +326,15 @@ function paintCreature({ at, F, head, body, neck, limb, SK, TOP, BOT, SHOE, rnd 
   }
 }
 
+// Evergreen: a knitted jumper with a gold-starred tree; its green follows the shirt colour so teams still read
+const EVERGREEN_PX = 'IU1NTRmgICK6K93e3uvr666vsB+4KD09PWtraz8/P7m6upZfQSgoKKp9ZpZvWykpKWpAMNLS0lExJczOz4dVO8jHx9maHP/POgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQQQTTTTVBxxxxx1AQQQQQQQUhEhEU0UwQQQTTTTRgggggghgQQQQQQQREhEkU0UwQQQTTTTVAggggglAQQQQQQQUhEhE0U0QQQQTTTTRhxxxxxxgQQQQQQQREhEk0U0QQUAQQQQQSAQQQQSFhlhhRBRBBRBRlhllBRBRRBVBixixBRBRixixBRBQUEAQQQQQSAQQQQQRwhwgwgwgwgwhwhwgwgwgwgwgwgwgwgwgwgwgwgwgUAQQQQQQSAQQQQQQhwhwgwmFwwgwhwhwgwgwgwgwgwgwgwhwgwgwgwgwUAQQQQQQSAQQQQQRwhwgwgxRAgwhwhwgwgwgwgwixixhRBRCxixhBRBQUAQQQQQQQSASCCCAhwhwgxRRRAgwhwhwgwgwgwgxixixBRBRixixRBRAUAQQSCAQSCASCCCBwhwgwgxRAgwhwhwgwgwgwgwixixhRBRCxixhBRBQUAQQQQQQSAQQQQQQhwhwgxRRRAgwhwhwgwgwgwgwgwgwgwgwgwgwwgwgQQQQQQQQSAQQQQQRwhwgxRRRRRAhwhwgwgwgwgwgwgwgwgwgwgwggwgwQQQQQQQQQQQQQQQQhwhwgwkUQwgwhwhwgwgwgwgxixixBRBRixixRBRCigQQQQQQQSiiSSSRwhwgwgwgwgwhwhwgwgwgwgwjDFTDjjjjDDDDjzjyiiiiSSSSiiiiSSSVhlhhVBRBBVBRlhllBRBRRBVDDFTDjjzlTFTDjzjyiiiiSSSSiiiiSSSQUAQQQQQQQSEAUAQQQQSEAQQTDDDDzjz1TDDDjzjwQQQTTTTREhEk0U0QQQQTTTTUhEhE0U0QQQQTTTTREhEkU0UwQQQTTTTUhEhEU0UwQSAQQQQQUAQSAQQSxixhRBRCxixhRBRAQSAQQQQQUEAQQQQQgwgwgwgwgwgwgwgwQSAQQQQQQUAQQQQQwgwgwgwgwgwgwgwgQSAQQQQQQUAQQQQRixixBRBRixixRBRASAQQQQQQQUASCCCCxixhRBRCxixhBRBQSCAQSCAQQUASCCCBixixBRBRixixRBRAQSAQQQQQQUAQQQQQwgwgwgwgwggggwgwQSAQQQQQQQQQQQQQgwgwgwgwgwgwwgwgQQQQQQQQQQQQQQQSxixhRBRCxixhBRBSigQQQQQQQSiiSSSTDDDDjjjjFTDDzjziiiiiSSSSiiiiSSSTFTFTjzjjFTDDzjziiiiiSSSSiiiiSSSTDDFTzzjzDDDDzjzg==';
+const KNIT = [0x19a020, 0x22ba2b, 0x1fb828];
+function paintEvergreen({ px, TOP }) {
+  const d = decodePx(EVERGREEN_PX), k0 = hexRGB(KNIT[0]);
+  const pal = d.pal.map(c => { const k = hexRGB(c); return KNIT.includes(c) ? TOP.map((v, i) => v + k[i] - k0[i]) : k; });
+  d.idx.forEach((v, i) => { if (v) px(i % 64, i >> 6, pal[v - 1]); });
+}
+
 // a box textured with parts of the skin
 const EPS = .02; // stops neighbouring pixels bleeding in
 function skinBox(w, h, d, U, faces) {
@@ -357,32 +368,42 @@ function buildChar(look, U = 1 / 16, own = false) {
   const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null, boots: null, hat: null };
   const S = !pxShown(look) && SECRETS[look.secret];
   if (S) secretFx(ch, S);
-  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); ch.hat?.mat.dispose(); };
+  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); ch.hat?.mat.dispose(); ch.hat?.fx?.own?.dispose(); };
   return ch;
 }
 
 // secret skin effects: glowing eyes and sparks off the stitches
 const EYE_GEO = new THREE.PlaneGeometry(1, 1), ZAP_BOX = new THREE.BoxGeometry(1, 1, 1), ZUP = new THREE.Vector3(0, 0, 1);
 let haloTex = null;
-function secretMats(S) {
-  if (S.mats) return S.mats;
+// a soft round glow for sprites
+function haloMap() {
   if (!haloTex) {
     const c = document.createElement('canvas'); c.width = c.height = 32;
     const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
     gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.35, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = gr; g.fillRect(0, 0, 32, 32); haloTex = new THREE.CanvasTexture(c);
   }
-  return S.mats = { eye: new THREE.MeshBasicMaterial({ color: S.eye }), zap: new THREE.MeshBasicMaterial({ color: S.zap }),
-    halo: new THREE.SpriteMaterial({ map: haloTex, color: S.eye, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .55 }) };
+  return haloTex;
+}
+const secretGlow = (color, opacity) => new THREE.SpriteMaterial({ map: haloTex, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity });
+function secretMats(S) {
+  if (S.mats) return S.mats;
+  haloMap();
+  return S.mats = { eye: new THREE.MeshBasicMaterial({ color: S.eye }), halo: secretGlow(S.halo ?? S.eye, .55), white: S.whites && new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    zap: S.zap && new THREE.MeshBasicMaterial({ color: S.zap }),
+    glint: S.glint && new THREE.MeshBasicMaterial({ color: S.glint }), core: S.glint && new THREE.MeshBasicMaterial({ color: 0xfff6d0 }), glow: S.glint && secretGlow(S.glint, .8) };
 }
 function secretFx(ch, S) {
   const M = secretMats(S), U = ch.U, eyes = new THREE.Group();
-  for (const x of [-1.5, 1.5]) {
-    const e = new THREE.Mesh(EYE_GEO, M.eye); e.position.set(x * U, -.5 * U, 4.02 * U); e.scale.setScalar(U); eyes.add(e);
-    const h = new THREE.Sprite(M.halo); h.position.set(x * U, -.5 * U, 4.3 * U); h.scale.set(3 * U, 3 * U, 1); eyes.add(h);
+  for (const [x, y, w] of S.eyes ?? [[2, 4, 1], [5, 4, 1]]) { // face pixels
+    const cx = (x + w / 2 - 4) * U, cy = (3.5 - y) * U;
+    const e = new THREE.Mesh(EYE_GEO, M.eye); e.position.set(cx, cy, 4.02 * U); e.scale.set(w * U, U, 1); eyes.add(e);
+    const h = new THREE.Sprite(M.halo); h.position.set(cx, cy, 4.3 * U); h.scale.set((w + 2) * U, (w + 2) * U, 1); eyes.add(h);
   }
+  for (const [x, y] of S.whites ?? []) { const e = new THREE.Mesh(EYE_GEO, M.white); e.position.set((x - 3.5) * U, (3.5 - y) * U, 4.02 * U); e.scale.set(U, U, 1); eyes.add(e); } // lit whites
   ch.head.add(eyes);
-  ch.zap = { parts: ch.parts, eyes, U, mat: M.zap, segs: null, t: .4 + Math.random() * 2, on: 0, k: 0, site: [] };
+  ch.zap = S.glint ? { parts: ch.parts, eyes, U, mats: M, star: S.star, gl: null, t: .3 + Math.random(), tick: glintTick, off: glintOff }
+    : { parts: ch.parts, eyes, U, mat: M.zap, segs: null, t: .4 + Math.random() * 2, on: 0, k: 0, site: [], tick: zapTick, off: zapOff };
 }
 // part, height and ring size in skin pixels (0: along the forehead seam)
 const ZAP_SITES = [[1, 0, 2.6], [3, -3.5, 2.6], [4, -3.5, 2.6], [0, 1.5, 0]], ZAP_N = 6;
@@ -419,13 +440,52 @@ function zapTick(z, dt) {
   z.t = .7 + Math.random() * 2.8; z.on = .1 + Math.random() * .14; z.k = 0;
   z.site = Math.random() < .35 ? [pick(), pick()] : [pick()];
 }
+// gold glints: a little star twinkles somewhere on the body now and then
+const GLINT_N = 3, GLINT_PARTS = [0, 0, 0, 2, 2, 2, 3, 4, 5, 6]; // head, body, arms, legs
+const GLINT_FACES = ['fbrlt', '', 'fb', 'fbrt', 'fblt', 'fbr', 'fbl']; // the faces that show on each part
+function glintMake(z) {
+  const g = new THREE.Group(), M = z.mats;
+  for (let a = 0; a < 3; a++) g.add(new THREE.Mesh(ZAP_BOX, M.glint));
+  g.add(new THREE.Mesh(ZAP_BOX, M.core), new THREE.Sprite(M.glow));
+  g.visible = false; g.userData = { life: 0, L: 1, y: 0 };
+  return g;
+}
+const glintOff = z => z.gl?.forEach(g => { g.visible = false; g.userData.life = 0; });
+function glintAt(z) {
+  const g = z.gl.find(g => g.userData.life <= 0); if (!g) return;
+  const U = z.U, st = z.star && Math.random() < .25, pi = st ? 2 : GLINT_PARTS[Math.random() * GLINT_PARTS.length | 0], part = z.parts[pi];
+  const { width: W, height: H, depth: D } = part.geometry.parameters, o = .3 * U, a = Math.random() - .5, b = Math.random() - .5;
+  const F = GLINT_FACES[pi], f = F[Math.random() * F.length | 0];
+  if (st) g.position.set(z.star[0] * U, z.star[1] * U, z.star[2] * U + o);
+  else if (f === 'f' || f === 'b') g.position.set(a * W * .8, b * H * .8, (f === 'f' ? 1 : -1) * (D / 2 + o));
+  else if (f === 'r' || f === 'l') g.position.set((f === 'r' ? -1 : 1) * (W / 2 + o), b * H * .8, a * D * .8);
+  else g.position.set(a * W * .8, H / 2 + o, b * D * .8);
+  if (g.parent !== part) part.add(g);
+  g.userData.y = g.position.y; g.userData.L = g.userData.life = .5 + Math.random() * .25; g.visible = true;
+}
+function glintTick(z, dt) {
+  z.gl ??= Array.from({ length: GLINT_N }, () => glintMake(z));
+  if ((z.t -= dt) <= 0) { z.t = .3 + Math.random() * 1.4; glintAt(z); }
+  const U = z.U;
+  for (const g of z.gl) {
+    const d = g.userData; if (d.life <= 0) continue;
+    if ((d.life -= dt) <= 0) { g.visible = false; continue; }
+    const k = 1 - d.life / d.L, s = Math.sin(Math.PI * k), r = 3.6 * s * U, t = .4 * U, [a, b, c, core, glow] = g.children;
+    a.scale.set(r, t, t); b.scale.set(t, r, t); c.scale.set(t, t, r);
+    core.scale.setScalar(1.1 * s * U); glow.scale.setScalar(5 * s * U);
+    g.rotation.y += dt * 2.5; g.position.y = d.y + k * U;
+  }
+}
 // yours in the lobby, and everyone else's in a match
 function secretTick(dt) {
-  if (heroCh?.zap) zapTick(heroCh.zap, dt);
+  if (heroCh?.zap) heroCh.zap.tick(heroCh.zap, dt);
+  heroCh?.hat?.fx?.tick(dt); // hat skins move too
   if (inLobby) return;
-  for (const z of zombies) if (z.zap) {
+  for (const z of zombies) {
+    if (z.hatFx && !z.dead) z.hatFx.tick(dt);
+    if (!z.zap) continue;
     const on = !z.dead; z.zap.eyes.visible = on;
-    if (on) zapTick(z.zap, dt); else zapOff(z.zap);
+    if (on) z.zap.tick(z.zap, dt); else z.zap.off(z.zap);
   }
 }
 
@@ -452,8 +512,9 @@ function randomLook(seedStr, topC) {
 }
 
 // ---- red glow around enemies
-const GLOW_LAYER = 2, OCC_LAYER = 3; // OCC: what can hide an enemy's glow
-const GLOW_C = new THREE.Vector3(1, .16, .12), GLOW_A = .65;
+const GLOW_LAYER = 2, OCC_LAYER = 3, TRACK_LAYER = 4; // OCC: what can hide an enemy's glow, TRACK: enemies your Tracker hit (seen through walls)
+const GLOW_C = new THREE.Vector3(1, .16, .12), TRACK_C = new THREE.Vector3(1, .82, .2), GLOW_A = .65;
+let outlineTracked = 0;
 // call before adding the gun, so the gun doesn't glow
 function addOutline(z) {
   z.glowMs = []; z.g.traverse(o => { if (o.isMesh) { o.layers.enable(GLOW_LAYER); z.glowMs.push(o); } });
@@ -462,21 +523,24 @@ function addOutline(z) {
 // no glow on dead enemies or hooded ones out of range; returns how many glow on screen
 const _glFr = new THREE.Frustum(), _glFm = new THREE.Matrix4(), _glFs = new THREE.Sphere(), occOn = o => o.layers.enable(OCC_LAYER);
 function outlineTick(cam) {
-  let n = 0;
+  let n = 0; outlineTracked = 0; const now = performance.now();
   _glFr.setFromProjectionMatrix(_glFm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
   for (const z of zombies) {
     if (!z.glowMs) continue;
     let on = !z.dead;
     const far = z.rec?.fx.stealth;
     if (on && far) { const d = cam.position.distanceTo(z.g.position); on = z.glowOn ? d <= far + .5 : d < far - .5; }
+    const tr = !z.dead && z.trackAt > now; if (tr) on = false; // tracked: yellow and through walls, stealth or not
     if (on !== z.glowOn) { z.glowOn = on; for (const m of z.glowMs) on ? m.layers.enable(GLOW_LAYER) : m.layers.disable(GLOW_LAYER); }
-    if (on && z.g.visible) { _glFs.center.copy(z.g.position); _glFs.radius = 2.2 * z.g.scale.y; _glFs.center.y += _glFs.radius / 2; if (_glFr.intersectsSphere(_glFs)) n++; }
+    if (tr !== !!z.trackOn) { z.trackOn = tr; for (const m of z.glowMs) tr ? m.layers.enable(TRACK_LAYER) : m.layers.disable(TRACK_LAYER); }
+    if ((on || tr) && z.g.visible) { _glFs.center.copy(z.g.position); _glFs.radius = 2.2 * z.g.scale.y; _glFs.center.y += _glFs.radius / 2; if (_glFr.intersectsSphere(_glFs)) { n++; if (tr) outlineTracked++; } }
   }
   return n;
 }
 const glowRT = [0, 1, 2].map(() => new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true }));
 const maskBlack = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
-const maskWhite = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, depthFunc: THREE.LessEqualDepth });
+const maskWhite = new THREE.MeshBasicMaterial({ color: 0xff0000, fog: false, depthFunc: THREE.LessEqualDepth }); // red: the glow, green: tracked
+const maskTrack = new THREE.MeshBasicMaterial({ color: 0x00ff00, fog: false, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
 const glowQuadVS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }';
 // blur
 const blurMat = new THREE.ShaderMaterial({
@@ -484,20 +548,20 @@ const blurMat = new THREE.ShaderMaterial({
   vertexShader: glowQuadVS, depthTest: false, depthWrite: false,
   fragmentShader: `uniform sampler2D tex; uniform vec2 dir; varying vec2 vUv;
     void main() {
-      float s = texture2D(tex, vUv).r * .227;
-      s += (texture2D(tex, vUv + dir * 1.385).r + texture2D(tex, vUv - dir * 1.385).r) * .316;
-      s += (texture2D(tex, vUv + dir * 3.231).r + texture2D(tex, vUv - dir * 3.231).r) * .070;
-      gl_FragColor = vec4(s, s, s, 1.);
+      vec2 s = texture2D(tex, vUv).rg * .227;
+      s += (texture2D(tex, vUv + dir * 1.385).rg + texture2D(tex, vUv - dir * 1.385).rg) * .316;
+      s += (texture2D(tex, vUv + dir * 3.231).rg + texture2D(tex, vUv - dir * 3.231).rg) * .070;
+      gl_FragColor = vec4(s, 0., 1.);
     }`,
 });
 const glowMat = new THREE.ShaderMaterial({
-  uniforms: { blur: { value: null }, mask: { value: null }, col: { value: GLOW_C }, a: { value: GLOW_A } },
+  uniforms: { blur: { value: null }, mask: { value: null }, col: { value: GLOW_C }, col2: { value: TRACK_C }, a: { value: GLOW_A } },
   vertexShader: glowQuadVS, transparent: true, depthTest: false, depthWrite: false,
-  fragmentShader: `uniform sampler2D blur, mask; uniform vec3 col; uniform float a; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D blur, mask; uniform vec3 col, col2; uniform float a; varying vec2 vUv;
     void main() {
-      float g = texture2D(blur, vUv).r, inside = texture2D(mask, vUv).r;
-      g = smoothstep(0., .55, g) * (1. - inside); // fades out away from the body, nothing on the body itself
-      gl_FragColor = vec4(col, g * a);
+      vec2 m = texture2D(mask, vUv).rg, g = smoothstep(0., .55, texture2D(blur, vUv).rg) * (1. - max(m.r, m.g)); // fades out away from the body, nothing on the body itself
+      float t = max(g.r, g.g);
+      gl_FragColor = vec4(t > 0. ? (col * g.r + col2 * g.g) / (g.r + g.g) : col, t * a);
     }`,
 });
 const glowQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blurMat); glowQuad.frustumCulled = false;
@@ -521,6 +585,7 @@ function outlineRender(cam) {
   scene.overrideMaterial = maskBlack; renderer.render(scene, cam);
   renderer.autoClear = false; cam.layers.set(GLOW_LAYER);
   scene.overrideMaterial = maskWhite; renderer.render(scene, cam);
+  if (outlineTracked) { cam.layers.set(TRACK_LAYER); scene.overrideMaterial = maskTrack; renderer.render(scene, cam); }
   scene.overrideMaterial = null; cam.layers.mask = layers; scene.background = bg;
   // blur it
   blurMat.uniforms.dir.value.set(1 / w, 0); blurMat.uniforms.tex.value = glowRT[0].texture; glowPass(0, glowRT[1], blurMat);

@@ -64,7 +64,8 @@ const suitUse = id => { const st = suitStars(id), u = prof.suitUse?.[id] | 0; re
 const wornSuit = () => { const id = prof.armorOn; return id && suitOf(id) && suitStars(id) ? { id, st: suitUse(id) } : null; };
 // the basic tier you picked, your best by default
 const basicWorn = () => { const n = Math.min(ARMOR_MAX, prof.armor | 0), u = prof.armorUse | 0; return u ? Math.min(u, n) : n; };
-const wornArmor = () => { const s = wornSuit(); return s ? suitN(s.id, s.st) : basicWorn(); };
+const ARMOR_OFF = 'none', armorOff = () => prof.armorOn === ARMOR_OFF; // took it all off
+const wornArmor = () => { const s = wornSuit(); return s ? suitN(s.id, s.st) : armorOff() ? 0 : basicWorn(); };
 const matchArmor = () => wornArmor();
 // bots get random armor up to your best tier, now and then a set piece
 const BOT_BARE = .15, BOT_SUIT = .25;

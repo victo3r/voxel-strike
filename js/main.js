@@ -138,7 +138,7 @@ function update(dt) {
 
   // keep the real fire rate at any frame rate
   cd -= dt;
-  if ((autoFire(w) || keys['T:shoot']) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun
+  if (myBurst.bn > 0 || (autoFire(w) || keys['T:shoot']) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun, and a burst finishes
     const c0 = cd; shoot(); if (cd === c0) break;
     if (c0 > -dt) cd += c0;
   }
@@ -155,6 +155,7 @@ function update(dt) {
     gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
     gunRound.position.z = reloading > 0 ? k / .4 * 10 * GPX : 0;
   }
+  if (gunRounds && gunShown === cur) roundsShow(gunRounds, ammo[cur], reloading > 0 ? 1 - reloading / reloadFull : -1);
   const hold = holdOf(w);
   zoomSound(w);
   adsT += ((aiming && reloading <= 0 && !w.melee ? 1 : 0) - adsT) * Math.min(1, dt * 14); // no aiming with the knife
@@ -403,7 +404,7 @@ function update(dt) {
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, r.gust ? 0xe8f7ff : 0x888888, 1); }
   }
 
-  updateFlares(dt); updateGrenades(dt); beamTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt);
+  updateFlares(dt); updateGrenades(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;
@@ -417,9 +418,10 @@ function update(dt) {
   if (boss) $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
 
   for (let i = parts.length - 1; i >= 0; i--) {
-    const p = parts[i]; p.life -= dt; p.v.y -= 15 * dt; p.m.position.addScaledVector(p.v, dt);
-    if (p.life <= 0 || p.m.position.y < 0) { scene.remove(p.m); parts.splice(i, 1); }
+    const p = parts[i]; p.life -= dt; p.v.y -= 15 * dt; p.p.addScaledVector(p.v, dt);
+    if (p.life <= 0 || p.p.y < 0) { parts[i] = parts[parts.length - 1]; parts.pop(); }
   }
+  partsDraw();
 
   vitBar('hp', P.hp, P.max, 'heart'); vitBar('arm', P.armor, P.maxArmor, 'shield');
   $('arm').classList.toggle('grow', (P.growA = (P.growA || 0) - dt) > 0); $('hp').classList.toggle('grow', (P.growH = (P.growH || 0) - dt) > 0);
@@ -486,9 +488,10 @@ function autoGfx(raw, playing) {
   cgPlay(live && locked && !inLobby); // tell CrazyGames you're playing
   autoGfx(raw, live && locked);
   if (live) for (let k = 0; k < steps && (k === 0 || isLive()); k++) update(sdt);
-  if ((dead || respawnT > 0 || matchOver || inLobby) && $('rl').style.display !== 'none') $('rl').style.display = 'none'; // reload ring only while playing
+  const sitOut = net.coop && (!net.alive || P.downed || P.waiting); // co-op: joining, down or waiting, so the gun isn't updating
+  if ((dead || respawnT > 0 || matchOver || inLobby || sitOut) && $('rl').style.display !== 'none') $('rl').style.display = 'none'; // reload ring only while playing
   else if (mode === 'zombies' && dead && !matchOver && (deadT += dt) >= DEAD_T) zombiesOver(); // zombie waves game over
-  soundTick(dt, live && respawnT <= 0); // nothing keeps whirring while you're down
+  soundTick(dt, live && respawnT <= 0 && !sitOut); // nothing keeps whirring while you're down
   // smooth ledge climbing
   const lagged = zombies.filter(z => z.g.position.lag), realY = lagged.map(z => z.g.position.y);
   for (const z of lagged) z.g.position.y -= z.g.position.lag;

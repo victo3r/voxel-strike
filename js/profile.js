@@ -8,8 +8,8 @@ const lvBoosts = lv => 1 + Math.floor(lv / 10);
 const DEV_ALL = /[?&]all=1\b/.test(location.search) && /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
 const PROF_KEY = DEV_ALL ? 'voxelstrike-profile-dev' : 'voxelstrike-profile';
 // saved profile (v = save format version)
-let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, suits: {}, suitUse: {}, armorOn: '', boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '' };
-try { const s = JSON.parse(localStorage.getItem(PROF_KEY)); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, suits: { ...s.suits }, suitUse: { ...s.suitUse }, boots: { ...s.boots }, bootUse: { ...s.bootUse }, hats: { ...s.hats }, hatUse: { ...s.hatUse } }; } catch {}
+let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, suits: {}, suitUse: {}, armorOn: '', boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '', skins: {}, hatSkin: {} };
+try { const s = JSON.parse(localStorage.getItem(PROF_KEY)); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, suits: { ...s.suits }, suitUse: { ...s.suitUse }, boots: { ...s.boots }, bootUse: { ...s.bootUse }, hats: { ...s.hats }, hatUse: { ...s.hatUse }, skins: { ...s.skins }, hatSkin: { ...s.hatSkin } }; } catch {}
 let onSave = () => {}; // cloud.js uploads changes when signed in
 const saveProf = () => { try { localStorage.setItem(PROF_KEY, JSON.stringify(prof)); } catch {} onSave(); };
 // tops the dev profile up, so anything new shows up owned
@@ -21,6 +21,7 @@ function devAll() {
   for (const S of SUITS) prof.suits[S.id] ||= 1;
   for (const b of BOOTS) prof.boots[b.id] ||= 1;
   for (const h of HATS) prof.hats[h.id] ||= 1;
+  for (const S of HAT_SKINS) prof.skins[S.id] ||= 1;
   prof.secrets = Object.keys(SECRETS);
   saveProf(); showProf(); renderChests();
 }

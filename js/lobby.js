@@ -188,7 +188,7 @@ function heroGun(i) {
   const parts = makeGun(i, g, Math.max(0, gunUse(i) - 1));
   g.scale.setScalar(GUN_S);
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
-  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rs: { rk: -1 } });
+  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rounds: parts.rounds, bn: 0, rs: { rk: -1 } });
   hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   const kind = holdOf(BASE[i]);
@@ -218,15 +218,15 @@ function heroTrigger(down) {
 }
 function heroReload() {
   const w = hf.st; if (!heroCan() || !w || w.melee || w.pool || hf.rl > 0) return;
-  heroFireStop(); hf.rl = w.reload;
+  heroFireStop(); hf.rl = w.reload; hf.bn = 0;
   sfx('r_' + w.id, { v: .7 * hv(), rate: BASE[hf.i].reload / w.reload });
 }
 const _hm = new THREE.Vector3(), _hd = new THREE.Vector3(), _hq = new THREE.Quaternion();
 function heroShot() {
   const w = hf.st;
   if (hf.rl > 0 || hf.cd > 0) return;
-  if (!w.inf && hf.ammo <= 0) { if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
-  hf.cd = w.rate; if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
+  if (!w.inf && hf.ammo <= 0) { hf.bn = 0; if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
+  hf.cd = burstCd(w, hf); if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
   hf.kick = w.beam ? 0 : w.flame ? .06 : 1; // a beam can't kick: its far end would jump
   if (w.melee) {
     sfx(w.swing || 'swing', { v: .7 * hv() });
@@ -243,16 +243,17 @@ function heroShot() {
     return;
   }
   if (w.beam) {
-    if (w.frost) frostHeld = .12; else beamHeld = .12;
+    if (w.frost) frostHeld = .12; else if (w.chain) stormHeld = .12; else beamHeld = .12;
+    if ((w.shock || w.chain) && Math.random() < .25) sfx('zap', { v: .4 * hv() });
+    if (w.chain) { const L = w.range; arc('hero', _hm, _hm.clone().addScaledVector(_hd, L), .1, lobbyScene, (a, b) => { hf.flashM.getWorldPosition(a); hf.g.getWorldQuaternion(_hq); b.set(0, 0, -1).applyQuaternion(_hq).multiplyScalar(L).add(a); }); return; }
     hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.frost ? FX_MATS.frost : w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
-    if (w.shock && Math.random() < .25) sfx('zap', { v: .4 * hv() });
     hf.beamOn = .08; return;
   }
   sfx(w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
   muzzleBits(w, hf.flashM, lobbyScene, .8);
   if (hf.spin) hf.spinV = 30;
   if (w.lance) { showLance(_hm.clone(), { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, w.lance, .6, lobbyScene, hf.flashM, (gi => () => hf.i === gi)(hf.i)); return; }
-  if (w.wand) { hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
+  if (w.wand || w.bolt) { if (w.wand) hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand || w.bolt, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
@@ -262,7 +263,7 @@ function heroShot() {
   }
 }
 function heroTick(dt) {
-  lanceTick(dt);
+  lanceTick(dt); arcTick(dt);
   for (let k = heroFx.length - 1; k >= 0; k--) {
     const f = heroFx[k]; f.life -= dt; f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt);
     if (f.life <= 0) { lobbyScene.remove(f.m); heroFx.splice(k, 1); }
@@ -270,14 +271,15 @@ function heroTick(dt) {
   if (hf.i < 0) return;
   const w = hf.st;
   const can = heroCan();
-  if (!heroLive()) heroFireStop();
+  if (!heroLive()) { heroFireStop(); hf.bn = 0; }
   hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1)); hf.flash -= dt;
-  if (can && hf.held && (autoFire(w) || hf.pend)) { hf.pend = false; heroShot(); }
+  if (can && (hf.held && (autoFire(w) || hf.pend) || hf.bn > 0)) { hf.pend = false; heroShot(); }
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
   if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload();
   hf.flashM.visible = hf.flash > 0;
   if (hf.spin) { hf.spin.rotation.z += hf.spinV * dt; hf.spinV = Math.max(0, hf.spinV - dt * 25); }
   if (hf.round) hf.round.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .4);
+  if (hf.rounds) roundsShow(hf.rounds, hf.ammo, hf.rl > 0 ? 1 - hf.rl / w.reload : -1);
   if (w.flare && hf.mag) hf.mag.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .6);
   hf.wt = (hf.wt || 0) - dt;
   if (w.wand) hf.wf = Math.max(0, Math.min(1, hf.wf + dt * (hf.held && can || hf.wt > 0 ? 14 : -4)));
@@ -362,7 +364,7 @@ function dressHero() {
 let heroArmorN = 0;
 function heroArmor(n) { if (heroCh && n !== heroArmorN) { dressArmor(heroCh, heroArmorN = n); } }
 let heroBootsB = null;
-const bootKey = b => b ? b.id + b.st : '';
+const bootKey = b => b ? b.id + b.st + (b.skin || '') : '';
 function heroBoots(b) { if (heroCh && bootKey(b) !== bootKey(heroBootsB)) dressBoots(heroCh, heroBootsB = b); }
 let heroHatH = null;
 function heroHat(h) { if (heroCh && bootKey(h) !== bootKey(heroHatH)) dressHat(heroCh, heroHatH = h); }

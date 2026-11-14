@@ -45,7 +45,7 @@ function coopPhase(w, ph) {
   if (ph === 1 && (was !== 1 || w !== wasW)) { countShown = 0; waveStartFx(); missionWave(wave); }
   if (ph === 2 && was !== 2) coopCleared();
   if (ph === 0 && was === 2) coopShopShut();
-  if (ph === 3 && was !== 3) { dead = true; deadT = 0; if (shopOpen) { shopOpen = false; showShop(false); } }
+  if (ph === 3 && was !== 3) { dead = true; deadT = 0; coopForget(); if (shopOpen) { shopOpen = false; showShop(false); } }
 }
 // wave cleared: everyone back up, paid, and off to the shop
 function coopCleared() {
@@ -53,9 +53,9 @@ function coopCleared() {
   if (P.waiting) P.waiting = false;
   if (P.downed) coopGetUp(0);
   if (!net.alive) return;
-  wavePay(); openShop();
-  if (!locked) { showShop(true); $('menu').style.display = 'none'; }
+  wavePay(); coopShop();
 }
+function coopShop() { openShop(); if (!locked) { showShop(true); $('menu').style.display = 'none'; } }
 function coopShopShut() { // the next wave's coming, shopping or not
   if (!shopOpen) return;
   shopOpen = false; showShop(false); rerollPads();
@@ -137,9 +137,42 @@ function coopHeader(h) {
 function coopJoined() {
   if (zJoined || !net.alive || !zSynced && !net.host) return;
   zJoined = true;
+  const back = !net.host && coopBack();
   if (zph === 1 && wave && net.mates().some(m => m.here && !m.wait)) P.waiting = true;
-  if (zph === 2) coopReadyUp(); // nothing to buy yet
+  if (zph === 2) { if (back) coopShop(); else coopReadyUp(); } // nothing to buy yet, unless you're back with your coins
 }
+// your side of the run, kept in this tab: a reload or going back and forward brings it back if the run's still on
+const Z_KEEP = 'voxelstrike-coop';
+let zKeepT = 0;
+function coopKeep() {
+  if (!net.coop || !zJoined || dead || !wave) return;
+  const id = i => BASE[i]?.id;
+  const s = { room: net.room, w: wave, t: Date.now(), coins, bonus, shopWave, armorBought, perk: { ...perk }, runCoins, runXp, kills, bossKills,
+    hp: P.downed ? Math.ceil(P.max / 2) : Math.ceil(P.hp), max: P.max, armor: Math.ceil(P.armor), maxArmor: P.maxArmor,
+    guns: WEAPONS.map((w, i) => owned[i] && [id(i), lvl[i], ammo[i], w.inf ? -1 : reserve[i]]).filter(Boolean), slots: slotGun.map(id), cur: id(cur) };
+  try { sessionStorage.setItem(Z_KEEP, JSON.stringify(s)); } catch {}
+}
+function coopForget() { try { sessionStorage.removeItem(Z_KEEP); } catch {} }
+function coopBack() {
+  let s = null; try { s = JSON.parse(sessionStorage.getItem(Z_KEEP)); } catch {}
+  coopForget();
+  if (!s || s.room !== net.room || !(s.w <= wave) || !(Date.now() - s.t < 600e3)) return false; // another run, or too long ago
+  coins = s.coins | 0; bonus = s.bonus | 0; shopWave = s.shopWave | 0; armorBought = s.armorBought | 0;
+  for (const k in perk) perk[k] = Math.min(PERK_MAX, s.perk?.[k] | 0);
+  runCoins = s.runCoins | 0; runXp = s.runXp | 0; kills = s.kills | 0; bossKills = s.bossKills | 0;
+  P.max = Math.max(P.max, s.max | 0); P.hp = Math.min(P.max, Math.max(1, s.hp | 0));
+  P.maxArmor = Math.min(ARMOR_CAP, Math.max(P.maxArmor, s.maxArmor | 0)); P.armor = Math.min(P.maxArmor, Math.max(0, s.armor | 0));
+  for (const [gid, l, a, r] of Array.isArray(s.guns) ? s.guns : []) {
+    const g = gi(gid); if (g === undefined) continue;
+    owned[g] = true; lvl[g] = Math.max(0, Math.min(2, l | 0)); applyLvl(g); ammo[g] = Math.min(WEAPONS[g].mag, Math.max(0, a | 0));
+    if (r >= 0 && !WEAPONS[g].inf) reserve[g] = Math.min(resMax(g), r | 0);
+  }
+  if (Array.isArray(s.slots)) s.slots.forEach((gid, k) => { const g = gi(gid); if (g !== undefined && owned[g] && k < slotGun.length) slotGun[k] = g; });
+  const c = gi(s.cur); cur = c !== undefined && owned[c] ? c : slotGun.find(g => g >= 0) ?? cur;
+  cancelReload(); buildGun(); renderHotbar();
+  return true;
+}
+addEventListener('pagehide', coopKeep);
 function zRow(r, st) {
   const id = r[0]; if (zGone.has(id)) return;
   let z = zMap.get(id);
@@ -272,7 +305,7 @@ function coopSpots() {
 }
 function coopDowned() {
   if (P.downed) return;
-  P.downed = true; P.hp = 0; P.burn = 0; reviveT = 0; cancelReload();
+  P.downed = true; P.hp = 0; P.burn = 0; reviveT = 0; cancelReload(); gunSpinV = 0; // the barrels stop
 }
 // a teammate standing over you for REVIVE_T gets you up
 function reviveTick(dt) {
@@ -305,6 +338,7 @@ function reviveHelp(dt) {
 function coopTick(dt) {
   net.coopTick(dt);
   if (!zJoined && (zSynced || net.host)) coopJoined();
+  if ((zKeepT -= dt) <= 0) { zKeepT = 1; coopKeep(); }
   coopWaves(dt);
   reviveHelp(dt);
   if (shopOpen && zph === 2) {

@@ -68,15 +68,15 @@ const STREAKS = {
 };
 // match rewards by map size: [xp, coins] per place
 const REWARDS = {
-  small:  [[30, 5], [15, 2]],
-  medium: [[40, 8], [30, 5], [30, 5], [15, 2]],
-  large:  [[40, 8], [30, 5], [30, 5], [15, 2]],
+  small:  [[30, 8], [15, 3]],
+  medium: [[40, 12], [30, 8], [30, 8], [15, 3]],
+  large:  [[40, 12], [30, 8], [30, 8], [15, 3]],
 };
 // blitz is shorter, so it pays about half
 const BLITZ_REWARDS = {
-  small:  [[15, 3], [8, 1]],
-  medium: [[20, 4], [15, 3], [15, 3], [8, 1]],
-  large:  [[20, 4], [15, 3], [15, 3], [8, 1]],
+  small:  [[15, 5], [8, 2]],
+  medium: [[20, 6], [15, 5], [15, 5], [8, 2]],
+  large:  [[20, 6], [15, 5], [15, 5], [8, 2]],
 };
 const rewardTable = () => (mode === 'blitz' || mode === 'blitzTeam' ? BLITZ_REWARDS : REWARDS)[MAP.size];
 const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t.length) - 1]; };
@@ -86,7 +86,7 @@ const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res
 const botGun = c => pickRare(BASE.filter(w => w.cat === c && (w.unlock || 0) <= botTop())).id;
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
-  voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
+  voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], hornet: [8, 18], salvo: [9, 18], apex: [18, 36], tracker: [6, 16], tempest: [6, 16], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
   rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
@@ -113,6 +113,11 @@ const GUN_FIT = {
   heatray: d => d < 3 ? .5 : d < 25 ? .85 : .2,
   ar: d => d < 3 ? .6 : d < 20 ? .9 : .55,
   thrasher: d => d < 3 ? .6 : d < 24 ? .92 : .65,
+  hornet: d => d < 3 ? .6 : d < 26 ? .93 : .7,
+  salvo: d => d < 5 ? 0 : d < 22 ? .82 : .45,
+  apex: d => d > 20 ? 1.2 : d > 14 ? .7 : d > 8 ? .3 : .1,
+  tracker: d => d < 20 ? .6 : .45,
+  tempest: d => d < 3 ? .55 : d < 21 ? .93 : .2,
   eradicator: d => d < 16 ? .95 : .5,
   sniper: d => d > 20 ? 1.1 : d > 14 ? .6 : d > 8 ? .25 : .1,
   semisniper: d => d > 18 ? 1.05 : d > 12 ? .7 : d > 7 ? .35 : .15,
@@ -279,14 +284,14 @@ const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag } = makeGun(b.gun, gunM, b.rec.stars[b.gun]);
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag, rounds } = makeGun(b.gun, gunM, b.rec.stars[b.gun]);
   // the hold pose from hold.js
   const h = holdFor(b.gun);
   gunM.position.set(h.T[0] * u, (h.T[1] - 22) * u, h.T[2] * u); gunM.quaternion.fromArray(h.q);
   b.armR.quaternion.setFromUnitVectors(ARM_DOWN, _hv.fromArray(h.dR));
   b.armL.quaternion.setFromUnitVectors(ARM_DOWN, h.dL ? _hv.fromArray(h.dL) : _hv.set(.08, -.95, .3).normalize());
   b.holdTurn = h.turn; // sideways stance so the gun points where it aims
-  b.round = round;
+  b.round = round; b.rounds = rounds; b.bn = 0;
   b.flashM ??= makeFlash(.1); b.flashM.material = flashOf(BASE[b.gun]);
   b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
@@ -314,6 +319,7 @@ function holdReload(b, left, total) {
   const id = BASE[b.gun].id, k = left > 0 && total > 0 ? Math.max(0, 1 - left / total) : -1, ra = k >= 0 ? reloadPose(id, k) : null;
   reloadSwap(R, id, k, b.mag, scene);
   if (BASE[b.gun].flare && b.mag) b.mag.visible = b.ammo > 0 || k > .4;
+  if (b.rounds) roundsShow(b.rounds, b.ammo, k);
   if (!ra) {
     if (R.on) { R.on = false; g.position.copy(R.p); g.quaternion.copy(R.q); b.armR.quaternion.copy(R.qR); b.armL.quaternion.copy(R.qL); if (b.mag) b.mag.position.copy(R.magAt); }
     return;
@@ -371,7 +377,7 @@ function makeBot(rec, spot) {
   const yaw = spot?.yaw ?? Math.atan2(-x, -z);
   g.rotation.y = yaw;
   const mags = {}; for (const i of rec.load) mags[i] = rec.W[i].mag; // full ammo on respawn
-  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, wings: ch.wings, zap: ch.zap, rec, pid: rec.pid, remote: !!rec.remote,
+  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, wings: ch.wings, zap: ch.zap, hatFx: ch.hat?.fx, rec, pid: rec.pid, remote: !!rec.remote,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, armor: arm ? arm.hp : 0, maxArmor: arm ? arm.hp : 0, dr: arm ? arm.dr : 0, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, fireEnd: 'flameEnd', leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
@@ -461,7 +467,7 @@ function killerCard(rec, gun) {
     const gear = [
       T && item(armorPic(n - 1), armorTitle(T), T, starRow(T.suit ? T.st : n)),
       B && item(bootPic(B.id, rec.boots.st), B.name, B, starRow(rec.boots.st)),
-      H && item(hatPic(H.id, rec.hat.st), H.name, H, starRow(rec.hat.st)),
+      H && item(hatPic(H.id, rec.hat.st, rec.hat.skin), H.name, H, starRow(rec.hat.st)),
     ].filter(Boolean);
     const w = BASE[gun], st = (rec.stars?.[gun] | 0) + 1, set = rec.fx?.set && suitOf(rec.fx.set);
     if (!w && !gear.length) return;
@@ -631,10 +637,11 @@ function botFire(b, W, dist) {
   const bolt = W.wand && !W.beam; if (bolt) b.wandT = .15; // a wand flicks forward
   muzzleBits(W, b.flashM);
   // beams in long sweeps, everything else in short bursts
-  if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
+  if (W.burst) { b.cd = burstCd(W, b); if (!b.bn) b.cd += Math.random() * .3; } // whole bursts, a little apart
+  else if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto: about as fast as a person clicks
   if (W.scope) b.aimT = 0;
-  if (W.beam) { if (!(b.fireOn > 0)) sfx(W.frost ? 'frostStart' : 'heatStart', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = W.frost ? 'frostEnd' : 'heatEnd'; }
+  if (W.beam) { if (!(b.fireOn > 0)) sfx(beamSnd(W) + 'Start', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = beamSnd(W) + 'End'; }
   else if (!W.flame) sfx(W.id, { at: b.g.position, far: W.quiet ? 35 : 100 });
   if (b.ammo <= 0) {
     b.reload = rlOf(W, b.rec.fx); if (!W.pool) sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
@@ -668,18 +675,21 @@ function botFire(b, W, dist) {
     const bot = others.length ? losRay.intersectObjects(others, false)[0] : null, botD = bot ? bot.distance : Infinity;
     const onYou = youUp && losRay.ray.intersectBox(pBox, hitV), youD = onYou ? eye.distanceTo(hitV) : Infinity;
     const near = Math.min(wallD, botD, youD);
-    if (W.beam) showBeam(b, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)), beamKind(W));
-    if (bolt) wandBolt(W.wand, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, 90)));
+    if (W.beam) { b.flashM.getWorldPosition(beamFrom); beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)); if (W.chain) arc(b, beamFrom, beamTo, .1); else showBeam(b, beamFrom, beamTo, beamKind(W)); }
+    if (bolt || W.bolt) wandBolt(W.wand || W.bolt, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, 90)));
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45, was = respawnT;
       hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? headMul(W) : 1))), false, b, head, W.beam ? 2 : 0);
       if (slows(W)) shockHit(P, W);
+      if (W.track && !net.pvp) youTracked(W.track); // online the server's hit says so
+      if (W.chain) chainJumps(YOU_T, W, b, b.rec.stars[b.gun] | 0);
       if (bolt) { wandHit(W, P, eye, b); if (W.soul && !net.on && was <= 0 && respawnT > 0) soulHeal(b, P.pos.clone().setY(P.pos.y + 1), W.soul); }
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
       if (!zz.dead) {
         hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W);
+        if (W.chain) chainJumps(zz, W, b, b.rec.stars[b.gun] | 0);
         if (bolt) { wandHit(W, zz, eye, b); if (W.soul && !net.on && zz.dead) soulHeal(b, zz.g.position.clone().setY(zz.g.position.y + 1), W.soul); }
       }
     } else if (!bolt) burst(wall.point, 0x999999, 2);

@@ -12,10 +12,8 @@ const ICE_MATS = [0x9fe8ff, 0xe8fbff, 0x5fb8ff].map(c => bitMat(c, SHARD_TEX)), 
 const WAND_BITS = { ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0] };
 function wandBits(k, at, sc, n, spread, size = 1) {
   const [mats, , , , life, sz, g] = WAND_BITS[k];
-  for (let i = 0; i < n; i++) {
-    const s = new THREE.Sprite(mats[Math.random() * mats.length | 0]); s.position.copy(at); s.scale.setScalar(sz * size * (.7 + Math.random() * .6)); sc.add(s);
-    starBits.push({ s, sc, v: new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread), life: life * (.8 + Math.random() * .4), k: s.scale.x, g });
-  }
+  for (let i = fxN(n); i > 0; i--)
+    fxBit(mats[Math.random() * mats.length | 0], sc, at, sz * size * (.7 + Math.random() * .6), new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread), life * (.8 + Math.random() * .4), g);
 }
 
 // bolts: just for show, the hit already happened (the Ancient Wand's spell goes off when it lands)
@@ -24,6 +22,7 @@ const WAND_BOLT = {
   wind: { spd: 90, glow: 0xbfe8ff, core: 0xffffff, size: .3, bits: 'wind', gap: .5 },
   soul: { spd: 260, glow: 0x3fe8c0, core: 0xe0fff6, size: .2, bits: 'soul', gap: .6 },
   stun: { spd: 50, glow: 0xffd23a, core: 0xffffff, size: .3, bits: 'spark', gap: .25 },
+  dart: { spd: 150, glow: 0xffb21a, core: 0xfff4c0, size: .13, bits: 'spark', gap: 1.6 }, // the Tracker
   spell0: { spd: 160, glow: 0xff4a2a, core: 0xffd070, size: .34, bits: 'ember', gap: .4 },
   spell1: { spd: 160, glow: 0x6fc8ff, core: 0xf0fcff, size: .34, bits: 'ice', gap: .4 },
   spell2: { spd: 160, glow: 0xd8f6ff, core: 0xffffff, size: .34, bits: 'wind', gap: .4 },
@@ -132,9 +131,9 @@ function soulHeal(by, from, n) {
 function soulFly(from, to) { // wisps from the body to whoever took the soul
   const at = to ?? camera.position;
   for (let i = 0; i < 8; i++) {
-    const s = new THREE.Sprite(SOUL_MATS[i % 3]); s.position.copy(from).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(.5)); s.scale.setScalar(.12); scene.add(s);
-    const life = .45 + Math.random() * .15, v = at.clone().sub(s.position).multiplyScalar(1.7 / life).add(new THREE.Vector3(Math.random() - .5, Math.random(), Math.random() - .5).multiplyScalar(1.5));
-    starBits.push({ s, sc: scene, v, life, k: .12 });
+    const p = from.clone().add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(.5));
+    const life = .45 + Math.random() * .15, v = at.clone().sub(p).multiplyScalar(1.7 / life).add(new THREE.Vector3(Math.random() - .5, Math.random(), Math.random() - .5).multiplyScalar(1.5));
+    fxBit(SOUL_MATS[i % 3], scene, p, .12, v, life);
   }
 }
 

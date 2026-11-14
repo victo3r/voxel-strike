@@ -95,7 +95,7 @@ function renderCard() {
   const s = cardWeek ? c.week : c.all, z = c.zombies?.[cardWeek ? 'week' : 'all'], zc = c.coop?.[cardWeek ? 'week' : 'all'], pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
   const fi = BASE.findIndex(w => w.id === c.fav), g = c.gear || {};
   const gear = [
-    g.hat && HATS.find(h => h.id === g.hat.id) ? `<img class="ai" title="${HATS.find(h => h.id === g.hat.id).name}" src="${hatPic(g.hat.id, g.hat.st)}">` : '',
+    g.hat && HATS.find(h => h.id === g.hat.id) ? `<img class="ai" title="${HATS.find(h => h.id === g.hat.id).name}" src="${hatPic(g.hat.id, g.hat.st, g.hat.skin)}">` : '',
     g.armor > 0 && armorOf(g.armor) ? `<img class="ai" title="${armorTitle(armorOf(g.armor))}" src="${armorPic(g.armor - 1)}">` : '',
     g.boots && BOOTS.find(b => b.id === g.boots.id) ? `<img class="ai" title="${BOOTS.find(b => b.id === g.boots.id).name}" src="${bootPic(g.boots.id, g.boots.st)}">` : '',
   ].join('');
