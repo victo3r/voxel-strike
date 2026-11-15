@@ -1,0 +1,186 @@
+// the mythics: the Wisp Caller's wisps, the Void Lantern's orbs and the Aurora Rail's charge
+const _my = new THREE.Vector3(), _my2 = new THREE.Vector3(), _myFoes = [];
+// everyone a shot of by's can hurt (by = null: yours)
+function foesOf(by) {
+  const out = _myFoes; out.length = 0;
+  if (by && respawnT <= 0 && !dead && !P.downed && !friendly(by, YOU_T)) out.push(YOU_T);
+  for (const z of zombies) if (z !== by && !z.dead && z.g.visible && !friendly(by, z)) out.push(z);
+  return out;
+}
+// the first thing along the ray that isn't on by's team
+const firstHit = (by, rc) => rc.intersectObjects(targetsFor(by, rc), false).find(h => { const z = h.object.userData.zombie; return !z || !friendly(by, z); });
+
+// ---- the Wisp Caller: each wisp turns toward the nearest enemy in front of it
+const WISP_SPD = 24, WISP_TURN = 3.5, WISP_SEEK = 20, WISP_CONE = .8, WISP_LIFE = 1.8; // speed, turn rate, how far and how wide (cos) it looks, how long it flies
+const wisps = [], WISP_SPR = [bitMat(0x5fe8d8, PUFF_TEX), bitMat(0xeafffb, PUFF_TEX)];
+function fireWisp(w, from = null, dir = null, by = null, opts = {}) {
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
+  const ms = WISP_SPR.map((m, j) => { const s = new THREE.Sprite(m); s.scale.setScalar(j ? .13 : .34); scene.add(s); return s; });
+  const o = { ms, p: from.clone().addScaledVector(dir, .6), v: dir.clone().multiplyScalar(WISP_SPD), life: WISP_LIFE, dmg: w.dmg, by, ghost: !!opts.ghost, id, g: w.id, tgt: null, look: 0, trail: 0, t: Math.random() * 6, gone: 0 };
+  wisps.push(o); wispDraw(o);
+}
+function wispSeek(o) {
+  _my2.copy(o.v).normalize();
+  let best = null, bs = WISP_CONE;
+  for (const t of foesOf(o.by)) {
+    const d = chestOf(t, _my).distanceTo(o.p); if (d > WISP_SEEK || d < .3) continue;
+    const s = _my.sub(o.p).divideScalar(d).dot(_my2);
+    if (s > bs && clearLine(o.p, chestOf(t, _my))) { bs = s; best = t; }
+  }
+  return best;
+}
+const wispDraw = o => { for (const m of o.ms) m.position.set(o.p.x, o.p.y + Math.sin(o.t * 17) * .05, o.p.z); };
+function wispPop(p) { wandBits('wisp', p, scene, 10, 3); sfx('wispHit', { at: p, far: 40 }); }
+function updateWisps(dt) {
+  for (let i = wisps.length - 1; i >= 0; i--) {
+    const o = wisps[i];
+    if (o.gone) { if ((o.gone -= dt) <= 0) wisps.splice(i, 1); continue; } // someone else's, gone here: waiting for where the server says it went
+    o.life -= dt; o.t += dt;
+    if (o.tgt && (o.tgt === YOU_T ? respawnT > 0 || dead : o.tgt.dead)) o.tgt = null;
+    if ((o.look -= dt) <= 0) { o.look = .1; o.tgt = wispSeek(o); }
+    if (o.tgt) { // turn toward it
+      const c = chestOf(o.tgt, _my).sub(o.p).normalize(), f = _my2.copy(o.v).normalize(), a = f.angleTo(c);
+      if (a > 1e-3) o.v.copy(f.lerp(c, Math.min(1, WISP_TURN * dt / a)).normalize()).multiplyScalar(WISP_SPD);
+    }
+    const step = WISP_SPD * dt;
+    ray2.set(o.p, _my2.copy(o.v).normalize()); ray2.far = step;
+    let hit = firstHit(o.by, ray2);
+    const onYou = !o.ghost && o.by && !friendly(o.by, YOU_T) && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    if (onYou) hit = null;
+    if (hit || onYou || o.life <= 0) {
+      for (const m of o.ms) scene.remove(m);
+      if (o.ghost) { o.gone = .6; continue; }
+      wisps.splice(i, 1);
+      const p = onYou ? youHitP.clone() : hit ? hit.point.clone() : o.p.clone();
+      net.boom(o.id, p, o.by); wispPop(p);
+      if (onYou) { const head = p.y > P.pos.y + 1.45; hurtPlayer(Math.round(o.dmg * (head ? HEAD_MUL : 1)), false, o.by, head, 5, o.id); }
+      const zz = hit?.object.userData.zombie;
+      if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, o.dmg * (head ? HEAD_MUL : 1), hit.point, head, false, o.by, 5, o.id); }
+      continue;
+    }
+    o.p.addScaledVector(o.v, dt); wispDraw(o);
+    if ((o.trail -= dt) <= 0) { o.trail = .03; wandBits('wisp', o.p, scene, 1, .4, .8); }
+  }
+}
+
+// ---- the Void Lantern: a slow orb that opens a void where it lands. The void pulls in whoever was near when it opened, then bursts
+const VOID_SPD = 20, VOID_LIFE = 2, VOID_T = 1.2, VOID_R = 3.5, VOID_PULL_R = 6, VOID_PULL = 6; // orb speed and flight time, how long it pulls, burst radius, pull reach and speed
+const orbs = [], voids = [], orbGeo = new THREE.BoxGeometry(.24, .24, .24), ORB_MAT = new THREE.MeshBasicMaterial({ color: 0x1c0b30 }), ORB_GLOW = bitMat(0x9a5aff, PUFF_TEX), VOID_IN = bitMat(0xc89aff, PUFF_TEX);
+const VOID_HALO = new THREE.SpriteMaterial({ map: PUFF_TEX, color: 0x5a24a8, depthWrite: false, fog: false, opacity: .9 }); // dark, not glowing: it's a hole
+function fireVoid(w, from = null, dir = null, by = null, opts = {}) {
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
+  const m = new THREE.Group(), glow = new THREE.Sprite(ORB_GLOW); glow.scale.setScalar(.75); m.add(new THREE.Mesh(orbGeo, ORB_MAT), glow);
+  m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
+  orbs.push({ m, dir: dir.clone(), life: VOID_LIFE, dmg: w.dmg, by, ghost: !!opts.ghost, id, g: w.id, trail: 0, wait: 0 });
+}
+function updateOrbs(dt) {
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i];
+    if (o.wait) { if ((o.wait -= dt) <= 0) { scene.remove(o.m); orbs.splice(i, 1); } continue; } // someone else's, landed here: waiting for the server
+    o.life -= dt;
+    const step = VOID_SPD * dt;
+    ray2.set(o.m.position, o.dir); ray2.far = step;
+    const hit = firstHit(o.by, ray2);
+    const onYou = !o.ghost && o.by && !friendly(o.by, YOU_T) && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    if (hit || onYou || o.life <= 0) {
+      const p = (onYou ? youHitP.clone() : hit ? hit.point.clone() : o.m.position.clone()).addScaledVector(o.dir, hit && !hit.object.userData.zombie ? -.35 : 0); // not inside the wall
+      if (o.ghost) { o.m.position.copy(p); o.wait = .6; continue; }
+      scene.remove(o.m); orbs.splice(i, 1);
+      net.boom(o.id, p, o.by);
+      openVoid(p, o.by, o.dmg, o.g, o.id, false);
+      continue;
+    }
+    o.m.position.addScaledVector(o.dir, step); o.m.children[0].rotation.x += dt * 7; o.m.children[0].rotation.y += dt * 5;
+    if ((o.trail -= dt) <= 0) { o.trail = .04; wandBits('void', o.m.position, scene, 1, .3, .9); }
+  }
+}
+// who a void of by's pulls: only the bodies this game moves (other players' own games pull them)
+function pullable(by, p) {
+  const out = [], near = c => c.distanceTo(p) < VOID_PULL_R;
+  if (by && respawnT <= 0 && !dead && !P.downed && !friendly(by, YOU_T) && near(chestOf(YOU_T, _my))) out.push(YOU_T);
+  for (const z of zombies) if (z !== by && !z.dead && !z.remote && !z.mirror && !friendly(by, z) && near(chestOf(z, _my))) out.push(z);
+  return out;
+}
+function openVoid(p, by, dmg, g, id, ghost) {
+  const fx = new THREE.Group(), core = new THREE.Mesh(orbGeo, ORB_MAT), halo = new THREE.Sprite(VOID_HALO);
+  fx.add(core, halo); fx.position.copy(p); scene.add(fx);
+  voids.push({ p: p.clone(), by, dmg, g, id, ghost, t: VOID_T, caught: ghost && !by ? [] : pullable(by, p), fx, core, halo, bits: 0, snd: sfx('voidOpen', { at: p, far: 70 }) });
+}
+function pullBody(o, pos, r, c, dt) {
+  const fx = fxOf(o); if (fx?.steady) return; // Ironclad stands its ground
+  const dx = c.x - pos.x, dz = c.z - pos.z, d = Math.hypot(dx, dz);
+  if (d < .5 || d > VOID_PULL_R + 1.5) return;
+  const s = Math.min(d - .4, VOID_PULL * (1 - .5 * Math.min(1, d / VOID_PULL_R)) * (1 - (fx?.heavy || 0)) / (o.scale || 1) * dt);
+  walkTo(pos, pos.x + dx / d * s, pos.z, r, false); walkTo(pos, pos.x, pos.z + dz / d * s, r, false);
+}
+function voidPop(p) {
+  burst(p, 0xb46bff, 22); burst(p, 0xffffff, 8); wandBits('void', p, scene, 18, 7, 1.4); sfx('voidPop', { at: p, far: 110 });
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xb46bff, transparent: true, opacity: .7 }));
+  m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R: VOID_R });
+}
+function updateVoids(dt) {
+  for (let i = voids.length - 1; i >= 0; i--) {
+    const v = voids[i]; v.t -= dt;
+    for (const o of v.caught) {
+      if (o === YOU_T) { if (respawnT <= 0 && !dead && !P.downed) pullBody(P, P.pos, .35, v.p, dt); }
+      else if (!o.dead) pullBody(o, o.g.position, o.r, v.p, dt);
+    }
+    const k = 1 - v.t / VOID_T, now = performance.now() / 1000; // it swells as it pulls
+    v.core.scale.setScalar(2 + k * 2.5); v.core.rotation.x = now * 3; v.core.rotation.y = now * 4.4;
+    v.halo.scale.setScalar(1.6 + k * 1.6 + Math.sin(now * 30) * .1);
+    for (v.bits += dt * fxN(40); v.bits >= 1; v.bits--) { // bits drawn in from all round
+      const a = Math.random() * 6.283, y = (Math.random() - .5) * 2.4, r = VOID_PULL_R * (.6 + Math.random() * .4);
+      _my.set(v.p.x + Math.cos(a) * r, v.p.y + y, v.p.z + Math.sin(a) * r);
+      fxBit(VOID_IN, scene, _my, .12, v.p.clone().sub(_my).multiplyScalar(4), .45, 0); // fast enough to get there through the drag
+    }
+    if (v.t > 0) continue;
+    voids.splice(i, 1); scene.remove(v.fx); stopSfx(v.snd);
+    voidPop(v.p);
+    if (!v.ghost) blast(v.p, VOID_R, v.dmg, v.by ? v.dmg : 0, null, v.by, v.g, v.id); // the server says what someone else's did
+  }
+}
+// someone else's wisp or orb, where the server says it went (g: its gun)
+function mythBoom(id, p, g, by) {
+  const wi = wisps.findIndex(o => o.ghost && o.id === id), oi = orbs.findIndex(o => o.ghost && o.id === id);
+  if (wi >= 0) { const o = wisps[wi]; for (const m of o.ms) scene.remove(m); wisps.splice(wi, 1); wispPop(p); return true; }
+  if (oi >= 0) { const o = orbs[oi]; scene.remove(o.m); orbs.splice(oi, 1); openVoid(p, o.by, 0, o.g, id, true); return true; }
+  if (BASE[gi(g)]?.wisp) { wispPop(p); return true; }
+  if (BASE[gi(g)]?.vortex) { openVoid(p, by, 0, g, id, true); return true; }
+  return false;
+}
+function clearMyths() {
+  for (const o of wisps) for (const m of o.ms) scene.remove(m);
+  for (const o of orbs) scene.remove(o.m);
+  for (const v of voids) { scene.remove(v.fx); stopSfx(v.snd); }
+  wisps.length = orbs.length = voids.length = 0; chargeEnd();
+}
+function mythTick(dt) { updateWisps(dt); updateOrbs(dt); updateVoids(dt); }
+
+// ---- the Aurora Rail: hold to charge (its coils light up one by one), let go to fire. A tap does CHARGE_MIN of the damage, only a full charge goes through
+const CHARGE_MIN = .3;
+const chargeMul = (w, k) => w.charge ? CHARGE_MIN + (1 - CHARGE_MIN) * Math.min(1, k) : 1;
+let chargeSnd = null, chargeFull = false, shotCharge = 1; // shotCharge: how charged the shot being claimed was
+function chargeEnd() { chargeT = 0; chargeFull = false; stopSfx(chargeSnd); chargeSnd = null; }
+function chargeTick(dt, w) {
+  const can = cd <= 0 && reloading <= 0 && respawnT <= 0 && !dead && !P.downed && ammo[cur] > 0 && gunShown === cur;
+  if (can && held('shoot')) {
+    if (!chargeT) chargeSnd = sfx('chargeUp');
+    chargeT = Math.min(w.charge, chargeT + dt);
+    if (chargeT >= w.charge && !chargeFull) { chargeFull = true; sfx('chargeReady'); }
+  } else if (chargeT > 0) {
+    const k = chargeT / w.charge; chargeEnd();
+    if (can) shoot(k);
+  }
+  if (gunShown === cur) chargeShow(gunCharges, chargeT / w.charge);
+}
+// the beam: thin and teal for a tap, a full charge is a wide band of every color
+function auroraBeam(from, L, k, s, tip, held, sc = scene) { // s: how thick
+  const full = k >= 1;
+  if (!full) { showLance(from, L, 0x3dffd6, (.45 + .4 * k) * s, sc, tip, held); return; }
+  showLance(from, L, 0xa07bff, 2.2 * s, sc, tip, held);
+  showLance(from, { ...L, walls: [], stop: false }, 0x4dff9a, 1.2 * s, sc, tip, held);
+  for (const q of L.walls) wandBits('aurora', q, sc, 8, 3);
+  if (L.stop) wandBits('aurora', L.end, sc, 10, 3.5);
+}

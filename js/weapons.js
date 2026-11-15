@@ -42,6 +42,11 @@ const BASE = [
   { id: 'apex', rar: 'legend', hold: 'rifle', name: 'Apex Predator', cat: 'sniper', unlock: 32, price: 1215, mob: 58, zoom: 6, scope: true, dmg: 135, rate: .9, mag: 6, reload: 1.9, pellets: 1, spread: 0, auto: false, color: 0xe8edf3, len: .95 },
   { id: 'tracker', rar: 'epic', hold: 'pistol', name: 'Tracker', cat: 'backup', unlock: 10, price: 290, mob: 70, quiet: true, bolt: 'dart', track: 4, dmg: 30, rate: .28, mag: 10, reload: 1.4, pellets: 1, spread: 0, auto: false, color: 0xffc21a, len: .35 },
   { id: 'tempest', rar: 'legend', hold: 'rifle', name: 'Tempest Coil', cat: 'special', unlock: 27, price: 1025, mob: 60, beam: true, chain: [3.5, 4, 4.5], dmg: 10, rate: 1 / 15, range: 24, mag: 120, reload: 2.4, pellets: 1, spread: 0, auto: true, color: 0x8a6bff, len: .7 },
+  // mythics
+  { id: 'wisp', rar: 'mythic', hold: 'pistol', name: 'Wisp Caller', cat: 'backup', unlock: 35, price: 1750, mob: 70, wisp: true, dmg: 36, rate: .3, mag: 12, reload: 1.5, pellets: 1, spread: 0, auto: false, color: 0x5fe8d8, len: .45 },
+  { id: 'voidlantern', rar: 'mythic', hold: 'lantern', name: 'Void Lantern', cat: 'special', unlock: 38, price: 1900, mob: 60, vortex: true, launch: .5, dmg: 130, rate: 1.4, mag: 3, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x5a2f9a, len: .7 },
+  { id: 'crystal', rar: 'mythic', hold: 'rifle', name: 'Crystal Companion', cat: 'primary', unlock: 45, price: 2250, chest: true, drop: .2, mob: 70, zoom: 3, reticle: '255,150,225', tracer: 0xa8f4ff, grow: { top: 45, dmg: 14, mag: 30 }, dmg: 21, rate: .09, mag: 40, reload: 1.5, pellets: 1, spread: .004, auto: true, color: 0x4fd0ea, len: .6 },
+  { id: 'aurora', rar: 'mythic', hold: 'rifle', name: 'Aurora Rail', cat: 'sniper', unlock: 42, price: 2100, mob: 55, zoom: 7, scope: true, charge: 1, lance: 0x4dffc4, heavyKick: true, dmg: 150, rate: .4, mag: 5, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x1c2848, len: .95 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -57,13 +62,16 @@ const lvl = BASE.map(() => 0); // 0 = ★, 1 = ★★, 2 = ★★★
 const WEAPONS = BASE.map(w => ({ ...w }));
 const STAR_DPS = b => b.rate < .15 ? .1 : b.rate < .5 ? .12 : .15, STAR_MAG = .2, STAR_RELOAD = .1, STAR_FAST = .15;
 const magAt = (b, L) => b.mag === 1 || b.tubes ? b.mag : Math.round(b.mag * (1 + STAR_MAG * L)); // a rocket per tube, whatever the stars
-// a gun's stats at a star level
-const statsAt = (i, L) => {
-  const b = BASE[i], k = 1 + STAR_DPS(b) * L, fast = b.fast ?? b.rate < STAR_FAST; // fast: stars add fire rate (the Flame Wand opts in)
+// a gun that grows with its owner (the Crystal Companion): from grow's numbers at level 1 to its own at level grow.top
+const grown = (b, lv) => { const t = Math.min(1, Math.max(0, ((lv || 1) - 1) / (b.grow.top - 1))), o = { ...b }; for (const k in b.grow) if (k !== 'top') o[k] = Math.round(b.grow[k] + (b[k] - b.grow[k]) * t); return o; };
+// a gun's stats at a star level (lv: its owner's level, yours if not given)
+const statsAt = (i, L, lv) => {
+  const b = BASE[i].grow ? grown(BASE[i], lv ?? prof.lv) : BASE[i], k = 1 + STAR_DPS(b) * L, fast = b.fast ?? b.rate < STAR_FAST; // fast: stars add fire rate (the Flame Wand opts in)
   return { ...b, dmg: fast ? b.dmg : Math.max(b.dmg + L, Math.round(b.dmg * k)), rate: fast ? +(b.rate / k).toFixed(4) : b.rate, mag: magAt(b, L), reload: +(b.reload * (1 - STAR_RELOAD * L)).toFixed(2) };
 };
 function applyLvl(i) { const s = statsAt(i, lvl[i]); Object.assign(WEAPONS[i], { dmg: s.dmg, rate: s.rate, mag: s.mag, reload: s.reload }); }
 const upgradable = i => !BASE[i].start;
+const GROW_MAX = 5, growStage = (i, lv = prof.lv) => BASE[i].grow ? Math.min(GROW_MAX, Math.floor(Math.min(lv || 1, BASE[i].grow.top) / 9)) : 0; // how many crystals a growing gun has (0-5)
 const stars = i => upgradable(i) ? starRow(lvl[i] + 1, lvl[i] + 1, 3) : '';
 let cur = gi('voxel'), cd = 0, reloading = 0, reloadFull = 1, kick = 0, aiming = false, adsT = 0, wandOn = 0, wandK = 0;
 // camera recoil per gun
@@ -76,6 +84,7 @@ const RECOIL = {
   heatray: { up: .05, side: .06, back: 2 }, shockbeam: { up: .06, side: .08, back: 2 }, frostwand: { up: .05, side: .06, back: 2 }, flame: { up: .04, side: .07, back: 2 },
   windwand: { up: 1.2, side: .3, back: .9 }, flamewand: { up: .5, side: .22, back: 1.1 }, soulwand: { up: 1.6, side: .2, back: .4 }, ancientwand: { up: 2.2, side: .3, back: .55 },
   hornet: { up: .62, side: .2, back: 1 }, salvo: { up: 2.3, side: .35, back: .55 }, apex: { up: 2.1, side: .22, back: .3 }, tracker: { up: 1.3, side: .25, back: 1 }, tempest: { up: .06, side: .1, back: 2 },
+  crystal: { up: .5, side: .2, back: 1 }, wisp: { up: .9, side: .2, back: 1 }, voidlantern: { up: 1, side: .25, back: .8 }, aurora: { up: 2.3, side: .2, back: .3 },
 };
 // big single-shot energy guns kick higher and take longer to settle: every lance gun, or heavyKick on a gun
 const HEAVY = { lift: 1.45, settle: .55 }, heavyKick = w => w.heavyKick ?? !!w.lance;
@@ -156,6 +165,28 @@ const FLASH_FX = {
     if (r < 1.5) return '#fffbea'; if (dx + dy <= 4) return '#ffe08a';
     if (Math.min(dx, dy) < 1 && r < 7.5) return r < 5 ? '#ffd060' : '#c89a30'; if (Math.abs(dx - dy) < 1 && r < 4.5) return '#ffeaa8';
   }, .5, 1.2), light: 0xffe2a0, t: .09, bits: 'rune' },
+  wisp: { spr: flashSpr((dx, dy) => { // a soft teal puff with four little petals
+    const r = Math.hypot(dx, dy);
+    if (r < 1.5) return '#ffffff'; if (r < 2.8) return '#c8fff6'; if (r < 3.9) return '#5fe8d8';
+    if (Math.abs(dx - dy) < 1.5 && r < 6.5) return r < 5 ? '#9ff6ea' : '#3fc8b8';
+  }, 1.2, 1), light: 0x7ff0e0, t: .07, bits: 'wisp' },
+  voidlantern: { spr: flashSpr((dx, dy) => { // a violet ring round a dark middle
+    const r = Math.hypot(dx, dy);
+    if (r < 1.1) return '#f6ecff'; if (r > 2.8 && r < 4.6) return r < 3.7 ? '#e0c0ff' : '#a060ff';
+    if (Math.min(dx, dy) < 1 && r > 4.6 && r < 7.2) return '#7a3ad8';
+  }, .6, 1.2), light: 0x9a5aff, t: .09, bits: 'void' },
+  crystal: { spr: flashSpr((dx, dy) => { // a cut crystal: a white heart, rose facets, aqua points
+    const m = Math.max(dx, dy), d = dx + dy;
+    if (d <= 2.5) return '#ffffff'; if (d <= 5) return dx > dy ? '#ffb4ea' : '#ff7fd4';
+    if (d <= 7.5 && m <= 6) return Math.abs(dx - dy) < 2 ? '#d8fbff' : '#6fe4ff';
+    if (Math.min(dx, dy) < 1 && m < 7.8) return '#a8f4ff';
+  }, .5, 1.05), light: 0xa8f0ff, t: .05, bits: 'crystal' },
+  aurora: { spr: flashSpr((dx, dy) => { // a white core with green, teal, blue and violet rays
+    const r = Math.hypot(dx, dy);
+    if (r < 1.6) return '#ffffff'; if (r < 2.8) return '#d4fff0'; if (r < 3.8) return '#4dffb0';
+    if (Math.min(dx, dy) < 1 && r < 7.6) return r < 5.4 ? '#3dffd6' : '#4ab8ff';
+    if (Math.abs(dx - dy) < 1 && r < 5.6) return '#a07bff';
+  }, 1.4, 1.25), light: 0x6fffc8, t: .1, bits: 'aurora' },
 };
 const flashOf = w => FLASH_FX[w.id]?.spr || FLASH_SPR, flashTime = w => FLASH_FX[w.id]?.t ?? (w.scope ? .1 : .05);
 function makeFlash(size = .1, mat = FLASH_SPR) {
@@ -169,11 +200,23 @@ flashMesh.renderOrder = 5;
 const flashLight = new THREE.PointLight(0xffcc66, 0, 8); flashLight.layers.enableAll();
 let flashT = 0;
 let gunSpin = null, gunSpinV = 0;
-let gunRound = null, gunRounds = null;
+const SPIN_IDLE = { wisp: 1.6, voidlantern: .9, crystal: 1.3 }, spinIdle = i => SPIN_IDLE[BASE[i]?.id] || 0, spinKick = i => spinIdle(i) ? 9 : 30; // magic parts turn on their own with no motor, and only whirl a bit faster when fired
+let gunRound = null, gunRounds = null, gunCharges = null, chargeT = 0; // chargeT: how long the Aurora Rail has been charging
 // guns with a rocket in each tube: each shows while it's loaded, and a reload puts them back one by one (k = reload done, -1 when not reloading)
 const roundsShow = (rs, n, k = -1) => rs.forEach((r, i) => { r.visible = n > i || k >= .232 + .16 * i; });
+function chargeShow(cs, k) { // the Aurora Rail's coils light up one by one as it charges, all four when it's full, and the bar inside glows brighter all the way
+  if (!cs) return;
+  cs.forEach((c, i) => { const on = k >= (i + 1) / cs.length - 1e-3; for (const m of c.children) if (m.material === gunGlow || m.material === gunGlowDim) m.material = on ? gunGlow : gunGlowDim; });
+  if (cs.bar) for (const m of cs.bar.children) m.material.color.setScalar(k >= 1 ? 1.5 : (.3 + .7 * k) ** 2.2);
+}
 let gunHolo = null;
+// barrels spin about the bore; a hovering part (the Crystal Companion's crystal) turns upright and bobs
+function spinTurn(s, v, dt) { if (s.userData.hover === undefined) { s.rotation.z += v * dt; return; } s.rotation.y += v * dt; s.position.y = s.userData.hover + Math.sin(performance.now() * .003) * .01; }
+// the Crystal Companion's crystals: while it fires, a white-hot light runs along them toward the muzzle
+let gunPulse = null;
+function pulseShow(ps, on) { const hot = on ? Math.floor(performance.now() / 45) % ps.length : -1; ps.forEach((c, i) => { for (const m of c.children) if (m.material === gunGlow || m.material === gunGlowHot) m.material = i === hot ? gunGlowHot : gunGlow; }); }
 let gunMag = null, gunArmL = null, gunHand = null; // parts a reload moves
+let gunSwing = null; // the Void Lantern hangs from your fist and swings
 const vmRl = {};
 // switching guns (lighter guns come up faster)
 const drawT = w => Math.min(.4, Math.max(.2, .2 + (80 - (w.mob ?? 60)) * .008)), SWAP_DOWN = .35;
@@ -184,20 +227,21 @@ const POSE_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz', 'ay', 'az'
 const magSwap = (roll, drop, lift = .2) => { const h = { rz: roll, rx: lift, y: .06, x: -.07 }; return [[0, {}], [.14, h], [.3, { ...h, my: -drop * .4, ay: -.15 }], [.42, { ...h, my: -drop, ay: -.42 }], [.56, { ...h, my: -drop * .35, ay: -.18 }], [.7, { ...h, y: .07 }], [.74, { ...h, y: .085 }], [.86, { rx: .05, z: .035 }], [.93, { z: -.01 }], [1, {}]]; };
 // rounds pushed in one at a time
 const dips = (h, n, t0, t1, d = .025) => Array.from({ length: n }, (_, i) => { const t = t0 + (t1 - t0) * i / n, w = (t1 - t0) / n; return [[t + w * .45, { ...h, y: (h.y || 0) - d, ay: -.05 }], [t + w * .9, h]]; }).flat();
-const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], aerial: [.3, .42], rubypierce: [.3, .36], paragon: [.3, .42], flamewand: [.3, .42], windwand: [.3, .42], soulwand: [.3, .42], ancientwand: [.3, .42], hornet: [.3, .42], apex: [.3, .42], tracker: [.3, .36], tempest: [.3, .42] };
+const RELOAD_SWAP = { voxel: [.3, .36], hitman: [.3, .36], ar: [.3, .42], thrasher: [.3, .42], semisniper: [.3, .42], eradicator: [.36, .48], heatray: [.3, .42], flame: [.34, .46], executioner: [.3, .36], shockbeam: [.3, .42], tigerbite: [.3, .42], starsmasher: [.3, .42], aerial: [.3, .42], rubypierce: [.3, .36], paragon: [.3, .42], flamewand: [.3, .42], windwand: [.3, .42], soulwand: [.3, .42], ancientwand: [.3, .42], hornet: [.3, .42], apex: [.3, .42], tracker: [.3, .36], tempest: [.3, .42], wisp: [.3, .36], voidlantern: [.3, .44], aurora: [.3, .42], crystal: [.3, .42] };
 const RELOAD_ANIM = (() => {
   const pistol = roll => { const h = { rx: .45, rz: roll, y: .07, x: -.06 }; return [[0, {}], [.16, h], [.3, { ...h, my: -.26 }], [.31, { ...h, my: -.45 }], [.46, { ...h, my: -.11, hand: 1 }], [.58, { ...h, my: -.09, hand: 1 }], [.66, { ...h, y: .03, hand: 1 }], [.72, { ...h, y: .045, hand: .7 }], [.8, { ...h, y: .02 }], [.86, { rx: .08, z: .04 }], [.93, { z: -.012 }], [1, {}]]; };
   const wandRl = (() => { const h = { rx: .5, y: .05, x: -.05 }; return [[0, {}], [.14, h], [.24, { ...h, hand: 1 }], [.3, { ...h, mz: .12, hand: 1 }], [.5, { ...h, mz: .12, hand: 1 }], [.62, { ...h, hand: 1 }], [.72, { ...h, hand: .6 }], [.86, { rx: .06 }], [1, {}]]; })(); // tip up, a fresh charge into the pommel
   const sg = { rz: -.5, rx: .28, y: -.04 }, bolt = { rz: .3, rx: .1, y: -.03, mz: .09, my: .02 }, box = { rz: -.4, ry: -.22, y: -.05 }, cell = { rx: .38, rz: -.25, y: .02 }, tank = { rz: -.5, rx: .18, y: -.02 };
   return {
     voxel: pistol(-.3), hitman: pistol(-.4), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16), aerial: magSwap(-.4, .36, .2),
-    rubypierce: pistol(-.35), paragon: magSwap(-.35, .38, .16), hornet: magSwap(-.45, .36, .2), apex: magSwap(-.35, .4, .16), tracker: pistol(-.38),
+    rubypierce: pistol(-.35), paragon: magSwap(-.35, .38, .16), hornet: magSwap(-.45, .36, .2), apex: magSwap(-.35, .4, .16), tracker: pistol(-.38), wisp: pistol(-.32), aurora: magSwap(-.38, .4, .16), crystal: magSwap(-.45, .38, .22),
     flamewand: wandRl, windwand: wandRl, soulwand: wandRl, ancientwand: wandRl,
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     trex: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
     eradicator: [[0, {}], [.15, box], [.36, { ...box, my: -.36, ay: -.3 }], [.48, { ...box, my: -.48, ay: -.42 }], [.6, { ...box, my: -.36, ay: -.3 }], [.74, { ...box, y: -.04 }], [.78, { ...box, y: -.015 }], [.9, { y: -.02 }], [1, {}]],
     heatray: [[0, {}], [.14, cell], [.3, { ...cell, my: -.3, ay: -.3 }], [.42, { ...cell, my: -.42, ay: -.42 }], [.54, { ...cell, my: -.3, ay: -.3 }], [.68, cell], [.72, { ...cell, y: .04 }], [.86, { rx: .05, z: .02 }], [.93, { z: -.01 }], [1, {}]],
+    voidlantern: (() => { const h = { rx: -.25, rz: -.3, y: .1, x: -.03 }; return [[0, {}], [.12, h], [.28, { ...h, my: -.06 }], [.34, { ...h, my: -.4 }], [.46, { ...h, my: -.3, hand: 1 }], [.56, { ...h, my: -.02, hand: 1 }], [.6, { ...h, y: .115, hand: 1 }], [.68, { ...h, hand: .6 }], [.8, { rx: .12 }], [.9, { rx: -.05 }], [1, {}]]; })(), // lifted and tipped in toward you, the cell drops out of the floor and a fresh one goes up
     shockbeam: [[0, {}], [.14, cell], [.3, { ...cell, my: -.3, ay: -.3 }], [.42, { ...cell, my: -.42, ay: -.42 }], [.54, { ...cell, my: -.3, ay: -.3 }], [.68, cell], [.72, { ...cell, y: .04 }], [.86, { rx: .05, z: .02 }], [.93, { z: -.01 }], [1, {}]],
     tempest: [[0, {}], [.14, { ...cell, rz: -.32 }], [.3, { ...cell, rz: -.32, my: -.32, ay: -.3 }], [.44, { ...cell, rz: -.32, my: -.46, ay: -.44 }], [.56, { ...cell, rz: -.32, my: -.3, ay: -.3 }], [.7, { ...cell, rz: -.32 }], [.74, { ...cell, rz: -.32, y: .045 }], [.87, { rx: .05, z: .02 }], [.94, { z: -.01 }], [1, {}]],
     flame: [[0, {}], [.14, tank], [.34, { ...tank, my: -.38, ay: -.3 }], [.46, { ...tank, my: -.5, ay: -.42 }], [.58, { ...tank, my: -.38, ay: -.3 }], [.74, tank], [.8, { ...tank, rz: -.58 }], [.9, { rx: .05 }], [1, {}]],
@@ -258,7 +302,7 @@ function partMid(part) {
 const partBounds = part => { const m = partMid(part); return { c: [part.position.x + m.x, part.position.y + m.y, part.position.z + m.z], h: part.userData.half }; };
 
 // voxel models: boxes filled into a pixel grid, edges drawn black
-const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, windwand: .6, stunwand: .6, flamewand: .6, soulwand: .6, ancientwand: .6, grenade: .85, salvo: .75 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
+const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, windwand: .6, stunwand: .6, flamewand: .6, soulwand: .6, ancientwand: .6, grenade: .85, salvo: .75, voidlantern: .9 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
 const gunPal = [null], gunPalI = {};
 function palIdx(col, glow = false) {
   const k = (glow ? 'g' : '') + col;
@@ -845,16 +889,103 @@ const GUN_MODELS = {
     p(6, 4, 6, dark, 0, -5, -14); // front handle
     return { muzzle: [1, -34], grip: [4, 7, 4, 0, -6, -.5], fore: [6, 4, 6, 0, -5, -14], bands: [-6, -10], band: [8, 7, -.5], mag };
   },
+  wisp({ p, mat, dark, glow, sub, at }) {
+    const silv = mat(0xd5e2ea), lsilv = mat(0xf4f9fc), slate = mat(0x2b3944), teal = mat(0x2fb3a4), soft = glow(0x5fe8d8), core = glow(0xeafffb);
+    p(4, 4, 14, silv, 0, 2, -7); p(4, 1, 14, lsilv, 0, 4.5, -7); p(4, 1, 10, soft, 0, 2.5, -8); // slide, its bright top, a glowing teal seam
+    p(2, 1, 3, lsilv, 0, 5.5, -1.5); // a little fin for a rear sight
+    p(2, 2, 2, lsilv, 0, 3, 1); p(4, 4, 1, silv, 0, 3, 2.5); p(2, 2, 1, 0, 0, 3, 2.5); // a mouthpiece at the back, like a horn's
+    p(6, 6, 2, silv, 0, 2, -15); p(8, 8, 2, silv, 0, 2, -17); p(10, 10, 1, teal, 0, 2, -18.5); p(6, 6, 2, 0, 0, 2, -18); // the horn, flaring out to a teal lip, its mouth hollow
+    for (const [w, h, y, m] of [[2, 2, .5, core], [2, 1, 2, core], [1, 1, 3, soft], [1, 1, 4, soft]]) p(w, h, 1, m, 0, y, -16.5); // a little teal flame inside it
+    for (const x of [-1.5, 1.5]) p(1, 2, 1, soft, x, 1, -16.5);
+    p(4, 2, 13, slate, 0, -1, -6.5); // frame
+    p(1, 1, 4, dark, 0, -4.5, -7); p(1, 2, 1, dark, 0, -3, -9.5); p(1, 2, 1, mat(0x8a96a0), 0, -3, -6.5); // trigger guard and trigger
+    p(4, 3, 4, slate, 0, -3.5, -3); p(4, 3, 4, slate, 0, -6.5, -2); p(2, 3, 1, 0, 0, -4, -1.5); // grip, with a window in its back
+    const spin = sub(0, 2, -12), sp = at(spin); // three wisps circling the barrel, each trailing a little light
+    for (let k = 0; k < 3; k++) {
+      const a = Math.PI / 2 + k * Math.PI * 2 / 3;
+      sp(2, 2, 2, core, Math.round(6 * Math.cos(a)), Math.round(6 * Math.sin(a)), 0);
+      for (const t of [.3, .5]) sp(1, 1, 1, soft, Math.floor(6 * Math.cos(a - t)) + .5, Math.floor(6 * Math.sin(a - t)) + .5, .5);
+    }
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 1, 4, dark, 0, -8.5, -2); mg(2, 6, 2, soft, 0, -5, -2); // a wisp jar up the grip
+    return { muzzle: [2, -19], grip: [4, 7, 5, 0, -5.5, -2.5], fore: null, bands: [-3, -5.5], band: [6, 6, 2], spin, mag };
+  },
+  voidlantern({ p, mat, glow, sub, at }) { // a lantern on a bail handle: the handle's bar is at the origin, the lantern hangs under it
+    const iron = mat(0x3d3556), liron = mat(0x7566a6), diron = mat(0x1c1826), vio = glow(0xb46bff), pale = glow(0xe8d2ff), heart = glow(0x13091f);
+    p(18, 2, 2, diron, 0, -1, 0); for (const x of [-8, 8]) p(2, 10, 2, diron, x, -7, 0); // the handle: a bar across the top, down both sides to the roof
+    p(6, 4, 4, liron, 0, -1, 0); // its grip
+    p(4, 2, 4, diron, 0, -7, 0); p(10, 3, 10, liron, 0, -9.5, 0); p(16, 2, 16, iron, 0, -12, 0); // cap, roof and eaves
+    for (const x of [-6, 6]) for (const z of [-6, 6]) p(4, 12, 4, iron, x, -19, z); // corner posts
+    p(10, 1, 10, vio, 0, -13.5, 0); p(10, 1, 10, vio, 0, -24.5, 0); // its violet light under the roof and on the floor
+    p(16, 2, 16, iron, 0, -26, 0); // floor
+    const spin = sub(0, -19, 0), sp = at(spin); // the void inside, turning faster when it fires
+    sp(6, 6, 6, heart, 0, 0, 0);
+    for (const [x, y, z] of [[0, 4, 1.5], [3.5, -2, -1.5], [-3.5, -2, .5]]) sp(2, 2, 2, vio, x, y, z);
+    sp(1, 1, 1, pale, 0, 3.5, -3); sp(1, 1, 1, pale, -3, 1, 3);
+    const mag = sub(0, 0, 0), mg = at(mag); mg(10, 1, 10, diron, 0, -27.5, 0); mg(6, 1, 6, vio, 0, -28.5, 0); // the violet cell under the floor
+    return { muzzle: [-19, -9], grip: [18, 2, 2, 0, -1, 0], fore: null, bands: [7, -7], band: [16, 2, -12], spin, mag };
+  },
+  crystal({ p, mat, dark, glow, sub, at, grow }) { // a rifle cut from crystal; more of it grows as its owner levels up (grow 0-5)
+    const cry = mat(0x46c6e6), lcry = mat(0xa4ecff), dcry = mat(0x1d86b0), rosy = mat(0xf070c8), rose = glow(0xff7fd4), pale = glow(0xfff2fc);
+    p(4, 6, 4, dcry, 0, 0, 2); p(4, 5, 3, cry, 0, -.5, 5.5); p(4, 4, 2, lcry, 0, -1, 8); p(4, 6, 1, dcry, 0, -1, 9.5); // stock: three facets narrowing back, and the butt
+    p(6, 6, 16, cry, 0, 0, -8); p(4, 1, 16, lcry, 0, 3.5, -8); // receiver and its pale top
+    p(6, 1, 6, lcry, 0, 2.5, -3); p(6, 1, 3, lcry, 0, 1.5, -1.5); p(6, 1, 6, dcry, 0, -2.5, -13); p(6, 1, 3, dcry, 0, -1.5, -14.5); // a light facet and a deep one
+    p(6, 1, 11, rose, 0, -.5, -7.5); p(6, 1, 1, pale, 0, 2.5, -9.5); // a rose vein along each side, and a glint
+    p(6, 1, 4, dark, 0, 4.5, -10); for (const x of [-2.5, 2.5]) p(1, 4, 2, dark, x, 7, -10); p(6, 1, 2, dark, 0, 9.5, -10); // ring sight
+    p(1, 1, 1, rose, .5, 5.5, -8.5); // its emitter
+    p(6, 6, 10, dcry, 0, 0, -21); p(4, 1, 10, cry, 0, 3.5, -21); for (const z of [-18.5, -21.5, -24.5]) p(6, 2, 1, rose, 0, 0, z); // handguard with glowing slits
+    p(4, 4, 8, lcry, 0, 1, -30); p(6, 6, 2, cry, 0, 1, -33); p(2, 2, 3, pale, 0, 1, -35.5); // barrel, a collar, and the bright point it fires from
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 8, 5, rosy, 0, -7, -10.5); mg(4, 1, 5, pale, 0, -5.5, -10.5); // a rose crystal for a magazine
+    p(4, 4, 4, dcry, 0, -5, -2); p(4, 3, 4, dcry, 0, -8.5, -1); // pistol grip
+    p(1, 1, 4, dark, 0, -6.5, -6); p(1, 2, 1, mat(0xc8f6ff), 0, -4, -5.5); // guard and trigger
+    const g = grow | 0, big = g > 2, spin = sub(0, 9 + big, -19), sp = at(spin); // its companion: a little crystal that hovers over the handguard and turns
+    sp(2, 6 + 2 * big, 2, pale, 0, 0, 0); sp(4, 2 + 2 * big, 4, rose, 0, 0, 0); if (big) sp(4, 2, 4, glow(0xe0489f), 0, 0, 0);
+    // crystals growing out of it. A shard is four columns of light, deep to pale, the tallest one tipped white: [corner x, base y, corner z, height at each stage, colour]
+    const AQUA = [0x2fb4e0, 0x6fe0ff, 0xb8f8ff], ROSE = [0xe0489f, 0xff7fd4, 0xffb8ea];
+    const shard = (r, x, y, z, h, [deep, mid, light]) => {
+      for (const [dx, dz, hh, c] of [[0, 0, h - 2, deep], [1, 0, h - 1, mid], [0, 1, h - 1, mid], [1, 1, h, light]]) if (hh > 0) r(1, hh, 1, glow(c), x + dx + .5, y + hh / 2, z + dz + .5);
+      r(1, 1, 1, pale, x + 1.5, y + h - .5, z + 1.5);
+    };
+    const pulse = [];
+    const cluster = list => { const c = sub(0, 0, 0), r = at(c); let any = false; for (const [x, y, z, hs, col] of list) if (hs[g]) { shard(r, x, y, z, hs[g], col); any = true; } if (any) pulse.push(c); };
+    cluster([[-1, 2, 5, [3, 4, 4, 5, 5, 6], AQUA], [0, 3, 2, [0, 0, 3, 4, 4, 5], ROSE], [-2, 1, 7, [0, 0, 0, 0, 3, 3], ROSE]]); // on the stock (short: they're right by your eye)
+    cluster([[-1, 4, -5, [0, 3, 4, 5, 6, 7], ROSE], [0, 4, -3, [0, 0, 3, 3, 4, 5], AQUA], [-2, 4, -7, [0, 0, 0, 3, 4, 5], AQUA]]); // behind the sight
+    cluster([[-1, 3, -29, [0, 0, 4, 5, 7, 8], AQUA], [0, 3, -31, [0, 0, 0, 3, 5, 6], ROSE], [-2, 3, -31, [0, 0, 0, 0, 3, 4], ROSE]]); // on the barrel
+    cluster([[-1, 4, -34, [0, 0, 0, 3, 5, 6], ROSE], [1, 4, -34, [0, 0, 0, 0, 3, 4], AQUA], [-3, 4, -34, [0, 0, 0, 0, 0, 4], AQUA]]); // round the muzzle
+    return { muzzle: [1, -38], grip: [4, 7, 5, 0, -6.5, -1.5], fore: [6, 6, 10, 0, 0, -21], bands: [-14, -17], band: [8, 8, 0], holo: [7, -10], spin, hover: true, pulse, mag };
+  },
+  aurora({ p, mat, dark, glow, sub, at }) {
+    const navy = mat(0x1a2442), lnavy = mat(0x2e3f6a), silv = mat(0xc9d3e2), tip = glow(0xeafff6), lens = glow(0x9fffd6);
+    p(4, 3, 12, navy, 0, 1.5, 6); p(4, 2, 11, navy, 0, -6, 5.5); p(4, 10, 2, lnavy, 0, -2, 12); // an open stock: top bar, bottom bar, butt
+    p(6, 6, 16, navy, 0, 0, -8); p(4, 1, 16, silv, 0, 3.5, -8); // receiver and its silver top
+    p(4, 4, 16, navy, 0, 7, -9); p(6, 6, 2, lnavy, 0, 7, -1); p(6, 6, 2, lnavy, 0, 7, -17); // scope tube and bells
+    p(4, 4, 1, lens, 0, 7, -16.5); p(4, 4, 1, 0, 0, 7, -17.5); // pale green lens, set back in its bell
+    p(4, 4, 1, mat(0x24467a), 0, 7, -1.5); p(4, 4, 1, 0, 0, 7, -.5); p(1, 1, 1, mat(0xd8fff0), -1.5, 8.5, -1.5); // eyepiece glass and its glint
+    p(2, 2, 2, dark, 0, 4, -5); p(2, 2, 2, dark, 0, 4, -13); // scope mounts
+    p(4, 3, 32, silv, 0, 4.5, -32); p(4, 3, 32, silv, 0, -2.5, -32); // twin rails
+    const bar = sub(0, 1, -32), br = at(bar); // the light between them, brighter the more it's charged
+    for (const [c, len, z] of [[0x4dff9a, 10, 11], [0x3dffd6, 8, 2], [0x4ab8ff, 8, -6], [0xa07bff, 6, -13]]) br(2, 2, len, glow(c), 0, 0, z);
+    p(4, 4, 2, lnavy, 0, 1, -17); p(4, 4, 2, lnavy, 0, 1, -46); p(2, 2, 1, tip, 0, 1, -48.5); // braces between the rails, a hot tip
+    p(6, 4, 10, navy, 0, -5, -22); // handguard
+    const charges = [0x4dff9a, 0x3dffd6, 0x4ab8ff, 0xa07bff].map((c, i) => { // coils of aurora light that brighten as it charges
+      const s = sub(0, 0, 0), r = at(s), m = glow(c), z = -30 - i * 4;
+      r(8, 2, 2, m, 0, 7, z); r(8, 2, 2, m, 0, -5, z); for (const x of [-3, 3]) r(2, 10, 2, m, x, 1, z);
+      return s;
+    });
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 7, 5, navy, 0, -6.5, -11); mg(4, 1, 5, glow(0x3dffd6), 0, -8, -11); // box mag with a glowing band
+    p(4, 5, 4, navy, 0, -5.5, -2); p(4, 3, 4, navy, 0, -9.5, -1); // pistol grip
+    p(1, 1, 5, dark, 0, -6.5, -5.5); p(1, 2, 1, mat(0xaaaaaa), 0, -4, -4.5); // guard and trigger
+    return { muzzle: [1, -49], grip: [4, 8, 5, 0, -7, -1.5], fore: [6, 4, 10, 0, -5, -22], bands: [-6, -12], band: [8, 8, 0], charges, bar, mag };
+  },
 };
 // shared gun geometry (never dispose meshes marked shared)
 const gunGeoCache = {};
 // a little glow so the shady side still shows its color
-const gunLit = new THREE.MeshLambertMaterial({ vertexColors: true }), gunGlow = new THREE.MeshBasicMaterial({ vertexColors: true });
+const gunLit = new THREE.MeshLambertMaterial({ vertexColors: true }), gunGlow = new THREE.MeshBasicMaterial({ vertexColors: true }), gunGlowDim = new THREE.MeshBasicMaterial({ vertexColors: true, color: 0x4a4a4a }), gunGlowHot = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.6, 2.6, 2.6) });
 gunLit.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * .45;'); };
 const gunPx = i => GPX * (GUN_SCALE[BASE[i].id] || 1);
-function gunPieces(i, stars) {
+function gunPieces(i, stars, grow = BASE[i].grow ? GROW_MAX : 0) { // grow: full grown unless told (the hold pose and the arms fit that)
   const main = [], subs = [];
-  const c = { mat: col => palIdx(col), dark: palIdx(GUN_DARK), glow: col => palIdx(col, true) };
+  const c = { mat: col => palIdx(col), dark: palIdx(GUN_DARK), glow: col => palIdx(col, true), grow };
   c.p = (...a) => main.push(a);
   // a part that moves on its own (barrels, mag, rocket)
   c.sub = (x, y, z, off = [0, 0, 0]) => { const s = { at: [x, y, z], off, list: [] }; subs.push(s); return s; };
@@ -863,28 +994,31 @@ function gunPieces(i, stars) {
   for (let s = 0; s < stars; s++) c.p(bw, bh, 2, gold, 0, by, m.bands[s]); // one gold band per upgrade
   return { m, main, subs };
 }
-function gunGeos(i, stars) {
-  const { m, main } = gunPieces(i, stars), px = gunPx(i);
+function gunGeos(i, stars, grow) {
+  const { m, main } = gunPieces(i, stars, grow), px = gunPx(i);
   const part = s => {
     if (!s) return null;
     const geos = voxelGeos(s.list, px);
     for (const g of [geos.lit, geos.glow]) if (g) { g.translate(-s.off[0] * px, -s.off[1] * px, -s.off[2] * px); g.computeBoundingSphere(); }
     return { at: s.at.map((v, k) => v + s.off[k]), geos };
   };
-  return { m, main: voxelGeos(main, px), spin: part(m.spin), round: part(m.round), mag: part(m.mag), rounds: m.rounds?.map(part) };
+  return { m, main: voxelGeos(main, px), spin: part(m.spin), round: part(m.round), mag: part(m.mag), rounds: m.rounds?.map(part), charges: m.charges?.map(part), bar: part(m.bar), pulse: m.pulse?.map(part) };
 }
 // gun pictures (hotbar, armory, chests): muzzle turned away a little, seen from above
 const gunPicAt = (i, yaw = .4, tilt = .36, w = 320, h = 160) => modelPic(null, g => makeGun(i, g, 0), { yaw: yaw - Math.PI / 2, tilt, w, h });
-const gunPic = i => modelPic('gun:' + i, g => makeGun(i, g, 0), { yaw: .4 - Math.PI / 2, tilt: .36 });
+const gunPic = i => modelPic('gun:' + i + (BASE[i].grow ? ':' + growStage(i) : ''), g => makeGun(i, g, 0), { yaw: .4 - Math.PI / 2, tilt: .36 }); // a growing gun as grown as yours
 const gunBox = (b, px) => b && { c: [b[3] * px, b[4] * px, b[5] * px], h: [b[0] / 2 * px, b[1] / 2 * px, b[2] / 2 * px] };
-function makeGun(i, g, stars) {
-  const b = gunGeoCache[BASE[i].id + ':' + stars] ??= gunGeos(i, stars), px = gunPx(i);
+function makeGun(i, g, stars, grow = growStage(i)) {
+  const b = gunGeoCache[BASE[i].id + ':' + stars + ':' + grow] ??= gunGeos(i, stars, grow), px = gunPx(i);
   const add = (parent, geos) => {
     for (const [geo, mat] of [[geos.lit, gunLit], [geos.glow, gunGlow]]) if (geo) { const m = new THREE.Mesh(geo, mat); m.userData.shared = true; parent.add(m); }
   };
   add(g, b.main);
   const sub = s => { if (!s) return null; const grp = new THREE.Group(); grp.position.set(...s.at.map(n => n * px)); add(grp, s.geos); g.add(grp); return grp; };
-  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin: sub(b.spin), round: sub(b.round), mag: sub(b.mag), rounds: b.rounds?.map(sub), holo: b.m.holo && b.m.holo.map(n => n * px) };
+  const charges = b.charges?.map(sub), bar = sub(b.bar);
+  if (charges && bar) { for (const m of bar.children) m.material = gunGlow.clone(); charges.bar = bar; } // its own material, so each gun's bar has its own brightness
+  const spin = sub(b.spin); if (spin && b.m.hover) spin.userData.hover = spin.position.y;
+  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin, round: sub(b.round), mag: sub(b.mag), rounds: b.rounds?.map(sub), charges, pulse: b.pulse?.map(sub), holo: b.m.holo && b.m.holo.map(n => n * px) };
 }
 // the gun's outer pixels, for keeping arms out of it
 const gunCellCache = {};
@@ -917,40 +1051,55 @@ const swingAt = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return 
 const ARM_U = .0325, UP_V = new THREE.Vector3(0, 1, 0);
 let armGeos = null;
 const armMats = {};
-function vmArm(left, box, dir, low = 0, at = null) { // at: fist this far out along the arm, instead of just clear of the gun
+function vmArm(left, box, dir, low = 0, at = null, size = 1) { // at: fist this far out along the arm, instead of just clear of the gun; size: [thicker, longer]
   armGeos ??= [partBox(4, 12, 4, 40, 16, ARM_U), partBox(4, 12, 4, 32, 48, ARM_U)];
   const L = prof.look ?? PRESETS[0].look, k = JSON.stringify(L);
   const mat = armMats[k] ??= lam({ map: skinTexture(L) });
   dir.normalize();
   const c = [box.c[0], box.c[1] - low * box.h[1], box.c[2]], t = at ?? fistOut(gunCells(cur), c, dir, 2.2 * ARM_U, .006);
-  const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir);
-  for (let s = 0; s < 3; s++) { // extra length so the arm's end never shows
-    const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; m.userData.shared = true; piv.add(m);
+  const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir); if (size.length) piv.scale.set(size[0], size[1], size[0]);
+  for (let s = 0; s < 3; s++) { // extra length so the arm's end never shows, every other piece turned end for end so a sleeve carries on as sleeve, not as a second hand
+    const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; if (s & 1) m.rotation.x = Math.PI; m.userData.shared = true; piv.add(m);
   }
   vm.add(piv);
   return piv;
+}
+// the Void Lantern in your view: big on the right, your fist on the right end of its handle at the screen's edge, the arm running off the screen
+const LAN = { in: -.04, up: .64, far: .9, grip: .155, dir: [.08, -.81, .58], at: -.05, size: [1.15, 1.15] }, LAN_FOV = Math.tan(75 * Math.PI / 360);
+let gunBody = null;
+function lanternPose(bob = 0, kz = 0) { // vm sits at the middle of its handle
+  const down = Math.tan(fovBase * Math.PI / 360), far = LAN.far * LAN_FOV / down, half = 8 * gunPx(gunShown); // farther out on a narrow view, so it looks the same size
+  vm.position.set((down * camera.aspect - LAN.in) * (far - half) - half, LAN.up - down * far + bob, -far - kz); vm.rotation.set(0, 0, 0); // its near corner by the right edge
 }
 // arm directions per hold
 const X_V = new THREE.Vector3(1, 0, 0), meleeUp = w => w.tilt ? 1.2 : .22, WAND_UP = .3; // how far first person tips a melee weapon (or a wand) up
 const VM_ARMS = {
   pistol: [[.15, -.2, 1, .3]], rifle: [[.2, -.25, 1, .5], [-.35, -.3, 1, .6]], heavy: [[.25, -.25, 1, .4], [-.4, -.3, 1, .3]],
   shoulder: [[.2, -.25, 1, .5], [-.35, -.3, 1, .5]], melee: [[.15, -.15, 1, 0]],
+  lantern: [], // lanternPose aims its arm
 };
 function buildGun() {
   vm.traverse(o => { if (o.geometry && o !== flashMesh && !o.userData.shared) o.geometry.dispose(); });
   vm.clear(); flashMesh.visible = false;
-  const { muzzle: [my, mz], grip, fore, spin, round, mag, rounds, holo } = makeGun(cur, vm, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
-  gunSpin = spin; gunRound = round; gunRounds = rounds; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
+  gunSwing = holdOf(BASE[cur]) === 'lantern' ? new THREE.Group() : null; gunBody = null;
+  if (gunSwing) { gunBody = new THREE.Group(); gunSwing.add(gunBody); vm.add(gunSwing); } // gunSwing swings from your fist, gunBody is the lantern hung from it
+  const body = gunBody || vm, { muzzle: [my, mz], grip, fore, spin, round, mag, rounds, charges, pulse, holo } = makeGun(cur, body, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
+  if (chargeT) chargeEnd(); // put away mid-charge
+  gunSpin = spin; gunRound = round; gunRounds = rounds; gunCharges = charges; chargeShow(charges, 0); gunPulse = pulse; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
   const hand = WEAPONS[cur].tilt ? { ...grip, c: [grip.c[0], grip.c[1], grip.c[2] - 5 * gunPx(cur)] } : grip; // a sword's fist goes up under the guard
   if (WEAPONS[cur].tilt) vmArm(false, hand, new THREE.Vector3(.35, -.3, .9).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])), 0, .04); // a sword stands up: the arm comes in from the bottom right, the handle just in front of the fist
+  else if (gunSwing) { // your fist on the right end of its handle: it swings from there
+    const at = [grip.c[0] + LAN.grip, grip.c[1], grip.c[2]]; gunSwing.position.set(...at); gunBody.position.set(...at).negate();
+    vmArm(false, { c: at, h: [0, 0, 0] }, new THREE.Vector3(...LAN.dir), 0, LAN.at, LAN.size);
+  }
   else vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
   gunArmL = fore && arms[1] ? vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]) : null;
   // one-handed guns: the left hand only shows up to reload
-  gunHand = !gunArmL && mag && !WEAPONS[cur].melee ? vmArm(true, partBounds(mag),new THREE.Vector3(-.3, -1, .45), 1) : null;
+  gunHand = !gunArmL && mag && !WEAPONS[cur].melee ? vmArm(true, partBounds(mag), new THREE.Vector3(-.3, -1, .45), 1) : null;
   if (gunHand) gunHand.visible = false;
   for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone();
   vmRl.rk = -1;
-  flashMesh.position.set(0, my, mz - .015); flashLight.position.copy(flashMesh.position); vm.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
+  flashMesh.position.set(0, my, mz - .015); flashLight.position.copy(flashMesh.position); body.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
   if (WEAPONS[cur].melee) return; // still marks the tip, where the Stun Wand's blast starts
   flashMesh.material = vmFlashMat(flashOf(WEAPONS[cur])); flashLight.color.setHex(FLASH_FX[WEAPONS[cur].id]?.light ?? 0xffcc66);
 }

@@ -148,10 +148,11 @@ function cellMesh(quads, mats) {
 const occ = (x, z, h) => { let n = 0; for (const [a, b] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { const i = x + O + a, j = z + O + b; if (inGrid(i, j) && land(at(i, j)) && H[at(i, j)] > h + .01) n++; } return 1 - .14 * n; };
 const topQuad = (m, x0, z0, y, h = y) => [m, [[x0, y, z0, 0, 1, occ(x0, z0, h)], [x0 + 1, y, z0, 1, 1, occ(x0 + 1, z0, h)], [x0 + 1, y, z0 + 1, 1, 0, occ(x0 + 1, z0 + 1, h)], [x0, y, z0 + 1, 0, 0, occ(x0, z0 + 1, h)]], [0, 1, 0]];
 const lawn = tex(g => { noise(g, [104, 176, 76], 20); for (let i = 0; i < 6; i++) { g.fillStyle = ['rgba(55,105,35,.5)', 'rgba(185,225,125,.5)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 2); } });
-const lipTex = tex(g => {
+const lipOf = (r, gr, b) => tex(g => { // earth with a ragged band of what's on top
   noise(g, [128, 96, 64], 22); g.fillStyle = 'rgba(70,45,25,.4)'; for (let i = 0; i < 6; i++) g.fillRect(Math.random() * 16 | 0, 4 + Math.random() * 12 | 0, 2, 1);
-  for (let x = 0; x < 16; x++) { const d = 2 + (Math.random() * 3 | 0); for (let y = 0; y < d; y++) { g.fillStyle = `rgb(${96 + (x * 7 + y * 5) % 20},${168 + (x * 3) % 20},${70})`; g.fillRect(x, y, 1, 1); } }
+  for (let x = 0; x < 16; x++) { const d = 2 + (Math.random() * 3 | 0); for (let y = 0; y < d; y++) { g.fillStyle = `rgb(${r + (x * 7 + y * 5) % 20},${gr + (x * 3) % 20},${b})`; g.fillRect(x, y, 1, 1); } }
 });
+const lipTex = lipOf(96, 168, 70), pathLip = lipOf(136, 115, 92);
 const dirtTex = tex(g => { noise(g, [122, 92, 62], 22); g.fillStyle = 'rgba(70,45,25,.35)'; for (let i = 0; i < 7; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); });
 const rockTex = tex(g => { noise(g, [118, 116, 124], 18); g.fillStyle = 'rgba(40,40,52,.35)'; for (let i = 0; i < 8; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 3, 1); g.fillStyle = 'rgba(200,200,215,.25)'; for (let i = 0; i < 5; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); });
 const sandTex = tex(g => { noise(g, [176, 138, 96], 16); g.fillStyle = 'rgba(120,80,50,.4)'; for (let y = 2; y < 16; y += 5) g.fillRect(0, y, 16, 1); });
@@ -162,11 +163,11 @@ const stone = surf(lam({ map: stoneTex }), 'stone'), rock = surf(lam({ map: rock
 // island tops, cliffs and banded undersides, in chunks so shots only check nearby ones
 {
   const vc = map => lam({ map, vertexColors: true });
-  const mats = [vc(lawn), vc(lipTex), vc(dirtTex), vc(rockTex), vc(tex(g => noise(g, [120, 140, 150], 12))), vc(pathTex), vc(sandTex), vc(deepTex)];
+  const mats = [vc(lawn), vc(lipTex), vc(dirtTex), vc(rockTex), vc(tex(g => noise(g, [120, 140, 150], 12))), vc(pathTex), vc(sandTex), vc(deepTex), vc(pathLip)];
   const CH = 20;
   const wall = (quads, m, x0, z0, a, b, y0, y1, k = 1) => { // one side of a cell from y0 to y1, facing (a, b)
     if (y1 - y0 < .01) return;
-    const ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0, v0 = m === 1 ? 1 - (y1 - y0) : y0, v1 = m === 1 ? 1 : y1;
+    const lip = m === 1 || m === 8, ex = a > 0 ? x0 + 1 : x0, ez = b > 0 ? z0 + 1 : z0, v0 = lip ? 1 - (y1 - y0) : y0, v1 = lip ? 1 : y1;
     quads.push([m, a ? [[ex, y0, z0, 0, v0, .75 * k], [ex, y0, z0 + 1, 1, v0, .75 * k], [ex, y1, z0 + 1, 1, v1, k], [ex, y1, z0, 0, v1, k]]
       : [[x0, y0, ez, 0, v0, .75 * k], [x0 + 1, y0, ez, 1, v0, .75 * k], [x0 + 1, y1, ez, 1, v1, k], [x0, y1, ez, 0, v1, k]], [a, 0, b]]);
   };
@@ -189,21 +190,21 @@ const stone = surf(lam({ map: stoneTex }), 'stone'), rock = surf(lam({ map: rock
       const h = H[c], u = UNDER[c], base = LIFT[isle[c]], wet = kind[c] === WATER;
       quads.push(topQuad(wet ? 4 : top[c] === 1 ? 5 : top[c] === 2 ? 3 : 0, x0, z0, h));
       quads.push([7, [[x0, u, z0, 0, 0, .5], [x0 + 1, u, z0, 1, 0, .5], [x0 + 1, u, z0 + 1, 1, 1, .5], [x0, u, z0 + 1, 0, 1, .5]], [0, -1, 0]]); // underside
-      const grassy = !wet && top[c] !== 2;
+      const edge = wet ? 4 : [1, 8, 3][top[c]], lipped = edge === 1 || edge === 8; // each top's sides: a lip of grass or path over earth, rock, or the stream bed
       for (const [a, b] of D4) {
         const ni = i + a, nj = j + b, n = inGrid(ni, nj) ? at(ni, nj) : -1;
         if (n < 0 || !land(n)) { // island edge: lip, then the rock layers
           const lipLo = Math.min(h, base) - 1;
-          if (h > base) wall(quads, grassy ? 1 : 3, x0, z0, a, b, Math.max(base, h - 1), h);
+          if (h > base) wall(quads, edge, x0, z0, a, b, Math.max(base, h - 1), h);
           if (h - 1 > base) wall(quads, top[c] ? 3 : 2, x0, z0, a, b, base, h - 1);
-          wall(quads, h > base ? (top[c] === 2 ? 3 : 2) : grassy || wet ? 1 : 3, x0, z0, a, b, lipLo, Math.min(h, base));
+          wall(quads, h > base ? (top[c] === 2 ? 3 : 2) : edge, x0, z0, a, b, lipLo, Math.min(h, base));
           bands(quads, x0, z0, a, b, u, lipLo, base);
           continue;
         }
         const nt = H[n];
         if (nt < h) { // a step or a cliff down to the neighbour
-          if (h - nt <= .5) wall(quads, grassy ? 1 : 3, x0, z0, a, b, nt, h);
-          else { const lip = grassy ? Math.min(.6, h - nt) : 0; if (lip) wall(quads, 1, x0, z0, a, b, h - lip, h); wall(quads, 3, x0, z0, a, b, nt, h - lip, .9); }
+          if (h - nt <= .5) wall(quads, edge, x0, z0, a, b, nt, h);
+          else { const lip = lipped ? Math.min(.6, h - nt) : 0; if (lip) wall(quads, edge, x0, z0, a, b, h - lip, h); wall(quads, 3, x0, z0, a, b, nt, h - lip, .9); }
         }
         if (UNDER[n] > u) bands(quads, x0, z0, a, b, u, Math.min(UNDER[n], h - 1), base); // the underside steps up
       }

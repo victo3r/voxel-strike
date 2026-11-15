@@ -297,8 +297,8 @@ function blastFx(p, R, gust = false) {
 }
 // el: the Ancient Wand's spell (0 fire, 1 ice, 2 wind), which never hurts whoever cast it
 function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -1) {
-  const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', W = BASE[gi(gun)], lk = W?.launch ?? 1, spell = !!W?.spell;
-  if (spell) spellFx(p, el); else blastFx(p, R, !!W?.gust);
+  const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', W = BASE[gi(gun)], lk = W?.launch ?? 1, spell = !!W?.spell, vortex = !!W?.vortex, noSelf = spell || vortex; // a spell or a void never touches whoever made it
+  if (spell) spellFx(p, el); else if (!vortex) blastFx(p, R, !!W?.gust); // a void has its own (voidPop)
   const k = spell ? longOf(by ? by.rec?.fx : youFx(), W) : 1, push = self => !self && spell && el === 2 ? SPELL_GUST : 1;
   const hex = o => { if (el === 0) applyBurn(o, W.burnT * k, W.burn, by, W.id, true, pj); else if (el === 1 && !net.pvp) shockHit(o, FROST, k); }; // online the server sends the ice
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
@@ -306,10 +306,10 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -
     const kind = rocket ? 4 : 6;
     if (pd < R && !dead && respawnT <= 0) {
       if (pDmg) { net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by }); if (spell) hex(P); }
-      if (rocket && !by) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true, lk);
+      if (rocket && !by && !vortex) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true, lk);
     }
     for (const o of zombies) {
-      if (o === skip || o.dead || !o.pid || spell && o === by) continue; // other players and room bots
+      if (o === skip || o.dead || !o.pid || noSelf && o === by) continue; // other players and room bots
       const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
       if (od < R) { net.claim(o, { kind, point: c, gun, pj, by }); if (spell) hex(o); }
     }
@@ -317,15 +317,15 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -
   }
   if (pd < R && !dead && respawnT <= 0 && !P.downed && !P.waiting && !(by && friendly(by, YOU_T))) {
     if (pDmg) { hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by); if (spell) hex(P); }
-    if (rocket && respawnT <= 0 && !dead) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, (1 - pd / R) * push(!by), !by, lk);
+    if (rocket && respawnT <= 0 && !dead && !(vortex && !by)) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, (1 - pd / R) * push(!by), !by, lk);
   }
   for (const o of zombies) {
     if (o === skip || o.dead || o.type === 'bot' && friendly(by, o)) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p), self = o === by;
     if (od >= R) continue;
-    if (!(spell && self)) hurtZombie(o, self ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
+    if (!(noSelf && self)) hurtZombie(o, self ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
     if (spell && !self && !o.dead) hex(o);
-    if (rocket && !o.dead) launch(o, c, p, (1 - od / R) * push(self), self, lk);
+    if (rocket && !o.dead && !(vortex && self)) launch(o, c, p, (1 - od / R) * push(self), self, lk);
   }
 }
 
@@ -373,6 +373,9 @@ const SHOP = [
   { gun: 'apex', price: 440, desc: `${BASE[gi('apex')].dmg} dmg, top of the food chain` },
   { gun: 'tracker', price: 200, desc: 'darts that show them through walls' },
   { gun: 'tempest', price: 460, desc: 'lightning that jumps from one to the next' },
+  { gun: 'wisp', price: 420, desc: 'wisps that find them on their own' },
+  { gun: 'voidlantern', price: 560, desc: 'pulls a whole crowd together, then pops' },
+  { gun: 'aurora', price: 500, desc: 'hold to charge, a full one goes through the lot' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
 // gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often (chest odds)

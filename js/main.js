@@ -138,7 +138,8 @@ function update(dt) {
 
   // keep the real fire rate at any frame rate
   cd -= dt;
-  if (myBurst.bn > 0 || (autoFire(w) || keys['T:shoot']) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun, and a burst finishes
+  if (w.charge) chargeTick(dt, w); // the Aurora Rail fires when you let go
+  else if (myBurst.bn > 0 || (autoFire(w) || keys['T:shoot']) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun, and a burst finishes
     const c0 = cd; shoot(); if (cd === c0) break;
     if (c0 > -dt) cd += c0;
   }
@@ -147,8 +148,9 @@ function update(dt) {
   kick = Math.max(0, kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1)); // gun settles after a shot
   wandOn -= dt; wandK = Math.max(0, Math.min(1, wandK + dt * (wandOn > 0 && gunShown === cur ? 14 : -4)));
   tickCross(dt, BASE[cur]);
-  if (gunSpin) { gunSpin.rotation.z += gunSpinV * dt; gunSpinV = Math.max(0, gunSpinV - dt * 25); } // barrels wind down
+  if (gunSpin) { spinTurn(gunSpin, gunSpinV + spinIdle(gunShown), dt); gunSpinV = Math.max(0, gunSpinV - dt * 25); } // barrels wind down
   if ((flashT -= dt) <= 0) { flashMesh.visible = false; flashLight.intensity = 0; }
+  if (gunPulse) pulseShow(gunPulse, flashT > 0);
   if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / reloadFull < .6); // flare leaves the muzzle when fired
   if (gunRound) { // rocket leaves the tube when fired
     const k = reloading > 0 ? reloading / reloadFull : 0;
@@ -187,6 +189,11 @@ function update(dt) {
   } else if (vhold === 'shoulder') { // on the shoulder
     vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob, -.62 + kick * .1);
     vm.rotation.set(kick * .2, 0, 0);
+  } else if (vhold === 'lantern') { // carried by its handle on the right of your view; it swings back when it's thrust out to fire, and with your steps
+    lanV.x += ((-kick * .45 - lanA.x) * 90 - lanV.x * 7) * dt; lanA.x += lanV.x * dt;
+    lanV.z += ((-mx * .12 - lanA.z) * 60 - lanV.z * 6) * dt; lanA.z += lanV.z * dt;
+    if (gunBody) lanternPose(bob, kick * .09);
+    if (gunSwing) gunSwing.rotation.set(lanA.x, 0, lanA.z + bob * 1.5);
   } else {
     const kk = kick * (heavyKick(vw) ? HEAVY.lift : 1);
     vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob, -.55 + kk * .08);
@@ -210,7 +217,8 @@ function update(dt) {
   if (sw > 0) { const e = sw * sw * (3 - 2 * sw); vm.position.y -= e * .5; vm.rotation.x -= e * .9; }
   // reload ring
   const rl = $('rl');
-  if (reloading > 0) { rl.style.display = 'block'; $('rlFg').style.strokeDashoffset = RL_C * reloading / reloadFull; } else if (rl.style.display !== 'none') rl.style.display = 'none';
+  const chg = w.charge && chargeT > 0 ? chargeT / w.charge : 0; // the Aurora Rail's charge fills the same ring
+  if (reloading > 0 || chg) { rl.style.display = 'block'; rl.classList.toggle('chg', !!chg); rl.classList.toggle('full', chg >= 1); $('rlFg').style.strokeDashoffset = RL_C * (chg ? 1 - chg : reloading / reloadFull); } else if (rl.style.display !== 'none') rl.style.display = 'none';
   }
 
   if (pvp()) { updateDM(dt); if (matchOver) return; }
@@ -404,7 +412,7 @@ function update(dt) {
     if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, r.gust ? 0xe8f7ff : 0x888888, 1); }
   }
 
-  updateFlares(dt); updateGrenades(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt);
+  updateFlares(dt); updateGrenades(dt); mythTick(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;
@@ -433,6 +441,7 @@ function update(dt) {
 // knife swing curve
 const knifeChopFP = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); }; return t < .22 ? .6 * e(t / .22) : t < .5 ? .6 - 1.15 * e((t - .22) / .28) : -.55 * (1 - e((t - .5) / .5)); };
 const KNIFE_PIV = new THREE.Vector3(.04, -.06, .22), knifeRest = new THREE.Euler(), _kp = new THREE.Vector3(), _kq = new THREE.Vector3(); // knife pivot
+const lanA = { x: 0, z: 0 }, lanV = { x: 0, z: 0 }; // the Void Lantern's swing
 const clock = new THREE.Clock();
 // fade the buttons in once the lobby is drawn
 let bootFrames = 0;

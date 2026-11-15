@@ -162,6 +162,7 @@ const lookKey = l => JSON.stringify(Object.keys(l).sort().filter(k => l[k] != nu
 const isPreset = l => PRESETS.some(p => lookKey(p.look) === lookKey(l));
 // your look without a drawn skin (what CrazyGames players see you in)
 const lookBase = () => { const { px, ...b } = prof.look; return b; };
+const lookSent = () => { const L = lookBase(), hide = prof.hide & 7; return hide && Object.keys(L).length < 24 ? { ...L, hide } : L; }; // what others see: hidden pieces ride along
 const ownSecret = id => Array.isArray(prof.secrets) && prof.secrets.includes(id);
 const lookChoices = () => [...PRESETS, ...(prof.myLook && !isPreset(prof.myLook) ? [{ name: 'CUSTOM', look: prof.myLook }] : []),
   ...Object.keys(SECRETS).filter(ownSecret).map(id => ({ name: SECRETS[id].name, look: SECRETS[id].look, secret: id })),
@@ -178,17 +179,18 @@ const SHR = new THREE.Vector3(...SH_R).divideScalar(16), SHL = new THREE.Vector3
 const armTo = (sh, p, out) => out.setFromUnitVectors(DOWN, _av.copy(p).sub(sh).normalize());
 const _av = new THREE.Vector3();
 function heroGun(i) {
-  const key = i < 0 ? '' : i + ':' + gunUse(i);
+  const key = i < 0 ? '' : i + ':' + gunUse(i) + ':' + growStage(i);
   if (key === holdKey) return;
   holdKey = key;
   holdG.clear();
-  heroFireStop();
+  heroFireStop(); stopSfx(hf.chgSnd);
   if (i < 0) { pose = null; hf.i = -1; return; }
   const g = new THREE.Group();
   const parts = makeGun(i, g, Math.max(0, gunUse(i) - 1));
   g.scale.setScalar(GUN_S);
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
-  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rounds: parts.rounds, bn: 0, rs: { rk: -1 } });
+  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rounds: parts.rounds, bn: 0, rs: { rk: -1 }, charges: parts.charges, chg: 0, pulse: parts.pulse });
+  chargeShow(parts.charges, 0);
   hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   const kind = holdOf(BASE[i]);
@@ -214,7 +216,7 @@ function heroTrigger(down) {
   if (!down) { heroFireStop(); return; }
   if (!armOpen || !inLobby || armPage === 'wear') return;
   hf.held = true; hf.pend = true;
-  if (heroCan()) { hf.pend = false; if (!autoFire(hf.st)) heroShot(); }
+  if (heroCan()) { hf.pend = false; if (!autoFire(hf.st) && !hf.st.charge) heroShot(); } // the Aurora Rail fires when it's let go (heroTick)
 }
 function heroReload() {
   const w = hf.st; if (!heroCan() || !w || w.melee || w.pool || hf.rl > 0) return;
@@ -222,7 +224,7 @@ function heroReload() {
   sfx('r_' + w.id, { v: .7 * hv(), rate: BASE[hf.i].reload / w.reload });
 }
 const _hm = new THREE.Vector3(), _hd = new THREE.Vector3(), _hq = new THREE.Quaternion();
-function heroShot() {
+function heroShot(k = 1) {
   const w = hf.st;
   if (hf.rl > 0 || hf.cd > 0) return;
   if (!w.inf && hf.ammo <= 0) { hf.bn = 0; if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
@@ -249,12 +251,17 @@ function heroShot() {
     hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.frost ? FX_MATS.frost : w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
     hf.beamOn = .08; return;
   }
-  sfx(w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
+  sfx(w.charge ? k >= 1 ? 'auroraFull' : 'aurora' : w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
   muzzleBits(w, hf.flashM, lobbyScene, .8);
-  if (hf.spin) hf.spinV = 30;
-  if (w.lance) { showLance(_hm.clone(), { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, w.lance, .6, lobbyScene, hf.flashM, (gi => () => hf.i === gi)(hf.i)); return; }
+  if (hf.spin) hf.spinV = spinKick(hf.i);
+  if (w.lance) {
+    const L = { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, held = (gi => () => hf.i === gi)(hf.i);
+    if (w.charge) auroraBeam(_hm.clone(), L, k, .6, hf.flashM, held, lobbyScene); else showLance(_hm.clone(), L, w.lance, .6, lobbyScene, hf.flashM, held);
+    return;
+  }
+  if (w.wisp || w.vortex) { wandBolt(w.wisp ? 'wisp' : 'voidorb', _hm.clone(), _hm.clone().addScaledVector(_hd, w.wisp ? 18 : 12), lobbyScene, null, .7); return; }
   if (w.wand || w.bolt) { if (w.wand) hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand || w.bolt, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
-  const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
+  const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : w.tracer ? tracerCol(w.tracer) : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
     const len = w.rocket || w.flare || w.grenade ? .6 : 3, m = new THREE.Mesh(fxGeo, mat);
@@ -273,11 +280,17 @@ function heroTick(dt) {
   const can = heroCan();
   if (!heroLive()) { heroFireStop(); hf.bn = 0; }
   hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1)); hf.flash -= dt;
-  if (can && (hf.held && (autoFire(w) || hf.pend) || hf.bn > 0)) { hf.pend = false; heroShot(); }
+  if (w.charge) { // the Aurora Rail charges while it's held and fires when it's let go
+    if (hf.held && can && hf.cd <= 0 && hf.rl <= 0 && hf.ammo > 0) {
+      if (!hf.chg) hf.chgSnd = sfx('chargeUp', { v: .6 * hv() });
+      const was = hf.chg; hf.chg = Math.min(1, hf.chg + dt / w.charge); if (hf.chg >= 1 && was < 1) sfx('chargeReady', { v: .6 * hv() });
+    } else if (hf.chg > 0) { const k = hf.chg; hf.chg = 0; stopSfx(hf.chgSnd); if (can) heroShot(k); }
+    chargeShow(hf.charges, hf.chg);
+  } else if (can && (hf.held && (autoFire(w) || hf.pend) || hf.bn > 0)) { hf.pend = false; heroShot(); }
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
   if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload();
-  hf.flashM.visible = hf.flash > 0;
-  if (hf.spin) { hf.spin.rotation.z += hf.spinV * dt; hf.spinV = Math.max(0, hf.spinV - dt * 25); }
+  hf.flashM.visible = hf.flash > 0; if (hf.pulse) pulseShow(hf.pulse, hf.flash > 0);
+  if (hf.spin) { spinTurn(hf.spin, hf.spinV + spinIdle(hf.i), dt); hf.spinV = Math.max(0, hf.spinV - dt * 25); }
   if (hf.round) hf.round.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .4);
   if (hf.rounds) roundsShow(hf.rounds, hf.ammo, hf.rl > 0 ? 1 - hf.rl / w.reload : -1);
   if (w.flare && hf.mag) hf.mag.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .6);
@@ -320,6 +333,7 @@ function lobbyGuns(t) {
   if (r < .3 && !w.melee && !w.pool && !w.inf) heroReload();
   else if (r < .65 && !lobbyHush()) { // a few shots, or a short burst
     if (autoFire(w)) { hf.held = hf.pend = true; lob.rel = t + .4 + Math.random() * .6; }
+    else if (w.charge) { hf.held = true; lob.rel = t + (Math.random() < .6 ? w.charge + .3 : .3 + Math.random() * .4); } // a full charge, or a quick one
     else { const n = w.rate >= .8 ? 1 : 1 + (Math.random() * 3 | 0), gap = Math.max(w.rate, .3) + .12; for (let k = 0; k < n; k++) lob.taps.push(t + k * gap); }
   }
 }
@@ -354,9 +368,9 @@ function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
   heroCh = buildChar(prof.look, 1 / 16, true);
-  dressArmor(heroCh, heroArmorN = wornArmor());
-  dressBoots(heroCh, heroBootsB = wornBoots());
-  dressHat(heroCh, heroHatH = wornHat());
+  dressArmor(heroCh, heroArmorN = shownArmor());
+  dressBoots(heroCh, heroBootsB = hidOn('boots') ? null : wornBoots());
+  dressHat(heroCh, heroHatH = hidOn('hats') ? null : wornHat());
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
 }

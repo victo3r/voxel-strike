@@ -84,8 +84,9 @@ ROCKS.forEach(([rx, rz, ax, az, h], k) => {
 // stone steps cut into the plateau, up from the ridge
 for (let z0 = -33; z0 <= -31; z0++) for (let x0 = -22; x0 <= -16; x0++) { const c = at(x0 + O, z0 + O); H[c] = r2(RIDGE + LV * (x0 + 23)); kind[c] = STEPS; }
 // dirt paths between the ways up and the buildings
-const PATHS = [[[-23.5, -1], [-28, -4.5], [-27.5, -14], [-24.5, -22.5]], [[-27.5, -14], [-25.5, -27], [-23.5, -31]], [[-28, -4.5], [-28, 3], [-25, 9.5], [-23.8, 16.2]],
-  [[-15, -32], [-11, -27.6], [-9, -19]], [[-9, -19.5], [0, -21], [9.6, -24.3]], [[13, -24.5], [21, -28.5], [28, -22], [30, -17]], [[30, -12], [29, 2.6]], [[23, -4.5], [24, 7]]];
+const PATHS = [[[-15.5, -.5], [-23.5, -1], [-28, -4.5], [-27.5, -14], [-24.5, -22.5], [-22.6, -24]], [[-27.5, -14], [-25.5, -27], [-22.6, -31.5]], [[-28, -4.5], [-28, 3], [-25, 9.5], [-23.8, 16.2]],
+  [[-15, -31.8], [-13.4, -29.1], [-11.6, -29.1], [-9.8, -27.4], [-9.2, -17.5]], // in and out of the ruin by its doorways
+  [[-9.2, -18.5], [0, -21], [9.6, -24.3], [13, -24.5], [21, -28.5], [28, -22], [30, -17], [30, -12], [29, 2.6]], [[23, -4.5], [24, 7]]];
 for (const pts of PATHS) for (let k = 1; k < pts.length; k++) {
   const [ax, az] = pts[k - 1], [bx, bz] = pts[k], L = Math.hypot(bx - ax, bz - az);
   for (let s = 0; s <= L; s += .25) {
@@ -138,10 +139,11 @@ const caveK = new Float64Array(N * N); // light reaching in from the openings
 
 // textures
 const lawn = tex(g => { noise(g, [98, 162, 76], 20); for (let i = 0; i < 6; i++) { g.fillStyle = ['rgba(55,100,35,.5)', 'rgba(180,220,120,.45)'][i % 2]; g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 2); } });
-const lipT = tex(g => {
+const lipOf = (r, gr, b) => tex(g => { // earth with a ragged band of what's on top
   noise(g, [124, 98, 70], 20); g.fillStyle = 'rgba(70,45,25,.4)'; for (let i = 0; i < 6; i++) g.fillRect(Math.random() * 16 | 0, 4 + Math.random() * 12 | 0, 2, 1);
-  for (let x = 0; x < 16; x++) { const d = 2 + (Math.random() * 3 | 0); for (let y = 0; y < d; y++) { g.fillStyle = `rgb(${92 + (x * 7 + y * 5) % 20},${156 + (x * 3) % 20},70)`; g.fillRect(x, y, 1, 1); } }
+  for (let x = 0; x < 16; x++) { const d = 2 + (Math.random() * 3 | 0); for (let y = 0; y < d; y++) { g.fillStyle = `rgb(${r + (x * 7 + y * 5) % 20},${gr + (x * 3) % 20},${b})`; g.fillRect(x, y, 1, 1); } }
 });
+const lipT = lipOf(92, 156, 70), pathLipT = lipOf(136, 111, 86);
 const dirtT = tex(g => { noise(g, [120, 94, 66], 20); g.fillStyle = 'rgba(70,45,25,.35)'; for (let i = 0; i < 7; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); });
 const rockT = tex(g => {
   noise(g, [132, 124, 112], 16); g.fillStyle = 'rgba(70,60,50,.35)'; for (const y of [3, 9, 14]) g.fillRect(0, y, 16, 1);
@@ -179,8 +181,9 @@ function cellMesh(quads, mats) {
 // the land: tops, cliffs, cave walls and ceilings, the shallow sea floor, in chunks so shots only check nearby ones
 {
   const vc = map => lam({ map, vertexColors: true });
-  const mats = [lawn, lipT, dirtT, rockT, sandT, wetT, tex(drawBed), caveT, gravelT, pathT, blockT].map(vc);
+  const mats = [lawn, lipT, dirtT, rockT, sandT, wetT, tex(drawBed), caveT, gravelT, pathT, blockT, pathLipT].map(vc);
   const TOP = { [SAND]: 4, [GRASS]: 0, [ROCK]: 3, [PATH]: 9, [STEPS]: 10 };
+  const SIDE = { [SAND]: 5, [ROCK]: 3, [STEPS]: 10 }, LIP = { [GRASS]: 1, [PATH]: 11 }; // every top's sides: the same stuff, or a lip of it over earth
   const BOT = -SEA_D, CH = 18;
   // what's solid in a column
   const spans = c => c < 0 ? [] : kind[c] === SEA ? [[BOT, SF[c]]] : cave[c] ? [[BOT, CF[c]], [CC[c], H[c]]] : [[BOT, H[c]]];
@@ -209,13 +212,13 @@ function cellMesh(quads, mats) {
         const n = inGrid(i + a, j + b) ? at(i + a, j + b) : -1;
         for (const [y0, y1] of minus(spans(c), spans(n))) {
           if (sea) { face(quads, 6, x0, z0, a, b, y0, y1, .7, .85); continue; }
+          if (cave[c] && Math.abs(y1 - CF[c]) < .01) { const k = caveK[c]; face(quads, 8, x0, z0, a, b, y0, y1, k * .8, k); continue; } // a step in a cave floor: gravel like the floor
           if (n >= 0 && cave[n] && y0 >= CF[n] - .01 && y1 <= CC[n] + .01) { const k = caveK[n]; face(quads, 7, x0, z0, a, b, y0, y1, k * .8, k); continue; }
           const h = y1 - y0, kd = kind[c];
-          if (Math.abs(y1 - H[c]) > .01 || kd === ROCK) { face(quads, 3, x0, z0, a, b, y0, y1, .75, .92); continue; }
-          if (kd === SAND) { face(quads, 5, x0, z0, a, b, y0, y1, .75, .95); continue; }
-          if (kd === STEPS) { face(quads, 10, x0, z0, a, b, y0, y1, .75, .95); continue; }
-          if (h <= .55) face(quads, 1, x0, z0, a, b, y0, y1, .78, 1, true); // grass: a lip on top, earth or rock below
-          else { face(quads, 1, x0, z0, a, b, y1 - .5, y1, .9, 1, true); face(quads, h > 1.4 ? 3 : 2, x0, z0, a, b, y0, y1 - .5, .72, .92); }
+          if (Math.abs(y1 - H[c]) > .01) { face(quads, 3, x0, z0, a, b, y0, y1, .75, .92); continue; }
+          if (kd in SIDE) { face(quads, SIDE[kd], x0, z0, a, b, y0, y1, .75, kd === ROCK ? .92 : .95); continue; }
+          if (h <= .55) face(quads, LIP[kd], x0, z0, a, b, y0, y1, .78, 1, true); // a lip on top, earth or rock below
+          else { face(quads, LIP[kd], x0, z0, a, b, y1 - .5, y1, .9, 1, true); face(quads, h > 1.4 ? 3 : 2, x0, z0, a, b, y0, y1 - .5, .72, .92); }
         }
       }
     }
@@ -408,6 +411,7 @@ const SX = -11.5, SW = 3, SZ0 = 12, SZ1 = 31, DECK = 2.25, QD = 4.05, FC = 3.15,
   const X0 = -5.5, X1 = -3, Z0 = 6.5, Z1 = 29.5, Y = .9;
   rect(X0, X1, Z0, Z1, Y - .25, Y, planks);
   rect(X0, X1, Z0 - 1, Z0, 0, LV, planks); // a step up from the sand
+  { const c = tbox(X1 - X0, Y - .25, 1, planks); c.position.set((X0 + X1) / 2, (Y - .25) / 2, Z0 + .5); add(c); building.cover.push(c); } // the deck's end resting on a crib behind it (nobody fits under the deck, so no solid)
   for (let z = Z0 + 1.5; z < Z1; z += 2.5) for (const x of [X0 + .15, X1 - .15]) { const f = hAt(x, z); building.cover.push(deco(.26, Y - .25 - f, .26, postMat, x, (f + Y - .25) / 2, z)); solid(x - .13, x + .13, z - .13, z + .13, f - 1, Y - .25, 'wood'); }
   for (const [x, z] of [[X0 + .2, 12.2], [X1 - .2, 12.2], [X1 - .2, Z1 - .2], [X0 + .2, 20.8]]) { building.cover.push(deco(.28, .5, .28, postMat, x, Y + .25, z)); solid(x - .14, x + .14, z - .14, z + .14, Y, Y + .5, 'wood'); }
   torch(X0 + .2, Z1 - .2, Y, 1.6);

@@ -20,7 +20,7 @@ const CHESTS = [
     { k: 'coins', n: [120, 180], w: 24 }, { k: 'boosts', n: 12, w: 16 }, { k: 'star', n: 2, w: 14, r: 'rare' },
     ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 3, r: rarOf(b) })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 3, r: rarOf(h) })),
     { k: 'coins', n: 300, w: 12, r: 'epic' },
-    ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: w.chest ? CHEST_GUN_DROP : GUN_DROP[rarOf(w)], r: rarOf(w) })),
+    ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: w.drop ?? (w.chest ? CHEST_GUN_DROP : GUN_DROP[rarOf(w)]), r: rarOf(w) })), // drop: a gun's own odds (the Crystal Companion is as rare as any mythic)
     { k: 'coins', n: 500, w: 3, r: 'legend' },
   ] },
 ];
@@ -50,7 +50,7 @@ function lootCard(l, n = l.n) {
   else if (l.k === 'star') { pic = `<span class="lc ls">${ico('star').repeat(n)}</span>`; name = l.gave ? l.gave.map(([i, k]) => `${BASE[i].name.toUpperCase()} +${k} ${ico('star')}`).join('<br>') || '50 COINS A STAR' : n > 1 ? `+${n} STARS ON YOUR GUNS` : '+1 STAR ON A GUN'; }
   else if (l.k === 'gun') { pic = `<img class="ai" src="${gunPic(gi(l.id))}">`; name = BASE[gi(l.id)].name.toUpperCase(); }
   else { pic = `<img class="ai" src="${l.k === 'boots' ? bootPic(l.id, 1) : hatPic(l.id, 1)}">`; name = gearOf(l).name.toUpperCase(); }
-  return `<div class="loot" style="--rc:${rc}"><div class="pic">${pic}</div><b>${name}</b><small>${rn}</small>${l.p !== undefined ? `<i>${(l.p * 100).toFixed(l.p < .1 ? 1 : 0)}%</i>` : ''}</div>`;
+  return `<div class="loot" style="--rc:${rc}"><div class="pic">${pic}</div><b>${name}</b><small>${rn}${l.k === 'gun' ? ' ' + CATS[CAT_I[BASE[gi(l.id)].cat]][1] : ''}</small>${l.p !== undefined ? `<i>${(l.p * 100).toFixed(l.p < .1 ? 1 : 0)}%</i>` : ''}</div>`;
 }
 // open one: a won chest or the keys, roll, hand it over
 function openChest(c) {

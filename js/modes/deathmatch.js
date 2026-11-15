@@ -90,6 +90,7 @@ const BOT_KEEP = {
   knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
   rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
+  wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -131,6 +132,10 @@ const GUN_FIT = {
   flamewand: d => d < 3 ? .65 : d < 22 ? .95 : .6,
   soulwand: d => d > 20 ? 1.15 : d > 14 ? .65 : d > 8 ? .25 : .1,
   ancientwand: d => d < 3 ? .2 : d < 22 ? .85 : .45,
+  wisp: d => d < 3 ? .5 : d < 20 ? .85 : .55,
+  voidlantern: d => d < 5 ? .1 : d < 22 ? .8 : .45,
+  aurora: d => d > 20 ? 1.2 : d > 14 ? .75 : d > 8 ? .35 : .15,
+  crystal: d => d < 3 ? .65 : d < 28 ? 1 : .7,
 };
 const HUNT_D = 8;
 const pickOf = list => list[Math.random() * list.length | 0];
@@ -154,15 +159,15 @@ function botWear() {
 function botGearNet() {
   const load = CATS.map(([c]) => botGun(c)), stars = {};
   for (const id of load) { const top = Math.max(0, gunUse(gi(id)) - 1); stars[id] = Math.random() * (top + 1) | 0; }
-  return { ...botWear(), stars, load };
+  return { ...botWear(), stars, load, lv: Math.min(LV_MAX, botTop()) }; // lv: how grown a gun that grows is
 }
 function botLoadout(easy) {
   const load = CATS.map(([c]) => gi(easy ? pickRare(BASE.filter(w => w.cat === c && rarOf(w) === 'common')).id : botGun(c))), taste = tasteFor(load);
   // stars: never more than you use on that gun
-  const stars = {}, W = {};
-  for (const g of load) { const top = easy ? 0 : Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g]); }
+  const stars = {}, W = {}, lv = Math.min(LV_MAX, botTop()); // lv: how grown a gun that grows is
+  for (const g of load) { const top = easy ? 0 : Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g], lv); }
   const { armor, boots, hat } = easy ? { armor: 0, boots: null, hat: null } : botWear();
-  return { load, taste, stars, W, armor, boots, hat, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
+  return { load, taste, stars, W, lv, armor, boots, hat, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
 }
 
 const BOT_U = 1.85 / 33; // one skin pixel, so bots are as tall as you
@@ -284,14 +289,14 @@ const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag, rounds } = makeGun(b.gun, gunM, b.rec.stars[b.gun]);
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag, rounds, charges, pulse } = makeGun(b.gun, gunM, b.rec.stars[b.gun], growStage(b.gun, b.rec.lv));
   // the hold pose from hold.js
   const h = holdFor(b.gun);
   gunM.position.set(h.T[0] * u, (h.T[1] - 22) * u, h.T[2] * u); gunM.quaternion.fromArray(h.q);
   b.armR.quaternion.setFromUnitVectors(ARM_DOWN, _hv.fromArray(h.dR));
   b.armL.quaternion.setFromUnitVectors(ARM_DOWN, h.dL ? _hv.fromArray(h.dL) : _hv.set(.08, -.95, .3).normalize());
   b.holdTurn = h.turn; // sideways stance so the gun points where it aims
-  b.round = round; b.rounds = rounds; b.bn = 0;
+  b.round = round; b.rounds = rounds; b.bn = 0; b.charges = charges; b.chargeK = 0; chargeShow(charges, 0); b.pulse = pulse;
   b.flashM ??= makeFlash(.1); b.flashM.material = flashOf(BASE[b.gun]);
   b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
@@ -303,10 +308,16 @@ function holdGun(b) {
   b.rl.fA = b.armR.position.clone().addScaledVector(_hv.fromArray(h.dR), ARM_LEN * u);
 }
 // a wand tips down to point straight while it fires (k = how far), turning round the fist
-const _wfq = new THREE.Quaternion(), _wfI = new THREE.Quaternion(), _wfd = new THREE.Vector3(), _wfl = new THREE.Vector3();
+const _wfq = new THREE.Quaternion(), _wfI = new THREE.Quaternion(), _wfd = new THREE.Vector3(), _wfl = new THREE.Vector3(), _lnE = new THREE.Euler();
 function wandFlick(q, k) { _wfd.set(0, 0, -1).applyQuaternion(q); _wfl.set(_wfd.x, 0, _wfd.z).normalize(); return _wfq.setFromUnitVectors(_wfd, _wfl).slerp(_wfI, 1 - k); }
 function wandHold(b, dt) {
-  const R = b.rl, g = b.gunM; if (!R || !g || R.on || !BASE[b.gun].wand) return;
+  const R = b.rl, g = b.gunM; if (!R || !g || R.on) return;
+  if (BASE[b.gun].hold === 'lantern') { // a lantern swings from the fist: back when it fires, a little with every step
+    b.lanT = b.muzzle > 0 ? 0 : (b.lanT ?? 9) + dt;
+    const sp = Math.min(1, Math.hypot(b.vx || 0, b.vz || 0) / 5);
+    g.quaternion.copy(R.q).multiply(_wfq.setFromEuler(_lnE.set(-.45 * Math.exp(-3 * b.lanT) * Math.sin(9 * b.lanT), 0, .09 * sp * Math.sin(performance.now() * .006)))); return;
+  }
+  if (!BASE[b.gun].wand) return;
   b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 || b.wandT > 0 ? 14 : -4)));
   const r = wandFlick(R.q, b.wf); g.quaternion.copy(R.q).premultiply(r); g.position.copy(R.p).sub(R.fA).applyQuaternion(r).add(R.fA);
 }
@@ -364,9 +375,9 @@ function botEquip(b, g) {
 // spawn a bot (online the server picks the spot)
 function makeBot(rec, spot) {
   const [x, z] = spot ? [spot.x, spot.z] : spawnSpot(rec);
-  const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(rec.armor);
-  if (arm) dressArmor(ch, rec.armor, teamMode() ? TEAMS[rec.team].shirts[0] : null);
-  dressBoots(ch, rec.boots); dressHat(ch, rec.hat);
+  const ch = buildChar(rec.look, BOT_U), g = ch.g, u = BOT_U, arm = armorOf(rec.armor), hide = rec.look?.hide | 0; // hidden pieces still count
+  if (arm && !(hide & HIDE_BIT.armor)) dressArmor(ch, rec.armor, teamMode() ? TEAMS[rec.team].shirts[0] : null);
+  dressBoots(ch, hide & HIDE_BIT.boots ? null : rec.boots); dressHat(ch, hide & HIDE_BIT.hats ? null : rec.hat);
   g.rotation.order = 'YXZ'; g.position.set(x, groundAt(x, z, .35, floorY(x, z)), z);
   // arms forward holding the gun
   const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
@@ -649,11 +660,11 @@ function botFire(b, W, dist) {
   }
   if (W.flame) return botFlame(b, W);
   const S = skillOf(b), err = S.aimErr + S.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
-  if (W.rocket || W.flare || W.grenade || W.spell) {
+  if (W.rocket || W.flare || W.grenade || W.spell || W.wisp || W.vortex) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
     if (W.spell) castSpell(W, eye.clone(), dirV.clone(), b, b.flashM);
-    else (W.rocket ? fireRocket : W.grenade ? fireGrenade : fireFlare)(W, eye.clone(), dirV, b);
+    else (W.rocket ? fireRocket : W.grenade ? fireGrenade : W.wisp ? fireWisp : W.vortex ? fireVoid : fireFlare)(W, eye.clone(), dirV, b);
     b.leadGuess = .6 + Math.random() * .6;
     return;
   }
@@ -697,6 +708,8 @@ function botFire(b, W, dist) {
 }
 // a bot's lance: through anyone in the way (not its team), you included
 function botLance(b, W) {
+  const k = W.charge ? b.chargeK : 1, full = k >= 1; // the Aurora Rail: as charged as the bot let it get
+  if (W.charge) { W = { ...W, pierce: full, wallBreak: full }; b.chargeK = 0; chargeShow(b.charges, 0); if (full) b.fullFlag = true; b.chargeWant = null; }
   let you = null;
   if (respawnT <= 0 && !friendly(b, YOU_T)) {
     pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25);
@@ -705,12 +718,15 @@ function botLance(b, W) {
   }
   const parts = [ground, ...coverAlong(eye, dirV, LANCE_FAR)]; for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) parts.push(...z.parts);
   const L = lanceLine(eye, dirV, W, parts, you);
+  shotCharge = k;
   for (const h of L.hits) {
-    const d = W.dmg * BOT.dmgMul * h.mul * (h.head ? headMul(W) : 1);
+    const d = W.dmg * chargeMul(W, k) * BOT.dmgMul * h.mul * (h.head ? headMul(W) : 1);
     if (h.zz === YOU_T) hurtPlayer(Math.max(1, Math.round(d)), false, b, h.head, 0, 0, h.thru);
     else hurtZombie(h.zz, d, h.point, h.head, false, b, 0, 0, h.thru);
   }
-  const g = b.gun; showLance(b.flashM.getWorldPosition(beamFrom).clone(), L, W.lance, 1, scene, b.flashM, () => b.gun === g && !b.dead);
+  shotCharge = 1;
+  const g = b.gun, from = b.flashM.getWorldPosition(beamFrom).clone(), held = () => b.gun === g && !b.dead;
+  if (W.charge) auroraBeam(from, L, k, 1, b.flashM, held); else showLance(from, L, W.lance, 1, scene, b.flashM, held);
 }
 
 function updateBot(b, dt) {
@@ -775,10 +791,10 @@ function updateBot(b, dt) {
     if (b.seeT <= dt) { b.lpx = tp.x; b.lpz = tp.z; }
     if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
     b.lpx = tp.x; b.lpz = tp.z;
-    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : W.spell ? dist / WAND_BOLT.spell0.spd : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
+    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : W.spell ? dist / WAND_BOLT.spell0.spd : W.vortex ? dist / VOID_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
     const tx = dx + (fly ? b.pvx * fly * b.leadGuess : (b.pvx * S.lead - b.vx * S.self) * lag), tz = dz + (fly ? b.pvz * fly * b.leadGuess : (b.pvz * S.lead - b.vz * S.self) * lag), th = Math.hypot(tx, tz);
     wantYaw = Math.atan2(tx, tz);
-    wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade || W.spell ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);
+    wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade || W.spell || W.vortex ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);
   } else {
     // nobody around: look where it's going and glance about
     if ((b.gazeT -= dt) <= 0) {
@@ -795,18 +811,22 @@ function updateBot(b, dt) {
   botLook(b, wantYaw, wantPitch, dt);
   b.g.rotation.y = b.aimYaw - b.holdTurn; b.headPiv.rotation.y = b.holdTurn; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
-  b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.wandT = (b.wandT || 0) - dt; b.flashM.visible = b.muzzle > 0;
+  b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.wandT = (b.wandT || 0) - dt; b.flashM.visible = b.muzzle > 0; if (b.pulse) pulseShow(b.pulse, b.muzzle > 0);
   if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx(b.fireEnd, { at: pos, far: 50 });
   b.stab = Math.max(0, b.stab - dt); knifeChop(b); // knife chop
-  if (b.spin) { if (b.muzzle > 0) b.spinV = 30; b.spin.rotation.z += b.spinV * dt; b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
+  if (b.spin) { if (b.muzzle > 0) b.spinV = spinKick(b.gun); spinTurn(b.spin, b.spinV + spinIdle(b.gun), dt); b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
   holdReload(b, b.reload, rlOf(W, b.rec.fx)); wandHold(b, dt);
   // in range for this gun
-  const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : W.spell ? dist > 2.5 : true;
+  const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : W.spell ? dist > 2.5 : W.vortex ? dist > 5 : true;
   const ready = sees && b.seeT >= S.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
-  b.aimT = ready && sniper ? b.aimT + dt : 0;
-  if (ready && b.cd <= 0 && (!sniper || b.aimT >= SNIPE_T)) { if (W.melee) botStab(b, W, t, dist); else botFire(b, W, dist); }
+  b.aimT = ready && sniper && !(W.charge && b.cd > 0) ? b.aimT + dt : 0; // the Aurora Rail charges while it lines up, once it can fire
+  if (W.charge) { // a full charge from far off, a quicker one up close
+    b.chargeWant ??= dist > 12 ? W.charge : .25 + Math.random() * .5;
+    b.chargeK = Math.min(1, b.aimT / W.charge); chargeShow(b.charges, b.chargeK);
+  }
+  if (ready && b.cd <= 0 && (!sniper || b.aimT >= (W.charge ? b.chargeWant : SNIPE_T))) { if (W.melee) botStab(b, W, t, dist); else botFire(b, W, dist); }
 
   // movement: keep its distance, strafe while fighting
   let radial = 1, side = 0;

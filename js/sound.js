@@ -284,6 +284,12 @@ const SOUNDS = {
     s.tone({ type: 'sawtooth', t: .04, f: 78, f2: 48, d: .32, v: .2, lp: 520 }); // a low growl in the tail
     s.pump(.46);
   }],
+  crystal: [.24, .45, s => { // a tight crack with the ring of struck glass
+    s.hiss({ ft: 'bandpass', f: 2600, f2: 1100, q: .8, d: .06, v: .85 });
+    s.tone({ f: 190, f2: 70, d: .05, v: .8 });
+    s.click({ f: 5200, v: .3 });
+    s.tone({ type: 'triangle', t: .005, f: 3136, f2: 3110, d: .12, v: .08 }); s.tone({ type: 'triangle', t: .02, f: 4186, f2: 4150, d: .1, v: .045 });
+  }],
   starsmasher: [.2, .45, s => {
     s.hiss({ ft: 'bandpass', f: 2300, f2: 1000, q: .8, d: .07, v: .9 });
     s.tone({ f: 180, f2: 62, d: .06, v: .9 });
@@ -434,6 +440,56 @@ const SOUNDS = {
   }],
   trackOn: [.3, .45, s => { s.tone({ type: 'square', f: 1568, d: .045, v: .2, lp: 5000 }); s.tone({ type: 'square', f: 2093, t: .08, d: .07, v: .2, lp: 5000 }); }], // locked on
   tracked: [.5, .5, s => { for (let k = 0; k < 3; k++) s.tone({ type: 'square', f: 1760, t: k * .12, d: .06, v: .22, lp: 4000 }); s.tone({ type: 'triangle', f: 440, f2: 330, t: .02, d: .3, v: .2 }); }], // someone's tracking you
+  // the mythics
+  wisp: [.55, .5, s => { // a breathy horn note and a little chime as the wisp flies off
+    s.hiss({ ft: 'bandpass', f: 900, f2: 1800, q: 2.5, a: .02, d: .22, v: .7, sweep: .2 });
+    s.tone({ type: 'triangle', f: 523, f2: 784, a: .015, d: .25, v: .3, glide: .12 }); s.tone({ type: 'triangle', f: 527, f2: 790, a: .015, d: .25, v: .2, glide: .12 });
+    s.tone({ f: 1568, t: .06, d: .25, v: .08 }); s.tone({ f: 2093, t: .1, d: .22, v: .06 });
+    s.tone({ f: 140, f2: 70, d: .08, v: .35 });
+  }],
+  wispHit: [.4, .45, s => { // a soft pop and a sparkle
+    s.hiss({ ft: 'bandpass', f: 2400, f2: 800, q: 1.5, d: .08, v: .7 });
+    s.tone({ f: 220, f2: 90, d: .08, v: .5 });
+    for (let k = 0; k < 3; k++) s.tone({ f: [1760, 2349, 2637][k], t: .02 + k * .03, d: .14, v: .07 });
+  }],
+  voidlantern: [.8, .75, s => { // a deep hollow thoom
+    s.tone({ f: 85, f2: 32, d: .45, v: 1 }); s.thud({ d: .06, f: 110, v: .7 });
+    s.tone({ type: 'triangle', f: 330, f2: 165, a: .01, d: .35, v: .25, glide: .3 }); s.tone({ type: 'triangle', f: 336, f2: 168, a: .01, d: .35, v: .18, glide: .3 });
+    s.hiss({ ft: 'bandpass', f: 1600, f2: 300, q: 1.2, a: .01, d: .4, v: .6, sweep: .4 });
+  }],
+  voidOpen: [1.4, .6, s => { // air rushing in over a low drone that swells and rises
+    s.tone({ type: 'sawtooth', f: 45, f2: 95, a: 1, d: .3, v: .35, lp: 500, glide: 1.1 });
+    s.tone({ f: 55, f2: 115, a: 1, d: .3, v: .55, glide: 1.1 });
+    s.hiss({ ft: 'bandpass', f: 3000, f2: 450, q: 1.5, a: .9, d: .35, v: .7, sweep: 1.2 });
+    s.tone({ type: 'triangle', f: 220, f2: 660, a: .9, d: .3, v: .1, glide: 1.1 });
+  }],
+  voidPop: [1.2, .95, s => { // it caves in: a heavy thump, a burst of air and a glassy ring
+    s.tone({ f: 75, f2: 26, d: .6, v: 1 }); s.thud({ d: .08, f: 90, v: 1 });
+    s.hiss({ f: 2600, f2: 120, a: .003, d: .8, v: .9 });
+    s.hiss({ ft: 'highpass', f: 3000, d: .04, v: .6 });
+    s.ring({ f: 880, t: .01, d: .6, v: .15 });
+    s.tone({ type: 'triangle', f: 660, f2: 220, t: .01, d: .5, v: .15, glide: .4 });
+  }],
+  aurora: [.6, .6, s => { // a quick zip of light
+    s.tone({ f: 140, f2: 50, d: .2, v: .6 });
+    s.tone({ f: 2600, f2: 700, d: .06, v: .22 });
+    s.beam({ f: 1300, f2: 650, d: .35, v: .4, wob: 44, lp: .35 });
+    s.hiss({ ft: 'bandpass', f: 5000, f2: 1400, q: 1.5, d: .3, v: .28 });
+  }],
+  auroraFull: [1.4, 1, s => { // a crack, then a long shimmering beam with a chord of light in it
+    s.hiss({ ft: 'highpass', f: 3200, d: .035, v: .9 });
+    s.tone({ f: 100, f2: 26, d: .55, v: 1 }); s.thud({ d: .06, f: 100, v: .7 });
+    s.beam({ f: 900, f2: 380, d: .9, v: .5, wob: 26, lp: .3 });
+    s.beam({ f: 225, f2: 120, d: .85, v: .42, wob: 13, lp: .1 });
+    for (const [f, t] of [[1047, 0], [1319, .03], [1568, .06], [2093, .09]]) s.tone({ type: 'triangle', f, f2: f * 1.01, t: .02 + t, a: .01, d: .8, v: .07 });
+    s.hiss({ ft: 'bandpass', f: 3800, f2: 500, q: 1.2, d: .8, v: .4 });
+  }],
+  chargeUp: [1.1, .4, s => { // the coils filling up
+    s.tone({ type: 'sawtooth', f: 160, f2: 640, a: 1, d: .08, v: .22, lp: 1800, glide: 1 });
+    s.tone({ f: 320, f2: 1280, a: 1, d: .08, v: .3, glide: 1 }); s.tone({ f: 326, f2: 1300, a: 1, d: .08, v: .2, glide: 1 });
+    s.hiss({ ft: 'bandpass', f: 600, f2: 3600, q: 3, a: 1, d: .08, v: .3, sweep: 1 });
+  }],
+  chargeReady: [.5, .4, s => s.arp(0, [1319, 1760, 2637], { gap: .045, d: .3, v: .25 })], // full
   stormStart: [.45, .5, s => { s.arc({ d: .2, rate: 140, buzz: 70, v: .9 }); s.tone({ type: 'sawtooth', f: 55, f2: 110, d: .3, v: .3, lp: 800, glide: .2 }); }],
   stormEnd: [.35, .35, s => { s.arc({ d: .1, rate: 80, buzz: 50, v: .6 }); s.tone({ f: 900, f2: 200, d: .2, v: .2 }); }],
   stormLoop: [2, .32, s => s.draw(0, 2, o => { // the Tempest Coil's beam: a buzzing hum and crackles, made to loop
@@ -549,6 +605,14 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 1500, f2: 900, a: .004, d: .045, v: .14, lp: 2400, glide: .04 });
     s.hiss({ ft: 'bandpass', f: 1600, f2: 550, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
   }],
+  zin_crystal: [.34, .4, s => { // the ring sight chimes awake
+    s.hiss({ ft: 'bandpass', f: 700, f2: 2000, q: 1.4, a: .02, d: .06, v: .5, sweep: .07 });
+    s.tone({ type: 'triangle', f: 1568, t: .04, d: .16, v: .1 }); s.tone({ type: 'triangle', f: 2349, t: .09, d: .18, v: .07 });
+  }],
+  zout_crystal: [.26, .34, s => {
+    s.hiss({ ft: 'bandpass', f: 1700, f2: 600, q: 1.4, a: .015, d: .07, v: .42, sweep: .08 });
+    s.tone({ type: 'triangle', f: 1760, f2: 1175, a: .005, d: .12, v: .08, glide: .08 });
+  }],
   zin_starsmasher: [.3, .4, s => {
     s.hiss({ ft: 'bandpass', f: 600, f2: 1800, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 });
     s.clack({ t: .05, f: 1800, d: .012, v: .55, body: .4 });
@@ -620,6 +684,15 @@ const SOUNDS = {
     s.hiss({ ft: 'bandpass', f: 1150, f2: 400, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
     s.clack({ t: .1, f: 1150, d: .012, v: .3, body: .3 });
   }],
+  zin_aurora: [.45, .42, s => { // the scope hums up with a shimmer
+    s.hiss({ ft: 'bandpass', f: 450, f2: 1300, q: 1.5, a: .03, d: .07, v: .55, sweep: .09 });
+    s.clack({ t: .08, f: 1600, d: .012, v: .45, body: .4 });
+    s.tone({ f: 330, f2: 990, t: .05, a: .02, d: .18, v: .1, glide: .15 }); s.tone({ f: 1976, t: .12, d: .2, v: .04 });
+  }],
+  zout_aurora: [.3, .36, s => {
+    s.hiss({ ft: 'bandpass', f: 1200, f2: 420, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 });
+    s.tone({ f: 900, f2: 300, a: .01, d: .1, v: .09, glide: .1 });
+  }],
   zin_soulwand: [.3, .34, s => { s.tone({ type: 'triangle', f: 440, f2: 880, a: .01, d: .14, v: .16, glide: .1 }); s.hiss({ ft: 'bandpass', f: 1200, f2: 2600, q: 2, a: .01, d: .06, v: .3 }); }],
   zout_soulwand: [.25, .3, s => { s.tone({ type: 'triangle', f: 880, f2: 440, a: .01, d: .12, v: .14, glide: .1 }); }],
   dry: [.1, .5, s => { s.clack({ f: 2800, d: .01, v: .8 }); }],
@@ -666,6 +739,7 @@ const SOUNDS = {
   r_ancientwand: [2.2, .45, s => { s.latch(.22); s.thunk(.95); s.tone({ f: 110, f2: 220, t: 1.3, a: .2, d: .4, v: .4, glide: .5 }); for (let k = 0; k < 4; k++) s.tone({ f: 1200 + k * 300, t: 1.5 + k * .08, d: .2, v: .07 }); }],
   r_tigerbite: [2, .45, s => { s.magOut(.2); s.magIn(1.0); s.clack({ t: 1.1, f: 1500, d: .015, v: .5, body: .3 }); s.rack(1.55); }],
   r_apex: [1.9, .45, s => { s.magOut(.18); s.magIn(.92); s.clack({ t: 1.02, f: 1450, d: .015, v: .5, body: .3 }); s.rack(1.44); }],
+  r_crystal: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.arp(.76, [2093, 2637, 3136], { gap: .05, d: .22, v: .1 }); s.rack(1.12); }], // a fresh crystal chimes as it seats
   r_hornet: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.clack({ t: .82, f: 1900, d: .015, v: .5, body: .3 }); s.rack(1.12); }],
   r_tracker: [1.4, .45, s => { s.magOut(.1); s.magIn(.6); s.rack(.95); s.tone({ type: 'square', f: 1568, t: 1.2, d: .04, v: .12, lp: 5000 }); }],
   r_tempest: [2.4, .45, s => {
@@ -673,6 +747,12 @@ const SOUNDS = {
     for (let k = 0; k < 6; k++) s.clack({ t: 1.75 + k * .035, f: 2400 + k * 500, d: .008, v: .35 });
     s.tone({ type: 'sawtooth', f: 80, f2: 320, t: 1.85, a: .15, d: .25, v: .2, lp: 1500, glide: .3 }); s.tone({ f: 600, f2: 2800, t: 1.85, a: .2, d: .12, v: .22, glide: .3 });
   }],
+  r_wisp: [1.5, .45, s => { s.magOut(.12); s.magIn(.62); s.rack(.95); s.arp(1.15, [784, 1047, 1319], { gap: .06, d: .25, v: .12 }); }], // a fresh jar of wisps
+  r_voidlantern: [2.6, .45, s => {
+    s.latch(.18); s.magOut(.85); s.magIn(1.45);
+    s.tone({ f: 70, f2: 140, t: 1.9, a: .2, d: .35, v: .35, glide: .45 }); s.tone({ type: 'triangle', f: 220, f2: 440, t: 1.95, a: .15, d: .3, v: .12, glide: .35 });
+  }],
+  r_aurora: [2.2, .45, s => { s.magOut(.2); s.magIn(1.05); s.arp(1.3, [523, 659, 784, 1047], { type: 'sine', gap: .08, d: .3, v: .12 }); s.clack({ t: 1.8, f: 1700, d: .015, v: .5, body: .3 }); }],
   r_salvo: [2.8, .45, s => { s.latch(.15); for (const t of [.65, 1.1, 1.55, 1.99]) s.thunk(t); s.latch(2.4); }], // a rocket into each tube
   r_shockbeam: [2, .45, s => {
     s.latch(.12); s.magOut(.7); s.magIn(1.15);
@@ -923,7 +1003,7 @@ function soundTick(dt, live) {
   }
   if (fOn !== flameOn) { flameOn = fOn; sfx(fOn ? 'flameStart' : 'flameEnd'); flameGain?.gain.setTargetAtTime(fOn ? .45 : 0, t, fOn ? .04 : .08); }
   // eradicator motor
-  const spin = live && gunSpin ? gunSpinV / 30 : inLobby && hf.spin ? hf.spinV / 30 : 0; // yours, or the armory's
+  const spin = live && gunSpin && !spinIdle(gunShown) ? gunSpinV / 30 : inLobby && hf.spin && !spinIdle(hf.i) ? hf.spinV / 30 : 0; // yours, or the armory's (magic parts make no whine)
   if (spin > 0 && !spinOsc) { // a whine plus rushing air, pulsing as the barrels go round
     spinOsc = ac.createOscillator(); spinOsc.type = 'triangle';
     const air = ac.createBufferSource(), nb = ac.createBuffer(1, SR, SR), nd = nb.getChannelData(0); for (let i = 0; i < SR; i++) nd[i] = Math.random() * 2 - 1; air.buffer = nb; air.loop = true;

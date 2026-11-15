@@ -8,8 +8,10 @@ const puffMats = cs => cs.map(c => bitMat(c, PUFF_TEX));
 const EMBER_MATS = puffMats([0xff5a1a, 0xff9a2a, 0xffd060]), WIND_MATS = puffMats([0xffffff, 0xd8f2ff, 0xa8dcff]), SOUL_MATS = puffMats([0x6fffd8, 0xb8fff0, 0x2fc8a0]);
 const SPARK_MATS = [0xffe14a, 0xffffff, 0xfff08a].map(c => bitMat(c, SHARD_TEX));
 const ICE_MATS = [0x9fe8ff, 0xe8fbff, 0x5fb8ff].map(c => bitMat(c, SHARD_TEX)), RUNE_MATS = [0xffe08a, 0xffd060, 0xfff4c0].map(c => bitMat(c, STAR_MATS[0].map));
+const CRYSTAL_MATS = [0x8ff2ff, 0xff7fd4, 0xffffff].map(c => bitMat(c, SHARD_TEX)), WISP_MATS = puffMats([0x5fe8d8, 0xeafffb, 0x9ff6ea]), VOID_MATS = puffMats([0xb46bff, 0xe8d2ff, 0x6a2fd0]), AURORA_MATS = puffMats([0x4dff9a, 0x3dffd6, 0x4ab8ff, 0xa07bff]);
 // bits off a wand: [mats, count, speed, spread, life, size, gravity]
-const WAND_BITS = { ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0] };
+const WAND_BITS = { ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0],
+  crystal: [CRYSTAL_MATS, 3, 4, 2.6, .4, .08, 5], wisp: [WISP_MATS, 6, 1.6, 1.4, .5, .08, -2], void: [VOID_MATS, 8, 2.2, 2, .4, .1, 0], aurora: [AURORA_MATS, 8, 3, 2.2, .45, .1, -1] };
 function wandBits(k, at, sc, n, spread, size = 1) {
   const [mats, , , , life, sz, g] = WAND_BITS[k];
   for (let i = fxN(n); i > 0; i--)
@@ -26,6 +28,8 @@ const WAND_BOLT = {
   spell0: { spd: 160, glow: 0xff4a2a, core: 0xffd070, size: .34, bits: 'ember', gap: .4 },
   spell1: { spd: 160, glow: 0x6fc8ff, core: 0xf0fcff, size: .34, bits: 'ice', gap: .4 },
   spell2: { spd: 160, glow: 0xd8f6ff, core: 0xffffff, size: .34, bits: 'wind', gap: .4 },
+  wisp: { spd: 26, glow: 0x5fe8d8, core: 0xeafffb, size: .34, bits: 'wisp', gap: .35 }, // the armory's wisps and void orbs (the real ones are in mythics.js)
+  voidorb: { spd: 20, glow: 0x9a5aff, core: 0xe8d2ff, size: .45, bits: 'void', gap: .3 },
 };
 for (const K of Object.values(WAND_BOLT)) { K.mg = bitMat(K.glow, PUFF_TEX); K.mc = bitMat(K.core, PUFF_TEX); }
 const bolts = [], _bp = new THREE.Vector3(), _bt = new THREE.Vector3();

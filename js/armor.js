@@ -66,6 +66,10 @@ const wornSuit = () => { const id = prof.armorOn; return id && suitOf(id) && sui
 const basicWorn = () => { const n = Math.min(ARMOR_MAX, prof.armor | 0), u = prof.armorUse | 0; return u ? Math.min(u, n) : n; };
 const ARMOR_OFF = 'none', armorOff = () => prof.armorOn === ARMOR_OFF; // took it all off
 const wornArmor = () => { const s = wornSuit(); return s ? suitN(s.id, s.st) : armorOff() ? 0 : basicWorn(); };
+// pieces you wear but don't show (prof.hide bits); the stats stay
+const HIDE_BIT = { armor: 1, boots: 2, hats: 4 }, hidOn = k => !!((prof.hide | 0) & HIDE_BIT[k]);
+const unhide = k => { if (hidOn(k)) prof.hide &= ~HIDE_BIT[k]; };
+const shownArmor = () => hidOn('armor') ? 0 : wornArmor(); // what he shows
 const matchArmor = () => wornArmor();
 // bots get random armor up to your best tier, now and then a set piece
 const BOT_BARE = .15, BOT_SUIT = .25;

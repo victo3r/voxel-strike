@@ -3,9 +3,9 @@ const ray = new THREE.Raycaster(), ray2 = new THREE.Raycaster(), ndc = new THREE
 const headMul = w => w.headMul ?? HEAD_MUL; // the crossbow hits heads harder
 function shotTargets(rc) { const t = [ground, ...(rc ? coverAlong(rc.ray.origin, rc.ray.direction, rc.far) : crateMeshes)]; for (const zz of zombies) if (!zz.dead && !(net.coop && zz.type === 'bot')) t.push(...zz.parts); return t; } // rc: only the cover along that ray; co-op: shots go past teammates
 // recoil only moves the camera, your real aim stays put
-function recoilKick(w) {
+function recoilKick(w, k = 1) { // k: a part charge kicks less
   const r = RECOIL[w.id]; if (!r) return;
-  const soft = 1 - adsT * ADS_SOFT;
+  const soft = (1 - adsT * ADS_SOFT) * k;
   rec.tp = Math.min(REC_MAX, rec.tp + r.up * soft * (heavyKick(w) ? HEAVY.lift : 1));
   rec.ty = Math.max(-REC_MAX / 2, Math.min(REC_MAX / 2, rec.ty + (Math.random() - .5) * 2 * r.side * soft));
 }
@@ -22,11 +22,13 @@ const laserMat = new THREE.MeshBasicMaterial({ color: 0xd47bff, transparent: tru
 const trFrom = new THREE.Vector3(), trTo = new THREE.Vector3();
 let tracerN = 0;
 function tracerOk(w, k) { return w.laser || !w.scope && (w.pellets > 1 ? k % 3 === 0 : w.id !== 'eradicator' || (tracerN++ & 1) === 0); }
-function tracer(from, to, laser = false) {
+const tracerCols = {}, tracerCol = c => tracerCols[c] ??= new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .75, depthWrite: false }); // guns with their own tracer colour (the Crystal Companion)
+function tracer(from, to, laser = false, col = 0) {
   const len = from.distanceTo(to); if (len < TRACER_LEN + .5) return; // point blank: nothing to see
   const m = tracerPool.pop() || new THREE.Mesh(tracerGeo, tracerMat);
-  m.material = laser ? laserMat : tracerMat;
-  m.position.copy(from); m.lookAt(to); m.scale.set(laser ? .07 : .04, laser ? .07 : .04, TRACER_LEN);
+  m.material = laser ? laserMat : col ? tracerCol(col) : tracerMat;
+  const th = laser ? .07 : col ? .05 : .04;
+  m.position.copy(from); m.lookAt(to); m.scale.set(th, th, TRACER_LEN);
   scene.add(m); tracers.push({ m, from: from.clone(), dir: to.clone().sub(from).divideScalar(len), d: TRACER_LEN / 2, len });
 }
 function tracerTick(dt) {
@@ -37,16 +39,17 @@ function tracerTick(dt) {
   }
 }
 function clearTracers() { for (const t of tracers) { scene.remove(t.m); tracerPool.push(t.m); } tracers.length = 0; }
-function shoot() {
+function shoot(k) { // k: how charged the Aurora Rail was
   const w = WEAPONS[cur];
   if (cd > 0 || reloading > 0 || respawnT > 0) return;
   if (w.melee) return stab(w);
+  if (w.charge && k === undefined && ammo[cur] > 0) return; // it fires when you let go (chargeTick)
   if (ammo[cur] <= 0) { myBurst.bn = 0; if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
   ammo[cur]--; cd = burstCd(w, myBurst); net.shot(w); botHear(P.pos.x, P.pos.z, YOU_T, w.quiet); // bots hear it
-  if (gunSpin) gunSpinV = 30;
+  if (gunSpin) gunSpinV = spinKick(cur);
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);
-  else if (w.lance) fireLance(w);
+  else if (w.lance) fireLance(w, k);
   else {
     kick = 1; flashMesh.visible = true; flashLight.intensity = 3; flashT = flashTime(w); crossKick(kickFor(w)); recoilKick(w);
     if (!aiming) muzzleBits(w, flashMesh, scene, .6); // not while you aim: they'd fill the sight
@@ -55,6 +58,8 @@ function shoot() {
     if (w.rocket) fireRocket(w);
     else if (w.flare) fireFlare(w);
     else if (w.grenade) fireGrenade(w);
+    else if (w.wisp) fireWisp(w);
+    else if (w.vortex) fireVoid(w);
     else if (w.spell) castSpell(w, camera.position.clone(), camera.getWorldDirection(fwd).clone(), null, flashMesh);
     else {
       flashMesh.getWorldPosition(trFrom);
@@ -65,7 +70,7 @@ function shoot() {
         ray.setFromCamera(ndc, camera);
         const hit = ray.intersectObjects(shotTargets(ray), false)[0];
         const end = hit ? hit.point : ray.ray.at(60, trTo);
-        if (w.wand || w.bolt) wandBolt(w.wand || w.bolt, trFrom, end); else if (tracerOk(w, i)) tracer(trFrom, end, w.laser); // wands and darts throw a bolt
+        if (w.wand || w.bolt) wandBolt(w.wand || w.bolt, trFrom, end); else if (tracerOk(w, i)) tracer(trFrom, end, w.laser, w.tracer); // wands and darts throw a bolt
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
         if (zz && !zz.dead) {
@@ -131,18 +136,25 @@ function lanceTick(dt) {
   }
 }
 function clearLances() { for (const l of lances) { l.sc.remove(l.g); l.mats.forEach(m => m.dispose()); } lances.length = 0; }
-function fireLance(w) {
-  kick = 1; flashMesh.visible = true; flashLight.intensity = 3; flashT = flashTime(w); crossKick(kickFor(w)); recoilKick(w);
-  if (!aiming) muzzleBits(w, flashMesh, scene, .6);
-  sfx(w.id);
+function fireLance(w, k = 1) {
+  const full = !w.charge || k >= 1, kk = w.charge ? .35 + .65 * Math.min(1, k) : 1; // a part charge kicks less
+  kick = kk; flashMesh.visible = true; flashLight.intensity = 3 * kk; flashT = flashTime(w); crossKick(kickFor(w) * kk); recoilKick(w, kk);
+  if (!aiming) muzzleBits(w, flashMesh, scene, .6 * kk);
+  sfx(w.charge ? full ? 'auroraFull' : 'aurora' : w.id);
+  if (w.charge && full) net.ev('full');
   ray.setFromCamera(ndc.set(0, 0), camera);
-  const L = lanceLine(ray.ray.origin, ray.ray.direction, w, shotTargets(ray), null, zz => zz.type === 'bot' && friendly(null, zz));
-  for (const h of L.hits) hurtZombie(h.zz, w.dmg * h.mul * (h.head ? headMul(w) : 1), h.point, h.head, false, null, 0, 0, h.thru);
+  const W = w.charge ? { ...w, pierce: full, wallBreak: full } : w; // only a full charge goes through
+  const L = lanceLine(ray.ray.origin, ray.ray.direction, W, shotTargets(ray), null, zz => zz.type === 'bot' && friendly(null, zz));
+  shotCharge = w.charge ? Math.min(1, k) : 1;
+  for (const h of L.hits) hurtZombie(h.zz, w.dmg * chargeMul(w, k) * h.mul * (h.head ? headMul(w) : 1), h.point, h.head, false, null, 0, 0, h.thru);
+  shotCharge = 1;
   // through a sight it starts further out, or it would cover the view
-  if (adsT > .5 && (w.scope || gunHolo)) {
-    const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), D = Math.min(.5 / t, .4 * camera.position.distanceTo(L.end));
-    showLance(camera.localToWorld(_lf.set(0, -.7 * D * t, -D)), L, w.lance, .3);
-  } else { const g = cur; showLance(flashMesh.getWorldPosition(_lf), L, w.lance, 1, scene, flashMesh, () => cur === g && respawnT <= 0); }
+  const g = cur, held = () => cur === g && respawnT <= 0, scoped = adsT > .5 && (w.scope || gunHolo);
+  let from = flashMesh.getWorldPosition(_lf);
+  if (scoped) { const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), D = Math.min(.5 / t, .4 * camera.position.distanceTo(L.end)); from = camera.localToWorld(_lf.set(0, -.7 * D * t, -D)); }
+  if (w.charge) auroraBeam(from, L, k, scoped ? .3 : 1, scoped ? null : flashMesh, scoped ? null : held);
+  else if (scoped) showLance(from, L, w.lance, .3);
+  else showLance(from, L, w.lance, 1, scene, flashMesh, held);
 }
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {

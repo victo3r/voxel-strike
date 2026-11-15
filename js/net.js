@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 6; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 7; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -79,10 +79,10 @@ net = (() => {
   function myGear() { // every gun you own, since you can swap mid-match
     const load = CATS.map(([c]) => BASE[loadoutGun(c)].id), stars = {};
     BASE.forEach((w, i) => { if (hasGun(i)) stars[w.id] = Math.max(0, Math.min(2, gunUse(i) - 1)); });
-    return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load };
+    return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load, lv: prof.lv }; // lv: how grown a gun that grows is
   }
   function hello(rejoin = null) {
-    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookBase(), gear: myGear(), lv: prof.lv }; // a drawn skin follows in its own message
+    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookSent(), gear: myGear(), lv: prof.lv }; // a drawn skin follows in its own message
     if (auth?.token) m.token = auth.token; else m.guest = guestId;
     if (rejoin) m.rejoin = rejoin;
     send(m);
@@ -302,13 +302,13 @@ net = (() => {
   // their gear as the fields the bot code reads
   function gearFields(gear) {
     gear = gear || {};
-    const stars = {}, W = {};
-    BASE.forEach((w, i) => { stars[i] = Math.max(0, Math.min(2, gear.stars?.[w.id] | 0)); W[i] = statsAt(i, stars[i]); });
+    const stars = {}, W = {}, lv = Math.max(1, Math.min(LV_MAX, gear.lv | 0));
+    BASE.forEach((w, i) => { stars[i] = Math.max(0, Math.min(2, gear.stars?.[w.id] | 0)); W[i] = statsAt(i, stars[i], lv); });
     const load = CATS.map(([c], k) => { const i = gi(gear.load?.[k]); return i !== undefined && BASE[i].cat === c ? i : BASE.findIndex(w => w.cat === c && w.start); });
     const boots = gear.boots && bootOf(gear.boots.id) ? { id: gear.boots.id, st: Math.max(1, Math.min(3, gear.boots.st | 0)) } : null;
     const hat = gear.hat && hatOf(gear.hat.id) ? { id: gear.hat.id, st: Math.max(1, Math.min(3, gear.hat.st | 0)), ...(hatSkinOf(gear.hat.skin) ? { skin: gear.hat.skin } : {}) } : null;
     const armor = Math.max(0, Math.min(ARMOR_ALL, gear.armor | 0));
-    return { stars, load, W, boots, hat, armor, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
+    return { stars, load, W, lv, boots, hat, armor, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
   }
   function gearMsg(m) { // someone changed gear mid-match
     if (m.pid === undefined) { if (roomMode !== 'coop') { P.maxArmor = m.maxArmor; P.armor = m.armor; } return; } // the server's answer to your own change (co-op: your armor's yours, shop plates and all)
@@ -554,12 +554,13 @@ net = (() => {
       const b = wandBolt('spell' + el, tip, from.clone().addScaledVector(dir, SPELL_FAR)); b.ghost = id; b.el = el;
       return;
     }
-    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : null)?.(w, from, dir, by, { ghost: true, id });
+    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : w.wisp ? fireWisp : w.vortex ? fireVoid : null)?.(w, from, dir, by, { ghost: true, id });
   }
   function remoteBoom(m) {
     const id = m.pid * 100000 + m.id, p = new THREE.Vector3(...m.p);
     const sb = bolts.findIndex(b => b.ghost === id);
     if (sb >= 0) { const b = bolts[sb]; b.ms.forEach(x => b.sc.remove(x)); bolts.splice(sb, 1); spellFx(p, b.el); return; }
+    if (mythBoom(id, p, m.g, bodyOf(m.pid))) return; // a wisp, or a void opening
     let kind = 'rocket', gust = false;
     for (const list of [rockets, flares, grenades]) {
       const k = list.findIndex(x => x.ghost && x.id === id);
@@ -584,7 +585,8 @@ net = (() => {
       while (buf.length > 2 && buf[1].ts < st - NET_HIST) buf.shift();
       r.fired += fd | 0; r.burn = burn | 0;
       const rl = !!(flags & 2); if (rl && !r.reloadWas) r.q |= 2; r.reloadWas = rl;
-      if (flags & 64) r.q |= 64; if (flags & 256) r.q |= 256;
+      if (flags & 64) r.q |= 64; if (flags & 256) r.q |= 256; if (flags & 4096) r.q |= 4096;
+      r.charging = !!(flags & 2048); // the Aurora Rail
       if (roomMode === 'coop') { // down, or waiting for the next wave
         const dn = !!(flags & 512); if (dn && !r.down) { feed(`${nameTag(r.rec)} is down`); sfx('die', { at: r.body?.g.position, far: 40, v: .6 }); }
         r.down = dn; r.wait = !!(flags & 1024);
@@ -633,14 +635,18 @@ net = (() => {
     if (r.q & 64) { sfx('djump', { at: pos, far: 20, v: .7 }); burst(fv.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     if (r.q & 256) { sfx('dash', { at: pos, far: 25, v: .8 }); burst(fv.set(pos.x, pos.y + .8, pos.z), 0xbff6fa, 6); }
     wingTick(z, !!(cur.flags & 16), dt); // Skyrunner wings while they glide
-    r.q = 0;
+    if (W.charge) { // their coils light up while they charge
+      z.chargeK = r.charging ? Math.min(1, (z.chargeK || 0) + dt / W.charge) : 0; chargeShow(z.charges, z.chargeK);
+      if (z.chargeK >= 1 && !z.chargeFull) sfx('chargeReady', { at: pos, far: 30, v: .6 }); z.chargeFull = z.chargeK >= 1;
+    }
+    const full = !!(r.q & 4096); r.q = 0;
     if (r.fired) {
       const n = Math.min(r.fired, 3); r.fired = 0; z.ammo = Math.max(0, z.ammo - n); // just for the rockets in a Salvo's tubes
       if (W.melee) {
         sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING;
         if (W.wand && z.flashM) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); stunZap(z.flashM.getWorldPosition(fv).clone(), zapEnd(W, eyeV, dirV, z)); } // their stun blast, just for show
       }
-      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
+      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.charge ? full ? 'auroraFull' : 'aurora' : W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
       if ((W.wand || W.bolt) && !W.melee && !W.beam) { // a wand flicks and throws a bolt, a dart just flies (a spell comes in its own message)
         if (W.wand) z.wandT = .15;
         if (!W.spell && z.flashM) { // where it lands, just for show: the first wall or body, you included
@@ -649,11 +655,14 @@ net = (() => {
           wandBolt(W.wand || W.bolt, z.flashM.getWorldPosition(fv).clone(), yd < Infinity ? youHitP.clone() : L.end);
         }
       }
-      if (W.lance) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); const g = z.gun; showLance(z.flashM.getWorldPosition(fv).clone(), lanceLine(eyeV, dirV, W, [ground, ...crateMeshes]), W.lance, 1, scene, z.flashM, () => z.gun === g && !z.dead); } // their beam, just for show
+      if (W.lance) { // their beam, just for show
+        eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); const g = z.gun, L = lanceLine(eyeV, dirV, W.charge ? { ...W, wallBreak: full } : W, [ground, ...crateMeshes]), held = () => z.gun === g && !z.dead;
+        if (W.charge) auroraBeam(z.flashM.getWorldPosition(fv).clone(), L, full ? 1 : .4, 1, z.flashM, held); else showLance(z.flashM.getWorldPosition(fv).clone(), L, W.lance, 1, scene, z.flashM, held);
+      }
     }
-    z.muzzle -= dt; z.flashM.visible = z.muzzle > 0;
+    z.muzzle -= dt; z.flashM.visible = z.muzzle > 0; if (z.pulse) pulseShow(z.pulse, z.muzzle > 0);
     z.stab = Math.max(0, z.stab - dt); knifeChop(z);
-    if (z.spin) { if (z.muzzle > 0) z.spinV = 30; z.spin.rotation.z += z.spinV * dt; z.spinV = Math.max(0, z.spinV - dt * 25); }
+    if (z.spin) { if (z.muzzle > 0) z.spinV = spinKick(z.gun); spinTurn(z.spin, z.spinV + spinIdle(z.gun), dt); z.spinV = Math.max(0, z.spinV - dt * 25); }
     if (z.round) z.round.visible = true;
     // flame and heat ray stay on while they hold fire
     const firing = !!(cur.flags & 4) && (W.flame || W.beam);
@@ -693,7 +702,7 @@ net = (() => {
     let flags = evFlags; evFlags = 0;
     if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8; if (P.gliding) flags |= 16;
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
-    if (P.downed) flags |= 512; if (P.waiting) flags |= 1024;
+    if (P.downed) flags |= 512; if (P.waiting) flags |= 1024; if (chargeT > 0) flags |= 2048; // 2048 charging, 4096 (an event) a full charge went off
     const h = hits; hits = [];
     const f = fired; fired = 0;
     clock.off += Math.max(-3, Math.min(3, clock.target - clock.off)); // slide, don't jump
@@ -706,6 +715,7 @@ net = (() => {
       if (!b || b.dead) { r.fired = 0; r.hits = []; continue; }
       let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (b.aimT > 0) bf |= 1; if (b.gliding) bf |= 16;
       if (b.dashFlag) { bf |= 256; b.dashFlag = false; }
+      if (b.chargeK > 0) bf |= 2048; if (b.fullFlag) { bf |= 4096; b.fullFlag = false; }
       if (b.drownFlag) { bf |= 128; b.drownFlag = false; }
       const q = b.g.position;
       botRows.push([r.rec.pid, r3(q.x), r3(q.y), r3(q.z), r3(wrapAng(b.aimYaw - Math.PI)), r3(b.aimPitch), BASE[b.gun].id, bf, r.fired, r.hits]);
@@ -741,6 +751,7 @@ net = (() => {
     // where the victim was when you saw it
     const r = remotes.get(vp), seen = r && r.body === victim && r.seenT ? r.seenT : now();
     const c = [vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(seen), o.pj | 0, o.thru | 0]; // thru: how a lance got there
+    if (BASE[gi(gun)]?.charge) c.push(Math.round(shotCharge * 100)); // how charged the shot was
     c.s = shotN; list.push(c);
   }
   const burn = (victim, gunId, by, pj) => claim(victim, { kind: 7, gun: gunId, pellets: 1, by, pj });
@@ -847,7 +858,7 @@ net = (() => {
 
   Object.assign(api, {
     coopTick, mates: () => mateList, recOf, zHit, zEvent: e => { if (zev.length < 60) zev.push(e); }, zHurt: h => { if (zhurts.length < 20) zhurts.push(h); }, zSend: send,
-    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : 32; },
+    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : k === 'full' ? 4096 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
   Object.defineProperties(api, { // read live
