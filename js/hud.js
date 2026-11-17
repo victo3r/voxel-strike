@@ -51,6 +51,7 @@ const CROSSES = {
   eradicator: () => [...xDot(), ...xLines(9, 6), ...xTicks(10, 13)],
   voxel: () => [...xDot(), ...xLines(4, 6)],
   hitman: () => [...xDot(), ...xLines(4, 6)],
+  daybreak: () => [...xDot(), ...xArcs(9, DIAG, 40)], highnoon: () => [...xDot(), ...xLines(6, 7), ...xArcs(11, DIAG, 30)], // a sun's rays
   knife: () => [...xDot(), ...xLines(4, 6)],
   herosword: () => [...xDot(), ...xLines(5, 7)],
   executioner: () => [...xDot(), ...xLines(5, 6), ...xTicks(8, 10)],

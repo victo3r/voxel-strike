@@ -62,7 +62,7 @@ function gunAttrs(w) {
   else if (w.auto) a.push('AUTOMATIC');
   else if (autoFire(w)) a.push('RAPID FIRE');
   else if (w.mag > 1) a.push('SEMI-AUTO');
-  if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : w.bow ? 'BOW SIGHT' : 'HOLO SIGHT');
+  if (w.zoom) a.push(w.zoom + 'X ZOOM', w.scope ? 'SCOPE' : w.bow ? 'BOW SIGHT' : w.irons ? 'IRON SIGHTS' : 'HOLO SIGHT');
   if (w.quiet) a.push(w.bow || w.bolt ? 'SILENT' : 'SUPPRESSED');
   if (w.headMul) a.push('HEADSHOT X' + w.headMul);
   if (w.pool) a.push('NO RELOADS');
@@ -135,6 +135,8 @@ const DESC = {
   aurora: 'Fill its coils with northern lights, then let go and cut through everything',
   crystal: 'A rifle of living crystal that grows stronger every time you do',
   tishot: 'A drum of shells and a wall of pellets, polished to a shine',
+  daybreak: 'A six shooter the colour of sunrise, for players who came back',
+  highnoon: 'A lever rifle that settles things at midday, a first week keepsake',
   tipistol: 'A heavy titanium hand cannon that hits like a rifle',
   tisword: 'A broad titanium blade with an edge that never dulls',
   tisaw: 'Throws spinning saw blades that cut through a whole row and skip off walls',
@@ -167,12 +169,12 @@ function gunSpecs(i) {
   if (w.pierce) out.push(['PIERCE', `-${Math.round((1 - PIERCE_FALL) * 100)}% A BODY`]);
   if (w.wallBreak) out.push(['THROUGH WALLS', `${Math.round(WALL_MUL * 100)}% DAMAGE`]);
   if (w.grow) out.push(['GROWS WITH YOU', growNext(i) ? 'NEXT AT LVL ' + growNext(i) : 'FULLY GROWN']);
-  if (w.chest) out.push(['FOUND IN', 'GOLDEN CHESTS']);
+  if (w.chest) out.push(['FOUND IN', w.gift ? 'THE WELCOME WEEK, GOLDEN CHESTS' : 'GOLDEN CHESTS']);
   else if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }
-// a category's list, by unlock level. A chest gun joins it once it's yours: at the very bottom, or right after what your level has unlocked if it grows with you
-const listAt = i => { const w = BASE[i]; return !w.chest ? w.unlock ?? 0 : w.grow ? Math.min(prof.lv, w.grow.top) + .5 : 1e9; };
+// a category's list, by level. A chest gun joins it once it's yours, at its own level (your level, if it grows with you)
+const listAt = i => { const w = BASE[i]; return w.grow ? Math.min(prof.lv, w.grow.top) + .5 : w.unlock ?? 0; };
 const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat && (!BASE[i].chest || hasGun(i))).sort((a, b) => listAt(a) - listAt(b));
 const exclList = () => BASE.map((w, i) => i).filter(i => BASE[i].chest); // only from chests: the EXCLUSIVE page
 const isLocked = i => !hasGun(i) && prof.lv < (BASE[i].unlock ?? 0);
@@ -186,7 +188,7 @@ const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIV
 const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare', 'eradicator', 'rocket', 'hitman', 'heatray', 'thrasher', 'semisniper', 'herosword', 'shockbeam', 'tigerbite', 'executioner',
   'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
   'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
-  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket'];
+  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon'];
 const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
 function renderIndex() {
   const list = indexList(), have = list.filter(hasGun).length;
@@ -205,7 +207,7 @@ let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, ge
 let armBare = false; // after TAKE OFF he shows what you wear, not the picked card
 const myArmor = () => Math.min(ARMOR_MAX, prof.armor | 0);
 const pageIcon = p => p === 'weapons' ? gunPic(loadoutGun('primary')) : p === 'exclusive' ? gunPic(exclList()[0]) : p === 'index' ? gunPic(gi(GUN_ORDER[0])) : armorPic(Math.max(0, wornArmor() - 1));
-const EXCL_DESC = 'Rare finds from golden chests, never for sale';
+const EXCL_DESC = 'Gifts and rare finds from golden chests, never for sale';
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
   $('armPages').innerHTML = PAGES.map(([p, label]) =>
@@ -222,7 +224,7 @@ function renderArmory() {
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
   else $('armList').innerHTML = (excl ? `<p class="wd">${EXCL_DESC}</p>` : '') + list.map(i => {
-    const w = BASE[i], tag = chestOnly(i) ? `${ico('lock')} GOLDEN CHEST` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : on(i) ? 'EQUIPPED' : '';
+    const w = BASE[i], tag = chestOnly(i) ? `${ico('lock')} ${w.gift ? 'WELCOME GIFT' : 'GOLDEN CHEST'}` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : on(i) ? 'EQUIPPED' : '';
     return `<div class="card rr${isLocked(i) || chestOnly(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${on(i) ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${gunPic(i)}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
@@ -239,7 +241,7 @@ function renderAct() {
   if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(w.cat);
   let btns;
-  if (chestOnly(i)) btns = `<button disabled>${ico('lock')} FOUND IN GOLDEN CHESTS</button>`;
+  if (chestOnly(i)) btns = `<button disabled>${ico('lock')} ${BASE[i].gift ? 'A WELCOME WEEK GIFT, OR IN GOLDEN CHESTS' : 'FOUND IN GOLDEN CHESTS'}</button>`;
   else if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
   else if (!hasGun(i)) btns = `<button data-buy="${i}" ${prof.coins < w.price ? 'disabled' : ''}>BUY ${COIN}${w.price}</button>`;
   else {
@@ -473,10 +475,12 @@ let drawSure = -1; // delete needs a second click
 // secret codes, kept as hashes
 let codeOn = false, codeMsg = '';
 const CODES = { '5690d215caed2a6699cdf70479d8c6447be1e39a14bb6ad7aa96f31e91b32031': 'creature', '1c48319173d993e160c8c14a377f7aa4357d5a09fa41df198c6862db2cf28f03': 'creature',
-  '5467529071157e32ac53218d0d4ceb6c558faf4acff3f96fb171158dd0072327': 'evergreen', '8852032455ce783ddeae72e9f41cf20e3ff6ead5c35249ecb90cc003292797e6': 'hat:map' };
+  '5467529071157e32ac53218d0d4ceb6c558faf4acff3f96fb171158dd0072327': 'evergreen', '8852032455ce783ddeae72e9f41cf20e3ff6ead5c35249ecb90cc003292797e6': 'hat:map',
+  '06e1a5d53766a0be3db629e2a732262c41ceec5f2c394873351b137aa8f6e50f': 'hat:octopus', 'e0eb5a9059ccd1fae3b75c96f5c1456b6cde04a9e572c7bcfffc933e50679e42': 'hat:octopus' };
 const SECRET_HI = { creature: ["Victor's Creature wakes up and joins your skins", "Victor's Creature is already yours"],
   evergreen: ['Evergreen lights up and joins your skins', 'Evergreen is already yours'],
-  'hat:map': ['The Map Hat unrolls, find it in the SKINS of any hat', 'The Map Hat is already yours'] };
+  'hat:map': ['The Map Hat unrolls, find it in the SKINS of any hat', 'The Map Hat is already yours'],
+  'hat:octopus': ['An octopus climbs aboard, find it in the SKINS of any hat', 'The Octopus Hat is already yours'] };
 async function redeem() {
   const c = ($('secretIn')?.value || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!c) return;
   let id = null;

@@ -377,6 +377,8 @@ const SHOP = [
   { gun: 'voidlantern', price: 560, desc: 'pulls a whole crowd together, then pops' },
   { gun: 'aurora', price: 500, desc: 'hold to charge, a full one goes through the lot' },
   { gun: 'tishot', price: 620, desc: 'a drum of shells, 7 pellets a blast' },
+  { gun: 'daybreak', price: 150, desc: 'six heavy shots from a sunrise revolver' },
+  { gun: 'highnoon', price: 300, desc: 'a lever rifle that drops them one by one' },
   { gun: 'tipistol', price: 520, desc: 'a hand cannon that hits like a rifle' },
   { gun: 'tisword', price: 540, desc: `${BASE[gi('tisword')].dmg} a swing, long reach` },
   { gun: 'tisaw', price: 600, desc: 'saw blades that cut through rows and skip off walls' },
@@ -508,8 +510,8 @@ function zombiesOver() {
   else $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`)
     + (auth ? '' : row('TOP PLAYERS', sign));
   if (co) { coopRank(); if (typeof frPostButtons === 'function') frPostButtons(); } else zRankRow();
-  missionEnd(false);
-  $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), barTile(runBars), boxTile(runBoxes), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
+  missionEnd(false); dailyPlayed(); funnelEnd();
+  $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), barTile(runBars), boxTile(runBoxes), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}${unlockRow()}`
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');

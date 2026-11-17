@@ -447,7 +447,7 @@ const clock = new THREE.Clock();
 let bootFrames = 0;
 function bootDone() {
   if (bootFrames < 0 || ++bootFrames < 3) return;
-  bootFrames = -1; cgLoaded(); // tell CrazyGames loading is done
+  bootFrames = -1; cgLoaded(); funnelBoot(); // tell CrazyGames loading is done
   document.body.classList.replace('boot', 'booting');
   setTimeout(() => document.body.classList.remove('booting'), 600);
 }
@@ -495,6 +495,7 @@ function autoGfx(raw, playing) {
   const isLive = () => !dead && !matchOver && (net.coop || !shopOpen && (pvp() || locked));
   const live = isLive();
   cgPlay(live && locked && !inLobby); // tell CrazyGames you're playing
+  if (live && locked && !inLobby) funnelPlay(raw);
   autoGfx(raw, live && locked);
   if (live) for (let k = 0; k < steps && (k === 0 || isLive()); k++) update(sdt);
   const sitOut = net.coop && (!net.alive || P.downed || P.waiting); // co-op: joining, down or waiting, so the gun isn't updating

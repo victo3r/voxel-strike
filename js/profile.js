@@ -58,6 +58,16 @@ const xpTile = n => [ico('xp'), 'XP', `+${n}`, 'tx'], coinTile = n => [COIN, 'CO
 const barChest = () => CHESTS.findIndex(c => c.id === BAR_CHEST), boxTile = n => n ? [`<img src="${chestPic(barChest())}">`, CHESTS[barChest()].name, `+${n}`, 'tbr'] : null;
 const barWord = () => barNext() ? 'BAR' : 'CHESTS';
 const xpText = () => prof.lv >= LV_MAX ? `NEXT ${barNext() ? 'BAR' : BAR_CHESTS + ' CHESTS'} ${prof.barXp | 0} / ${BAR_XP} XP` : `${prof.xp} / ${xpNeed(prof.lv)} XP`;
+// what the armory opens at a level: [picture, name] for its guns (not ones you have), armor, boots and hats
+const unlocksAt = lv => [...BASE.map((w, i) => w.price && !w.chest && w.unlock === lv && !prof.guns[w.id] && [gunPic(i), w.name]), ...SUITS.map(S => S.unlock[0] === lv && [armorPic(suitN(S.id, 1) - 1), S.name]),
+  ...BOOTS.map(b => b.unlock === lv && [bootPic(b.id, 1), b.name]), ...HATS.map(h => h.unlock === lv && [hatPic(h.id, 1), h.name])].filter(Boolean);
+const unlockPics = list => list.slice(0, 4).map(([pic, name]) => `<span><img src="${pic}">${name.replace(/"/g, '').toUpperCase()}</span>`).join('');
+// results screen: what the levels you just reached opened, or what the next one will
+function unlockRow(ups = 0) {
+  if (ups) { const got = []; for (let l = prof.lv - ups + 1; l <= prof.lv; l++) got.push(...unlocksAt(l)); return got.length ? `<div class="nx new"><b>NEW IN THE ARMORY</b>${unlockPics(got)}</div>` : ''; }
+  for (let l = prof.lv + 1; l <= LV_MAX; l++) { const u = unlocksAt(l); if (u.length) return `<div class="nx"><b>LVL ${l} UNLOCKS</b>${unlockPics(u)}</div>`; }
+  return '';
+}
 function showProf() { // lobby level badge and coins
   const max = prof.lv >= LV_MAX;
   $('prof').innerHTML = `<div class="lv${max ? ' max' : ''}"><b><small>LVL</small>${prof.lv}</b><div class="xp"><small>${max ? `${barWord()} <span>${prof.barXp | 0} / ${BAR_XP}</span> XP` : `<span>${prof.xp} / ${xpNeed(prof.lv)}</span> XP`}</small>${xpBar()}</div></div>`;

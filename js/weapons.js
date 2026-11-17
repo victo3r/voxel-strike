@@ -54,6 +54,9 @@ const BASE = [
   { id: 'tisaw', rar: 'mythic', hold: 'rifle', name: 'Titanium Ripsaw', cat: 'special', unlock: 50, price: 2500, mob: 60, saw: true, pierce: true, dmg: 120, rate: .7, mag: 5, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0xc3ccd6, len: .7 },
   { id: 'tisniper', rar: 'mythic', hold: 'rifle', name: 'Titanium Longshot', cat: 'sniper', unlock: 50, price: 2500, mob: 58, zoom: 6, scope: true, dmg: 160, rate: 1, mag: 5, reload: 2, pellets: 1, spread: 0, auto: false, color: 0xc3ccd6, len: .95 },
   { id: 'tirocket', rar: 'mythic', hold: 'shoulder', name: 'Titanium Launcher', cat: 'premium', unlock: 50, price: 2500, mob: 55, rocket: true, tubes: true, dmg: 170, rate: .9, mag: 2, reload: 2.4, pellets: 1, spread: 0, auto: false, color: 0xc3ccd6, len: .8 },
+  // the welcome week's two (js/daily.js): never sold, a rare find in golden chests otherwise
+  { id: 'daybreak', rar: 'rare', hold: 'pistol', name: 'Daybreak', cat: 'backup', unlock: 4, price: 110, chest: true, gift: true, drop: 1, mob: 70, zoom: 2, irons: true, action: 'SIX SHOOTER', dmg: 34, rate: .38, mag: 6, reload: 1.7, pellets: 1, spread: 0, auto: false, color: 0xf0a030, len: .45 },
+  { id: 'highnoon', rar: 'epic', hold: 'rifle', name: 'High Noon', cat: 'primary', unlock: 10, price: 300, chest: true, gift: true, drop: .6, mob: 60, zoom: 3, irons: true, action: 'LEVER ACTION', dmg: 55, rate: .5, mag: 8, reload: 2, pellets: 1, spread: .002, auto: false, color: 0xe0a83c, len: .75 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -92,6 +95,7 @@ const RECOIL = {
   windwand: { up: 1.2, side: .3, back: .9 }, flamewand: { up: .5, side: .22, back: 1.1 }, soulwand: { up: 1.6, side: .2, back: .4 }, ancientwand: { up: 2.2, side: .3, back: .55 },
   hornet: { up: .62, side: .2, back: 1 }, salvo: { up: 2.3, side: .35, back: .55 }, apex: { up: 2.1, side: .22, back: .3 }, tracker: { up: 1.3, side: .25, back: 1 }, tempest: { up: .06, side: .1, back: 2 },
   tishot: { up: 2.6, side: .45, back: .65 }, tipistol: { up: 1.7, side: .3, back: .9 }, tisaw: { up: 1.6, side: .3, back: .7 }, tisniper: { up: 2, side: .2, back: .3 }, tirocket: { up: 2.4, side: .35, back: .55 },
+  daybreak: { up: 1.9, side: .3, back: .9 }, highnoon: { up: 1.7, side: .2, back: .4 },
   crystal: { up: .5, side: .2, back: 1 }, wisp: { up: .9, side: .2, back: 1 }, voidlantern: { up: 1, side: .25, back: .8 }, aurora: { up: 2.3, side: .2, back: .3 },
 };
 // big single-shot energy guns kick higher and take longer to settle: every lance gun, or heavyKick on a gun
@@ -203,6 +207,13 @@ const FLASH_FX = {
   }, .4, 1.15);
   for (const id of ['tishot', 'tipistol', 'tisniper']) FLASH_FX[id] = { spr, light: 0xcfe4ff, t: id === 'tisniper' ? .1 : .06, bits: 'ti' };
 }
+{ // the welcome guns: a little sunrise
+  const spr = flashSpr((dx, dy) => {
+    const r = Math.hypot(dx, dy), ray = Math.min(dx, dy) < 1 || Math.abs(dx - dy) < 1;
+    if (r < 2.5) return '#fffbe0'; if (r < 4.5) return '#ffd24a'; if (ray && r < 7.8) return r < 6 ? '#ffb02a' : '#ff7a2a';
+  }, .4, 1.1);
+  for (const id of ['daybreak', 'highnoon']) FLASH_FX[id] = { spr, light: 0xffc060, t: .06, bits: 'spark' };
+}
 const flashOf = w => FLASH_FX[w.id]?.spr || FLASH_SPR, flashTime = w => FLASH_FX[w.id]?.t ?? (w.scope ? .1 : .05);
 function makeFlash(size = .1, mat = FLASH_SPR) {
   const s = new THREE.Sprite(mat); s.scale.setScalar(size);
@@ -251,6 +262,8 @@ const RELOAD_ANIM = (() => {
     voxel: pistol(-.3), hitman: pistol(-.4), executioner: pistol(-.35), tigerbite: magSwap(-.35, .38, .16), ar: magSwap(-.4, .34), thrasher: magSwap(-.5, .38, .24), starsmasher: magSwap(-.45, .4, .22), semisniper: magSwap(-.35, .38, .16), aerial: magSwap(-.4, .36, .2),
     rubypierce: pistol(-.35), paragon: magSwap(-.35, .38, .16), hornet: magSwap(-.45, .36, .2), apex: magSwap(-.35, .4, .16), tracker: pistol(-.38), wisp: pistol(-.32), aurora: magSwap(-.38, .4, .16), crystal: magSwap(-.45, .38, .22), tishot: magSwap(-.45, .42, .22), tipistol: pistol(-.36), tisaw: magSwap(-.4, .4, .2), tisniper: magSwap(-.35, .4, .16),
     flamewand: wandRl, windwand: wandRl, soulwand: wandRl, ancientwand: wandRl,
+    daybreak: (() => { const h = { rx: .4, rz: -.35, y: .06, x: -.05 }, o = { ...h, mx: -.07 }; return [[0, {}], [.12, h], [.2, o], ...dips(o, 3, .24, .7), [.76, o], [.84, h], [.93, { rx: .06 }], [1, {}]]; })(), // the cylinder out, rounds in, shut
+    highnoon: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, my: -.05, mz: .02 }], [.95, { z: -.012 }], [1, {}]],
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     trex: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
@@ -1004,6 +1017,30 @@ const GUN_MODELS = {
     p(4, 4, 4, gm, 0, -6, -2); p(4, 3, 4, gm, 0, -9.5, -1); // pistol grip
     p(1, 1, 2, dark, 0, -7.5, -5); p(1, 2, 1, mat(0x777777), 0, -5, -4.5); // guard (closed by the drum) and trigger
     return { muzzle: [1, -38], grip: [4, 7, 5, 0, -7.5, -1.5], fore: [6, 3, 12, 0, -3.5, -24], bands: [-32, -35], band: [8, 8, 1], mag };
+  },
+  daybreak({ p, mat, dark, glow, sub, at }) {
+    const sun = mat(0xf0a030), hi = mat(0xffd070), rose = mat(0xe8603c), iv = mat(0xf3e6c8), div = mat(0xcbb890), ray = glow(0xfff0a0);
+    p(4, 4, 13, sun, 0, 3, -16.5); p(4, 1, 13, hi, 0, 4.5, -16.5); // a long barrel, lit along the top
+    p(2, 2, 9, dark, 0, 0, -14.5); p(2, 1, 1, dark, 0, 5.5, -22.5); // ejector rod, front sight
+    p(4, 11, 3, sun, 0, 1.5, -.5); p(4, 1, 8, sun, 0, 6.5, -6); p(4, 3, 10, sun, 0, -2.5, -6); // the frame: behind the cylinder, over it and under it
+    p(2, 2, 2, dark, 0, 8, 1); // hammer
+    const mag = sub(0, 0, 0), mg = at(mag); mg(6, 7, 8, rose, 0, 2.5, -6); for (const y of [.5, 4.5]) mg(6, 1, 6, sun, 0, y, -6); // the cylinder and its flutes (it swings out to reload)
+    mg(6, 1, 4, ray, 0, 2.5, -6); mg(6, 3, 2, ray, 0, 2.5, -6); // a little sun on each side
+    p(1, 1, 5, dark, 0, -6.5, -7.5); p(1, 2, 1, dark, 0, -5, -9.5); p(1, 2, 1, mat(0x777777), 0, -5, -6.5); // guard and trigger
+    p(4, 3, 5, iv, 0, -5.5, -3.5); p(4, 3, 5, iv, 0, -8.5, -2.5); p(4, 2, 6, div, 0, -11, -2); // a curved ivory grip
+    return { muzzle: [3, -23], grip: [4, 7, 6, 0, -7.5, -3], fore: null, bands: [-13, -17], band: [6, 6, 3], mag };
+  },
+  highnoon({ p, mat, dark, glow, sub, at }) {
+    const wood = mat(0x8a5a32), dwood = mat(0x5c3a1e), brass = mat(0xe0a83c), hi = mat(0xffd070), tube = mat(0x4a4a4e), ray = glow(0xfff0a0);
+    p(4, 5, 12, wood, 0, -.5, 6); p(4, 5, 1, dwood, 0, -.5, 12.5); p(4, 5, 4, wood, 0, -5.5, 2); // a straight stock, its butt plate, a grip under it
+    p(6, 7, 10, brass, 0, 1.5, -5); p(6, 1, 10, hi, 0, 4.5, -5); // brass receiver, lit along the top
+    p(6, 3, 1, ray, 0, .5, -5.5); p(6, 1, 3, ray, 0, .5, -5.5); // the sun on its side
+    p(2, 2, 2, dark, 0, 6, -1); p(2, 1, 1, dark, 0, 5.5, -11.5); p(2, 2, 1, dark, 0, 6, -41.5); // hammer, rear sight, front sight
+    p(4, 4, 32, mat(GUN_STEEL), 0, 3, -26); p(4, 3, 26, tube, 0, -.5, -23); // a long barrel, the magazine tube under it
+    p(6, 5, 12, wood, 0, -.5, -16); p(6, 7, 1, brass, 0, 1.5, -35.5); // forend, muzzle band
+    p(1, 1, 4, dark, 0, -4.5, -5); p(1, 2, 1, dark, 0, -3, -7.5); p(1, 2, 1, mat(0x777777), 0, -3, -4.5); // guard and trigger
+    const mag = sub(0, 0, 0), mg = at(mag); mg(1, 1, 3, dark, 0, -4.5, -1.5); mg(1, 3, 1, dark, 0, -6.5, -1.5); mg(1, 1, 6, dark, 0, -8.5, 1); mg(1, 5, 1, dark, 0, -5.5, 4.5); // the lever: a loop round the grip (worked at the end of a reload)
+    return { muzzle: [3, -42], grip: [4, 7, 7, 0, -5.5, 1.5], fore: [6, 5, 12, 0, -.5, -16], bands: [-26, -30], band: [6, 7, 1.5], mag };
   },
   tipistol({ p, mat, dark, glow, shine, sub, at }) {
     const ti = shine(0xbcc6d2), lti = shine(0xe9eff5), gm = mat(0x363c46), blue = glow(0x4f9dff);

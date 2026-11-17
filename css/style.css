@@ -441,14 +441,17 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #dailyBox .day b{color:var(--muted)}
 #dailyBox .day .gift{display:flex;flex-direction:column;align-items:center;gap:3px;font:bold 15px monospace}
 #dailyBox .day .bz{color:#ffd75e;display:inline-flex;align-items:center;gap:3px}
-#dailyBox .day.big{background:rgba(160,120,20,.35)}
+#dailyBox .day.big{background:rgba(160,120,20,.35)}#dailyBox .gp{width:100%;max-width:76px;height:38px;object-fit:contain}#dailyBox .gp.gq{height:44px}#dailyBox .days.wk .day{justify-content:space-between}#dailyBox .day small{font:bold 10px monospace;color:#ffd75e;text-align:center;min-height:22px;line-height:11px}#dailyBox p b{color:#ffd75e}
+#dailyTmw img,.dyr img{height:18px;width:auto}#dailyTmw span{display:inline-flex}.dyr.big{font-size:15px;padding:4px 14px;margin-left:auto;margin-right:auto;width:fit-content;border:2px solid #ffd75e;background:rgba(0,0,0,.35);box-shadow:0 0 12px rgba(255,215,94,.4)}.dyr.big img{height:28px}
+.nx{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:2px 12px;margin-top:6px;font:bold 12px monospace;color:var(--silver);text-shadow:1px 1px 0 #000}.nx b{color:var(--acc-lt)}.nx span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.nx img{height:22px;width:auto}.nx.new{color:#fff;animation:lvpop .5s ease-out}.nx.new b{color:#ffd75e}
+@media (max-height:520px){.nx:not(.new){display:none}}
 #dailyBox .day.now{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.55)}#dailyBox .day.now b{color:#ffd75e}
 #dailyBox .day.next{border-style:dashed;border-color:#ffd75e}#dailyBox .day.next b{color:#ffd75e}
 #dailyBox p .pc,#dailyBox p .bz{display:inline-flex;align-items:center;gap:3px;margin:0 3px;color:#ffd75e}
 #dailyTmw{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:5px;display:flex;align-items:center;gap:3px;white-space:nowrap;font:bold 11px monospace;color:#ffd75e;text-shadow:1px 1px 0 #000;pointer-events:none}#dailyTmw:empty{display:none}
 .dyr{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:8px;font:bold 13px monospace;color:#ffd75e;text-shadow:1px 1px 0 #000}
 .dyr span{display:inline-flex;gap:8px}.dyr .pc,.dyr .bz{display:inline-flex;align-items:center;gap:3px}.dyr small{color:var(--silver);font-size:12px}
-@media (max-height:620px){.dyr{margin-top:3px;font-size:12px}}
+@media (max-height:620px){.dyr{margin-top:3px;font-size:12px}.dyr.big{font-size:12px;padding:1px 10px;border-width:1px}.dyr.big img{height:18px}}
 #dailyBox .day.done{opacity:.55}#dailyBox .day .ck{position:absolute;inset:auto 4px 4px auto;color:#5ee08a;font-size:18px}
 #dailyBox button{font:bold 16px monospace;padding:10px;color:#fff;background:var(--glass);border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
 #dailyBox button:hover:not(:disabled){background:var(--hov)}#dailyBox button:disabled{opacity:.5;cursor:default}
@@ -733,7 +736,6 @@ body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:
 /* game title */
 .logo{font-family:monospace;font-weight:bold;background:linear-gradient(135deg,#fff 0%,#fff 38%,#a8f2b8 50%,#3fd45e 66%,#1fae3f 100%) 0 0/calc(1ch + var(--ls)) 100% repeat-x;--ls:3px;letter-spacing:var(--ls);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;
   filter:drop-shadow(2px 0 0 #000) drop-shadow(-2px 0 0 #000) drop-shadow(0 2px 0 #000) drop-shadow(0 -2px 0 #000) drop-shadow(3px 4px 0 rgba(0,0,0,.45))}
-#lobbyLogo{position:absolute;left:50%;top:clamp(48px,7.5vh,64px);transform:translateX(-50%);font-size:clamp(30px,4.6vw,56px);white-space:nowrap;pointer-events:none!important}
 /* pause key tip, CrazyGames only (Esc leaves their fullscreen). Always laid out, empty elsewhere: it's the menu's last child, which centres it */
 #menu #menuTip{margin:14px 0 0;font-size:14px;color:var(--muted)}
 #menu #menuTip:empty{margin:0}
@@ -830,7 +832,6 @@ body.touchOnly #drawPanel{width:min(560px,calc(var(--uw) * 50))}
 body.touchOnly #drawSheet{width:min(440px,100%,calc(var(--uh) * 56))!important}
 /* phones: a tighter lobby and picker */
 body.touchOnly #lobbyTop{flex-direction:column;align-items:flex-start;gap:8px;max-width:none}body.touchOnly #lobbyBtns{flex-basis:auto}
-body.tight #lobbyLogo{display:none}
 body.touchOnly #pickList{gap:10px;flex-wrap:nowrap}
 body.touchOnly #pickList :is([data-mode],[data-map]){width:clamp(96px,calc((var(--uw2) * 100 - 90px) / 5),200px);font-size:14px;padding:10px 6px}
 body.touchOnly #pickList .mc{padding-bottom:50px}

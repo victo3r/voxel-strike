@@ -20,6 +20,7 @@ const HAT_SKINS = [
   { id: 'circlet', name: 'Blade Circlet', about: 'Polished silver with a blade on the brow that catches the light' },
   { id: 'ghillie', name: 'Ghillie Hood', about: 'A hood of leaves and rags that sheds a leaf now and then' },
   { id: 'laurel', name: 'Golden Laurel', about: 'Gold leaves for a champion, sparkling wherever you go' },
+  { id: 'octopus', name: 'Octopus Hat', about: 'A bright little octopus who likes the view, all eight arms waving', secret: true },
   { id: 'map', name: 'Map Hat', about: 'A treasure map you can wear, X marks your head', secret: true }, // from a code, hidden till it's yours
 ];
 const HSKIN_I = Object.fromEntries(HAT_SKINS.map((S, i) => [S.id, i]));
@@ -217,6 +218,16 @@ function skinPieces(id) {
     }
     for (const x of [-8, 4]) B(x, x + 4, 15, 17, -9, -8, GH); // round the back
     B(-2, 2, 10, 16, -10, -9, RB); B(-4, -1, 4, 10, -10, -9, RB); B(1, 4, 3, 10, -10, -9, RD); // ribbon
+  } else if (id === 'octopus') {
+    // an octopus sitting on your head: a round mantle bulging out the back, two sleepy eyes (its arms are their own meshes, so they can wave)
+    const [C, HI, Y, K] = OCTO.map(c => hex(c));
+    B(-9, 9, 12, 24, -9, 9, C); B(-7, 7, 24, 27, -8, 6, C);
+    B(-7, 7, 12, 25, -14, -9, C); // the mantle, down to where the back arms hang
+    head();
+    for (const sx of [-1, 1]) { B(...X(sx, 2, 7), 15, 19, 8, 9, Y); B(...X(sx, 3, 6), 16, 18, 8, 9, K); } // eyes
+    for (const [x, z] of [[-4, 1], [2, -3], [-1, -6]]) B(x, x + 2, 26, 27, z, z + 2, HI); // spots
+    for (const [y, z] of [[19, -4], [15, 2], [20, 4]]) { B(-9, -8, y, y + 2, z, z + 2, HI); B(8, 9, y + 1, y + 3, -z - 2, -z, HI); }
+    B(-4, -2, 21, 23, -14, -13, HI); B(1, 3, 18, 20, -14, -13, HI);
   } else if (id === 'map') {
     // a treasure map wrapped round the head: sea on one side, hills on the other, a dotted trail to a red X, the rolled ends at the back
     const P = hex([228, 206, 152]), PD = hex([198, 170, 114]);
@@ -233,13 +244,29 @@ function skinPieces(id) {
   }
   return out;
 }
-// the jar's glass, in pictures too
+// the octopus: its colours, and its eight arms round the rim, each hung from a pivot so it can wave ([x, z, turn, length])
+const OCTO = [[226, 98, 64], [248, 150, 108], [255, 226, 120], [30, 22, 26]];
+const OCTO_ARMS = [[-10, 8, -.6, 10], [10, 8, .6, 10], [-11, 2, -1.57, 8], [11, 2, 1.57, 8], [-11, -5, -1.9, 10], [11, -5, 1.9, 10], [-4, -11, 3.14, 8], [4, -11, 3.14, 8]];
+const octoGeo = {};
+function octoArm(len, hp) {
+  return octoGeo[len + ':' + hp] ??= (() => {
+    const out = [], B = pieceBox(out), C = palIdx(rgbHex(OCTO[0])), HI = palIdx(rgbHex(OCTO[1]));
+    B(-2, 2, -len, 0, -2, 2, C); B(-2, 2, -len, 4 - len, 2, 6, C); // down, then curling out at the tip
+    for (let y = 2; y < len - 4; y += 3) B(-1, 1, -y - 1, -y, 1, 2, HI); // suckers
+    return voxelGeos(out, hp).lit;
+  })();
+}
+// the jar's glass and the octopus's arms, in pictures too
 const SKIN_GLASS = new THREE.MeshLambertMaterial({ color: 0xd2ffcc, transparent: true, opacity: .24, depthWrite: false });
 function skinExtras(id, g, hp) {
+  if (id === 'octopus') for (const [x, z, turn, len] of OCTO_ARMS) {
+    const piv = new THREE.Group(), arm = new THREE.Mesh(octoArm(len, hp), g.material);
+    piv.position.set(x * hp, 13 * hp, z * hp); piv.rotation.y = turn; arm.rotation.x = -.2; arm.userData.arm = true; piv.add(arm); g.add(piv);
+  }
   if (id !== 'brainjar') return;
   const m = new THREE.Mesh(ZAP_BOX, SKIN_GLASS); m.scale.set(17.6 * hp, 10 * hp, 17.6 * hp); m.position.y = 21 * hp; m.renderOrder = 2; g.add(m);
 }
-// what moves on a worn skin: bubbles in the jar, the bullseye pings, a glint runs up the blade, leaves fall off the hood, the laurel sparkles
+// what moves on a worn skin: bubbles in the jar, the bullseye pings, a glint runs up the blade, leaves fall off the hood, the laurel sparkles, the octopus waves
 const skinMats = {};
 const skinMat = (c, o = 1) => skinMats[c + ':' + o] ??= new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
 const skinSprite = c => skinMats['s' + c] ??= new THREE.SpriteMaterial({ map: haloMap(), color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false });
@@ -287,6 +314,11 @@ function skinFx(id, g, hp) { // { tick, own: a material of its own to dispose },
       const X = i === 3, a = (k - i) / (X ? 4 : 1.4); m.visible = a > 0 && a < 1;
       if (m.visible) m.scale.setScalar(hp * (X ? 7 : 3) * Math.sin(a * Math.PI));
     }); } };
+  }
+  if (id === 'octopus') { // its arms wave, each in its own time, and never in over your face
+    const arms = []; g.traverse(o => { if (o.userData.arm) arms.push(o); });
+    let t = R() * 9;
+    return { tick: dt => { t += dt; arms.forEach((a, i) => { a.rotation.x = -.14 - .2 * (.5 + .5 * Math.sin(t * (1.7 + i % 3 * .35) + i * 1.9)); a.rotation.z = .1 * Math.sin(t * 1.3 + i * 2.4); }); } };
   }
   if (id === 'laurel') {
     const ss = Array.from({ length: few ? 2 : 3 }, () => ({ s: new THREE.Sprite(skinSprite(0xffe9a0)), t: 1 + R() * 2, wait: 0 }));

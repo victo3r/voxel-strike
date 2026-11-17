@@ -41,7 +41,7 @@ let starterNext = false;
 const needStarter = () => prof.lv === 1 && !prof.xp && !localStorage.getItem('voxelstrike-starter');
 function startStarter() {
   try { localStorage.setItem('voxelstrike-starter', '1'); } catch {}
-  starterNext = true; mode = 'dm'; mapId = STARTER_MAP;
+  funnel('play'); starterNext = true; mode = 'dm'; mapId = STARTER_MAP;
   restart(); showLobby(false); lockMouse();
 }
 const DIE_T = 1.5; // how long a body stays
@@ -91,7 +91,7 @@ const BOT_KEEP = {
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
   rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
   wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
-  tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
+  daybreak: [6, 18], highnoon: [12, 28], tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -138,6 +138,8 @@ const GUN_FIT = {
   aurora: d => d > 20 ? 1.2 : d > 14 ? .75 : d > 8 ? .35 : .15,
   crystal: d => d < 3 ? .65 : d < 28 ? 1 : .7,
   tishot: d => d < 6 ? 1.1 : d < 11 ? .9 : d < 15 ? .3 : .05,
+  daybreak: d => d < 20 ? .6 : .45,
+  highnoon: d => d < 4 ? .45 : d < 30 ? .95 : .75,
   tipistol: d => d < 24 ? .85 : .6,
   tisword: d => d < 3 ? 1.35 : d < 4.8 ? .4 : 0,
   tisaw: d => d < 4 ? .3 : d < 24 ? .9 : .5,
@@ -1020,13 +1022,13 @@ function endMatch(results) {
   const won = results ? results.won : MR.team ? lead > 0 : place === 1;
   const key = !!results && !results.priv && place === 1; // keys come from public online wins
   if (key) prof.keys = (prof.keys | 0) + 1;
-  missionEnd(won);
+  missionEnd(won); dailyPlayed(); funnelEnd();
   const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp, bars, boxes } = grant(xp, gold); // doubled with a booster
   eventEnd(xp, won);
   $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), barTile(bars), boxTile(boxes), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile(), ...eventTiles()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
-    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + missionsRow() + dailyRow();
+    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + unlockRow(ups) + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(won ? 'win' : 'lose'); musicEnd();
   if (!MR.starter) setTimeout(cgMidgame, 1500); // CrazyGames midgame ad, not after your first game

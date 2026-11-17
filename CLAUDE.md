@@ -17,7 +17,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   play at another server (the tests use `?srv=http://127.0.0.1:9` to force offline).
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
   under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
-  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `keyboards.mjs`, `arsenal.mjs`, `skins.mjs`, `sides.mjs`, `mythics.mjs`, `crystal.mjs`, `titanium.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
+  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `keyboards.mjs`, `arsenal.mjs`, `skins.mjs`, `sides.mjs`, `mythics.mjs`, `crystal.mjs`, `titanium.mjs`, `welcome.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
   keeps your score and `node test/band.mjs` checks the level bands for matchmaking (both run the server's code directly, no servers or browser); `node test/measure-bots.mjs ladder` measures bot hit rates per
   skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards, `test/zboard.mjs` for the zombie board, `test/prizes.mjs` for the weekly prizes, `test/coop.mjs` for co-op zombie waves, `test/coopback.mjs` for coming back to a co-op run after a reload) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
@@ -26,8 +26,9 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 
 ## Shipping
 
-- Cache busting is manual: bump `const V = NNN` in `index.html` for any JS change (and the `style.css?v=` query for CSS). Commit
-  messages end with "Cache vNNN". Pushing `main` deploys the game.
+- Updates are named Alpha N: a new whole number for one that adds real content, N.1, N.2 for small ones (fixes, a visual
+  change). Alpha 10 was v208, the last of the old numbers. The name is also the cache key: set `const V = 'alpha-N'` and the
+  `style.css?v=alpha-N` query in `index.html` on every update. Commit messages end with "Alpha N". Pushing `main` deploys the game.
 - Server changes need `npx wrangler deploy` in the server repo (Node 26 here; `npx wrangler` runs the repo's own wrangler 4); the user
   runs production deploys themselves.
 
@@ -50,7 +51,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   zombies chase `ZT` (the nearest player who's up), never `P.pos` directly.
 - **Stats** are counted by the server only (room.js `saveStats`): signed-in players in public online rooms, into D1 `stats`,
   `stats_week` and `stats_guns`; `GET /stats/<id>` (a player card) and `GET /boards`
-  (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`), daily missions (`js/missions.js`) and weekly events (`js/events.js`) are client-side, in `prof.daily`, `prof.missions` and `prof.event`.
+  (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`; a new player's first seven are the welcome week, each after a game that day), daily missions (`js/missions.js`) and weekly events (`js/events.js`) are client-side, in `prof.daily`, `prof.missions` and `prof.event`.
 - **Account** (`js/profile.js`, synced by `js/cloud.js`): level, coins, owned guns and stars, loadout, armor, boots and hats in
   `prof`, saved to localStorage and to the server when signed in. At the top level XP makes titanium bars instead (`prof.bars`, one per `BAR_XP`),
   which craft the pieces that have `bars`. Zombie-wave shop coins are separate from account coins.

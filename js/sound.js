@@ -290,6 +290,15 @@ const SOUNDS = {
     s.tone({ f: 96, f2: 30, d: .32, v: 1 }); s.tone({ type: 'triangle', f: 200, f2: 62, d: .12, v: .7 }); s.thud({ t: .035, f: 90, d: .06, v: .6 });
     s.ring({ f: 830, t: .01, d: .3, v: .1 }); s.clack({ t: .17, f: 1900, d: .014, v: .45, body: .5 }); s.clack({ t: .23, f: 1350, d: .016, v: .4, body: .6 });
   }],
+  daybreak: [.5, .8, s => { // a round bark with a ring off the long barrel
+    s.hiss({ ft: 'bandpass', f: 1500, f2: 500, q: .7, d: .12, v: 1 }); s.hiss({ ft: 'highpass', f: 4500, d: .018, v: .7 });
+    s.tone({ f: 150, f2: 48, d: .16, v: 1 }); s.tone({ type: 'triangle', f: 320, f2: 110, d: .08, v: .5 }); s.ring({ f: 1180, t: .01, d: .3, v: .08 });
+  }],
+  highnoon: [.9, .95, s => { // a rifle crack that rolls away, then the lever: down and back
+    s.hiss({ ft: 'highpass', f: 3600, d: .025, v: 1 }); s.hiss({ ft: 'bandpass', f: 1500, f2: 260, q: .6, d: .28, v: 1 }); s.tone({ f: 110, f2: 34, d: .34, v: 1 });
+    s.hiss({ ft: 'bandpass', f: 600, f2: 200, q: .8, t: .14, a: .04, d: .4, v: .25 });
+    s.clack({ t: .2, f: 1700, d: .014, v: .5, body: .5 }); s.clack({ t: .32, f: 2100, d: .014, v: .5, body: .4 });
+  }],
   tipistol: [.4, .7, s => { s.hiss({ ft: 'bandpass', f: 2100, f2: 800, q: .8, d: .08, v: .95 }); s.tone({ f: 210, f2: 60, d: .08, v: 1 }); s.click({ f: 4200, v: .35 }); s.tone({ type: 'triangle', t: .01, f: 1760, f2: 1740, d: .16, v: .06 }); }],
   tisaw: [.8, .7, s => { // a spring lets go and the blade sings as it leaves
     s.thud({ f: 230, d: .03, v: .7 }); s.clack({ f: 2600, d: .012, v: .5 }); s.hiss({ ft: 'bandpass', f: 3000, f2: 9500, q: 3, d: .13, v: .6 });
@@ -646,6 +655,10 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 1700, f2: 1000, a: .004, d: .045, v: .12, lp: 2600, glide: .04 });
     s.hiss({ ft: 'bandpass', f: 1600, f2: 550, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
   }],
+  zin_daybreak: [.22, .32, s => { s.hiss({ ft: 'bandpass', f: 800, f2: 2000, q: 1.6, a: .015, d: .045, v: .45, sweep: .05 }); s.clack({ t: .035, f: 2400, d: .008, v: .45 }); }],
+  zout_daybreak: [.18, .28, s => { s.hiss({ ft: 'bandpass', f: 1800, f2: 700, q: 1.6, a: .01, d: .05, v: .4, sweep: .06 }); }],
+  zin_highnoon: [.3, .4, s => { s.hiss({ ft: 'bandpass', f: 550, f2: 1600, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 }); s.clack({ t: .05, f: 1600, d: .012, v: .55, body: .5 }); }],
+  zout_highnoon: [.25, .34, s => { s.hiss({ ft: 'bandpass', f: 1400, f2: 500, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 }); }],
   zin_hitman: [.22, .32, s => {
     s.hiss({ ft: 'bandpass', f: 900, f2: 2200, q: 1.6, a: .015, d: .045, v: .45, sweep: .05 });
     s.clack({ t: .035, f: 2800, d: .007, v: .4 });
@@ -729,6 +742,8 @@ const SOUNDS = {
     s.tone({ f: 600, f2: 2400, t: .55, a: .2, d: .08, v: .3, glide: .25 });
     s.tone({ f: 2400, t: .82, d: .15, v: .3 });
   }],
+  r_daybreak: [1.7, .45, s => { s.clack({ t: .2, f: 1500, d: .016, v: .7, body: .5 }); for (const t of [.45, .72, .99]) s.shell(t); s.clack({ t: 1.38, f: 1300, d: .02, v: .9, body: .8 }); s.clack({ t: 1.42, f: 2800, d: .008, v: .35 }); }],
+  r_highnoon: [2, .45, s => { for (const t of [.2, .58, .96, 1.34]) s.shell(t); s.clack({ t: 1.66, f: 1700, d: .014, v: .6, body: .5 }); s.clack({ t: 1.8, f: 2100, d: .016, v: .7, body: .5 }); }],
   r_shotgun: [1.6, .45, s => { for (const t of [.15, .45, .75, 1.05]) s.shell(t); s.pump(1.3); }],
   r_trex: [1.6, .45, s => { for (const t of [.15, .45, .75, 1.05]) s.shell(t); s.pump(1.3); }],
   r_starsmasher: [1.6, .45, s => { s.magOut(.15); s.magIn(.75); s.clack({ t: .85, f: 1900, d: .015, v: .5, body: .3 }); s.rack(1.2); }],
