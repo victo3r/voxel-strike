@@ -284,6 +284,28 @@ const SOUNDS = {
     s.tone({ type: 'sawtooth', t: .04, f: 78, f2: 48, d: .32, v: .2, lp: 520 }); // a low growl in the tail
     s.pump(.46);
   }],
+  // the titanium set: every shot leaves a ring of struck metal
+  tishot: [.85, .95, s => { // a deep double thump, a ring off the metal, the next shell slamming home
+    s.hiss({ ft: 'highpass', f: 5200, d: .015, v: .7 }); s.hiss({ ft: 'bandpass', f: 1300, f2: 280, q: .7, d: .2, v: 1 }); s.hiss({ f: 900, f2: 160, t: .03, d: .5, v: .4 });
+    s.tone({ f: 96, f2: 30, d: .32, v: 1 }); s.tone({ type: 'triangle', f: 200, f2: 62, d: .12, v: .7 }); s.thud({ t: .035, f: 90, d: .06, v: .6 });
+    s.ring({ f: 830, t: .01, d: .3, v: .1 }); s.clack({ t: .17, f: 1900, d: .014, v: .45, body: .5 }); s.clack({ t: .23, f: 1350, d: .016, v: .4, body: .6 });
+  }],
+  tipistol: [.4, .7, s => { s.hiss({ ft: 'bandpass', f: 2100, f2: 800, q: .8, d: .08, v: .95 }); s.tone({ f: 210, f2: 60, d: .08, v: 1 }); s.click({ f: 4200, v: .35 }); s.tone({ type: 'triangle', t: .01, f: 1760, f2: 1740, d: .16, v: .06 }); }],
+  tisaw: [.8, .7, s => { // a spring lets go and the blade sings as it leaves
+    s.thud({ f: 230, d: .03, v: .7 }); s.clack({ f: 2600, d: .012, v: .5 }); s.hiss({ ft: 'bandpass', f: 3000, f2: 9500, q: 3, d: .13, v: .6 });
+    s.ring({ f: 2350, t: .012, d: .6, v: .26, ratios: [1, 1.51, 2.27, 3.42] }); s.tone({ f: 2376, t: .012, d: .55, v: .1 }); s.tone({ f: 4730, f2: 4690, t: .012, d: .3, v: .05 });
+  }],
+  sawBounce: [.4, .5, s => { s.ring({ f: 2900, d: .3, v: .28, ratios: [1, 1.51, 2.27, 3.42] }); s.hiss({ ft: 'highpass', f: 5000, d: .03, v: .4 }); }],
+  sawHit: [.35, .6, s => { s.hiss({ ft: 'bandpass', f: 2600, f2: 700, q: 1.2, d: .1, v: .8 }); s.tone({ f: 170, f2: 70, d: .08, v: .6 }); }],
+  tisniper: [1.3, 1, s => { // a hard crack, a heavy thump, the barrel ringing, the shot rolling away
+    s.hiss({ ft: 'highpass', f: 4200, d: .022, v: 1 }); s.hiss({ ft: 'bandpass', f: 1700, f2: 240, q: .6, d: .3, v: 1 });
+    s.tone({ f: 88, f2: 26, d: .5, v: 1 }); s.thud({ t: .01, f: 70, d: .08, v: .8 }); s.tone({ type: 'triangle', f: 260, f2: 70, d: .14, v: .6 });
+    s.ring({ f: 640, t: .015, d: .7, v: .14, ratios: [1, 1.48, 2.31, 3.05] });
+    s.hiss({ ft: 'bandpass', f: 700, f2: 180, q: .8, t: .16, a: .04, d: .5, v: .32 }); s.hiss({ ft: 'bandpass', f: 500, f2: 150, q: .8, t: .42, a: .06, d: .6, v: .16 });
+    s.clack({ t: .2, f: 1500, d: .016, v: .4, body: .6 });
+  }],
+  tirocket: [.85, .9, s => { s.tone({ f: 95, f2: 40, d: .22, v: 1 }); s.hiss({ ft: 'bandpass', f: 320, f2: 2600, q: 2, a: .05, d: .55, v: .8 }); s.click({ f: 1100, v: .5 }); s.tone({ type: 'triangle', t: .01, f: 1319, f2: 1300, d: .2, v: .05 }); }],
+  tiSwing: [.4, .55, s => { s.hiss({ ft: 'bandpass', f: 700, f2: 3600, q: 3, a: .04, d: .14, v: 1, sweep: .16 }); s.tone({ type: 'triangle', t: .02, f: 2349, f2: 2300, d: .25, v: .07 }); }],
   crystal: [.24, .45, s => { // a tight crack with the ring of struck glass
     s.hiss({ ft: 'bandpass', f: 2600, f2: 1100, q: .8, d: .06, v: .85 });
     s.tone({ f: 190, f2: 70, d: .05, v: .8 });
@@ -605,6 +627,8 @@ const SOUNDS = {
     s.tone({ type: 'square', f: 1500, f2: 900, a: .004, d: .045, v: .14, lp: 2400, glide: .04 });
     s.hiss({ ft: 'bandpass', f: 1600, f2: 550, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 });
   }],
+  zin_tisniper: [.4, .42, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 1500, q: 1.5, a: .03, d: .07, v: .55, sweep: .09 }); s.clack({ t: .08, f: 1900, d: .012, v: .5, body: .4 }); }],
+  zout_tisniper: [.3, .36, s => { s.hiss({ ft: 'bandpass', f: 1300, f2: 450, q: 1.5, a: .02, d: .08, v: .5, sweep: .1 }); }],
   zin_crystal: [.34, .4, s => { // the ring sight chimes awake
     s.hiss({ ft: 'bandpass', f: 700, f2: 2000, q: 1.4, a: .02, d: .06, v: .5, sweep: .07 });
     s.tone({ type: 'triangle', f: 1568, t: .04, d: .16, v: .1 }); s.tone({ type: 'triangle', f: 2349, t: .09, d: .18, v: .07 });
@@ -739,6 +763,11 @@ const SOUNDS = {
   r_ancientwand: [2.2, .45, s => { s.latch(.22); s.thunk(.95); s.tone({ f: 110, f2: 220, t: 1.3, a: .2, d: .4, v: .4, glide: .5 }); for (let k = 0; k < 4; k++) s.tone({ f: 1200 + k * 300, t: 1.5 + k * .08, d: .2, v: .07 }); }],
   r_tigerbite: [2, .45, s => { s.magOut(.2); s.magIn(1.0); s.clack({ t: 1.1, f: 1500, d: .015, v: .5, body: .3 }); s.rack(1.55); }],
   r_apex: [1.9, .45, s => { s.magOut(.18); s.magIn(.92); s.clack({ t: 1.02, f: 1450, d: .015, v: .5, body: .3 }); s.rack(1.44); }],
+  r_tishot: [1.8, .45, s => { s.magOut(.18); s.magIn(.9); s.clack({ t: 1.0, f: 1500, d: .015, v: .5, body: .4 }); s.rack(1.4); }],
+  r_tipistol: [1.3, .45, s => { s.magOut(.1); s.magIn(.6); s.rack(.95); }],
+  r_tisaw: [2.2, .45, s => { s.magOut(.2); s.magIn(1.05); s.clack({ t: 1.2, f: 1600, d: .015, v: .5, body: .3 }); s.tone({ type: 'sawtooth', t: 1.5, f: 200, f2: 700, d: .3, v: .12, lp: 2600 }); }],
+  r_tisniper: [2, .45, s => { s.boltUp(.15); s.magOut(.45); s.magIn(1.1); s.boltDown(1.6); }],
+  r_tirocket: [2.4, .45, s => { s.latch(.15); s.thunk(.56); s.thunk(.94); s.latch(2.0); }],
   r_crystal: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.arp(.76, [2093, 2637, 3136], { gap: .05, d: .22, v: .1 }); s.rack(1.12); }], // a fresh crystal chimes as it seats
   r_hornet: [1.5, .45, s => { s.magOut(.15); s.magIn(.72); s.clack({ t: .82, f: 1900, d: .015, v: .5, body: .3 }); s.rack(1.12); }],
   r_tracker: [1.4, .45, s => { s.magOut(.1); s.magIn(.6); s.rack(.95); s.tone({ type: 'square', f: 1568, t: 1.2, d: .04, v: .12, lp: 5000 }); }],

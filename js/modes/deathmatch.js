@@ -91,6 +91,7 @@ const BOT_KEEP = {
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
   rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
   wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
+  tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -136,6 +137,12 @@ const GUN_FIT = {
   voidlantern: d => d < 5 ? .1 : d < 22 ? .8 : .45,
   aurora: d => d > 20 ? 1.2 : d > 14 ? .75 : d > 8 ? .35 : .15,
   crystal: d => d < 3 ? .65 : d < 28 ? 1 : .7,
+  tishot: d => d < 6 ? 1.1 : d < 11 ? .9 : d < 15 ? .3 : .05,
+  tipistol: d => d < 24 ? .85 : .6,
+  tisword: d => d < 3 ? 1.35 : d < 4.8 ? .4 : 0,
+  tisaw: d => d < 4 ? .3 : d < 24 ? .9 : .5,
+  tisniper: d => d > 20 ? 1.25 : d > 14 ? .75 : d > 8 ? .3 : .1,
+  tirocket: d => d < 5 ? 0 : d < 22 ? .85 : .45,
 };
 const HUNT_D = 8;
 const pickOf = list => list[Math.random() * list.length | 0];
@@ -660,11 +667,11 @@ function botFire(b, W, dist) {
   }
   if (W.flame) return botFlame(b, W);
   const S = skillOf(b), err = S.aimErr + S.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
-  if (W.rocket || W.flare || W.grenade || W.spell || W.wisp || W.vortex) {
+  if (W.rocket || W.flare || W.grenade || W.spell || W.wisp || W.vortex || W.saw) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
     if (W.spell) castSpell(W, eye.clone(), dirV.clone(), b, b.flashM);
-    else (W.rocket ? fireRocket : W.grenade ? fireGrenade : W.wisp ? fireWisp : W.vortex ? fireVoid : fireFlare)(W, eye.clone(), dirV, b);
+    else (W.rocket ? fireRocket : W.grenade ? fireGrenade : W.wisp ? fireWisp : W.vortex ? fireVoid : W.saw ? fireSaw : fireFlare)(W, eye.clone(), dirV, b);
     b.leadGuess = .6 + Math.random() * .6;
     return;
   }
@@ -791,7 +798,7 @@ function updateBot(b, dt) {
     if (b.seeT <= dt) { b.lpx = tp.x; b.lpz = tp.z; }
     if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
     b.lpx = tp.x; b.lpz = tp.z;
-    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : W.spell ? dist / WAND_BOLT.spell0.spd : W.vortex ? dist / VOID_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
+    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : W.spell ? dist / WAND_BOLT.spell0.spd : W.vortex ? dist / VOID_SPD : W.saw ? dist / SAW_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
     const tx = dx + (fly ? b.pvx * fly * b.leadGuess : (b.pvx * S.lead - b.vx * S.self) * lag), tz = dz + (fly ? b.pvz * fly * b.leadGuess : (b.pvz * S.lead - b.vz * S.self) * lag), th = Math.hypot(tx, tz);
     wantYaw = Math.atan2(tx, tz);
     wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade || W.spell || W.vortex ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);
@@ -1014,16 +1021,16 @@ function endMatch(results) {
   const key = !!results && !results.priv && place === 1; // keys come from public online wins
   if (key) prof.keys = (prof.keys | 0) + 1;
   missionEnd(won);
-  const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp } = grant(xp, gold); // doubled with a booster
+  const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp, bars, boxes } = grant(xp, gold); // doubled with a booster
   eventEnd(xp, won);
-  $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile(), ...eventTiles()])
+  $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), barTile(bars), boxTile(boxes), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile(), ...eventTiles()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
     + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(won ? 'win' : 'lose'); musicEnd();
   if (!MR.starter) setTimeout(cgMidgame, 1500); // CrazyGames midgame ad, not after your first game
-  if (ups) setTimeout(() => sfx('levelUp'), 700);
+  if (ups || bars || boxes) setTimeout(() => sfx('levelUp'), 700);
   unlockMouse();
 }
 $('againBtn').addEventListener('click', () => { if (net.on) { net.again(); return; } restart(); lockMouse(); });

@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 7; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 8; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -554,7 +554,7 @@ net = (() => {
       const b = wandBolt('spell' + el, tip, from.clone().addScaledVector(dir, SPELL_FAR)); b.ghost = id; b.el = el;
       return;
     }
-    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : w.wisp ? fireWisp : w.vortex ? fireVoid : null)?.(w, from, dir, by, { ghost: true, id });
+    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : w.wisp ? fireWisp : w.vortex ? fireVoid : w.saw ? fireSaw : null)?.(w, from, dir, by, { ghost: true, id });
   }
   function remoteBoom(m) {
     const id = m.pid * 100000 + m.id, p = new THREE.Vector3(...m.p);

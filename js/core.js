@@ -95,9 +95,19 @@ const COIN = '<i class="coin"></i>';
   rows.forEach((row, y) => [...row].forEach((ch, x) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x, y, 1, 1); } }));
   document.documentElement.style.setProperty('--coin', `url(${c.toDataURL()})`);
 }
+// titanium bar icon
+const BAR = '<i class="tbar"></i>';
+{
+  const rows = ['......oooooooooooo..', '.....oTTGGTGTTTTTTo.', '....oTTGGTGTTTTTTEo.', '...oTTGGTGTTTTTTEEo.', '..oHHHHHHHHHHHHEEEo.', '.oSSSSSSSSSSSSEEEEo.', '.oFFFMMFMFFFFFEEEEo.', '.oFFMMFMFFFFFFEEEeo.', '.oFMMFMFFFFFFFEEeo..', '.oFFFFFFFFFFFFEeo...', '.offffffffffffeo....', '..ooooooooooooo.....'];
+  const pal = { o: '#171c26', H: '#ffffff', G: '#ffffff', T: '#d0dbe7', S: '#bcc8d6', F: '#9aa9bb', M: '#c6d1de', f: '#76859a', E: '#63718a', e: '#4a566a' };
+  const c = document.createElement('canvas'); c.width = c.height = 100; const g = c.getContext('2d'); // drawn big so it stays sharp at any size
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x * 5, y * 5 + 20, 5, 5); } }));
+  document.documentElement.style.setProperty('--bar', `url(${c.toDataURL()})`);
+}
 // pictures of 3D models for the UI (guns, armor, boots, hats, skins), drawn in a small renderer of their own and kept as PNGs
 const picCache = new Map(), picRef = new Map(), picBox = new THREE.Box3();
 let pic = null;
+const SHINE_T = { value: 0 }; // the clock polished gun parts shine by
 function modelPic(key, build, { yaw = 0, tilt = .3, w = 320, h = 160, ref = null, done = null } = {}) {
   if (key && picCache.has(key)) return picCache.get(key);
   if (!pic) {
@@ -113,7 +123,8 @@ function modelPic(key, build, { yaw = 0, tilt = .3, w = 320, h = 160, ref = null
   if (ref) { const rk = [ref[0], yaw, tilt, w / h].join(); if (!picRef.has(rk)) picRef.set(rk, span(fit(ref[1]))); rs = picRef.get(rk); }
   const b = fit(build), cx = (b.min.x + b.max.x) / 2, cy = (b.min.y + b.max.y) / 2, fw = Math.max(rs, span(b)) * 1.06 / 2, fh = fw * h / w;
   Object.assign(cam, { left: cx - fw, right: cx + fw, top: cy + fh, bottom: cy - fh }); cam.updateProjectionMatrix();
-  r.setSize(w, h, false); r.render(sc, cam); turn.clear(); done?.();
+  const st = SHINE_T.value; SHINE_T.value = 3; // pictures catch no shine line
+  r.setSize(w, h, false); r.render(sc, cam); turn.clear(); done?.(); SHINE_T.value = st;
   const url = r.domElement.toDataURL();
   if (key) picCache.set(key, url);
   return url;

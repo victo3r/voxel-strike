@@ -141,12 +141,91 @@ function updateVoids(dt) {
     if (!v.ghost) blast(v.p, VOID_R, v.dmg, v.by ? v.dmg : 0, null, v.by, v.g, v.id); // the server says what someone else's did
   }
 }
+// ---- the Titanium Ripsaw: a spinning blade that skips off walls and cuts through everyone in its way
+const SAW_SPD = 60, SAW_LIFE = 1.5, SAW_BOUNCES = 3; // speed, how long it flies, how many walls it skips off
+const saws = [], SAW_PX = .035, SAW_R = 8, SAW_TILT = .6, SAW_SPIN = 16;
+let sawGeos = null;
+// the blade: a toothed disc with slots and a blue hub
+function sawPieces() {
+  const out = [], B = pieceBox(out), S = palIdx(0xdfe6ee, false, true), D = palIdx(0x39404a), BLUE = palIdx(0x4f9dff, true);
+  for (let z = -SAW_R; z < SAW_R; z++) { const w = Math.round(Math.sqrt(SAW_R * SAW_R - (z + .5) ** 2)); B(-w, w, 0, 1, z, z + 1, S); }
+  for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, x = Math.round(Math.cos(a) * (SAW_R + .5)), z = Math.round(Math.sin(a) * (SAW_R + .5)); B(x - 1, x + 1, 0, 1, z - 1, z + 1, S); } // teeth
+  B(3, 6, 0, 1, 0, 1, D); B(-6, -3, 0, 1, -1, 0, D); B(-1, 0, 0, 1, 3, 6, D); B(0, 1, 0, 1, -6, -3, D); // slots
+  B(-1, 1, -1, 2, -1, 1, BLUE);
+  return out;
+}
+// flying nose up, so whoever threw it sees its face and not just its edge
+function sawAim(m, dir) {
+  const f = _my.copy(dir).normalize(), r = _my2.crossVectors(f, grenUp);
+  if (r.lengthSq() < .01) r.set(1, 0, 0);
+  r.normalize(); const u = _sawU.crossVectors(r, f);
+  m.userData.tilt.quaternion.setFromUnitVectors(grenUp, u.multiplyScalar(Math.cos(SAW_TILT)).addScaledVector(f, -Math.sin(SAW_TILT)).addScaledVector(r, .2).normalize());
+}
+const _sawU = new THREE.Vector3();
+function sawBlade(dir, size = 1) {
+  sawGeos ??= voxelGeos(sawPieces(), SAW_PX);
+  const m = new THREE.Group(), tilt = new THREE.Group(), spin = new THREE.Group();
+  for (const [geo, mat] of [[sawGeos.lit, gunLit], [sawGeos.glow, gunGlow], [sawGeos.shine, gunShine]]) if (geo) spin.add(new THREE.Mesh(geo, mat));
+  tilt.add(spin); m.add(tilt); m.scale.setScalar(size); m.userData.tilt = tilt; m.userData.spin = spin;
+  sawAim(m, dir); return m;
+}
+WAND_BOLT.saw.mesh = sawBlade; // the armory throws the same blade
+function fireSaw(w, from = null, dir = null, by = null, opts = {}) {
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
+  const m = sawBlade(dir);
+  m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
+  const mine = !by && !opts.ghost; // yours leaves from the gun, low on the right, and swings onto its line
+  if (mine) { m.userData.tilt.position.copy(_my.crossVectors(dir, grenUp).normalize().multiplyScalar(.22)).y -= .2; m.userData.tilt.scale.setScalar(.3); }
+  saws.push({ m, v: dir.clone().multiplyScalar(SAW_SPD), life: SAW_LIFE, left: SAW_BOUNCES, dmg: w.dmg, by, ghost: !!opts.ghost, id, g: w.id, gone: 0, cut: new Set() });
+}
+function sawEnd(p, hit) { wandBits('ti', p, scene, 10, 4); if (hit) sfx('sawHit', { at: p, far: 40 }); }
+// the first thing in its way that it hasn't cut already
+const sawHit = (o, rc) => rc.intersectObjects(targetsFor(o.by, rc), false).find(h => { const z = h.object.userData.zombie; return !z || !friendly(o.by, z) && !o.cut.has(z); });
+function updateSaws(dt) {
+  for (let i = saws.length - 1; i >= 0; i--) {
+    const o = saws[i];
+    if (o.gone) { if ((o.gone -= dt) <= 0) saws.splice(i, 1); continue; } // someone else's, stopped here: waiting for where the server says it ended
+    o.life -= dt; o.m.userData.spin.rotation.y += dt * SAW_SPIN;
+    const T = o.m.userData.tilt, k = Math.exp(-14 * dt); T.position.multiplyScalar(k); T.scale.setScalar(1 - (1 - T.scale.x) * k);
+    const step = SAW_SPD * dt;
+    ray2.set(o.m.position, _my2.copy(o.v).normalize()); ray2.far = step + .05;
+    let hit;
+    for (;;) { // cuts through every body in its way, weaker each time
+      hit = sawHit(o, ray2);
+      const onYou = o.by && !o.cut.has(YOU_T) && !friendly(o.by, YOU_T) && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+      const zz = onYou ? YOU_T : hit?.object.userData.zombie; if (!zz) break;
+      const p = onYou ? youHitP.clone() : hit.point.clone(), d = o.dmg * PIERCE_FALL ** o.cut.size;
+      o.cut.add(zz); sawEnd(p, true);
+      if (o.ghost) continue; // the server says what someone else's did
+      if (onYou) { const head = p.y > P.pos.y + 1.45; hurtPlayer(Math.round(d * (head ? HEAD_MUL : 1)), false, o.by, head, 5, o.id); }
+      else if (!zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, d * (head ? HEAD_MUL : 1), p, head, false, o.by, 5, o.id); }
+    }
+    if (hit && o.left > 0 && o.life > 0) { // skips off a wall
+      grenN.copy(hit.face?.normal ?? grenUp).transformDirection(hit.object.matrixWorld); if (grenN.dot(o.v) > 0) grenN.negate();
+      o.m.position.copy(hit.point).addScaledVector(grenN, .08); o.v.addScaledVector(grenN, -2 * o.v.dot(grenN)); o.left--; sawAim(o.m, o.v);
+      wandBits('ti', hit.point, scene, 4, 3, .8); sfx('sawBounce', { at: hit.point, far: 40, v: .7 });
+      continue;
+    }
+    if (hit || o.life <= 0) {
+      scene.remove(o.m);
+      if (o.ghost) { o.gone = .6; continue; }
+      saws.splice(i, 1);
+      const p = hit ? hit.point.clone() : o.m.position.clone();
+      net.boom(o.id, p, o.by); sawEnd(p, false);
+      continue;
+    }
+    o.m.position.addScaledVector(o.v, dt);
+  }
+}
 // someone else's wisp or orb, where the server says it went (g: its gun)
 function mythBoom(id, p, g, by) {
-  const wi = wisps.findIndex(o => o.ghost && o.id === id), oi = orbs.findIndex(o => o.ghost && o.id === id);
+  const wi = wisps.findIndex(o => o.ghost && o.id === id), oi = orbs.findIndex(o => o.ghost && o.id === id), si = saws.findIndex(o => o.ghost && o.id === id);
+  if (si >= 0) { scene.remove(saws[si].m); saws.splice(si, 1); sawEnd(p, false); return true; }
   if (wi >= 0) { const o = wisps[wi]; for (const m of o.ms) scene.remove(m); wisps.splice(wi, 1); wispPop(p); return true; }
   if (oi >= 0) { const o = orbs[oi]; scene.remove(o.m); orbs.splice(oi, 1); openVoid(p, o.by, 0, o.g, id, true); return true; }
   if (BASE[gi(g)]?.wisp) { wispPop(p); return true; }
+  if (BASE[gi(g)]?.saw) { sawEnd(p, false); return true; }
   if (BASE[gi(g)]?.vortex) { openVoid(p, by, 0, g, id, true); return true; }
   return false;
 }
@@ -154,9 +233,10 @@ function clearMyths() {
   for (const o of wisps) for (const m of o.ms) scene.remove(m);
   for (const o of orbs) scene.remove(o.m);
   for (const v of voids) { scene.remove(v.fx); stopSfx(v.snd); }
-  wisps.length = orbs.length = voids.length = 0; chargeEnd();
+  for (const o of saws) scene.remove(o.m);
+  wisps.length = orbs.length = voids.length = saws.length = 0; chargeEnd();
 }
-function mythTick(dt) { updateWisps(dt); updateOrbs(dt); updateVoids(dt); }
+function mythTick(dt) { updateWisps(dt); updateOrbs(dt); updateVoids(dt); updateSaws(dt); }
 
 // ---- the Aurora Rail: hold to charge (its coils light up one by one), let go to fire. A tap does CHARGE_MIN of the damage, only a full charge goes through
 const CHARGE_MIN = .3;

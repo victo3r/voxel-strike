@@ -6,6 +6,7 @@ const BOOTS = [
   { id: 'arcane', rar: 'epic', name: 'Arcane Boots', unlock: 19, price: 280, spd: [.04, .06, .08], rl: [.1, .15, .2] },
   { id: 'thornwood', rar: 'epic', name: 'Thornwood Boots', unlock: 13, price: 220, heal: [2, 3, 4] },
   { id: 'skyrunner', rar: 'legend', name: 'Skyrunner Boots', unlock: 25, price: 340, spd: [.06, .09, .12], jmp: [.1, .15, .2] },
+  { id: 'titanium', rar: 'mythic', name: 'Titanium Greaves', unlock: 50, price: 500, bars: 2, spd: [.05, .07, .09], dmg: [.05, .08, .11] },
 ];
 const BOOT_I = Object.fromEntries(BOOTS.map((B, i) => [B.id, i]));
 const bootOf = id => BOOTS[BOOT_I[id]] ?? null;
@@ -30,7 +31,7 @@ function botBoots() {
 // ---- boot model (s = 1 for the left leg, -1 for the right)
 // keep the inside edge at x = -5 or the two boots touch
 function bootPieces(id, st, s = 1) {
-  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a));
+  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a), false, polished(id, a), id === 'titanium');
   const shell = (top, c, sole, toe) => {
     B(-5, 5, -24, top, -5, 5, c); B(-5, 5, -24, -20, 5, toe, c);
     B(-5, 5, -24, -21, -5, toe, sole);
@@ -81,6 +82,15 @@ function bootPieces(id, st, s = 1) {
     B(-5, 6, -16, -13, -6, 6, MOSS); // mossy cuff
     if (st >= 2) { B(-4, -1, -13, -11, 4, 7, hex([118, 184, 70])); B(1, 4, -13, -11, -7, -4, hex([118, 184, 70])); } // leaves
     if (st >= 3) B(4, 5, -21, -18, -2, 2, hex([255, 186, 50])); // amber on the side
+  } else if (id === 'titanium') {
+    // tall polished greaves with a blue line over the sole, a shin plate at 2 stars, brighter blue at 3
+    const C = hex([190, 200, 212]), HI = hex([234, 240, 246]), DK = hex([54, 60, 70]), BLUE = st >= 3 ? hex([150, 205, 255]) : hex([79, 157, 255]), SOLE = hex([34, 38, 46]);
+    B(-5, 5, -24, -11, -5, 5, C); B(-5, 5, -24, -19, 5, 9, C);
+    B(-5, 5, -24, -22, -5, 9, SOLE); B(-5, 5, -22, -21, -5, 9, BLUE);
+    B(-5, 5, -20, -19, 7, 9, HI); B(-5, 5, -17, -16, -5, 5, DK); // toe cap, ankle seam
+    B(-5, 6, -13, -11, -6, 6, HI); // cuff
+    if (st >= 2) { B(-3, 3, -18, -12, 5, 7, HI); B(-1, 1, -17, -13, 6, 7, BLUE); } // shin plate
+    if (st >= 3) B(4, 5, -20, -17, -3, 3, BLUE);
   } else if (id === 'skyrunner') {
     // sleek white runners with a teal sole and a heel fin, gold at 3 stars
     const C = hex([222, 228, 236]), DK = hex([146, 160, 178]), TEAL = st >= 3 ? hex([240, 196, 64]) : hex([40, 200, 210]), SOLE = hex([60, 70, 84]);
@@ -101,13 +111,13 @@ function bootPieces(id, st, s = 1) {
     if (st >= 3) B(-1, 1, -17, -13, 7, 8, DK);
   }
   // hollow inside so it looks wearable in the armory
-  const [top, floor] = { raider: [-14, -22], ironclad: [-11, -22], arcane: [-14, -22], thornwood: [-13, -22], skyrunner: [-14, -22] }[id] ?? [-10, -21];
+  const [top, floor] = { raider: [-14, -22], ironclad: [-11, -22], arcane: [-14, -22], thornwood: [-13, -22], skyrunner: [-14, -22], titanium: [-11, -22] }[id] ?? [-10, -21];
   B(-4, 4, floor, top, -4, 4, 0); B(-4, 4, floor, floor + 1, -4, 4, hex([40, 40, 46]));
   if (s < 0) for (const p of out) p[4] = -p[4];
   return out;
 }
 const bootGeoCache = {};
-const bootGeo = (id, st, s, U) => bootGeoCache[id + ':' + st + ':' + s + ':' + U] ??= voxelGeos(bootPieces(id, st, s), U / ARMOR_PX).lit;
+const bootGeo = (id, st, s, U) => bootGeoCache[id + ':' + st + ':' + s + ':' + U] ??= voxelGeos(bootPieces(id, st, s), U / ARMOR_PX);
 // put boots on a character (null takes them off)
 function dressBoots(ch, b) {
   if (ch.boots) {
@@ -115,12 +125,12 @@ function dressBoots(ch, b) {
     ch.mats.splice(ch.mats.indexOf(ch.boots.mat), 1); ch.boots.mat.dispose(); ch.boots = null;
   }
   if (!b || !bootOf(b.id)) return;
-  const mat = armorMat(), meshes = [[ch.legL, 1], [ch.legR, -1]].map(([leg, s]) => { const m = new THREE.Mesh(bootGeo(b.id, b.st, s, ch.U), mat); leg.add(m); return m; });
+  const mat = armorMat(), meshes = [[ch.legL, 1], [ch.legR, -1]].map(([leg, s]) => { const m = wearMesh(bootGeo(b.id, b.st, s, ch.U), mat, ch); leg.add(m); return m; });
   ch.mats.push(mat); ch.boots = { mat, meshes, key: b.id + b.st };
 }
 // armory preview
 function bootsModel(id, st, g) {
-  for (const s of [1, -1]) { const m = new THREE.Mesh(bootGeo(id, st, s, 1 / 16), gunLit); m.position.x = s * 2 / 16; m.rotation.z = s * LEG_SPREAD; g.add(m); }
+  for (const s of [1, -1]) { const m = wearMesh(bootGeo(id, st, s, 1 / 16), gunLit); m.position.x = s * 2 / 16; m.rotation.z = s * LEG_SPREAD; g.add(m); }
 }
 // boots pictures, at their 3-star size
 const bootPic = (id, st) => modelPic('boots:' + id + st, g => bootsModel(id, st, g), { yaw: .6, tilt: .3, w: 200, h: 180, ref: ['boots:' + id, g => bootsModel(id, 3, g)] });

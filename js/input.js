@@ -40,7 +40,7 @@ function renderSens() {
 }
 document.querySelectorAll('.sliders .mute').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const k = b.dataset.m; setMute(k, !mutes[k]); renderSens(); if (!mutes.sfx) sfx('ui'); }));
 // other control options
-const DEFAULT_OPTS = { aa: TOUCH ? 2 : 0, toggleAim: false, wheel: true, chat: true }; // thumbs get aim help
+const DEFAULT_OPTS = { aa: TOUCH ? 2 : 0, toggleAim: false, wheel: true, chat: true, auto: TOUCH }; // thumbs get aim help and auto fire
 let opts = { ...DEFAULT_OPTS };
 try { const o = JSON.parse(localStorage.getItem('voxelstrike-opts')); if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k]; } catch {}
 const saveOpts = () => { try { localStorage.setItem('voxelstrike-opts', JSON.stringify(opts)); } catch {} };
@@ -48,12 +48,13 @@ const AA_DESC = ['Off', 'Slows your aim near enemies and nudges it onto them, bu
 function renderOpts() {
   document.querySelectorAll('#aaQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.aa));
   $('aaDesc').textContent = AA_DESC[opts.aa];
-  $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel;
+  $('optToggleAim').checked = opts.toggleAim; $('optWheel').checked = opts.wheel; $('optAuto').checked = opts.auto;
   $('optChat').checked = opts.chat && !cgNoChat(); $('optChat').disabled = cgNoChat(); // follow CrazyGames' chat setting
 }
 $('aaQ').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || +b.dataset.v === opts.aa) return; opts.aa = +b.dataset.v; saveOpts(); renderOpts(); sfx('ui'); });
 $('optToggleAim').addEventListener('change', e => { opts.toggleAim = e.target.checked; aimOn = false; saveOpts(); });
 $('optWheel').addEventListener('change', e => { opts.wheel = e.target.checked; saveOpts(); });
+$('optAuto').addEventListener('change', e => { opts.auto = e.target.checked; saveOpts(); });
 $('optChat').addEventListener('change', e => { opts.chat = e.target.checked; saveOpts(); if (!opts.chat) $('chatLog').innerHTML = ''; });
 let aimOn = false;
 renderOpts();
@@ -147,7 +148,7 @@ $('gfxRes').addEventListener('input', e => { gfx.res = +e.target.value; gfx.auto
 $('gfxFps').addEventListener('change', e => { gfx.fps = e.target.checked; saveGfx(); renderGfx(); });
 renderGfx();
 // touch buttons press 'T:<action>'
-const held = a => keys['T:' + a] || binds[a].some(c => c && keys[c]);
+const held = a => keys['T:' + a] || a === 'shoot' && autoShot || binds[a].some(c => c && keys[c]);
 const isBind = (a, code) => !!code && (code === 'T:' + a || binds[a].includes(code)); // '' is an empty slot
 // letter keys are named by what the player's keyboard says on them (Z Q S D on a French one)
 const keyAs = {}, AZERTY = { KeyA: 'Q', KeyQ: 'A', KeyW: 'Z', KeyZ: 'W' };

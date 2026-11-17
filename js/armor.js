@@ -33,6 +33,8 @@ const SUITS = [
     unlock: [12, 18, 25, 35, 50], price: [280, 380, 520, 740, 1000], c: [112, 78, 46], hi: [150, 110, 66], dk: [70, 46, 26], bar: [[160, 230, 110], [92, 172, 62], [46, 112, 36]] },
   { id: 'skyrunner', rar: 'legend', name: 'Skyrunner Suit', mob: 4, jump: 4, hp: [50, 60, 75, 90, 100], dr: [0, 0, 0, 0, .04], glide: true,
     unlock: [24, 28, 33, 42, 50], price: [450, 560, 720, 900, 1200], c: [222, 228, 236], hi: [255, 255, 255], dk: [146, 160, 178], bar: [[150, 250, 255], [50, 204, 216], [24, 128, 140]] },
+  { id: 'titanium', rar: 'mythic', name: 'Titanium Plate', mob: 2, jump: 2, hp: [100, 100, 100, 100, 100], dr: [.16, .18, .20, .22, .24], bars: 3,
+    unlock: [50, 50, 50, 50, 50], price: [1000, 700, 800, 900, 1000], c: [190, 200, 212], hi: [234, 240, 246], dk: [54, 60, 70], bar: [[236, 242, 248], [176, 188, 202], [96, 108, 124]] },
 ];
 for (const S of SUITS) for (let k = 0; k < SUIT_ST; k++) ARMOR_TIERS.push({ id: S.id + (k + 1), suit: S.id, st: k + 1, rar: S.rar, name: S.name,
   hp: S.hp[k], dr: S.dr[k], mob: S.mob, jump: S.jump, grow: S.grow, glide: S.glide, unlock: S.unlock[k], price: S.price[k], c: S.c, hi: S.hi, dk: S.dk, bar: S.bar });
@@ -43,7 +45,7 @@ const LEVEL_NAMES = ['VERY LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY HIGH'];
 const MOB_FX = [-.12, -.06, 0, .06, .12], JUMP_FX = [-.16, -.08, 0, .1, .2];
 // full set bonuses: boots, hat and armor of one set
 const SET_FX = { warrior: { dmg: .05, dr: .05 }, raider: { spd: .08, air: 1 }, ironclad: { dr: .05, steady: true }, arcane: { wand: .1, long: .5 },
-  thornwood: { wait: 2 }, skyrunner: { spd: .04, dash: true } };
+  thornwood: { wait: 2 }, skyrunner: { spd: .04, dash: true }, titanium: { dmg: .05, dr: .05, spd: .04 } };
 const GROW_WAIT = 4; // seconds without a hit before Thornwood grows back
 function armorFx(f, n, b, h) {
   const T = armorOf(n), set = T?.suit && b?.id === T.suit && h?.id === T.suit ? T.suit : '', S = SET_FX[set] ?? {};
@@ -180,11 +182,11 @@ function armorPadPieces(n, s) {
 }
 // ---- set armor models
 function suitPieces(T, team) {
-  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a)), st = T.st;
+  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a), false, polished(T.suit, a), T.suit === 'titanium'), st = T.st;
   const M = (x0, x1, y0, y1, z0, z1, m) => { B(x0, x1, y0, y1, z0, z1, m); B(-x1, -x0, y0, y1, z0, z1, m); };
   const C = hex(T.c), HI = hex(T.hi), DK = hex(T.dk), GOLD = hex([240, 196, 64]), LEATHER = hex([92, 60, 34]);
-  const warrior = T.suit === 'warrior', iron = T.suit === 'ironclad', arc = T.suit === 'arcane', thorn = T.suit === 'thornwood', sky = T.suit === 'skyrunner', plate = warrior || iron || sky;
-  const zf = iron ? 8 : warrior || thorn ? 7 : 6, yb = iron ? -7 : warrior ? -5 : thorn || sky ? -6 : -12;
+  const warrior = T.suit === 'warrior', iron = T.suit === 'ironclad', arc = T.suit === 'arcane', thorn = T.suit === 'thornwood', sky = T.suit === 'skyrunner', ti = T.suit === 'titanium', plate = warrior || iron || sky || ti;
+  const zf = iron ? 8 : warrior || thorn || ti ? 7 : 6, yb = iron ? -7 : warrior ? -5 : thorn || sky || ti ? -6 : -12;
   const FB = (x0, x1, y0, y1, m, d = 0) => { B(x0, x1, y0, y1, 4, zf + d, m); B(x0, x1, y0, y1, -zf - d, -4, m); };
   const P = (x0, x1, y0, y1, m) => { B(x0, x1, y0, y1, zf - 1, zf, m); B(x0, x1, y0, y1, -zf, -zf + 1, m); }; // painted on, front and back
   FB(-8, 8, yb, 13, C); if (plate) FB(-8, 8, yb, yb + 1, DK); M(5, 8, 12, 13, -4, 4, C);
@@ -225,6 +227,16 @@ function suitPieces(T, team) {
     if (st >= 2) for (const y of [-3, 0]) P(-4, 4, y, y + 1, DK); // plates over the stomach
     if (st >= 3) M(6, 8, yb + 2, 9, zf - 1, zf, TEAL); // stripes down the sides
     if (st >= 4) M(4, 8, 10, 13, zf, zf + 1, HI); // shoulder plates
+  } else if (ti) { // polished titanium in clean plates with a blue line down the middle, a blue core at 5 stars
+    const BLUE = st >= 5 ? hex([150, 205, 255]) : hex([79, 157, 255]);
+    M(1, 8, 2, 10, zf, zf + 1, C); M(1, 8, 9, 10, zf, zf + 1, HI); // chest plates
+    B(-1, 1, yb + 3, 10, zf - 1, zf, BLUE);
+    for (const y of [-3, 0]) { P(-8, -1, y, y + 1, DK); P(1, 8, y, y + 1, DK); } // plates over the stomach
+    FB(-8, 8, yb, yb + 3, team ? hex(team) : DK, 1); B(-2, 2, yb, yb + 3, zf + 1, zf + 2, BLUE); // belt and buckle
+    if (st >= 2) for (const [z0, z1] of [[4, zf], [-zf, -4]]) { M(1, 8, yb - 3, yb, z0, z1, C); M(1, 8, yb - 3, yb - 2, z0, z1, DK); } // hip plates
+    if (st >= 3) M(6, 8, yb + 3, 1, zf - 1, zf, BLUE); // stripes up the sides
+    if (st >= 4) { B(-2, 2, yb + 3, 12, -zf - 2, -zf, C); B(-1, 1, yb + 3, 12, -zf - 2, -zf - 1, BLUE); } // back ridge
+    if (st >= 5) { B(-2, 2, 4, 8, zf, zf + 2, BLUE); FB(-8, 8, 12, 13, HI); }
   } else if (warrior) { // thick steel plate with a red stripe, gold at 5 stars
     const TRIM = st >= 5 ? GOLD : hex([158, 34, 40]);
     M(1, 8, 1, 9, zf, zf + 1, C); M(1, 8, 8, 9, zf, zf + 1, HI); // chest plates
@@ -250,12 +262,12 @@ function suitPieces(T, team) {
   return out;
 }
 function suitPadPieces(T, s) {
-  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a)), st = T.st;
+  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a), false, polished(T.suit, a), T.suit === 'titanium'), st = T.st;
   const C = hex(T.c), HI = hex(T.hi), GOLD = hex([240, 196, 64]);
-  const warrior = T.suit === 'warrior', iron = T.suit === 'ironclad', arc = T.suit === 'arcane', thorn = T.suit === 'thornwood', sky = T.suit === 'skyrunner';
-  const TRIM = st >= 5 ? (arc ? hex([255, 214, 90]) : thorn ? hex([255, 186, 50]) : GOLD) : warrior ? hex([158, 34, 40]) : iron ? hex([150, 110, 60]) : arc ? hex([196, 150, 60])
+  const warrior = T.suit === 'warrior', iron = T.suit === 'ironclad', arc = T.suit === 'arcane', thorn = T.suit === 'thornwood', sky = T.suit === 'skyrunner', ti = T.suit === 'titanium';
+  const TRIM = ti ? (st >= 5 ? hex([150, 205, 255]) : hex([79, 157, 255])) : st >= 5 ? (arc ? hex([255, 214, 90]) : thorn ? hex([255, 186, 50]) : GOLD) : warrior ? hex([158, 34, 40]) : iron ? hex([150, 110, 60]) : arc ? hex([196, 150, 60])
     : thorn ? hex([50, 96, 40]) : sky ? hex([40, 200, 210]) : hex([34, 200, 186]);
-  const x1 = iron ? 19 : warrior || thorn ? 18 : 17, zp = iron ? 7 : warrior || thorn ? 6 : 5, ylo = iron ? 3 : warrior || sky ? 5 : thorn ? 4 : arc ? -8 : -6, y1 = iron ? 17 : warrior || thorn ? 16 : 15;
+  const x1 = iron ? 19 : warrior || thorn || ti ? 18 : 17, zp = iron ? 7 : warrior || thorn || ti ? 6 : 5, ylo = iron ? 3 : warrior || sky || ti ? 5 : thorn ? 4 : arc ? -8 : -6, y1 = iron ? 17 : warrior || thorn ? 16 : 15;
   const ring = (y0, y1, m) => { B(8, x1, y0, y1, 4, zp, m); B(8, x1, y0, y1, -zp, -4, m); B(16, x1, y0, y1, -zp, zp, m); };
   B(8, x1, 12, y1, -zp, zp, C); B(8, x1, y1 - 1, y1, -zp, zp, HI);
   ring(ylo, 12, C); ring(ylo, ylo + 1, TRIM);
@@ -276,6 +288,12 @@ function suitPadPieces(T, s) {
     ring(9, 10, hex(T.dk));
     B(11, 16, y1, y1 + 3, -1, 2, TRIM);
     if (st >= 3) B(12, 15, y1, y1 + 2, -5, -2, TRIM);
+  } else if (ti) { // two plates under a guard that sweeps up at the outside, taller at 3 stars
+    ring(9, 10, hex(T.dk));
+    const top = y1 + (st >= 3 ? 4 : 2);
+    B(x1 - 3, x1, y1, top, -zp, zp, C); B(x1 - 3, x1, top - 1, top, -zp, zp, HI);
+    if (st >= 2) B(x1 - 1, x1, y1 - 3, y1, -3, 3, TRIM);
+    if (st >= 4) B(10, x1 - 3, y1, y1 + 1, -3, 3, TRIM);
   } else if (warrior) {
     ring(9, 10, HI); // two plates
     if (st >= 3) { B(10, x1 - 1, y1, y1 + 2, -4, 4, C); B(10, x1 - 1, y1 + 1, y1 + 2, -4, 4, HI); } // a second plate on top
@@ -323,16 +341,27 @@ function armorAllPieces(n, cut = -99) {
   });
 }
 const ARMOR_PX = 2; // armor pixels per skin pixel
+// titanium's bright metal shines like the guns
+const polished = (id, a) => id === 'titanium' && Math.min(...a) > 170;
 const armorGeoCache = {};
 // part: 'body', 'L', 'R' (pads), 'legL', 'legR' (coat tails), 'wingL', 'wingR' or 'all'
 function armorGeo(n, team, U, part = 'body') {
   const k = n + ':' + part + ':' + (part === 'body' ? team ?? '' : '') + ':' + U;
   return armorGeoCache[k] ??= voxelGeos(part === 'body' ? armorPieces(n, team) : part === 'all' ? armorAllPieces(n)
     : part.startsWith('leg') ? suitLegPieces(armorOf(n), part === 'legL' ? 1 : -1) : part.startsWith('wing') ? wingPieces(armorOf(n), part === 'wingL' ? 1 : -1)
-    : armorPadPieces(n, part === 'L' ? 1 : -1), U / ARMOR_PX).lit;
+    : armorPadPieces(n, part === 'L' ? 1 : -1), U / ARMOR_PX);
 }
 // one material per character so it can flash and fade with them
 const armorMat = () => { const m = new THREE.MeshLambertMaterial({ vertexColors: true }); m.onBeforeCompile = gunLit.onBeforeCompile; return m; };
+// a worn piece: its polished parts ride on it with the shine material (a character's own, or the guns' for a preview)
+function wearMesh(geos, mat, ch = null) {
+  const m = new THREE.Mesh(geos.lit, mat);
+  if (geos.shine) {
+    if (ch && !ch.shine) { ch.shine = new THREE.MeshLambertMaterial({ vertexColors: true }); ch.shine.onBeforeCompile = gunShine.onBeforeCompile; ch.mats.push(ch.shine); }
+    m.add(new THREE.Mesh(geos.shine, ch ? ch.shine : gunShine));
+  }
+  return m;
+}
 // put armor on a character (0 takes it off)
 function dressArmor(ch, n, team = null) {
   if (ch.armor) {
@@ -341,7 +370,7 @@ function dressArmor(ch, n, team = null) {
   }
   if (!n) return;
   const mat = armorMat(), U = ch.U, mesh = (part, parent, x, y) => {
-    const m = new THREE.Mesh(armorGeo(n, team, U, part), mat); m.position.set(x * U, y * U, 0); parent.add(m); return m;
+    const m = wearMesh(armorGeo(n, team, U, part), mat, ch); m.position.set(x * U, y * U, 0); parent.add(m); return m;
   };
   // pads ride on the arms so they swing with them
   const meshes = [mesh('body', ch.body, 0, 0), mesh('L', ch.armL, -6, -4), mesh('R', ch.armR, 6, -4)];
@@ -361,7 +390,7 @@ function wingTick(ch, open, dt) {
   w.L.rotation.set(WING_TILT * (1 - e), 0, a); w.R.rotation.set(WING_TILT * (1 - e), 0, -a);
 }
 // armory preview
-function armorModel(n, g) { g.add(new THREE.Mesh(armorGeo(n, null, 1 / 16, 'all'), gunLit)); }
+function armorModel(n, g) { g.add(wearMesh(armorGeo(n, null, 1 / 16, 'all'), gunLit)); }
 
 // armor pictures, all at the top basic tier's scale so better armor looks bigger; k = tier index (0 = Wooden)
 const armorPic = k => modelPic('armor:' + k, g => armorModel(k + 1, g), { yaw: .55, tilt: .25, w: 220, h: 200, ref: ['armor', g => armorModel(ARMOR_MAX, g)] });

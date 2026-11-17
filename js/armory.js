@@ -1,5 +1,8 @@
 // upgrade prices, as a share of the gun price
 const UPG = [.75, .9];
+// crafted pieces cost titanium bars as well as coins
+const cost = (X, p = X.price) => COIN + p + (X.bars ? ' ' + BAR + X.bars : ''), barShort = X => (prof.bars | 0) < (X.bars | 0);
+const barHint = X => X.bars ? `<div class="tn">${BAR}${prof.bars | 0} OF ${X.bars} BARS · ${barNext() ? `1 EVERY ${BAR_XP} XP AT LVL ${LV_MAX}` : 'YOU HAVE ALL YOU NEED'}</div>` : '';
 let armCat = 'primary', armOpen = false, armSel = -1, armDet = false, armPick = false, gearPick = false, skinPick = -1; // picks: clicked, not just shown
 const gunStars = i => prof.guns[BASE[i].id] ?? 0; // 0 = not bought
 // stars you use in a match (bots never get more)
@@ -68,6 +71,7 @@ function gunAttrs(w) {
   if (w.charge) a.push('CHARGE SHOT');
   if (w.grow) a.push('GROWS WITH YOU');
   if (w.wisp) a.push('HOMING');
+  if (w.saw) a.push('RICOCHET');
   if (w.vortex) a.push('PULLS IN', 'EXPLOSIVE', 'NO SELF DAMAGE');
   if (w.pierce) a.push('PIERCING');
   if (w.wallBreak) a.push('WALL BREAK');
@@ -130,6 +134,12 @@ const DESC = {
   voidlantern: 'A pocket of night that pulls everyone close, then pops',
   aurora: 'Fill its coils with northern lights, then let go and cut through everything',
   crystal: 'A rifle of living crystal that grows stronger every time you do',
+  tishot: 'A drum of shells and a wall of pellets, polished to a shine',
+  tipistol: 'A heavy titanium hand cannon that hits like a rifle',
+  tisword: 'A broad titanium blade with an edge that never dulls',
+  tisaw: 'Throws spinning saw blades that cut through a whole row and skip off walls',
+  tisniper: 'A long titanium rifle for one clean shot',
+  tirocket: 'Two tubes, two big rockets, all titanium',
 };
 // the next level a growing gun gets stronger at (0: fully grown)
 function growNext(i) { const w = BASE[i], a = grown(w, prof.lv); for (let lv = prof.lv + 1; lv <= w.grow.top; lv++) { const b = grown(w, lv); if (Object.keys(w.grow).some(k => a[k] !== b[k])) return lv; } return 0; }
@@ -146,6 +156,7 @@ function gunSpecs(i) {
   if (w.burn) out.push(['BURN', `${w.burn * 4} / SEC FOR ${w.burnT}s`]);
   if (w.flare) out.push(['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
   if (w.wisp) out.push(['SEEKS', WISP_SEEK + ' BLOCKS']);
+  if (w.saw) out.push(['SKIPS OFF', SAW_BOUNCES + ' WALLS']);
   if (w.vortex) out.push(['PULL RADIUS', VOID_PULL_R + ' BLOCKS'], ['BLAST RADIUS', VOID_R + ' BLOCKS']);
   if (w.charge) out.push(['FULL CHARGE', w.charge + 's'], ['QUICK SHOT', Math.round(CHARGE_MIN * 100) + '% DAMAGE'], ['FULLY CHARGED', 'THROUGH WALLS']);
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
@@ -170,12 +181,30 @@ const starTxt = i => BASE[i].start ? '' : starRow(gunUse(i), gunStars(i), 3);
 // star picker under your character
 const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>${ico('left')}</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>${ico('right')}</button></div>`;
 // armory pages and their sections
-const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIVE']];
+const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIVE'], ['index', 'INDEX']];
+// the gun index: every gun numbered, starters first, then roughly in the order they joined (new ones go on the end)
+const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare', 'eradicator', 'rocket', 'hitman', 'heatray', 'thrasher', 'semisniper', 'herosword', 'shockbeam', 'tigerbite', 'executioner',
+  'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
+  'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
+  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket'];
+const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
+function renderIndex() {
+  const list = indexList(), have = list.filter(hasGun).length;
+  $('armTabs').style.display = 'none'; $('armList').style.display = ''; $('armDet').style.display = 'none';
+  $('armList').innerHTML = list.map((i, k) => {
+    const w = BASE[i], own = hasGun(i);
+    return `<div class="card rr idx${own ? '' : ' miss'}${rarCls(w)}" data-idx="${i}"><span class="tag">${String(k + 1).padStart(2, '0')}</span><img class="ai" src="${gunPic(i)}"><div class="cn">${w.name}</div></div>`;
+  }).join('');
+  const by = Object.keys(RARITY).map(r => [r, list.filter(i => rarOf(BASE[i]) === r)]).filter(([, l]) => l.length);
+  setAct(`<div class="an"><span>GUN INDEX</span></div>` + statBoxes([['COLLECTED', `${have} / ${list.length}`, '']]) +
+    `<div class="at">${by.map(([r, l]) => `<span style="color:${RARITY[r][1]}">${RARITY[r][0]} ${l.filter(hasGun).length}/${l.length}</span>`).join('')}</div>`);
+  heroGun(-1); placeAct();
+}
 const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS']];
 let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1, suitSel = '';
 let armBare = false; // after TAKE OFF he shows what you wear, not the picked card
 const myArmor = () => Math.min(ARMOR_MAX, prof.armor | 0);
-const pageIcon = p => p === 'weapons' ? gunPic(loadoutGun('primary')) : p === 'exclusive' ? gunPic(exclList()[0]) : armorPic(Math.max(0, wornArmor() - 1));
+const pageIcon = p => p === 'weapons' ? gunPic(loadoutGun('primary')) : p === 'exclusive' ? gunPic(exclList()[0]) : p === 'index' ? gunPic(gi(GUN_ORDER[0])) : armorPic(Math.max(0, wornArmor() - 1));
 const EXCL_DESC = 'Rare finds from golden chests, never for sale';
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
@@ -184,6 +213,7 @@ function renderArmory() {
   $('armTabs').style.display = armPage === 'exclusive' ? 'none' : '';
   if (armPage === 'wear') { renderWear(); return; }
   heroArmor(shownArmor()); wearGear();
+  if (armPage === 'index') { renderIndex(); return; }
   const excl = armPage === 'exclusive', list = excl ? exclList() : catList(), on = i => loadoutGun(BASE[i].cat) === i;
   if (!excl) $('armTabs').innerHTML = CATS.map(([c, label], s) =>
     `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img class="ai" src="${gunPic(loadoutGun(c))}"><span>${label}</span></button>`).join('');
@@ -224,7 +254,7 @@ function renderAct() {
 function placeAct() {
   placeHide();
   if (!armOpen) return;
-  const h = $('heroAct'), on = inLobby && armPage !== 'wear' && innerWidth > 700;
+  const h = $('heroAct'), on = inLobby && armPage !== 'wear' && armPage !== 'index' && innerWidth > 700;
   h.style.display = on ? 'flex' : 'none';
   $('heroReload').style.display = BASE[armSel]?.inf || BASE[armSel]?.pool ? 'none' : ''; // nothing to reload: melee, wands
   if (on) { const edge = $('armory').getBoundingClientRect().right; h.style.left = Math.max(edge, heroScreen.x - innerHeight * .2 - 50) + 'px'; h.style.top = heroScreen.y + 'px'; }
@@ -336,9 +366,10 @@ const SUIT_ABOUT = {
   arcane: 'Starry robes for wand users, light on armor but full of magic',
   thornwood: 'Living bark that grows back once the shooting stops',
   skyrunner: 'Featherlight plates with glider wings for anyone who lives in the air',
+  titanium: 'Polished titanium plate, as tough as steel at half the weight',
 };
 const SET_TXT = { warrior: '+5% DMG, +5% DMG CUT', raider: 'TRIPLE JUMP, +8% SPEED', ironclad: '+5% DMG CUT, NO KNOCKBACK, NO SLOWS OR STUNS',
-  arcane: '+10% WAND DMG, WAND EFFECTS LAST 50% LONGER', thornwood: 'REGROWS AFTER 2S', skyrunner: 'SABER AIR DASH, +4% SPEED' };
+  arcane: '+10% WAND DMG, WAND EFFECTS LAST 50% LONGER', thornwood: 'REGROWS AFTER 2S', skyrunner: 'SABER AIR DASH, +4% SPEED', titanium: '+5% DMG, +5% DMG CUT, +4% SPEED' };
 const SUIT_SPECIAL = { thornwood: 'REGROWS AFTER 4S', skyrunner: 'HOLD JUMP TO GLIDE' };
 const suitSpecial = id => SUIT_SPECIAL[id] ? `<div class="at sb"><span>SPECIAL</span><span>${SUIT_SPECIAL[id]}</span></div>` : '';
 const shownSuit = () => armPage === 'wear' && wearCat === 'armor' ? suitSel || (!armorCard && wornSuit()?.id) || '' : '';
@@ -352,7 +383,7 @@ const setBonus = id => youFx().set === id ? `<div class="at sb"><span>SET BONUS<
 const setTag = (id, worn) => worn && youFx().set === id ? ['<span class="sa">SET ACTIVE</span>', ' set'] : ['', ''];
 function suitCard(S) {
   const st = suitStars(S.id), worn = wornSuit()?.id === S.id, locked = suitLocked(S), [sa, set] = setTag(S.id, worn);
-  const tag = locked ? `${ico('lock')} LVL ${S.unlock[0]}` : !st ? COIN + S.price[0] : worn ? wearTag('armor') : '';
+  const tag = locked ? `${ico('lock')} LVL ${S.unlock[0]}` : !st ? cost(S, S.price[0]) : worn ? wearTag('armor') : '';
   return `<div class="card rr${locked ? ' locked' : ''}${suitSel === S.id ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(S)}" data-suit="${S.id}">` +
     sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${armorPic(suitN(S.id, suitShown(S.id)) - 1)}">` +
     `<div class="cn">${S.name} <span class="st">${suitStarTxt(S.id)}</span></div></div>`;
@@ -361,7 +392,7 @@ function renderSuitDetail() {
   const id = shownSuit(), S = suitOf(id), have = suitStars(id), n = suitN(id, suitShown(id));
   const by = (a, f) => a.every(v => v === a[0]) ? f(a[0]) : a.map(f).join(' / ');
   const rows = [['ARMOR BY STAR', by(S.hp, v => '+' + v)], ['DAMAGE CUT BY STAR', by(S.dr, pct)], ['MOBILITY', lvlName(S.mob)], ['JUMP', lvlName(S.jump)],
-    ...SUIT_SPECIAL[id] ? [['SPECIAL', SUIT_SPECIAL[id]]] : [], ['FULL SET', SET_TXT[id]], ['STARS AT LVL', S.unlock.join(' / ')], ['PRICE', COIN + S.price[0]],
+    ...SUIT_SPECIAL[id] ? [['SPECIAL', SUIT_SPECIAL[id]]] : [], ['FULL SET', SET_TXT[id]], ['STARS AT LVL', by(S.unlock, v => v)], [S.bars ? 'CRAFT FOR' : 'PRICE', cost(S, S.price[0])],
     ['STATUS', wornSuit()?.id === id ? 'WEARING' : have ? 'OWNED' : suitLocked(S) ? ico('lock') + ' LOCKED' : 'NOT OWNED']];
   $('armDet').innerHTML = `<button id="detBack">${ico('left')} BACK</button><div id="detView"><span class="hint">DRAG TO TURN</span></div>` +
     `<div class="dn">${S.name} ${rarTag(S)} <span class="st">${suitStarTxt(id)}</span></div>` +
@@ -372,14 +403,14 @@ function renderSuitAct() {
   const id = shownSuit(), S = suitOf(id), st = suitStars(id), worn = wornSuit()?.id === id;
   let btns;
   if (suitLocked(S)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${S.unlock[0]}</button>`;
-  else if (!st) btns = `<button data-sbuy="1" ${prof.coins < S.price[0] ? 'disabled' : ''}>BUY ${COIN}${S.price[0]}</button>`;
+  else if (!st) btns = `<button data-sbuy="1" ${prof.coins < S.price[0] || barShort(S) ? 'disabled' : ''}>${S.bars ? 'CRAFT' : 'BUY'} ${cost(S, S.price[0])}</button>`;
   else {
     btns = worn ? '<button data-soff="1">TAKE OFF</button>' + hideBtn('armor') : '<button data-swear="1">WEAR</button>';
     if (st < SUIT_ST) btns += prof.lv < S.unlock[st] ? `<button disabled>${ico('lock')} ${starRow(st + 1)} AT LVL ${S.unlock[st]}</button>`
       : `<button data-sup="1" ${prof.coins < S.price[st] ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${S.price[st]}</button>`;
   }
   const u = suitUse(id), pick = st > 1 ? lvPick('su', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  const body = armorBoxes(armorOf(suitN(id, suitShown(id)))) + suitSpecial(id) + (worn ? setBonus(id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
+  const body = armorBoxes(armorOf(suitN(id, suitShown(id)))) + suitSpecial(id) + (worn ? setBonus(id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>' + barHint(S));
   setAct(actCard(S.name + ' ' + rarTag(S), suitStarTxt(id), body, pick, btns));
   placeAct();
 }
@@ -388,8 +419,8 @@ function suitClick(d) {
   const id = shownSuit(), S = suitOf(id); if (!S) return;
   const st = suitStars(id), own = prof.suits ??= {}, use = prof.suitUse ??= {};
   if (d.sbuy) {
-    if (st || prof.coins < S.price[0] || prof.lv < S.unlock[0]) return;
-    prof.coins -= S.price[0]; own[id] = 1; prof.armorOn = id; unhide('armor'); sfx('buy');
+    if (st || prof.coins < S.price[0] || prof.lv < S.unlock[0] || barShort(S)) return;
+    prof.coins -= S.price[0]; if (S.bars) prof.bars -= S.bars; own[id] = 1; prof.armorOn = id; unhide('armor'); sfx('buy');
   } else if (d.sup) {
     if (!st || st >= SUIT_ST || prof.coins < S.price[st] || prof.lv < S.unlock[st]) return;
     prof.coins -= S.price[st]; own[id] = st + 1; delete use[id]; sfx('upgrade');
@@ -429,7 +460,7 @@ function renderSkins() {
 }
 function renderSkinAct() {
   if (codeOn) {
-    setAct(actCard('SECRET CODE', '', '<div class="tn">SOME SKINS ONLY COME FROM CODES</div><input id="secretIn" maxlength="24" autocomplete="off" spellcheck="false" placeholder="TYPE A CODE">' +
+    setAct(actCard('SECRET CODE', '', '<div class="tn">SOME SKINS AND HATS ONLY COME FROM CODES</div><input id="secretIn" maxlength="24" autocomplete="off" spellcheck="false" placeholder="TYPE A CODE">' +
       `<p id="secretMsg" class="tn">${codeMsg}</p>`, '', '<button data-redeem="1">REDEEM</button>'));
     placeAct(); return;
   }
@@ -442,14 +473,22 @@ let drawSure = -1; // delete needs a second click
 // secret codes, kept as hashes
 let codeOn = false, codeMsg = '';
 const CODES = { '5690d215caed2a6699cdf70479d8c6447be1e39a14bb6ad7aa96f31e91b32031': 'creature', '1c48319173d993e160c8c14a377f7aa4357d5a09fa41df198c6862db2cf28f03': 'creature',
-  '5467529071157e32ac53218d0d4ceb6c558faf4acff3f96fb171158dd0072327': 'evergreen' };
+  '5467529071157e32ac53218d0d4ceb6c558faf4acff3f96fb171158dd0072327': 'evergreen', '8852032455ce783ddeae72e9f41cf20e3ff6ead5c35249ecb90cc003292797e6': 'hat:map' };
 const SECRET_HI = { creature: ["Victor's Creature wakes up and joins your skins", "Victor's Creature is already yours"],
-  evergreen: ['Evergreen lights up and joins your skins', 'Evergreen is already yours'] };
+  evergreen: ['Evergreen lights up and joins your skins', 'Evergreen is already yours'],
+  'hat:map': ['The Map Hat unrolls, find it in the SKINS of any hat', 'The Map Hat is already yours'] };
 async function redeem() {
   const c = ($('secretIn')?.value || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!c) return;
   let id = null;
   try { const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('voxel-strike:' + c))); id = CODES[[...h].map(b => b.toString(16).padStart(2, '0')).join('')] ?? null; } catch {}
   if (!id) { codeMsg = "That code doesn't do anything"; sfx('ui'); renderAct(); return; }
+  if (id.startsWith('hat:')) { // a hat skin: yours for every hat, and straight onto the one you're wearing
+    const k = id.slice(4), had = !!prof.skins?.[k];
+    prof.skins = { ...prof.skins, [k]: 1 };
+    if (prof.hatOn && hatStars(prof.hatOn)) prof.hatSkin = { ...prof.hatSkin, [prof.hatOn]: k };
+    saveProf(); dressHero(); codeOn = false; codeMsg = '';
+    sfx(had ? 'equip' : 'levelUp'); netToast(SECRET_HI[id][had ? 1 : 0]); renderArmory(); return;
+  }
   const had = ownSecret(id);
   if (!had) prof.secrets = [...(Array.isArray(prof.secrets) ? prof.secrets : []), id];
   prof.look = { ...SECRETS[id].look }; saveProf(); dressHero();
@@ -473,6 +512,7 @@ const GEAR = {
       arcane: 'Soft midnight boots that keep you quick and your wands charged',
       thornwood: 'Rooty bark boots that slowly patch you up when nobody is hitting you',
       skyrunner: 'Featherweight runners for going fast and jumping high',
+      titanium: 'Polished greaves that keep you quick and put weight behind every hit',
     } },
   hats: { list: HATS, I: HAT_I, own: 'hats', use: 'hatUse', on: 'hatOn', stars: hatStars, using: hatUse, worn: wornHat,
     pic: hatPic, model: hatModel, face: .5, put: h => heroHat(h), look: hatSkin,
@@ -484,6 +524,7 @@ const GEAR = {
       arcane: 'A pointy wizard hat that sometimes lets you shake off fire, ice and stuns',
       thornwood: 'A bark helm with thorny branches that stings anyone who hits you up close',
       skyrunner: 'A winged flight helm that takes the sting out of hits while you fly',
+      titanium: 'A polished helm that turns hits and headshots aside',
     } },
 };
 const wearGear = () => { for (const k in GEAR) GEAR[k].put(hidOn(k) ? null : GEAR[k].worn()); };
@@ -523,7 +564,7 @@ function renderGear() {
   if (armDet) renderGearDetail();
   else $('armList').innerHTML = `<p class="wd">${G.desc}</p>` + gearList(G).map(i => {
     const K = G.list[i], st = G.stars(K.id), worn = prof[G.on] === K.id && st, s = gearShown(G, K), [sa, set] = setTag(K.id, worn);
-    const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? COIN + K.price : worn ? wearTag(wearCat) : '';
+    const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? cost(K) : worn ? wearTag(wearCat) : '';
     return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel && gearPick ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(K)}" data-gear="${i}">` +
       sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${G.pic(K.id, s, st && G.look?.(K.id))}">` +
       `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div></div>`;
@@ -536,7 +577,7 @@ function renderGearDetail() {
   const G = gearNow(), B = G.list[gearSel], st = gearShown(G, B), have = G.stars(B.id);
   const specs = GEAR_STATS.filter(([f]) => B[f]).map(([f, k, fmt]) => [k + ' BY STAR', B[f].map(fmt).join(' / ')]);
   if (SET_TXT[B.id]) specs.push(['FULL SET', SET_TXT[B.id]]);
-  specs.push(['UNLOCKS AT', 'LVL ' + B.unlock], ['PRICE', COIN + B.price],
+  specs.push(['UNLOCKS AT', 'LVL ' + B.unlock], [B.bars ? 'CRAFT FOR' : 'PRICE', cost(B)],
     ['STATUS', prof[G.on] === B.id && have ? 'WEARING' : have ? 'OWNED' : gearLocked(G, B) ? ico('lock') + ' LOCKED' : 'NOT OWNED']);
   if (hskFor !== wearCat + gearSel) { hskOpen = false; hskSel = null; hskFor = wearCat + gearSel; }
   const skins = G.look && have, sk = skins ? hskSel ?? G.look(B.id) : '';
@@ -557,7 +598,7 @@ function hskGrid(B) {
   const on = hatSkin(B.id), sel = hskSel ?? on, S = hatSkinOf(sel), own = id => !!prof.skins?.[id];
   const card = (id, pic, name, note, cls) => `<button class="hsc${cls}" data-hsk="${id}"><img src="${pic}"><b>${name}</b><small>${note}</small></button>`;
   return '<div class="hsg">' + card('', hatPic(B.id, hatUse(B.id)), 'DEFAULT', on ? '' : 'WEARING', (on ? '' : ' on') + (sel ? '' : ' sel')) +
-    HAT_SKINS.map(K => card(K.id, hatPic(B.id, 0, K.id), K.name.toUpperCase(), own(K.id) ? (on === K.id ? 'WEARING' : '') : ico('lock') + ' ' + (skinEvent(K.id)?.name ?? ''),
+    HAT_SKINS.filter(K => !K.secret || own(K.id)).map(K => card(K.id, hatPic(B.id, 0, K.id), K.name.toUpperCase(), own(K.id) ? (on === K.id ? 'WEARING' : '') : ico('lock') + ' ' + (skinEvent(K.id)?.name ?? ''),
       (own(K.id) ? '' : ' locked') + (on === K.id ? ' on' : '') + (sel === K.id ? ' sel' : ''))).join('') + '</div>' +
     `<p class="hsa">${S ? S.about : 'The hat just as it comes'}</p>` + (S && !own(S.id) ? `<div class="tn">${ico('lock')} WIN IT IN ${skinEvent(S.id)?.name ?? 'AN EVENT'}</div>` : '');
 }
@@ -573,13 +614,13 @@ function renderGearAct() {
   const G = gearNow(), B = G.list[gearSel], st = G.stars(B.id), worn = prof[G.on] === B.id && st;
   let btns;
   if (gearLocked(G, B)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${B.unlock}</button>`;
-  else if (!st) btns = `<button data-gbuy="1" ${prof.coins < B.price ? 'disabled' : ''}>BUY ${COIN}${B.price}</button>`;
+  else if (!st) btns = `<button data-gbuy="1" ${prof.coins < B.price || barShort(B) ? 'disabled' : ''}>${B.bars ? 'CRAFT' : 'BUY'} ${cost(B)}</button>`;
   else {
     btns = worn ? '<button data-goff="1">TAKE OFF</button>' + hideBtn(wearCat) : '<button data-gwear="1">WEAR</button>';
     if (st < 3) btns += `<button data-gup="1" ${prof.coins < gearUpg(G, B) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${gearUpg(G, B)}</button>`;
   }
   const u = G.using(B.id), pick = st > 1 ? lvPick('gu', 'USING ' + starRow(u), u <= 1, u >= st) : '';
-  const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (worn ? setBonus(B.id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>');
+  const body = statBoxes(gearLines(B, gearShown(G, B)).map(([k, v]) => [GEAR_SHORT[k] ?? k, v, ''])) + (worn ? setBonus(B.id) : st ? '' : '<div class="tn">NOT OWNED · SHOWN AT ' + starRow(1) + '</div>' + barHint(B));
   setAct(actCard(B.name + ' ' + rarTag(B), gearStarTxt(G, B.id), body, pick, btns));
   placeAct();
 }
@@ -588,8 +629,8 @@ function gearClick(d) {
   const G = GEAR[wearCat], B = G?.list[gearSel]; if (!B) return;
   const st = G.stars(B.id), own = prof[G.own] ??= {}, use = prof[G.use] ??= {};
   if (d.gbuy) {
-    if (st || prof.coins < B.price || prof.lv < B.unlock) return;
-    prof.coins -= B.price; own[B.id] = 1; prof[G.on] = B.id; unhide(wearCat); sfx('buy');
+    if (st || prof.coins < B.price || prof.lv < B.unlock || barShort(B)) return;
+    prof.coins -= B.price; if (B.bars) prof.bars -= B.bars; own[B.id] = 1; prof[G.on] = B.id; unhide(wearCat); sfx('buy');
   } else if (d.gup) {
     if (!st || st >= 3 || prof.coins < gearUpg(G, B)) return;
     prof.coins -= gearUpg(G, B); own[B.id] = st + 1; delete use[B.id]; sfx('upgrade');
@@ -684,6 +725,7 @@ $('armList').addEventListener('click', e => {
   if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = basicWorn() || 1; } else { armorCard = true; suitSel = ''; } sfx('ui'); renderArmory(); return; }
   if (c.dataset.suit) { const id = c.dataset.suit; if (suitSel === id) armDet = true; else { suitSel = id; armorCard = false; } sfx('ui'); renderArmory(); return; }
   if (c.dataset.gear) { const i = +c.dataset.gear; if (i === gearSel && gearPick) armDet = true; else { gearSel = i; gearPick = true; } sfx('ui'); renderArmory(); return; }
+  if (c.dataset.idx) { const k = +c.dataset.idx; armPage = chestOnly(k) ? 'exclusive' : 'weapons'; armCat = BASE[k].cat; armSel = k; armPick = true; armDet = false; sfx('ui'); renderArmory(); return; } // to that gun's card
   const i = +c.dataset.i;
   if (i === armSel && armPick) armDet = true; else { armSel = i; armPick = true; }
   sfx('ui'); renderArmory();

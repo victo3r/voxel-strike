@@ -137,9 +137,9 @@ function update(dt) {
   else stepT = .08;
 
   // keep the real fire rate at any frame rate
-  cd -= dt;
+  cd -= dt; autoTick(dt, w);
   if (w.charge) chargeTick(dt, w); // the Aurora Rail fires when you let go
-  else if (myBurst.bn > 0 || (autoFire(w) || keys['T:shoot']) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun, and a burst finishes
+  else if (myBurst.bn > 0 || (autoFire(w) || keys['T:shoot'] || autoShot) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun, and a burst finishes
     const c0 = cd; shoot(); if (cd === c0) break;
     if (c0 > -dt) cd += c0;
   }
@@ -488,7 +488,7 @@ function autoGfx(raw, playing) {
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // dropped mags
-  starTick(dt); boltTick(dt); secretTick(dt);
+  starTick(dt); boltTick(dt); secretTick(dt); SHINE_T.value = performance.now() / 1000;
   if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pause in the menu, matches and co-op don't

@@ -21,6 +21,7 @@ Object.values(HAIRSTYLES).forEach(seamHair);
 
 // starting looks
 const PRESETS = [
+  { name: 'STRIKER', look: { skin: 3, eyes: 'brown', hair: 'short', hairC: 'black', top: 'jacket', topC: 0x2fae5a, top2: 0xf2f2f2, bottom: 'pants', bottomC: 0x2a2a2a, shoes: 'sneakers', shoeC: 0xf2f2f2, extra: 'headband', bandC: 0xf2f2f2 } },
   { name: 'CLASSIC', look: { skin: 2, eyes: 'blue', hair: 'short', hairC: 'dark', top: 'tee', topC: 0x1c9e98, bottom: 'pants', bottomC: 0x2c3e80, shoes: 'plain', shoeC: 0x3a3a40, extra: 'badge' } },
   { name: 'HOODIE', look: { skin: 1, eyes: 'brown', hair: 'short', hairC: 'black', top: 'hoodie', topC: 0x33363d, top2: 0xdddddd, bottom: 'pants', bottomC: 0x3d5a8c, shoes: 'sneakers', shoeC: 0xb8342c } },
   { name: 'BOB', look: { skin: 0, girl: true, eyes: 'green', bigEyes: true, hair: 'bob', hairC: 'blonde', top: 'tee', topC: 0xd4577a, bottom: 'pants', bottomC: 0x3f5f99, shoes: 'sneakers', shoeC: 0xf0f0f0 } },
@@ -34,7 +35,7 @@ const PRESETS = [
 const SECRETS = {
   creature: { name: "VICTOR'S CREATURE", sk: [204, 192, 128], sleeve: 8, eye: 0xb4ecff, zap: 0xcdf3ff, paint: paintCreature,
     look: { skin: 2, eyes: 'blue', hair: 'long', hairC: 'black', top: 'jacket', topC: 0x3a3630, top2: 0xb3a88e, bottom: 'pants', bottomC: 0x2f2b27, shoes: 'boots', shoeC: 0x2a2119, secret: 'creature' } },
-  evergreen: { name: 'EVERGREEN', sk: [178, 130, 106], eye: 0x3dff6a, halo: 0x2eff5e, eyes: [[2, 4, 1], [5, 4, 1]], whites: [[1, 4], [6, 4]], glint: 0xffcc33, star: [0, 3.5, 2], paint: paintEvergreen,
+  evergreen: { name: 'EVERGREEN', sk: [178, 130, 106], eye: 0x3dff6a, halo: false, eyes: [[2, 4, 1], [5, 4, 1]], whites: [[1, 4], [6, 4]], glint: 0xffcc33, star: [0, 3.5, 2], paint: paintEvergreen,
     look: { skin: 2, eyes: 'green', brows: 'none', hair: 'side', hairC: 'dark', top: 'long', topC: 0x19a020, top2: 0xebebeb, bottom: 'pants', bottomC: 0x4d4d4d, shoes: 'plain', shoeC: 0x3d3d3d, secret: 'evergreen' } },
 };
 
@@ -368,7 +369,7 @@ function buildChar(look, U = 1 / 16, own = false) {
   const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null, boots: null, hat: null };
   const S = !pxShown(look) && SECRETS[look.secret];
   if (S) secretFx(ch, S);
-  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); ch.hat?.mat.dispose(); ch.hat?.fx?.own?.dispose(); };
+  ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); ch.hat?.mat.dispose(); ch.shine?.dispose(); ch.hat?.fx?.own?.dispose(); };
   return ch;
 }
 
@@ -398,6 +399,7 @@ function secretFx(ch, S) {
   for (const [x, y, w] of S.eyes ?? [[2, 4, 1], [5, 4, 1]]) { // face pixels
     const cx = (x + w / 2 - 4) * U, cy = (3.5 - y) * U;
     const e = new THREE.Mesh(EYE_GEO, M.eye); e.position.set(cx, cy, 4.02 * U); e.scale.set(w * U, U, 1); eyes.add(e);
+    if (S.halo === false) continue; // lit, with no glow round it
     const h = new THREE.Sprite(M.halo); h.position.set(cx, cy, 4.3 * U); h.scale.set((w + 2) * U, (w + 2) * U, 1); eyes.add(h);
   }
   for (const [x, y] of S.whites ?? []) { const e = new THREE.Mesh(EYE_GEO, M.white); e.position.set((x - 3.5) * U, (3.5 - y) * U, 4.02 * U); e.scale.set(U, U, 1); eyes.add(e); } // lit whites

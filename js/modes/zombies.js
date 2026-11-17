@@ -1,7 +1,7 @@
 const zombies = [];
 let wave = 0, toSpawn = 0, spawnT = 0, waveWait = 1.5, kills = 0, coins = 0;
 // zombie waves run state
-let runCoins = 0, runXp = 0, bossKills = 0, deadT = 0, horde = false, countShown = 0;
+let runCoins = 0, runXp = 0, runBars = 0, runBoxes = 0, bossKills = 0, deadT = 0, horde = false, countShown = 0;
 const perk = { spd: 0, dmg: 0, hp: 0 }, PAY_WAVES = 30, DEAD_T = .9;
 // zombie hp scale, since gun damage is tuned for deathmatch
 const ZHP = .56;
@@ -376,6 +376,12 @@ const SHOP = [
   { gun: 'wisp', price: 420, desc: 'wisps that find them on their own' },
   { gun: 'voidlantern', price: 560, desc: 'pulls a whole crowd together, then pops' },
   { gun: 'aurora', price: 500, desc: 'hold to charge, a full one goes through the lot' },
+  { gun: 'tishot', price: 620, desc: 'a drum of shells, 7 pellets a blast' },
+  { gun: 'tipistol', price: 520, desc: 'a hand cannon that hits like a rifle' },
+  { gun: 'tisword', price: 540, desc: `${BASE[gi('tisword')].dmg} a swing, long reach` },
+  { gun: 'tisaw', price: 600, desc: 'saw blades that cut through rows and skip off walls' },
+  { gun: 'tisniper', price: 580, desc: `${BASE[gi('tisniper')].dmg} dmg, one clean shot` },
+  { gun: 'tirocket', price: 640, desc: 'two big rockets before a reload' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
 // gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often (chest odds)
@@ -413,7 +419,7 @@ function shopTop() {
   return `<div class="sg">${box('SHOP COINS', `${COIN}${coins}<em>+${bonus}</em>`, ' gold')}${box('HEALTH', `${ico('heart')} ${Math.ceil(P.hp)}/${P.max}${bar(P.hp, P.max, '#ff5a5a')}`)}` +
     (P.maxArmor ? box('ARMOR', `${ico('shield')} ${Math.ceil(P.armor)}/${P.maxArmor}${bar(P.armor, P.maxArmor, '#9fd3ff')}`) : '') + '</div>' +
     (R ? `<div class="sg acct">${box('ACCOUNT', R.pay ? `+${R.gold}${COIN} +${R.xp} XP` : `paid up to wave ${PAY_WAVES}`)}` +
-      (R.ups ? box(`LEVEL ${R.lv}!`, `+${R.bonus}${COIN} +${R.boost} ${ico('bolt')}`, ' up') : '') + '</div>' : '');
+      (R.ups ? box(`LEVEL ${R.lv}!`, `+${R.bonus}${COIN} +${R.boost} ${ico('bolt')}`, ' up') : '') + (R.bars ? box('TITANIUM BAR!', `+${R.bars}${BAR}`, ' up') : '') + (R.boxes ? box(CHESTS[barChest()].name + 'S!', `+${R.boxes}`, ' up') : '') + '</div>' : '');
 }
 // one row: icon or gun picture, name and what it does, price
 function shopRow(it, i) {
@@ -480,8 +486,8 @@ $('next').addEventListener('click', () => {
 function wavePay() {
   shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
   const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 2 + (bossW ? 5 : 0) : 0), r = grant(xp, gold);
-  runXp += xp; runCoins += gold + r.bonus; eventWave(xp);
-  waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp };
+  runXp += xp; runCoins += gold + r.bonus; runBars += r.bars; runBoxes += r.boxes; eventWave(xp);
+  waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp, bars: r.bars, boxes: r.boxes };
 }
 function waveStartFx() { // hordes and boss waves get a heads up
   const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };
@@ -503,7 +509,7 @@ function zombiesOver() {
     + (auth ? '' : row('TOP PLAYERS', sign));
   if (co) { coopRank(); if (typeof frPostButtons === 'function') frPostButtons(); } else zRankRow();
   missionEnd(false);
-  $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
+  $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), barTile(runBars), boxTile(runBoxes), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}`
     + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');
@@ -638,6 +644,7 @@ function bossWay(z, dt, way, dist) {
   if (dist <= z.reach && dy > -1 && dy < 3.5) return null; // close enough to hit you
   if (z.stuckOut > 0) { z.stuckOut -= dt; if (dy < -1.5) z.downT = 8; } // stuck getting down to you: stomp from above instead
   if (z.downT > 0) z.downT -= dt;
+  else if (dy < -1.5 && !bossFits(z, ZT.pos.x, ZT.pos.y, ZT.pos.z)) z.downT = 8; // you're down where it can't fit: no use trying the stairs
   const pg = groundAt(ZT.pos.x, ZT.pos.z, .3, ZT.pos.y + .1), tight = !!way && blocked(way.x, way.z, z.r * .9, way.y);
   z.up = !dead && pg - p.y > LEAP_UP; z.out = z.up || !dead && (z.stuckOut > 0 || z.downT > 0);
   if (!z.out) { z.go = z.hunt = z.bad = null; return way; }
@@ -705,5 +712,5 @@ function bossLanded(z, p, stomp, dmg) {
     if (up && d < 2.8 && P.pos.y < p.y - 1 && p.y - P.pos.y < 4.5) { const h = hurtPlayer(dmg); if (z) stingYou(z, h); sfx('smash'); }
   } else if (up && d < 3.4 && Math.abs(P.pos.y - p.y) < 2) { const h = hurtPlayer(dmg); if (z) stingYou(z, h); P.kx = dx / (d || 1) * 13; P.kz = dz / (d || 1) * 13; P.vy = Math.max(P.vy, 7); P.onGround = false; }
 }
-function resetRun() { perk.spd = perk.dmg = perk.hp = 0; runCoins = runXp = bossKills = 0; deadT = 0; horde = false; countShown = 0; shopOffer = []; clearGlobs(); }
+function resetRun() { perk.spd = perk.dmg = perk.hp = 0; runCoins = runXp = runBars = runBoxes = bossKills = 0; deadT = 0; horde = false; countShown = 0; shopOffer = []; clearGlobs(); }
 function banner(text, html = false) { const b = $('banner'); b[html ? 'innerHTML' : 'textContent'] = text; b.style.opacity = 1; setTimeout(() => b.style.opacity = 0, 1800); }

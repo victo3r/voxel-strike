@@ -13,12 +13,12 @@ const CHESTS = [
   { id: 'iron', name: 'IRON CHEST', cost: 3, pal: { m: '#7f8a99', w: '#b5bfcc', b: '#3c4450', g: '#4fa3ff' }, loot: [
     { k: 'coins', n: [30, 45], w: 34 }, { k: 'boosts', n: 3, w: 24 }, { k: 'xp', n: [300, 450], w: 18 },
     { k: 'star', n: 1, w: 5, r: 'rare' }, { k: 'coins', n: 100, w: 6, r: 'rare' },
-    ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 1.5, r: rarOf(b) })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 1.5, r: rarOf(h) })),
+    ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 1.5, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 1.5, r: rarOf(h) })), // crafted pieces stay out of chests
     { k: 'boosts', n: 6, w: 2, r: 'epic' },
   ] },
   { id: 'gold', name: 'GOLDEN CHEST', cost: 10, pal: { m: '#e0b234', w: '#ffe07a', b: '#8a5a12', g: '#d23cff' }, loot: [
     { k: 'coins', n: [120, 180], w: 24 }, { k: 'boosts', n: 12, w: 16 }, { k: 'star', n: 2, w: 14, r: 'rare' },
-    ...BOOTS.map(b => ({ k: 'boots', id: b.id, w: 3, r: rarOf(b) })), ...HATS.map(h => ({ k: 'hats', id: h.id, w: 3, r: rarOf(h) })),
+    ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 3, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 3, r: rarOf(h) })),
     { k: 'coins', n: 300, w: 12, r: 'epic' },
     ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: w.drop ?? (w.chest ? CHEST_GUN_DROP : GUN_DROP[rarOf(w)]), r: rarOf(w) })), // drop: a gun's own odds (the Crystal Companion is as rare as any mythic)
     { k: 'coins', n: 500, w: 3, r: 'legend' },

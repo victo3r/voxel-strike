@@ -6,19 +6,21 @@ const HATS = [
   { id: 'arcane', rar: 'epic', name: 'Arcane Hat', unlock: 20, price: 300, shrug: [.25, .35, .5] },
   { id: 'thornwood', rar: 'epic', name: 'Thornwood Helm', unlock: 14, price: 240, thorns: [.35, .5, .65] },
   { id: 'skyrunner', rar: 'legend', name: 'Skyrunner Helm', unlock: 26, price: 360, sky: [.15, .2, .25] },
+  { id: 'titanium', rar: 'mythic', name: 'Titanium Helm', unlock: 50, price: 500, bars: 2, dr: [.05, .07, .09], hs: [.3, .4, .5] },
 ];
 const HAT_I = Object.fromEntries(HATS.map((H, i) => [H.id, i]));
 const hatOf = id => HATS[HAT_I[id]] ?? null;
 const hatStars = id => prof.hats?.[id] | 0; // 0 = not bought
 const hatUse = id => { const st = hatStars(id), u = prof.hatUse?.[id] | 0; return u ? Math.max(1, Math.min(st, u)) : st; };
 const wornHat = () => { const id = prof.hatOn; if (!id || !hatStars(id)) return null; const skin = hatSkin(id); return skin ? { id, st: hatUse(id), skin } : { id, st: hatUse(id) }; };
-// hat skins: a new look for a hat you own, it keeps its stats (ids are used in saves, don't rename them). Each is a weekly event's top prize (EVENTS skin)
+// hat skins: a new look for a hat you own, it keeps its stats (ids are used in saves, don't rename them). Each is a weekly event's top prize (EVENTS skin), or a secret
 const HAT_SKINS = [
   { id: 'brainjar', name: 'Brain Jar', about: 'A brain in a jar of glowing goo, still thinking about lunch' },
   { id: 'hunter', name: "Hunter's Cap", about: 'Blaze orange with a bullseye that never stops pinging' },
   { id: 'circlet', name: 'Blade Circlet', about: 'Polished silver with a blade on the brow that catches the light' },
   { id: 'ghillie', name: 'Ghillie Hood', about: 'A hood of leaves and rags that sheds a leaf now and then' },
   { id: 'laurel', name: 'Golden Laurel', about: 'Gold leaves for a champion, sparkling wherever you go' },
+  { id: 'map', name: 'Map Hat', about: 'A treasure map you can wear, X marks your head', secret: true }, // from a code, hidden till it's yours
 ];
 const HSKIN_I = Object.fromEntries(HAT_SKINS.map((S, i) => [S.id, i]));
 const hatSkinOf = id => HAT_SKINS[HSKIN_I[id]] ?? null;
@@ -51,7 +53,7 @@ function botHat() {
 
 // ---- hat model (don't cover the eyes)
 function hatPieces(id, st) {
-  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a));
+  const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a), false, polished(id, a), id === 'titanium');
   const head = () => B(-8, 8, 0, 16, -8, 8, 0); // hollow out where the head goes
   if (id === 'raider') {
     // hood, scarf at 2 stars, gold trim at 3
@@ -105,6 +107,19 @@ function hatPieces(id, st) {
     for (const n of st >= 2 ? [3, 4, 4] : [2, 3, 3]) for (let d = 1; d <= n; d++, y--) B(-2, 2, y - 1, y, -9 - d, -9, d === n ? DK : THORN);
     if (st >= 2) { B(-12, -9, 14, 18, -3, 3, LEAF); B(-11, -9, 11, 14, 0, 4, LEAF); B(9, 12, 15, 18, -6, -1, LEAF); } // leaves at the temples
     if (st >= 3) B(-2, 2, 10, 13, 10, 12, AMBER); // amber on the brow
+  } else if (id === 'titanium') {
+    // a smooth polished helm with a blue band over the brow, a crest sweeping back at 2 stars, brighter blue at 3
+    const C = hex([190, 200, 212]), HI = hex([234, 240, 246]), DK = hex([54, 60, 70]), BLUE = st >= 3 ? hex([150, 205, 255]) : hex([79, 157, 255]);
+    B(-9, 9, 6, 17, -9, 9, C); B(-8, 8, 17, 18, -8, 8, C); B(-6, 6, 18, 19, -7, 6, HI); B(-9, 9, 3, 6, -9, -6, C); // a rounded shell, down over the neck
+    head();
+    B(-6, 6, 6, 11, 8, 9, 0); // face opening
+    B(-9, 9, 11, 15, 8, 10, C); B(-7, 7, 12, 14, 9, 10, BLUE); // brow
+    for (const sx of [-1, 1]) {
+      const X = (a, c) => sx > 0 ? [a, c] : [-c, -a];
+      B(...X(8, 10), 3, 10, 0, 10, C); B(...X(6, 10), 3, 8, 8, 10, C); B(...X(8, 10), 3, 4, 0, 10, DK); // cheek guards
+      if (st >= 3) B(...X(8, 9), 12, 14, -6, -1, BLUE);
+    }
+    if (st >= 2) B(-2, 2, 19, 22, -10, 5, st >= 3 ? BLUE : HI); // crest
   } else if (id === 'skyrunner') {
     // a white flight helm with wings sweeping back (never above the top, or they look like antennae), longer wings at 2 stars, gold at 3
     const C = hex([226, 232, 240]), HI = hex([196, 206, 220]), DK = hex([146, 160, 178]), TRIM = st >= 3 ? hex([240, 196, 64]) : hex([40, 200, 210]);
@@ -202,6 +217,19 @@ function skinPieces(id) {
     }
     for (const x of [-8, 4]) B(x, x + 4, 15, 17, -9, -8, GH); // round the back
     B(-2, 2, 10, 16, -10, -9, RB); B(-4, -1, 4, 10, -10, -9, RB); B(1, 4, 3, 10, -10, -9, RD); // ribbon
+  } else if (id === 'map') {
+    // a treasure map wrapped round the head: sea on one side, hills on the other, a dotted trail to a red X, the rolled ends at the back
+    const P = hex([228, 206, 152]), PD = hex([198, 170, 114]);
+    const C = { s: hex([92, 160, 204]), w: hex([150, 204, 232]), g: hex([122, 170, 84]), G: hex([64, 118, 60]), i: hex([92, 62, 36]), r: hex([200, 48, 40]), X: hex([255, 64, 52], true) };
+    const draw = (rows, put) => rows.forEach((row, j) => [...row].forEach((ch, i) => { if (C[ch]) put(i, rows.length - 1 - j, C[ch]); }));
+    B(-9, 9, 11, 25, -9, 9, P);
+    for (const x of [-8, 4]) B(x, x + 4, 10, 25, -12, -9, PD); // the rolls
+    head();
+    draw(['................', '.i...i....X.X...', 'i.i.i.i....X....', '..........X.X...', '........r.......', '.....rr.........', '..rr............', 'ss..............', 'sss.......ggg...', 'swss.....ggggg..', 'ssssw....gGggg..', 'sssss.....ggg...'], (i, j, c) => B(i - 8, i - 7, j + 12, j + 13, 8, 9, c));
+    draw(['................', '....i.i.........', '.....i.....ss...', '.........ssssss.', 's......sssswssss', 'ss...sssssssssss', 'sssssssss.i.ssss', 'sswsssss.iii.sws', 'ssssssss.iii.sss', 'sssswss.iiiii.ss', 'ssssssssssssssws', 'sswssssssswsssss'], (i, j, c) => B(-9, -8, j + 12, j + 13, 7 - i, 8 - i, c));
+    draw(['................', '...i.....i......', '..i.i...i.i.....', '.i...i.i...i....', '................', '....GG....GG....', '...GGGG..GGGG...', '....ii....ii....', 'gg..........gggg', 'gggg......gggggg', 'ggggg....ggggggg', 'gggg......gggggg'], (i, j, c) => B(8, 9, j + 12, j + 13, 7 - i, 8 - i, c));
+    draw(['...r...', '.i.r.i.', '..iri..', 'iiiiiii', '..iii..', '.i.i.i.', '...i...'], (i, j, c) => B(i - 4, i - 3, 24, 25, 3 - j, 4 - j, c)); // a compass rose on top
+    draw(['iii', '..i', '.i.', '...', '.i.'], (i, j, c) => B(1 - i, 2 - i, j + 16, j + 17, -9, -8, c)); // and a riddle on the back
   }
   return out;
 }
@@ -252,6 +280,14 @@ function skinFx(id, g, hp) { // { tick, own: a material of its own to dispose },
       if (k < 1) { at(l.m, l.x + Math.sin(k * 7) * 2, l.y - k * 16, l.z - k * 3); l.m.rotation.set(k * 5, k * 3, 0); l.m.scale.set(1.8 * hp, .4 * hp, 1.2 * hp); }
     } } };
   }
+  if (id === 'map') { // the trail lights up dash by dash, then the X
+    const ms = [[-5, 17.5], [-2, 18.5], [.5, 19.5], [3.5, 21.5]].map(([x, y], i) => { const m = new THREE.Sprite(skinSprite(i === 3 ? 0xff4030 : 0xffb060)); at(m, x, y, 9.4); m.visible = false; g.add(m); return m; });
+    let t = R() * 3;
+    return { tick: dt => { t += dt; const k = t % 3.6 / .3; ms.forEach((m, i) => {
+      const X = i === 3, a = (k - i) / (X ? 4 : 1.4); m.visible = a > 0 && a < 1;
+      if (m.visible) m.scale.setScalar(hp * (X ? 7 : 3) * Math.sin(a * Math.PI));
+    }); } };
+  }
   if (id === 'laurel') {
     const ss = Array.from({ length: few ? 2 : 3 }, () => ({ s: new THREE.Sprite(skinSprite(0xffe9a0)), t: 1 + R() * 2, wait: 0 }));
     for (const o of ss) { o.s.visible = false; g.add(o.s); }
@@ -267,8 +303,8 @@ const HAT_PX = ARMOR_PX;
 const hatGeoCache = {};
 const hatGeos = (id, st, U, skin) => hatGeoCache[(skin ? 'skin:' + skin : id + ':' + st) + ':' + U] ??= voxelGeos(skin ? skinPieces(skin) : hatPieces(id, st), U / HAT_PX);
 // a hat (with its skin) as meshes on g
-function hatMeshes(id, st, U, skin, mat, g) {
-  const geos = hatGeos(id, st, U, skin), m = new THREE.Mesh(geos.lit, mat);
+function hatMeshes(id, st, U, skin, mat, g, ch = null) {
+  const geos = hatGeos(id, st, U, skin), m = wearMesh(geos, mat, ch);
   if (geos.glow) m.add(new THREE.Mesh(geos.glow, gunGlow));
   if (skin) skinExtras(skin, m, U / HAT_PX);
   g.add(m); return m;
@@ -277,7 +313,7 @@ function hatMeshes(id, st, U, skin, mat, g) {
 function dressHat(ch, h) {
   if (ch.hat) { ch.hat.mesh.parent.remove(ch.hat.mesh); ch.mats.splice(ch.mats.indexOf(ch.hat.mat), 1); ch.hat.mat.dispose(); ch.hat.fx?.own?.dispose(); ch.hat = null; }
   if (!h || !hatOf(h.id)) return;
-  const skin = hatSkinOf(h.skin) ? h.skin : '', mat = armorMat(), mesh = hatMeshes(h.id, h.st, ch.U, skin, mat, ch.headPiv);
+  const skin = hatSkinOf(h.skin) ? h.skin : '', mat = armorMat(), mesh = hatMeshes(h.id, h.st, ch.U, skin, mat, ch.headPiv, ch);
   ch.mats.push(mat); ch.hat = { mat, mesh, fx: skin ? skinFx(skin, mesh, ch.U / HAT_PX) : null };
 }
 // armory preview
@@ -285,3 +321,4 @@ function hatModel(id, st, g, skin = '') { hatMeshes(id, st, 1 / 16, hatSkinOf(sk
 // hat pictures, at their 3-star size (a skin is its own picture)
 const hatPic = (id, st, skin = '') => hatSkinOf(skin) ? modelPic('hat:' + skin, g => hatModel(id, st, g, skin), { yaw: .4, tilt: .3, w: 200, h: 180 })
   : modelPic('hat:' + id + st, g => hatModel(id, st, g), { yaw: .4, tilt: .3, w: 200, h: 180, ref: ['hat:' + id, g => hatModel(id, 3, g)] });
+showProf(); // the badge can tell now whether the next one is a bar or a chest

@@ -259,7 +259,7 @@ function heroShot(k = 1) {
     if (w.charge) auroraBeam(_hm.clone(), L, k, .6, hf.flashM, held, lobbyScene); else showLance(_hm.clone(), L, w.lance, .6, lobbyScene, hf.flashM, held);
     return;
   }
-  if (w.wisp || w.vortex) { wandBolt(w.wisp ? 'wisp' : 'voidorb', _hm.clone(), _hm.clone().addScaledVector(_hd, w.wisp ? 18 : 12), lobbyScene, null, .7); return; }
+  if (w.wisp || w.vortex || w.saw) { wandBolt(w.wisp ? 'wisp' : w.saw ? 'saw' : 'voidorb', _hm.clone(), _hm.clone().addScaledVector(_hd, w.vortex ? 12 : 18), lobbyScene, null, .7); return; }
   if (w.wand || w.bolt) { if (w.wand) hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand || w.bolt, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : w.tracer ? tracerCol(w.tracer) : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {

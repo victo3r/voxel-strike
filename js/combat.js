@@ -2,6 +2,18 @@ const ray = new THREE.Raycaster(), ray2 = new THREE.Raycaster(), ndc = new THREE
 // what bullets can hit
 const headMul = w => w.headMul ?? HEAD_MUL; // the crossbow hits heads harder
 function shotTargets(rc) { const t = [ground, ...(rc ? coverAlong(rc.ray.origin, rc.ray.direction, rc.far) : crateMeshes)]; for (const zz of zombies) if (!zz.dead && !(net.coop && zz.type === 'bot')) t.push(...zz.parts); return t; } // rc: only the cover along that ray; co-op: shots go past teammates
+// auto fire (phones): the trigger pulls itself while your crosshair has been on an enemy for a moment
+let autoShot = false, autoT = 0;
+const AUTO_T = .1, AUTO_NEAR = 5;
+function autoTick(dt, w) {
+  autoShot = false;
+  if (!TOUCH || !opts.auto || !locked || respawnT > 0 || dead || P.downed || reloading > 0) { autoT = 0; return; }
+  ray.setFromCamera(ndc.set(0, 0), camera);
+  const hit = ray.intersectObjects(shotTargets(ray), false)[0], zz = hit?.object.userData.zombie, boom = w.rocket || w.grenade || w.flare;
+  const on = zz && !zz.dead && !friendly(null, zz) && hit.distance <= (w.range ?? 120) && !(boom && hit.distance < AUTO_NEAR); // nothing that would blow up in your face
+  autoT = on ? autoT + dt : 0;
+  autoShot = autoT >= AUTO_T && !(w.charge && chargeT >= w.charge); // a charge gun lets go once it's full
+}
 // recoil only moves the camera, your real aim stays put
 function recoilKick(w, k = 1) { // k: a part charge kicks less
   const r = RECOIL[w.id]; if (!r) return;
@@ -60,6 +72,7 @@ function shoot(k) { // k: how charged the Aurora Rail was
     else if (w.grenade) fireGrenade(w);
     else if (w.wisp) fireWisp(w);
     else if (w.vortex) fireVoid(w);
+    else if (w.saw) fireSaw(w);
     else if (w.spell) castSpell(w, camera.position.clone(), camera.getWorldDirection(fwd).clone(), null, flashMesh);
     else {
       flashMesh.getWorldPosition(trFrom);
@@ -508,7 +521,7 @@ function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust });
 }
 const GUST_MATS = [new THREE.MeshBasicMaterial({ color: 0xc8f0ff }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
-const ROCKET_COLS = { rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c] }; // body, tip
+const ROCKET_COLS = { rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c], tirocket: [0xaab5c2, 0x4f8fe0] }; // body, tip
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, drop
 const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and damage
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
