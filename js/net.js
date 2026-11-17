@@ -5,7 +5,7 @@ const NET_GEN = 8; // content version: rooms hold one, bump it when new guns or 
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
-const NET_BUILD = +(document.currentScript?.src.match(/[?&]v=(\d+)/)?.[1] ?? 0); // lets the server spot old cached clients
+const NET_BUILD = (m => m ? 1000 + m[1] * 10 + (m[2] | 0) : 0)(document.currentScript?.src.match(/[?&]v=alpha-(\d+)(?:\.(\d+))?/)); // 1111 for alpha-11.1: lets the server spot old cached clients
 const NET_RATE = 50; // ms between packets (20 a second)
 const NET_HIST = 600; // ms of position history for smoothing
 const REJOIN_FOR = 25000; // keep trying to get back in this long (the server holds your place 30 s)
