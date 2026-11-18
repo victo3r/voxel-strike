@@ -80,6 +80,7 @@ function gunAttrs(w) {
   if (w.track) a.push('TRACKING');
   if (w.chain) a.push('CHAIN LIGHTNING');
   if (w.knock) a.push('KNOCKBACK');
+  if (w.reel) a.push('REELS IN');
   if (w.stun) a.push('STUN');
   if (w.soul) a.push('HEALS ON KILL');
   if (w.rocket) a.push(...w.gust ? ['WIND BLAST', 'BIG LAUNCH'] : ['ROCKET', 'EXPLOSIVE']);
@@ -137,6 +138,9 @@ const DESC = {
   tishot: 'A drum of shells and a wall of pellets, polished to a shine',
   daybreak: 'A six shooter the colour of sunrise, for players who came back',
   highnoon: 'A lever rifle that settles things at midday, a first week keepsake',
+  cutlass: 'A quick blade pulled up from a wreck, still sharp',
+  harpoon: 'A speargun whose line reels them in to you',
+  conch: 'A shell with the sea inside, and its jet shoves them back',
   tipistol: 'A heavy titanium hand cannon that hits like a rifle',
   tisword: 'A broad titanium blade with an edge that never dulls',
   tisaw: 'Throws spinning saw blades that cut through a whole row and skip off walls',
@@ -164,6 +168,7 @@ function gunSpecs(i) {
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
   if (slows(w)) out.push(['SLOW', `${Math.round((1 - (w.frost ? FROST_K : SLOW_K)) * 100)}% FOR ${SLOW_T}s`]);
   if (w.knock) out.push(['KNOCKBACK', w.knock >= 1.2 ? 'BIG' : w.knock >= .75 ? 'MEDIUM' : 'SMALL']);
+  if (w.reel) out.push(['REELS IN', `UP TO ${REEL_MAX} BLOCKS`]);
   if (w.stun) out.push(['STUN', w.stun + 's']);
   if (w.soul) out.push(['HEAL ON KILL', w.soul + ' HP']);
   if (w.pierce) out.push(['PIERCE', `-${Math.round((1 - PIERCE_FALL) * 100)}% A BODY`]);
@@ -188,7 +193,7 @@ const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIV
 const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare', 'eradicator', 'rocket', 'hitman', 'heatray', 'thrasher', 'semisniper', 'herosword', 'shockbeam', 'tigerbite', 'executioner',
   'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
   'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
-  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon'];
+  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch'];
 const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
 function renderIndex() {
   const list = indexList(), have = list.filter(hasGun).length;
@@ -475,10 +480,9 @@ let drawSure = -1; // delete needs a second click
 // secret codes, kept as hashes
 let codeOn = false, codeMsg = '';
 const CODES = { '5690d215caed2a6699cdf70479d8c6447be1e39a14bb6ad7aa96f31e91b32031': 'creature', '1c48319173d993e160c8c14a377f7aa4357d5a09fa41df198c6862db2cf28f03': 'creature',
-  '5467529071157e32ac53218d0d4ceb6c558faf4acff3f96fb171158dd0072327': 'evergreen', '8852032455ce783ddeae72e9f41cf20e3ff6ead5c35249ecb90cc003292797e6': 'hat:map',
+  '8852032455ce783ddeae72e9f41cf20e3ff6ead5c35249ecb90cc003292797e6': 'hat:map',
   '06e1a5d53766a0be3db629e2a732262c41ceec5f2c394873351b137aa8f6e50f': 'hat:octopus', 'e0eb5a9059ccd1fae3b75c96f5c1456b6cde04a9e572c7bcfffc933e50679e42': 'hat:octopus' };
 const SECRET_HI = { creature: ["Victor's Creature wakes up and joins your skins", "Victor's Creature is already yours"],
-  evergreen: ['Evergreen lights up and joins your skins', 'Evergreen is already yours'],
   'hat:map': ['The Map Hat unrolls, find it in the SKINS of any hat', 'The Map Hat is already yours'],
   'hat:octopus': ['An octopus climbs aboard, find it in the SKINS of any hat', 'The Octopus Hat is already yours'] };
 async function redeem() {

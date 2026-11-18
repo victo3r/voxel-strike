@@ -30,14 +30,12 @@ const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 1.1); scene.add(hemi)
 const sun = new THREE.DirectionalLight(0xffffff, 1.3); sun.position.set(10, 20, 5); scene.add(sun);
 hemi.layers.enableAll(); sun.layers.enableAll(); // lights on every layer, so the glow passes see the same lights (a change re-checks every material)
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
-// menus shrink to fit a phone: --z for the big ones, --z2 for the rest (--uw/--uh: 1% of the screen inside them)
+// menus shrink to fit a phone: --z for the big ones, --z2 for the rest (--uw/--uh: 1% of the screen inside them); the lobby shrinks in any small window
 function fitUI() {
-  if (!TOUCH) return;
   const st = document.documentElement.style;
   [['', 500, 860], ['2', 420, 760]].forEach(([n, h, w]) => {
     const z = Math.max(.5, Math.min(1, innerHeight / h, innerWidth / w));
     st.setProperty('--z' + n, z); st.setProperty('--uw' + n, innerWidth / z / 100 + 'px'); st.setProperty('--uh' + n, innerHeight / z / 100 + 'px');
-    if (n) document.body.classList.toggle('tight', innerWidth / z < 940); // no room for the lobby logo
   });
 }
 fitUI(); addEventListener('resize', fitUI);

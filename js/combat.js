@@ -90,6 +90,7 @@ function shoot(k) { // k: how charged the Aurora Rail was
           const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? headMul(w) : 1), hit.point, head, false, null, 0);
           if (w.wand) wandHit(w, zz, camera.position, null);
           if (w.track) trackHit(zz, w.track);
+          if (w.reel && !net.pvp && !zz.dead) reelIn(zz, camera.position, w.reel); // online the server sends the pull
           if (w.soul && !net.pvp && zz.dead) soulHeal(null, zz.g.position.clone().setY(zz.g.position.y + 1), mode === 'zombies' ? SOUL_Z : w.soul); // online the server heals you
         }
         else if (!w.wand) burst(hit.point, 0x999999, 2);
@@ -312,7 +313,7 @@ function flame(w) {
 }
 // heat ray beam
 function heatBeam(w) {
-  if (w.frost) frostHeld = .12; else if (w.chain) stormHeld = .12; else beamHeld = .12; // keeps the hum going
+  if (w.frost) frostHeld = .12; else if (w.chain) stormHeld = .12; else if (w.water) waterHeld = .12; else beamHeld = .12; // keeps the hum going
   if (w.wand) wandOn = .15;
   crossKick(.4, 1.5); recoilKick(w);
   camera.getWorldDirection(fwd);
@@ -320,10 +321,11 @@ function heatBeam(w) {
   const hit = ray2.intersectObjects(shotTargets(ray2), false)[0];
   const end = hit ? hit.point : tmp.copy(camera.position).addScaledVector(fwd, w.range);
   const zz = hit?.object.userData.zombie;
-  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (slows(w)) shockHit(zz, w); if (w.chain) chainJumps(zz, w, null, lvl[cur]); }
+  if (zz && !zz.dead) { const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? 1.5 : 1), hit.point, head, false, null, 2); if (slows(w)) shockHit(zz, w); if (w.chain) chainJumps(zz, w, null, lvl[cur]);
+    if (w.knock && !net.pvp && !zz.dead) launch(zz, zz.g.position.clone().setY(zz.g.position.y + 1), camera.position, w.knock, false); } // a jet shoves them back
   if ((w.shock || w.chain) && Math.random() < .25) sfx('zap', { v: .6 });
   if (w.frost && Math.random() < .2) sfx('chill', { v: .6 });
-  if (hit && Math.random() < .35) burst(end, w.frost ? (Math.random() < .5 ? 0xcff4ff : 0xffffff) : w.shock ? (Math.random() < .5 ? 0x8fe9ff : 0xffffff) : w.chain ? (Math.random() < .5 ? 0xc8b4ff : 0xffffff) : Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
+  if (hit && Math.random() < .35) burst(end, w.frost ? (Math.random() < .5 ? 0xcff4ff : 0xffffff) : w.water ? (Math.random() < .5 ? 0x7fdcf0 : 0xffffff) : w.shock ? (Math.random() < .5 ? 0x8fe9ff : 0xffffff) : w.chain ? (Math.random() < .5 ? 0xc8b4ff : 0xffffff) : Math.random() < .5 ? 0xffd27a : 0xff8a1a, 1);
   flashMesh.getWorldPosition(beamFrom);
   if (!w.chain) return showBeam(null, beamFrom, end, beamKind(w));
   const d = camera.position.distanceTo(end); // stays on the muzzle and the crosshair between shots
@@ -332,8 +334,9 @@ function heatBeam(w) {
 // beams on screen, one per shooter (null = you)
 const beamGeo = new THREE.BoxGeometry(1, 1, 1), beamFrom = new THREE.Vector3(), beams = new Map();
 const beamMats = [new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xfff4d0 })];
-const beamKind = w => w.frost ? 'frost' : !!w.shock;
-const beamSnd = w => w.frost ? 'frost' : w.chain ? 'storm' : 'heat'; // its start and end sounds
+const beamKind = w => w.frost ? 'frost' : w.water ? 'water' : !!w.shock;
+const beamSnd = w => w.frost ? 'frost' : w.chain ? 'storm' : w.water ? 'water' : 'heat'; // its start and end sounds
+const waterMats = [new THREE.MeshBasicMaterial({ color: 0x4fb8e8, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xe8fbff })];
 const frostMats = [new THREE.MeshBasicMaterial({ color: 0xa8ecff, transparent: true, opacity: .6, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
 const shockMats = [new THREE.MeshBasicMaterial({ color: 0x4fc8ff, transparent: true, opacity: .55, depthWrite: false }), new THREE.MeshBasicMaterial({ color: 0xeefcff })];
 // shock beam: slows whoever it hits
@@ -353,7 +356,7 @@ function showBeam(by, from, to, shock = false) {
     for (const [mat, s] of [[beamMats[0], 1], [beamMats[1], .4]]) { const m = new THREE.Mesh(beamGeo, mat); m.scale.set(s, s, 1); g.add(m); }
     scene.add(g); beams.set(by, b = { g, life: 0 });
   }
-  const len = from.distanceTo(to), mats = shock === 'frost' ? frostMats : shock ? shockMats : beamMats, w = shock === 'frost' ? .05 + Math.random() * .012 : shock ? .04 + Math.random() * .04 : .055; // electricity flickers
+  const len = from.distanceTo(to), mats = shock === 'frost' ? frostMats : shock === 'water' ? waterMats : shock ? shockMats : beamMats, w = shock === 'frost' ? .05 + Math.random() * .012 : shock === 'water' ? .075 + Math.random() * .02 : shock ? .04 + Math.random() * .04 : .055; // electricity flickers
   b.g.children[0].material = mats[0]; b.g.children[1].material = mats[1];
   b.g.position.lerpVectors(from, to, .5); b.g.lookAt(to); b.g.scale.set(w, w, len);
   b.g.visible = true; b.life = .08;
@@ -468,11 +471,21 @@ function launch(o, center, p, f, self, k = 1) {
   o.lx = (o.lx || 0) + launchV.x * s; o.lz = (o.lz || 0) + launchV.z * s;
   if (you) P.onGround = false;
 }
+// the harpoon: whoever it hits is hauled toward the shooter, f of the way there
+const REEL_T = .45, REEL_MAX = 12;
+function reelIn(o, to, f) {
+  const fx = fxOf(o); if (fx?.steady) return; // Ironclad stands its ground
+  const pos = o === P ? P.pos : o.g.position, dx = to.x - pos.x, dz = to.z - pos.z, d = Math.hypot(dx, dz); if (d < 3) return;
+  const sp = Math.min(REEL_MAX, (d - 2) * f) * (1 - (fx?.heavy || 0)) / (o === P ? 1 : o.scale || 1) / REEL_T;
+  if (o.mirror) { net.zHit(o, { ln: [r2(dx / d * sp), 3, r2(dz / d * sp), 1, REEL_T] }); return; } // co-op: the host hauls it
+  o.lx = dx / d * sp; o.lz = dz / d * sp; o.reelT = REEL_T; o.vy = Math.max(o.vy || 0, 3); if (o === P) P.onGround = false;
+}
 // sideways part of a rocket launch
 function launchMove(o, pos, r, grounded, dt) {
   if (!o.lx && !o.lz) return;
   if (!walkTo(pos, pos.x + o.lx * dt, pos.z, r, false)) o.lx = 0; // hit a wall
   if (!walkTo(pos, pos.x, pos.z + o.lz * dt, r, false)) o.lz = 0;
+  if (o.reelT > 0) { if ((o.reelT -= dt) <= 0) { o.lx *= .2; o.lz *= .2; } return; } // on the harpoon's line: no drag until it lets go
   const k = Math.exp(-(grounded ? GROUND_DRAG : AIR_DRAG) * dt); o.lx *= k; o.lz *= k;
   if (Math.abs(o.lx) + Math.abs(o.lz) < .1) o.lx = o.lz = 0;
 }

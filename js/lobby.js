@@ -163,7 +163,10 @@ const isPreset = l => PRESETS.some(p => lookKey(p.look) === lookKey(l));
 // your look without a drawn skin (what CrazyGames players see you in)
 const lookBase = () => { const { px, ...b } = prof.look; return b; };
 const lookSent = () => { const L = lookBase(), hide = prof.hide & 7; return hide && Object.keys(L).length < 24 ? { ...L, hide } : L; }; // what others see: hidden pieces ride along
-const ownSecret = id => Array.isArray(prof.secrets) && prof.secrets.includes(id);
+const secretMine = o => { const a = typeof auth === 'object' ? auth : null; return DEV_ALL || !!a && !a.cg && (a.id === o.id || !a.id && a.user?.toLowerCase() === o.user); };
+const ownSecret = id => SECRET_OWNER[id] ? secretMine(SECRET_OWNER[id]) : Array.isArray(prof.secrets) && prof.secrets.includes(id);
+// a secret skin that isn't yours comes off
+function secretCheck() { const s = prof.look?.secret; if (!s || !SECRETS[s] || ownSecret(s)) return; prof.look = { ...PRESETS[0].look }; saveProf(); if (typeof dressHero === 'function') dressHero(); }
 const lookChoices = () => [...PRESETS, ...(prof.myLook && !isPreset(prof.myLook) ? [{ name: 'CUSTOM', look: prof.myLook }] : []),
   ...Object.keys(SECRETS).filter(ownSecret).map(id => ({ name: SECRETS[id].name, look: SECRETS[id].look, secret: id })),
   ...(prof.draws || []).map((d, i) => ({ name: d.n, look: { ...lookBase(), px: d.px }, drawn: i }))];
@@ -204,7 +207,7 @@ const heroFx = [], fxGeo = new THREE.BoxGeometry(1, 1, 1);
 const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: .9, depthWrite: false });
 const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), gust: new THREE.MeshBasicMaterial({ color: 0xd8f4ff }), flare: new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
   beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }),
-  shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), frost: new THREE.MeshBasicMaterial({ color: 0xc8f4ff, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
+  shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), frost: new THREE.MeshBasicMaterial({ color: 0xc8f4ff, transparent: true, opacity: .8, depthWrite: false }), water: new THREE.MeshBasicMaterial({ color: 0x5fc4ee, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
 const heroLive = () => inLobby && (armOpen ? armPage !== 'wear' : lob.on);
 const heroCan = () => heroLive() && hf.i >= 0 && holdK > .9;
 const hv = () => armOpen ? 1 : .55; // quieter when he plays with it in the lobby
@@ -245,10 +248,10 @@ function heroShot(k = 1) {
     return;
   }
   if (w.beam) {
-    if (w.frost) frostHeld = .12; else if (w.chain) stormHeld = .12; else beamHeld = .12;
+    if (w.frost) frostHeld = .12; else if (w.chain) stormHeld = .12; else if (w.water) waterHeld = .12; else beamHeld = .12;
     if ((w.shock || w.chain) && Math.random() < .25) sfx('zap', { v: .4 * hv() });
     if (w.chain) { const L = w.range; arc('hero', _hm, _hm.clone().addScaledVector(_hd, L), .1, lobbyScene, (a, b) => { hf.flashM.getWorldPosition(a); hf.g.getWorldQuaternion(_hq); b.set(0, 0, -1).applyQuaternion(_hq).multiplyScalar(L).add(a); }); return; }
-    hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.frost ? FX_MATS.frost : w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
+    hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.frost ? FX_MATS.frost : w.water ? FX_MATS.water : w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
     hf.beamOn = .08; return;
   }
   sfx(w.charge ? k >= 1 ? 'auroraFull' : 'aurora' : w.id, { v: .5 * hv() }); hf.flash = flashTime(w);

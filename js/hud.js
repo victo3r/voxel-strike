@@ -53,6 +53,7 @@ const CROSSES = {
   hitman: () => [...xDot(), ...xLines(4, 6)],
   daybreak: () => [...xDot(), ...xArcs(9, DIAG, 40)], highnoon: () => [...xDot(), ...xLines(6, 7), ...xArcs(11, DIAG, 30)], // a sun's rays
   knife: () => [...xDot(), ...xLines(4, 6)],
+  cutlass: () => [...xDot(), ...xLines(5, 7)], harpoon: () => [...xDot(), ...xLines(7, 6), ...xCorners(11, 2)], conch: () => [...xDot(), ...xArcs(7, DIAG, 60), ...xArcs(12, DIAG, 30)], // ripples
   herosword: () => [...xDot(), ...xLines(5, 7)],
   executioner: () => [...xDot(), ...xLines(5, 6), ...xTicks(8, 10)],
   shotgun: () => [...xDot(), ...xArcs(15, DIAG, 50)],

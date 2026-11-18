@@ -79,6 +79,11 @@ function renderMissions() {
     `<div class="mb${M.all ? ' ok' : ''}">${M.all ? ico('check') + ' ' : ''}ALL 3: <img src="${chestPic(0)}"> WOODEN CHEST</div>`;
 }
 $('missions').addEventListener('click', e => { const b = e.target.closest('.rr'); if (b) { e.stopPropagation(); missionReroll(+b.dataset.i); } });
+// the arrow tab pushes the card off the side and pulls it back
+function missionsIn(shut) { $('misDraw').classList.toggle('in', shut); $('misTab').innerHTML = ico('left'); $('misTab').title = shut ? 'Show daily missions' : 'Hide daily missions'; }
+let misIn = false; try { misIn = localStorage.getItem('voxelstrike-missions-in') === '1'; } catch {}
+missionsIn(misIn);
+$('misTab').addEventListener('click', e => { e.stopPropagation(); missionsIn(misIn = !misIn); try { localStorage.setItem('voxelstrike-missions-in', misIn ? '1' : '0'); } catch {} sfx('ui'); });
 setInterval(() => { if (inLobby) renderMissions(); }, 30000);
 addEventListener('pagehide', () => saveProf()); // kills so far this game
 renderMissions();

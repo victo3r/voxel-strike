@@ -6,6 +6,8 @@ const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '12
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
 const NET_BUILD = (m => m ? 1000 + m[1] * 10 + (m[2] | 0) : 0)(document.currentScript?.src.match(/[?&]v=alpha-(\d+)(?:\.(\d+))?/)); // 1111 for alpha-11.1: lets the server spot old cached clients
+// a hit that moves its victim: a harpoon hauls them toward where it came from, anything else throws them away from it
+function netLaunch(o, c, m) { const W = BASE[gi(m.gun)], from = new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]); if (W?.reel) reelIn(o, from, m.launch[0]); else launch(o, c, from, m.launch[0], false, W?.launch); }
 const NET_RATE = 50; // ms between packets (20 a second)
 const NET_HIST = 600; // ms of position history for smoothing
 const REJOIN_FOR = 25000; // keep trying to get back in this long (the server holds your place 30 s)
@@ -397,7 +399,7 @@ net = (() => {
       if (!alive) return;
       youHitFx(!!m.head, armorOnly); if (m.kind === 'thorns') sfx('thorns');
       wandFx(P, m);
-      if (m.launch && !m.launch[4]) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false, BASE[gi(m.gun)]?.launch); // someone else's blast throws you
+      if (m.launch && !m.launch[4]) netLaunch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), m); // someone else's blast throws you
       return;
     }
     const r = remotes.get(m.v); if (!r) return;
@@ -405,7 +407,7 @@ net = (() => {
     const b = r.body; if (!b) return;
     b.hp = Math.max(m.hp, b.dead ? 0 : .01); b.armor = m.armor;
     wandFx(b, m); // host bots run slower, stars show on anyone stunned
-    if (m.launch && !m.launch[4] && r.rec.hostBot && !b.dead) launch(b, b.g.position.clone().setY(b.g.position.y + 1), new THREE.Vector3(m.launch[1], m.launch[2], m.launch[3]), m.launch[0], false, BASE[gi(m.gun)]?.launch); // a blast or a hammer throws my bot
+    if (m.launch && !m.launch[4] && r.rec.hostBot && !b.dead) netLaunch(b, b.g.position.clone().setY(b.g.position.y + 1), m); // a blast or a hammer throws my bot
     if (r.rec.hostBot && m.by && m.by !== m.v) { // my bot remembers who's hurting it
       const who = m.by === pid ? YOU_T : bodyOf(m.by);
       if (who) { if (b.hitBy !== who || b.hitByT <= 0) b.hitDmg = 0; b.hitBy = who; b.hitByT = 2; b.hitDmg += m.d; }

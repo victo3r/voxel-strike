@@ -366,7 +366,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 
 /* lobby */
 #lobby{position:fixed;inset:0;display:flex;z-index:5;color:#fff;text-shadow:2px 2px 0 #000}
-#lobbyUI{position:absolute;inset:0;pointer-events:none}
+#lobbyUI{position:absolute;inset:0;pointer-events:none;zoom:var(--z2,1)}
 #lobbyUI>*{pointer-events:auto}
 #lobbyTop{position:absolute;left:20px;top:18px;display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;max-width:calc(100% - 300px)}
 #lobbyBtns{flex-basis:100%;display:flex;gap:8px}
@@ -376,8 +376,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #nameDice{font-size:16px;padding:0;width:38px;height:38px;flex:none}
 #nameIn{height:38px;box-sizing:border-box}
 #prof{display:flex;align-items:center;gap:16px}
-#lobbyTop .brk{flex-basis:100%;height:0}
-#missions{width:clamp(250px,42vmin,340px);box-sizing:border-box;padding:6px 9px 8px;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);color:#fff;text-shadow:2px 2px 0 #000;font:bold clamp(11px,1.9vmin,14px) monospace}
+#missions{position:relative;box-sizing:border-box;padding:6px 9px 8px;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);color:#fff;text-shadow:2px 2px 0 #000;font:bold clamp(11px,1.9vmin,14px) monospace}
 #missions .mh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px}
 #missions .mh b{color:var(--acc-lt);letter-spacing:1px}#missions .mh small{font-size:.8em;color:var(--silver)}
 #missions .mr{position:relative;display:flex;align-items:center;gap:6px;padding:4px 0 8px}
@@ -388,7 +387,13 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #missions u{position:absolute;left:0;right:0;bottom:1px;height:4px;background:rgba(0,0,0,.45)}#missions u i{display:block;height:100%;background:var(--acc)}
 #missions .ok .mt,#missions .ok .pay{opacity:.55}#missions .ok .mp{color:var(--acc-lt)}#missions .ok u i{background:var(--acc-lt)}
 #missions .mb{display:flex;align-items:center;gap:5px;margin-top:2px;font-size:.85em;color:#ffd75e}#missions .mb img{height:1.9em;margin:-.3em 0}#missions .mb.ok{color:var(--acc-lt)}
-@media (max-height:420px){#missions{padding:4px 8px 5px}#missions .mh{margin:0}#missions .mr{padding:3px 0 6px}}
+/* the right column: the weekly event, then the daily missions on a drawer */
+#lobbyUI>#side{position:absolute;right:20px;top:calc(38px + clamp(48px,7vmin,64px));width:clamp(250px,42vmin,340px);display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#side>*{pointer-events:auto}
+#misDraw{position:relative}#missions{transition:transform .25s}#misDraw.in #missions{transform:translateX(calc(100% + 28px))}
+#misTab{position:absolute;right:100%;top:0;bottom:0;width:clamp(26px,4vmin,32px);transition:right .25s;box-sizing:border-box;padding:0;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);border-right:0}
+#misDraw.in #misTab{right:0%;border-right:3px solid var(--line-dim)}#misTab:hover{background:var(--hov)}#misTab .ic{height:1em;width:calc(1em * var(--ar,1));transform:scaleX(-1)}#misDraw.in #misTab .ic{transform:none}
+@media (max-height:500px){#missions{padding:4px 8px 5px}#missions .mh{margin:0}#missions .mr{padding:2px 0 5px}#missions .rr{width:1.5em;height:1.5em}#missions .mb{margin-top:0}#lobbyUI>#side{gap:6px}}
 .msr{margin-top:10px}.msr>small{display:block;text-align:center;font-size:12px;letter-spacing:2px;color:var(--acc-lt);margin-bottom:4px}
 .msr>div{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .mcard{display:flex;flex-direction:column;gap:4px;padding:5px 6px;background:rgba(10,14,16,.55);border:2px solid var(--line-dim);text-align:center;font-size:12px}
@@ -428,6 +433,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 /* booster */
 #boostBtn{position:absolute;right:20px;bottom:calc(32px + clamp(100px,17vmin,230px));width:clamp(100px,17vmin,230px);box-sizing:border-box;justify-content:center;height:clamp(40px,5.5vmin,52px);display:flex;align-items:center;gap:8px;padding:0 14px;font:bold clamp(16px,2.4vmin,21px) monospace;color:#ffd75e;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);text-shadow:2px 2px 0 #000}
 #boostBtn b{color:#fff}#boostBtn:hover{background:var(--hov)}
+@media (max-height:560px){#boostBtn{right:calc(32px + clamp(100px,17vmin,230px));bottom:20px}} /* short screens: beside PLAY, out of the missions' way */
 /* daily reward */
 #dailyBtn{position:relative;width:clamp(48px,7vmin,64px);height:clamp(48px,7vmin,64px);box-sizing:border-box;padding:0;font-size:clamp(24px,3.6vmin,32px);background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
 #dailyBtn:hover{background:var(--hov)}
@@ -458,7 +464,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #dailyBox button.go{background:rgba(36,170,98,.85);font-size:18px}
 #boostBtn.on{border-color:#ffd75e;box-shadow:0 0 12px rgba(255,215,94,.6),4px 4px 0 rgba(0,0,0,.4)}
 /* weekly event: the lobby panel, the prize card, results tiles */
-#event{position:absolute;right:20px;top:calc(46px + clamp(48px,7vmin,64px));width:clamp(230px,38vmin,310px);box-sizing:border-box;padding:6px 9px 8px;background:var(--glass);border:3px solid var(--ev,var(--line-dim));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);color:#fff;text-shadow:2px 2px 0 #000;font:bold clamp(11px,1.9vmin,14px) monospace;cursor:pointer}
+#event{box-sizing:border-box;padding:6px 9px 8px;background:var(--glass);border:3px solid var(--ev,var(--line-dim));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);color:#fff;text-shadow:2px 2px 0 #000;font:bold clamp(11px,1.9vmin,14px) monospace;cursor:pointer}
 #event:hover{background:var(--hov)}#event:empty{display:none}
 #event .eh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 #event .eh b{display:flex;align-items:center;gap:5px;color:var(--ev);letter-spacing:1px;white-space:nowrap}#event .eh small{font-size:.8em;color:var(--silver);white-space:nowrap}
@@ -832,6 +838,7 @@ body.touchOnly #drawPanel{width:min(560px,calc(var(--uw) * 50))}
 body.touchOnly #drawSheet{width:min(440px,100%,calc(var(--uh) * 56))!important}
 /* phones: a tighter lobby and picker */
 body.touchOnly #lobbyTop{flex-direction:column;align-items:flex-start;gap:8px;max-width:none}body.touchOnly #lobbyBtns{flex-basis:auto}
+@media (max-width:1000px){#lobbyTop{flex-direction:column;align-items:flex-start;gap:8px;max-width:none}#lobbyBtns{flex-basis:auto}} /* a narrow window: the level goes under the name, clear of the coins */
 body.touchOnly #pickList{gap:10px;flex-wrap:nowrap}
 body.touchOnly #pickList :is([data-mode],[data-map]){width:clamp(96px,calc((var(--uw2) * 100 - 90px) / 5),200px);font-size:14px;padding:10px 6px}
 body.touchOnly #pickList .mc{padding-bottom:50px}

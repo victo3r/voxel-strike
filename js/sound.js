@@ -315,6 +315,12 @@ const SOUNDS = {
   }],
   tirocket: [.85, .9, s => { s.tone({ f: 95, f2: 40, d: .22, v: 1 }); s.hiss({ ft: 'bandpass', f: 320, f2: 2600, q: 2, a: .05, d: .55, v: .8 }); s.click({ f: 1100, v: .5 }); s.tone({ type: 'triangle', t: .01, f: 1319, f2: 1300, d: .2, v: .05 }); }],
   tiSwing: [.4, .55, s => { s.hiss({ ft: 'bandpass', f: 700, f2: 3600, q: 3, a: .04, d: .14, v: 1, sweep: .16 }); s.tone({ type: 'triangle', t: .02, f: 2349, f2: 2300, d: .25, v: .07 }); }],
+  cutSwing: [.3, .5, s => { s.hiss({ ft: 'bandpass', f: 900, f2: 4200, q: 3.5, a: .03, d: .1, v: 1, sweep: .12 }); s.tone({ type: 'triangle', t: .015, f: 1760, f2: 1700, d: .14, v: .05 }); }], // a quick, thin slash
+  harpoon: [.6, .85, s => { // a thump of air, the spear hissing off, its line singing after it
+    s.tone({ f: 150, f2: 60, d: .14, v: 1 }); s.click({ f: 900, v: .5 });
+    s.hiss({ ft: 'bandpass', f: 900, f2: 2600, q: 1.2, a: .01, d: .2, v: .7, sweep: .2 });
+    s.tone({ type: 'triangle', t: .06, f: 520, f2: 880, d: .35, v: .12, glide: .3 });
+  }],
   crystal: [.24, .45, s => { // a tight crack with the ring of struck glass
     s.hiss({ ft: 'bandpass', f: 2600, f2: 1100, q: .8, d: .06, v: .85 });
     s.tone({ f: 190, f2: 70, d: .05, v: .8 });
@@ -582,6 +588,8 @@ const SOUNDS = {
     }
   })],
   heatEnd: [.25, .3, s => { s.tone({ f: 1400, f2: 300, d: .13, v: .4 }); s.hiss({ f: 2200, f2: 400, d: .12, v: .3 }); }],
+  waterStart: [.35, .45, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 1800, q: 1, a: .03, d: .25, v: .8, sweep: .2 }); s.tone({ type: 'triangle', f: 300, f2: 180, d: .15, v: .25 }); }], // the Siren Shell's jet
+  waterEnd: [.35, .3, s => s.hiss({ ft: 'bandpass', f: 1600, f2: 400, q: 1, a: .01, d: .25, v: .7, sweep: .25 })],
   dash: [.4, .55, s => { s.hiss({ ft: 'bandpass', f: 600, f2: 3200, q: 1.3, a: .01, d: .3, v: .9, sweep: .25 }); s.tone({ type: 'triangle', f: 520, f2: 1040, d: .15, v: .2 }); }], // Skyrunner dash
   glide: [.6, .3, s => s.hiss({ ft: 'bandpass', f: 900, f2: 500, q: .9, a: .12, d: .45, v: .7, sweep: .45 })], // wings open
   thorns: [.25, .45, s => { s.clack({ f: 1800, d: .015, v: .7, body: .4 }); s.hiss({ ft: 'highpass', f: 3500, d: .06, v: .35 }); }], // the Thornwood Crown stings
@@ -659,6 +667,8 @@ const SOUNDS = {
   zout_daybreak: [.18, .28, s => { s.hiss({ ft: 'bandpass', f: 1800, f2: 700, q: 1.6, a: .01, d: .05, v: .4, sweep: .06 }); }],
   zin_highnoon: [.3, .4, s => { s.hiss({ ft: 'bandpass', f: 550, f2: 1600, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 }); s.clack({ t: .05, f: 1600, d: .012, v: .55, body: .5 }); }],
   zout_highnoon: [.25, .34, s => { s.hiss({ ft: 'bandpass', f: 1400, f2: 500, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 }); }],
+  zin_harpoon: [.3, .4, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 1500, q: 1.4, a: .02, d: .06, v: .55, sweep: .07 }); s.clack({ t: .05, f: 1400, d: .012, v: .5, body: .5 }); }],
+  zout_harpoon: [.25, .34, s => { s.hiss({ ft: 'bandpass', f: 1300, f2: 450, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 }); }],
   zin_hitman: [.22, .32, s => {
     s.hiss({ ft: 'bandpass', f: 900, f2: 2200, q: 1.6, a: .015, d: .045, v: .45, sweep: .05 });
     s.clack({ t: .035, f: 2800, d: .007, v: .4 });
@@ -744,6 +754,8 @@ const SOUNDS = {
   }],
   r_daybreak: [1.7, .45, s => { s.clack({ t: .2, f: 1500, d: .016, v: .7, body: .5 }); for (const t of [.45, .72, .99]) s.shell(t); s.clack({ t: 1.38, f: 1300, d: .02, v: .9, body: .8 }); s.clack({ t: 1.42, f: 2800, d: .008, v: .35 }); }],
   r_highnoon: [2, .45, s => { for (const t of [.2, .58, .96, 1.34]) s.shell(t); s.clack({ t: 1.66, f: 1700, d: .014, v: .6, body: .5 }); s.clack({ t: 1.8, f: 2100, d: .016, v: .7, body: .5 }); }],
+  r_harpoon: [1.7, .45, s => { s.hiss({ ft: 'bandpass', f: 600, f2: 1400, q: 1.5, t: .3, a: .1, d: .3, v: .4 }); s.clack({ t: .8, f: 1200, d: .02, v: .7, body: .6 }); s.latch(1.1); s.latch(1.35); }],
+  r_conch: [2.2, .45, s => { s.clack({ t: .45, f: 900, d: .02, v: .5, body: .5 }); s.hiss({ ft: 'bandpass', f: 700, f2: 1500, q: 1, t: .7, a: .2, d: .6, v: .3 }); for (const t of [.75, .95, 1.15, 1.35]) s.tone({ t, f: 240, f2: 420, d: .09, v: .35 }); s.clack({ t: 1.8, f: 1100, d: .02, v: .6, body: .5 }); }],
   r_shotgun: [1.6, .45, s => { for (const t of [.15, .45, .75, 1.05]) s.shell(t); s.pump(1.3); }],
   r_trex: [1.6, .45, s => { for (const t of [.15, .45, .75, 1.05]) s.shell(t); s.pump(1.3); }],
   r_starsmasher: [1.6, .45, s => { s.magOut(.15); s.magIn(.75); s.clack({ t: .85, f: 1900, d: .015, v: .5, body: .3 }); s.rack(1.2); }],
@@ -1020,7 +1032,7 @@ function hurtSfx(who, name, at, opts = {}) {
 
 // looping sounds: flamethrower, eradicator motor, heat ray
 let flameHeld = 0, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null, spinBp = null, spinLfo = null;
-let beamHeld = 0, beamOn = false, beamGain = null, frostHeld = 0, frostOn = false, frostGain = null, stormHeld = 0, stormOn = false, stormGain = null;
+let beamHeld = 0, beamOn = false, beamGain = null, frostHeld = 0, frostOn = false, frostGain = null, stormHeld = 0, stormOn = false, stormGain = null, waterHeld = 0, waterOn = false, waterGain = null;
 function flameBuffer() { // fire loop
   const n = SR * 2, x = SR / 10, r = rng(99), raw = new Float32Array(n + x);
   let lo = 0, lo2 = 0;
@@ -1091,5 +1103,16 @@ function soundTick(dt, live) {
     st.connect(stormGain).connect(bus); st.start();
   }
   if (stOn !== stormOn) { stormOn = stOn; sfx(stOn ? 'stormStart' : 'stormEnd'); stormGain?.gain.setTargetAtTime(stOn ? BUF.stormLoop.v : 0, t, stOn ? .03 : .06); }
+  // siren shell: rushing water
+  waterHeld = live || inLobby ? waterHeld - dt : 0;
+  const wOn = waterHeld > 0;
+  if (wOn && !waterGain) {
+    waterGain = ac.createGain(); waterGain.gain.value = 0;
+    const n = ac.createBufferSource(), nb = ac.createBuffer(1, SR, SR), nd = nb.getChannelData(0); for (let i = 0; i < SR; i++) nd[i] = Math.random() * 2 - 1; n.buffer = nb; n.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = .7;
+    const lfo = ac.createOscillator(), depth = ac.createGain(); lfo.frequency.value = 6; depth.gain.value = 350; lfo.connect(depth).connect(bp.frequency);
+    n.connect(bp).connect(waterGain).connect(bus); n.start(); lfo.start();
+  }
+  if (wOn !== waterOn) { waterOn = wOn; sfx(wOn ? 'waterStart' : 'waterEnd'); waterGain?.gain.setTargetAtTime(wOn ? .22 : 0, t, wOn ? .03 : .06); }
 }
-function soundsOff() { flameHeld = 0; if (flameGain) flameGain.gain.value = 0; flameOn = false; if (spinGain) spinGain.gain.value = 0; beamHeld = 0; beamOn = false; if (beamGain) beamGain.gain.value = 0; frostHeld = 0; frostOn = false; if (frostGain) frostGain.gain.value = 0; stormHeld = 0; stormOn = false; if (stormGain) stormGain.gain.value = 0; }
+function soundsOff() { flameHeld = 0; if (flameGain) flameGain.gain.value = 0; flameOn = false; if (spinGain) spinGain.gain.value = 0; beamHeld = 0; beamOn = false; if (beamGain) beamGain.gain.value = 0; frostHeld = 0; frostOn = false; if (frostGain) frostGain.gain.value = 0; stormHeld = 0; stormOn = false; if (stormGain) stormGain.gain.value = 0; waterHeld = 0; waterOn = false; if (waterGain) waterGain.gain.value = 0; }

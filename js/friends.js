@@ -162,6 +162,7 @@ $('plist').addEventListener('click', async e => {
 setInterval(() => { if (auth && !document.hidden) frPoll(); }, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && auth) frPoll(); });
 let frUser = auth?.user ?? null;
-onAuth = () => { const u = auth?.user ?? null; if (u !== frUser) { frUser = u; frReset(); frPoll(true); } };
+onAuth = () => { secretCheck(); const u = auth?.user ?? null; if (u !== frUser) { frUser = u; frReset(); frPoll(true); } };
 renderFriends();
 if (auth) frPoll(true);
+secretCheck();

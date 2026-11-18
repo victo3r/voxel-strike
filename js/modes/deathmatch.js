@@ -91,7 +91,7 @@ const BOT_KEEP = {
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
   rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
   wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
-  daybreak: [6, 18], highnoon: [12, 28], tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
+  daybreak: [6, 18], highnoon: [12, 28], cutlass: [1, 1.9], harpoon: [14, 30], conch: [5, 14], tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -140,6 +140,9 @@ const GUN_FIT = {
   tishot: d => d < 6 ? 1.1 : d < 11 ? .9 : d < 15 ? .3 : .05,
   daybreak: d => d < 20 ? .6 : .45,
   highnoon: d => d < 4 ? .45 : d < 30 ? .95 : .75,
+  cutlass: d => d < 2.6 ? 1.3 : d < 4.2 ? .4 : 0,
+  harpoon: d => d > 18 ? 1.05 : d > 10 ? .7 : d > 5 ? .3 : .1,
+  conch: d => d < 3 ? .5 : d < 18 ? .95 : d < 24 ? .5 : .1,
   tipistol: d => d < 24 ? .85 : .6,
   tisword: d => d < 3 ? 1.35 : d < 4.8 ? .4 : 0,
   tisaw: d => d < 4 ? .3 : d < 24 ? .9 : .5,
@@ -703,12 +706,14 @@ function botFire(b, W, dist) {
       hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? headMul(W) : 1))), false, b, head, W.beam ? 2 : 0);
       if (slows(W)) shockHit(P, W);
       if (W.track && !net.pvp) youTracked(W.track); // online the server's hit says so
+      if (!net.on) { if (W.reel) reelIn(P, eye, W.reel); else if (W.beam && W.knock) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), eye, W.knock, false); } // online the server sends the pull or the push
       if (W.chain) chainJumps(YOU_T, W, b, b.rec.stars[b.gun] | 0);
       if (bolt) { wandHit(W, P, eye, b); if (W.soul && !net.on && was <= 0 && respawnT > 0) soulHeal(b, P.pos.clone().setY(P.pos.y + 1), W.soul); }
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
       if (!zz.dead) {
         hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W);
+        if (!net.on && !zz.dead) { if (W.reel) reelIn(zz, eye, W.reel); else if (W.beam && W.knock) launch(zz, zz.g.position.clone().setY(zz.g.position.y + 1), eye, W.knock, false); }
         if (W.chain) chainJumps(zz, W, b, b.rec.stars[b.gun] | 0);
         if (bolt) { wandHit(W, zz, eye, b); if (W.soul && !net.on && zz.dead) soulHeal(b, zz.g.position.clone().setY(zz.g.position.y + 1), W.soul); }
       }

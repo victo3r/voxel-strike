@@ -32,6 +32,7 @@ const PRESETS = [
   { name: 'BEARD', look: { skin: 2, eyes: 'green', hair: 'buzz', hairC: 'ginger', top: 'long', topC: 0x8a2e2e, bottom: 'pants', bottomC: 0x4b4033, shoes: 'boots', shoeC: 0x3a2618, extra: 'beard' } },
 ];
 // secret skins, only from codes
+const SECRET_OWNER = { evergreen: { id: 3, user: 'victor' } }; // a skin that belongs to one account
 const SECRETS = {
   creature: { name: "VICTOR'S CREATURE", sk: [204, 192, 128], sleeve: 8, eye: 0xb4ecff, zap: 0xcdf3ff, paint: paintCreature,
     look: { skin: 2, eyes: 'blue', hair: 'long', hairC: 'black', top: 'jacket', topC: 0x3a3630, top2: 0xb3a88e, bottom: 'pants', bottomC: 0x2f2b27, shoes: 'boots', shoeC: 0x2a2119, secret: 'creature' } },

@@ -379,6 +379,9 @@ const SHOP = [
   { gun: 'tishot', price: 620, desc: 'a drum of shells, 7 pellets a blast' },
   { gun: 'daybreak', price: 150, desc: 'six heavy shots from a sunrise revolver' },
   { gun: 'highnoon', price: 300, desc: 'a lever rifle that drops them one by one' },
+  { gun: 'cutlass', price: 160, desc: 'a quick blade from a wreck' },
+  { gun: 'harpoon', price: 380, desc: 'spears one and reels it in' },
+  { gun: 'conch', price: 480, desc: 'a jet of water that shoves them back' },
   { gun: 'tipistol', price: 520, desc: 'a hand cannon that hits like a rifle' },
   { gun: 'tisword', price: 540, desc: `${BASE[gi('tisword')].dmg} a swing, long reach` },
   { gun: 'tisaw', price: 600, desc: 'saw blades that cut through rows and skip off walls' },
@@ -386,7 +389,8 @@ const SHOP = [
   { gun: 'tirocket', price: 640, desc: 'two big rockets before a reload' },
 ].map(it => it.gun ? { ...it, gun: gi(it.gun), name: BASE[gi(it.gun)].name } : it);
 const PERK_MAX = 3, FETCH = .25; // fetching your own gun costs a share of its rent
-// gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often (chest odds)
+// gun offers: one gun from each of a few categories, upgrades more likely, rarer guns less often
+const SHOP_ODDS = { common: 2, rare: 1.6, epic: 1, legend: .5, mythic: .2 };
 const OFFERS = 3, tierOf = g => BASE[g].start ? 0 : BASE[g].unlock || 1;
 let shopOffer = [];
 function pickOffers() {
@@ -402,7 +406,7 @@ function pickOffers() {
   const pool = Object.entries(cats).map(([cat, list]) => ({ list, w: list.some(i => tierOf(SHOP[i].gun) > (held[cat] ?? -1)) ? 3 : 1 }));
   const draw = (items, w) => { let r = Math.random() * items.reduce((s, x) => s + w(x), 0), k = 0; while (k < items.length - 1 && (r -= w(items[k])) >= 0) k++; return k; };
   const out = [];
-  while (pool.length && out.length < OFFERS) { const [p] = pool.splice(draw(pool, x => x.w), 1); out.push(p.list[draw(p.list, i => GUN_DROP[rarOf(BASE[SHOP[i].gun])])]); }
+  while (pool.length && out.length < OFFERS) { const [p] = pool.splice(draw(pool, x => x.w), 1); out.push(p.list[draw(p.list, i => SHOP_ODDS[rarOf(BASE[SHOP[i].gun])])]); }
   return out.sort((a, b) => a - b);
 }
 const ammoFull = () => WEAPONS.every((w, i) => !owned[i] || reserve[i] >= resMax(i) && (!BASE[i].pool || ammo[i] >= w.mag));

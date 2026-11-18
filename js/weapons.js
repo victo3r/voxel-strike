@@ -45,7 +45,7 @@ const BASE = [
   // mythics
   { id: 'wisp', rar: 'mythic', hold: 'pistol', name: 'Wisp Caller', cat: 'backup', unlock: 35, price: 1750, mob: 70, wisp: true, dmg: 36, rate: .3, mag: 12, reload: 1.5, pellets: 1, spread: 0, auto: false, color: 0x5fe8d8, len: .45 },
   { id: 'voidlantern', rar: 'mythic', hold: 'lantern', name: 'Void Lantern', cat: 'special', unlock: 38, price: 1900, mob: 60, vortex: true, launch: .5, dmg: 130, rate: 1.4, mag: 3, reload: 2.6, pellets: 1, spread: 0, auto: false, color: 0x5a2f9a, len: .7 },
-  { id: 'crystal', rar: 'mythic', hold: 'rifle', name: 'Crystal Companion', cat: 'primary', unlock: 45, price: 2250, chest: true, drop: .2, mob: 70, zoom: 3, reticle: '255,150,225', tracer: 0xa8f4ff, grow: { top: 45, dmg: 14, mag: 30 }, dmg: 21, rate: .09, mag: 40, reload: 1.5, pellets: 1, spread: .004, auto: true, color: 0x4fd0ea, len: .6 },
+  { id: 'crystal', rar: 'mythic', hold: 'rifle', name: 'Crystal Companion', cat: 'primary', unlock: 45, price: 2250, chest: true, drop: .15, mob: 70, zoom: 3, reticle: '255,150,225', tracer: 0xa8f4ff, grow: { top: 45, dmg: 14, mag: 30 }, dmg: 21, rate: .09, mag: 40, reload: 1.5, pellets: 1, spread: .004, auto: true, color: 0x4fd0ea, len: .6 },
   { id: 'aurora', rar: 'mythic', hold: 'rifle', name: 'Aurora Rail', cat: 'sniper', unlock: 42, price: 2100, mob: 55, zoom: 7, scope: true, charge: 1, lance: 0x4dffc4, heavyKick: true, dmg: 150, rate: .4, mag: 5, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0x1c2848, len: .95 },
   // the titanium set
   { id: 'tishot', rar: 'mythic', hold: 'rifle', name: 'Titanium Scattergun', cat: 'primary', unlock: 50, price: 2500, mob: 65, dmg: 20, rate: .55, mag: 8, reload: 1.8, pellets: 7, spread: .055, auto: false, color: 0xc3ccd6, len: .6 },
@@ -54,9 +54,13 @@ const BASE = [
   { id: 'tisaw', rar: 'mythic', hold: 'rifle', name: 'Titanium Ripsaw', cat: 'special', unlock: 50, price: 2500, mob: 60, saw: true, pierce: true, dmg: 120, rate: .7, mag: 5, reload: 2.2, pellets: 1, spread: 0, auto: false, color: 0xc3ccd6, len: .7 },
   { id: 'tisniper', rar: 'mythic', hold: 'rifle', name: 'Titanium Longshot', cat: 'sniper', unlock: 50, price: 2500, mob: 58, zoom: 6, scope: true, dmg: 160, rate: 1, mag: 5, reload: 2, pellets: 1, spread: 0, auto: false, color: 0xc3ccd6, len: .95 },
   { id: 'tirocket', rar: 'mythic', hold: 'shoulder', name: 'Titanium Launcher', cat: 'premium', unlock: 50, price: 2500, mob: 55, rocket: true, tubes: true, dmg: 170, rate: .9, mag: 2, reload: 2.4, pellets: 1, spread: 0, auto: false, color: 0xc3ccd6, len: .8 },
-  // the welcome week's two (js/daily.js): never sold, a rare find in golden chests otherwise
-  { id: 'daybreak', rar: 'rare', hold: 'pistol', name: 'Daybreak', cat: 'backup', unlock: 4, price: 110, chest: true, gift: true, drop: 1, mob: 70, zoom: 2, irons: true, action: 'SIX SHOOTER', dmg: 34, rate: .38, mag: 6, reload: 1.7, pellets: 1, spread: 0, auto: false, color: 0xf0a030, len: .45 },
-  { id: 'highnoon', rar: 'epic', hold: 'rifle', name: 'High Noon', cat: 'primary', unlock: 10, price: 300, chest: true, gift: true, drop: .6, mob: 60, zoom: 3, irons: true, action: 'LEVER ACTION', dmg: 55, rate: .5, mag: 8, reload: 2, pellets: 1, spread: .002, auto: false, color: 0xe0a83c, len: .75 },
+  // the welcome week's two (js/daily.js): never sold, found in golden chests otherwise
+  { id: 'daybreak', rar: 'rare', hold: 'pistol', name: 'Daybreak', cat: 'backup', unlock: 4, price: 110, chest: true, gift: true, mob: 70, zoom: 2, irons: true, action: 'SIX SHOOTER', dmg: 34, rate: .38, mag: 6, reload: 1.7, pellets: 1, spread: 0, auto: false, color: 0xf0a030, len: .45 },
+  { id: 'highnoon', rar: 'epic', hold: 'rifle', name: 'High Noon', cat: 'primary', unlock: 10, price: 300, chest: true, gift: true, mob: 60, zoom: 3, irons: true, action: 'LEVER ACTION', dmg: 55, rate: .5, mag: 8, reload: 2, pellets: 1, spread: .002, auto: false, color: 0xe0a83c, len: .75 },
+  // sunken treasure: only in golden chests
+  { id: 'cutlass', rar: 'rare', hold: 'melee', name: 'Sunken Cutlass', cat: 'melee', unlock: 8, price: 180, chest: true, inf: true, melee: true, tilt: 1.1, swing: 'cutSwing', mob: 85, dmg: 45, rate: .38, range: 2.9, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0x9fc4c0, len: .4 },
+  { id: 'harpoon', rar: 'epic', hold: 'rifle', name: 'Riptide Harpoon', cat: 'sniper', unlock: 18, price: 520, chest: true, mob: 58, zoom: 4, irons: true, action: 'SPEARGUN', bolt: 'harpoon', reel: .6, spare: 10, dmg: 115, rate: .5, mag: 1, reload: 1.7, pellets: 1, spread: 0, auto: false, color: 0x2f7f86, len: .9 },
+  { id: 'conch', rar: 'legend', hold: 'pistol', name: 'Siren Shell', cat: 'special', unlock: 30, price: 1150, chest: true, mob: 65, beam: true, water: true, knock: .18, dmg: 11, rate: 1 / 15, range: 26, mag: 110, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0xf2c8a8, len: .45 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -95,7 +99,7 @@ const RECOIL = {
   windwand: { up: 1.2, side: .3, back: .9 }, flamewand: { up: .5, side: .22, back: 1.1 }, soulwand: { up: 1.6, side: .2, back: .4 }, ancientwand: { up: 2.2, side: .3, back: .55 },
   hornet: { up: .62, side: .2, back: 1 }, salvo: { up: 2.3, side: .35, back: .55 }, apex: { up: 2.1, side: .22, back: .3 }, tracker: { up: 1.3, side: .25, back: 1 }, tempest: { up: .06, side: .1, back: 2 },
   tishot: { up: 2.6, side: .45, back: .65 }, tipistol: { up: 1.7, side: .3, back: .9 }, tisaw: { up: 1.6, side: .3, back: .7 }, tisniper: { up: 2, side: .2, back: .3 }, tirocket: { up: 2.4, side: .35, back: .55 },
-  daybreak: { up: 1.9, side: .3, back: .9 }, highnoon: { up: 1.7, side: .2, back: .4 },
+  daybreak: { up: 1.9, side: .3, back: .9 }, highnoon: { up: 1.7, side: .2, back: .4 }, harpoon: { up: 1.6, side: .15, back: .45 }, conch: { up: .05, side: .07, back: 2 },
   crystal: { up: .5, side: .2, back: 1 }, wisp: { up: .9, side: .2, back: 1 }, voidlantern: { up: 1, side: .25, back: .8 }, aurora: { up: 2.3, side: .2, back: .3 },
 };
 // big single-shot energy guns kick higher and take longer to settle: every lance gun, or heavyKick on a gun
@@ -214,6 +218,13 @@ const FLASH_FX = {
   }, .4, 1.1);
   for (const id of ['daybreak', 'highnoon']) FLASH_FX[id] = { spr, light: 0xffc060, t: .06, bits: 'spark' };
 }
+{ // the sunken ones: a splash
+  const spr = flashSpr((dx, dy) => {
+    const r = Math.hypot(dx, dy);
+    if (r < 2) return '#ffffff'; if (r < 4) return '#c8f6ff'; if ((Math.min(dx, dy) < 1 || Math.abs(dx - dy) < 1) && r < 7) return r < 5.5 ? '#6fd8f0' : '#2fa8d8';
+  }, .5, 1.1);
+  for (const id of ['harpoon', 'conch']) FLASH_FX[id] = { spr, light: 0x8fe0ff, t: .06, bits: 'ice' };
+}
 const flashOf = w => FLASH_FX[w.id]?.spr || FLASH_SPR, flashTime = w => FLASH_FX[w.id]?.t ?? (w.scope ? .1 : .05);
 function makeFlash(size = .1, mat = FLASH_SPR) {
   const s = new THREE.Sprite(mat); s.scale.setScalar(size);
@@ -264,6 +275,8 @@ const RELOAD_ANIM = (() => {
     flamewand: wandRl, windwand: wandRl, soulwand: wandRl, ancientwand: wandRl,
     daybreak: (() => { const h = { rx: .4, rz: -.35, y: .06, x: -.05 }, o = { ...h, mx: -.07 }; return [[0, {}], [.12, h], [.2, o], ...dips(o, 3, .24, .7), [.76, o], [.84, h], [.93, { rx: .06 }], [1, {}]]; })(), // the cylinder out, rounds in, shut
     highnoon: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, my: -.05, mz: .02 }], [.95, { z: -.012 }], [1, {}]],
+    harpoon: (() => { const h = { rx: -.3, y: -.08, z: .05 }; return [[0, {}], [.14, h], [.5, h], [.6, { ...h, mz: .09 }], [.76, { ...h, mz: .09 }], [.84, h], [.93, { rx: .05 }], [1, {}]]; })(), // a fresh harpoon down the tube, then the handle back and home
+    conch: (() => { const h = { rx: .7, rz: -.2, y: .04 }, o = { ...h, mz: .1 }; return [[0, {}], [.15, h], [.28, o], [.4, { ...o, y: 0 }], [.55, { ...o, y: .05 }], [.7, o], [.82, h], [.92, { rx: .06 }], [1, {}]]; })(), // tipped up, the spire off, filled, the spire back on
     shotgun: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     trex: [[0, {}], [.1, sg], ...dips(sg, 4, .14, .74), [.8, { rx: .06 }], [.87, { rx: .05, mz: .09, az: .09 }], [.95, { z: -.012 }], [1, {}]],
     sniper: [[0, {}], [.1, { rz: .3, rx: .1, y: -.03 }], [.22, bolt], ...dips(bolt, 3, .3, .72, .02), [.78, bolt], [.88, { rz: .3, rx: .1, y: -.03, z: -.012 }], [1, {}]],
@@ -331,7 +344,7 @@ function partMid(part) {
 const partBounds = part => { const m = partMid(part); return { c: [part.position.x + m.x, part.position.y + m.y, part.position.z + m.z], h: part.userData.half }; };
 
 // voxel models: boxes filled into a pixel grid, edges drawn black
-const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, windwand: .6, stunwand: .6, flamewand: .6, soulwand: .6, ancientwand: .6, grenade: .85, salvo: .75, voidlantern: .9, tisword: .75, tirocket: .85 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
+const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, windwand: .6, stunwand: .6, flamewand: .6, soulwand: .6, ancientwand: .6, grenade: .85, salvo: .75, voidlantern: .9, tisword: .75, tirocket: .85, cutlass: .75, conch: .7 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
 const gunPal = [null], gunPalI = {};
 function palIdx(col, glow = false, shine = false, even = shine) { // even: polished, no grain
   const k = (glow ? 'g' : shine ? 's' : even ? 'e' : '') + col;
@@ -1042,6 +1055,45 @@ const GUN_MODELS = {
     const mag = sub(0, 0, 0), mg = at(mag); mg(1, 1, 3, dark, 0, -4.5, -1.5); mg(1, 3, 1, dark, 0, -6.5, -1.5); mg(1, 1, 6, dark, 0, -8.5, 1); mg(1, 5, 1, dark, 0, -5.5, 4.5); // the lever: a loop round the grip (worked at the end of a reload)
     return { muzzle: [3, -42], grip: [4, 7, 7, 0, -5.5, 1.5], fore: [6, 5, 12, 0, -.5, -16], bands: [-26, -30], band: [6, 7, 1.5], mag };
   },
+  cutlass({ p, mat, glow }) {
+    const steel = mat(0x9fc4c0), edge = mat(0xe4f6f2), gold = mat(0xd9a520), lgold = mat(0xffd76a), wrap = mat(0x6a2a2a), weed = mat(0x2f8f5a), sea = glow(0x4fe0d0);
+    p(4, 4, 12, wrap, 0, 1, 4); for (const z of [.5, 4.5, 8.5]) p(4, 4, 1, mat(0x3c1414), 0, 1, z); // grip and its wraps
+    p(6, 6, 4, gold, 0, 1, 12); // pommel
+    p(6, 14, 4, gold, 0, -2, -4); p(6, 2, 4, lgold, 0, 4, -4); // a deep guard
+    p(4, 4, 20, gold, 0, -7, 4); p(4, 3, 4, gold, 0, -3.5, 12); // and its knuckle bow, round under the hand to the pommel
+    for (const [h, d, y, z] of [[8, 7, 2, -9.5], [8, 7, 3, -16.5], [9, 7, 4.5, -23.5], [10, 7, 6, -30.5], [10, 6, 8, -37], [9, 5, 9.5, -42.5], [7, 4, 11.5, -47]]) { // a broad blade that curves up as it widens
+      p(2, h, d, steel, 0, y, z); p(2, 1, d, edge, 0, y - h / 2 + .5, z); p(2, 1, d, sea, 0, y - h / 2 + 4.5, z); // a bright edge, the sea still glowing in its fuller
+    }
+    p(2, 4, 3, edge, 0, 14, -50.5); // clipped point
+    p(4, 8, 4, weed, 0, 2, -11); // weed caught round it
+    return { muzzle: [14, -52], grip: [6, 6, 18, 0, 1, 5], fore: null, bands: [-1.5, 1.5], band: [6, 6, 1] };
+  },
+  harpoon({ p, mat, dark, glow, sub, at }) {
+    const teal = mat(0x2f7f86), lteal = mat(0x5fb8b8), brass = mat(0xc9963a), hi = mat(0xf0c868), wood = mat(0x7a4a2a), dwood = mat(0x4f2e18), rope = mat(0xe8dcb8), steel = mat(0xc8d4d8), sea = glow(0x4fe0d0);
+    p(4, 4, 34, teal, 0, 2, -17); p(4, 1, 34, lteal, 0, 3.5, -17); // a long launch tube, lit along the top
+    p(6, 6, 12, brass, 0, 2, 2); p(6, 1, 12, hi, 0, 4.5, 2); p(6, 2, 4, sea, 0, 2, 2); // brass receiver, a window on the pressure inside
+    p(4, 5, 10, wood, 0, .5, 13); p(4, 7, 2, dwood, 0, .5, 19); // stock and butt
+    p(6, 5, 8, wood, 0, .5, -9); p(6, 6, 2, brass, 0, 2, -32); // forend, muzzle collar
+    p(2, 2, 1, dark, 0, 6, -31.5); p(2, 1, 1, dark, 0, 5.5, 6.5); // sights
+    p(6, 6, 6, rope, 0, -3, -19); p(8, 4, 4, brass, 0, -3, -19); // the reel under the tube, its line wound on
+    p(4, 6, 4, wood, 0, -4, 0); p(4, 3, 4, dwood, 0, -8.5, 1); // grip
+    p(1, 1, 5, dark, .5, -4.5, -4.5); p(1, 2, 1, dark, .5, -3, -7.5); p(1, 2, 1, mat(0x777777), .5, -2, -3.5); // guard and trigger
+    const round = sub(0, 0, 0), r = at(round); // the harpoon: shaft, swept barbs, point
+    r(2, 2, 12, steel, 0, 2, -39); r(4, 8, 3, steel, 0, 2, -45.5); r(4, 6, 2, steel, 0, 2, -48); r(4, 4, 2, mat(0xf2f8fa), 0, 2, -50);
+    const mag = sub(0, 0, 0), mg = at(mag); mg(2, 2, 4, dark, 4, 2, 5); // cocking handle on the side
+    return { muzzle: [2, -34], grip: [4, 7, 5, 0, -5.5, .5], fore: [6, 5, 8, 0, .5, -9], bands: [-25, -28], band: [6, 6, 2], round, mag };
+  },
+  conch({ p, mat, glow, sub, at }) {
+    const shell = mat(0xf6dcb8), hi = mat(0xfff2d8), peach = mat(0xe8905e), coral = mat(0xe2584a), dcoral = mat(0xb03a34), sea = glow(0x3fc8ec), foam = glow(0xf0ffff);
+    p(12, 12, 10, shell, 0, 3, -7); for (const z of [-10.5, -7.5, -4.5]) p(12, 12, 1, peach, 0, 3, z); // the big whorl, banded
+    p(14, 3, 3, peach, 0, 8.5, -13.5); p(14, 3, 3, peach, 0, -2.5, -13.5); for (const sd of [-1, 1]) p(3, 8, 3, peach, sd * 5.5, 3, -13.5); // its flared lip, open at the front
+    p(8, 8, 1, sea, 0, 3, -11.5); p(4, 1, 1, foam, -1, 5.5, -11.5); p(3, 1, 1, foam, 1.5, 2.5, -11.5); // and full of sea, a little foam on it
+    p(8, 8, 5, shell, 0, 3, .5); p(8, 8, 1, peach, 0, 3, .5); // a whorl winding back
+    p(4, 2, 3, hi, 0, 10, -9.5); p(4, 2, 3, hi, 0, 10, -4.5); p(4, 2, 3, hi, 0, 8, .5); // spines along its crown
+    const mag = sub(0, 0, 0), mg = at(mag); mg(4, 4, 5, shell, 0, 3, 5.5); mg(4, 4, 1, peach, 0, 3, 5.5); mg(2, 2, 2, hi, 0, 3, 9); // the spire (it comes off to fill it)
+    p(4, 3, 4, coral, 0, -4.5, -5); p(4, 3, 4, coral, 0, -7.5, -4); p(4, 2, 4, dcoral, 0, -10, -4); // a coral branch for a handle
+    return { muzzle: [3, -13], grip: [4, 7, 5, 0, -6.5, -4.5], fore: null, bands: [4.5, 6.5], band: [6, 6, 3], mag };
+  },
   tipistol({ p, mat, dark, glow, shine, sub, at }) {
     const ti = shine(0xbcc6d2), lti = shine(0xe9eff5), gm = mat(0x363c46), blue = glow(0x4f9dff);
     p(4, 5, 18, ti, 0, 2.5, -9); p(4, 1, 18, lti, 0, 5.5, -9); p(4, 1, 10, blue, 0, 2.5, -9); // long slide, its bright top, a blue line down each side
@@ -1193,8 +1245,8 @@ function vmArm(left, box, dir, low = 0, at = null, size = 1) { // at: fist this 
   const mat = armMats[k] ??= lam({ map: skinTexture(L) });
   dir.normalize();
   const c = [box.c[0], box.c[1] - low * box.h[1], box.c[2]], t = at ?? fistOut(gunCells(cur), c, dir, 2.2 * ARM_U, .006);
-  const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir); if (size.length) piv.scale.set(size[0], size[1], size[0]);
-  for (let s = 0; s < 3; s++) { // extra length so the arm's end never shows, every other piece turned end for end so a sleeve carries on as sleeve, not as a second hand
+  const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir); piv.rotateY(Math.PI); if (size.length) piv.scale.set(size[0], size[1], size[0]);
+  for (let s = 0; s < 3; s++) { // the arm's front faces up at you; extra length so the arm's end never shows, every other piece turned end for end so a sleeve carries on as sleeve, not as a second hand
     const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; if (s & 1) m.rotation.x = Math.PI; m.userData.shared = true; piv.add(m);
   }
   vm.add(piv);
@@ -1223,7 +1275,7 @@ function buildGun() {
   if (chargeT) chargeEnd(); // put away mid-charge
   gunSpin = spin; gunRound = round; gunRounds = rounds; gunCharges = charges; chargeShow(charges, 0); gunPulse = pulse; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
   const hand = WEAPONS[cur].tilt ? { ...grip, c: [grip.c[0], grip.c[1], grip.c[2] - 5 * gunPx(cur)] } : grip; // a sword's fist goes up under the guard
-  if (WEAPONS[cur].tilt) vmArm(false, hand, new THREE.Vector3(.35, -.3, .9).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])), 0, .04); // a sword stands up: the arm comes in from the bottom right, the handle just in front of the fist
+  if (WEAPONS[cur].tilt) vmArm(false, hand, new THREE.Vector3(0, -.45, .9).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])), 0, .04); // a sword stands up: the arm comes straight up under it, the handle just in front of the fist
   else if (gunSwing) { // your fist on the right end of its handle: it swings from there
     const at = [grip.c[0] + LAN.grip, grip.c[1], grip.c[2]]; gunSwing.position.set(...at); gunBody.position.set(...at).negate();
     vmArm(false, { c: at, h: [0, 0, 0] }, new THREE.Vector3(...LAN.dir), 0, LAN.at, LAN.size);

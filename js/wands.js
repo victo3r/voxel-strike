@@ -25,6 +25,7 @@ const WAND_BOLT = {
   soul: { spd: 260, glow: 0x3fe8c0, core: 0xe0fff6, size: .2, bits: 'soul', gap: .6 },
   stun: { spd: 50, glow: 0xffd23a, core: 0xffffff, size: .3, bits: 'spark', gap: .25 },
   dart: { spd: 150, glow: 0xffb21a, core: 0xfff4c0, size: .13, bits: 'spark', gap: 1.6 }, // the Tracker
+  harpoon: { spd: 170, glow: 0x6fd8f0, core: 0xffffff, size: .18, bits: 'ice', gap: .9 },
   spell0: { spd: 160, glow: 0xff4a2a, core: 0xffd070, size: .34, bits: 'ember', gap: .4 },
   spell1: { spd: 160, glow: 0x6fc8ff, core: 0xf0fcff, size: .34, bits: 'ice', gap: .4 },
   spell2: { spd: 160, glow: 0xd8f6ff, core: 0xffffff, size: .34, bits: 'wind', gap: .4 },

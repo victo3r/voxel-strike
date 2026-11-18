@@ -91,7 +91,7 @@ function coopHits(from, list) {
       if (Array.isArray(h.b)) applyBurn(z, Math.min(+h.b[0] || 0, 10), Math.min(+h.b[1] || 0, 300), null, null, true);
       if (Array.isArray(h.sl)) { const k = +h.sl[0] || SLOW_K; z.slowK = z.slowT > 0 ? Math.min(z.slowK || SLOW_K, k) : k; z.slowT = Math.max(z.slowT || 0, Math.min(+h.sl[1] || 0, 10)); }
       if (h.st > 0) stunHit(z, Math.min(+h.st, 5));
-      if (Array.isArray(h.ln)) { const [lx, ly, lz, k] = h.ln.map(n => +n || 0); z.vy = Math.min(LAUNCH_MAX * (k || 1), Math.max(z.vy || 0, 0) + ly); z.lx = (z.lx || 0) + lx; z.lz = (z.lz || 0) + lz; }
+      if (Array.isArray(h.ln)) { const [lx, ly, lz, k, rt] = h.ln.map(n => +n || 0); z.vy = Math.min(LAUNCH_MAX * (k || 1), Math.max(z.vy || 0, 0) + ly); if (rt > 0) { z.lx = lx; z.lz = lz; z.reelT = Math.min(rt, 1); } else { z.lx = (z.lx || 0) + lx; z.lz = (z.lz || 0) + lz; } } // rt: on a harpoon's line
     } finally { zFrom = 0; }
   }
 }

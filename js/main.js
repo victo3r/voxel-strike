@@ -179,10 +179,10 @@ function update(dt) {
   const vw = WEAPONS[gunShown] ?? w, vhold = holdOf(vw); // pose the gun on screen: the old one while it lowers
   if (vw.melee) { // knife swing
     const c = kick > 0 ? knifeChopFP(1 - kick) : 0;
-    const up = meleeUp(vw), lo = vw.tilt ? .12 : 0; // swords stand up, lower in the hand
+    const up = meleeUp(vw), lo = vw.tilt ? .12 : 0, out = vw.tilt ? .23 : 0; // swords stand up, lower in the hand and out to the right
     vm.rotation.set(up + c * .95, Math.abs(c) * .2, -c * .4);
     knifeRest.set(up, 0, 0); _kp.copy(KNIFE_PIV).applyEuler(knifeRest); _kq.copy(KNIFE_PIV).applyEuler(vm.rotation);
-    vm.position.set(.3 + lo * .3 + Math.min(0, c) * .18, -.22 - lo + bob + Math.max(0, c) * .1, -.5 - lo).add(_kp).sub(_kq);
+    vm.position.set(.3 + lo * .3 + out + Math.min(0, c) * .18, -.22 - lo + bob + Math.max(0, c) * .1, -.5 - lo).add(_kp).sub(_kq);
   } else if (vhold === 'heavy') { // low at the hip
     vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob, -.6 + kick * .06);
     vm.rotation.set(.04 + kick * .1, 0, 0);

@@ -2,9 +2,8 @@
 const keyCount = () => prof.keys | 0;
 // chests you've won (weekly prizes) open free: prof.box[id] = how many
 const boxN = c => prof.box?.[c.id] | 0, boxAll = () => CHESTS.reduce((s, c) => s + boxN(c), 0);
-// loot: k = kind, n = amount or [min, max], w = weight, r = rarity. Things you can only have one of drop out once you own them
-const GUN_DROP = { common: 2, rare: 1.6, epic: 1, legend: .5, mythic: .2 }; // the rarer the gun, the rarer the drop
-const CHEST_GUN_DROP = .5; // guns you can only find in a golden chest (the Ancient Wand) come up more than other mythics
+// loot: k = kind, n = amount or [min, max], w = weight, r = rarity. Things you can only have one of drop out once you own them, and wear waits for its level
+const GUN_DROP = { rare: 3, epic: 2.5, legend: 1.5, mythic: .5 }; // the guns a golden chest can hold are its own (chest: true), never the armory's
 const CHESTS = [
   { id: 'wood', name: 'WOODEN CHEST', cost: 1, pal: { m: '#9a6634', w: '#c48a4e', b: '#5d5d66', g: '#d8d8e0' }, loot: [
     { k: 'coins', n: [10, 16], w: 40 }, { k: 'boosts', n: 1, w: 30 }, { k: 'xp', n: [100, 160], w: 20 },
@@ -20,12 +19,12 @@ const CHESTS = [
     { k: 'coins', n: [120, 180], w: 24 }, { k: 'boosts', n: 12, w: 16 }, { k: 'star', n: 2, w: 14, r: 'rare' },
     ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 3, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 3, r: rarOf(h) })),
     { k: 'coins', n: 300, w: 12, r: 'epic' },
-    ...BASE.filter(w => w.price).map(w => ({ k: 'gun', id: w.id, w: w.drop ?? (w.chest ? CHEST_GUN_DROP : GUN_DROP[rarOf(w)]), r: rarOf(w) })), // drop: a gun's own odds (the Crystal Companion is as rare as any mythic)
+    ...BASE.filter(w => w.chest).map(w => ({ k: 'gun', id: w.id, w: w.drop ?? GUN_DROP[rarOf(w)], r: rarOf(w) })), // drop: a gun's own odds (the Crystal Companion is rarer still)
     { k: 'coins', n: 500, w: 3, r: 'legend' },
   ] },
 ];
 const starGuns = () => BASE.map((w, i) => i).filter(i => BASE[i].price && gunStars(i) >= 1 && gunStars(i) < 3);
-const lootOk = l => l.k === 'star' ? starGuns().length > 0 : l.k === 'gun' ? !gunStars(gi(l.id)) : l.k === 'boots' ? !prof.boots[l.id] : l.k === 'hats' ? !prof.hats[l.id] : true;
+const lootOk = l => l.k === 'star' ? starGuns().length > 0 : l.k === 'gun' ? !gunStars(gi(l.id)) : l.k === 'boots' ? !prof.boots[l.id] && prof.lv >= gearOf(l).unlock : l.k === 'hats' ? !prof.hats[l.id] && prof.lv >= gearOf(l).unlock : true;
 // what a chest can give you right now, with odds that add up to 100
 function lootNow(c) {
   const ok = c.loot.filter(lootOk), sum = ok.reduce((s, l) => s + l.w, 0);
