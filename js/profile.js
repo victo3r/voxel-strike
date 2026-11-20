@@ -48,6 +48,7 @@ function grant(xp, coins) {
   prof.coins += bonus;
   prof.boosts = (prof.boosts | 0) + boostUp;
   prof.earned = (prof.earned ?? 0) + coins + bonus; // lifetime coins, used to compare saves
+  if (ups && typeof lvlNote === 'function') lvlNote(prof.lv - ups, prof.lv, bonus, boostUp);
   saveProf(); showProf();
   return { ups, bonus, boostUp, bars, boxes };
 }
@@ -75,5 +76,6 @@ function showProf() { // lobby level badge and coins
   if (typeof renderBoost === 'function') renderBoost();
   if (typeof renderChests === 'function') renderChests();
   if (typeof renderEvent === 'function') renderEvent();
+  if (typeof renderAchBtn === 'function') renderAchBtn();
 }
 showProf();

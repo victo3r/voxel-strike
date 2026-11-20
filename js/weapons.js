@@ -1220,15 +1220,6 @@ function gunCells(i) {
       out.push((x + lo[0] + .5) * px, (y + lo[1] + .5) * px, (z + lo[2] + .5) * px);
   return gunCellCache[i] = new Float32Array(out);
 }
-// push a fist out until it's just outside the gun
-function fistOut(cells, c, dir, r, gap) {
-  let t = 0;
-  for (let k = 0; k < cells.length; k += 3) {
-    const vx = cells[k] - c[0], vy = cells[k + 1] - c[1], vz = cells[k + 2] - c[2], a = vx * dir.x + vy * dir.y + vz * dir.z;
-    if (a > t && vx * vx + vy * vy + vz * vz - a * a < r * r) t = a;
-  }
-  return t + gap;
-}
 const holdOf = w => w.hold;
 // knife swing for characters: raise, chop down, come back
 const KNIFE_SWING = .36; // seconds
@@ -1239,18 +1230,83 @@ const swingAt = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return 
 const ARM_U = .0325, UP_V = new THREE.Vector3(0, 1, 0);
 let armGeos = null;
 const armMats = {};
-function vmArm(left, box, dir, low = 0, at = null, size = 1) { // at: fist this far out along the arm, instead of just clear of the gun; size: [thicker, longer]
+// how far out to the side a palm sits to be just clear of the part it holds
+function palmOut(cells, c, dir, o, m, px, u) {
+  let t = 0;
+  for (let k = 0; k < cells.length; k += 3) {
+    const vx = cells[k] - c[0], vy = cells[k + 1] - c[1], vz = cells[k + 2] - c[2], po = vx * o.x + vy * o.y + vz * o.z;
+    if (po <= t || po > PALM_FAR || Math.abs(vx * dir.x + vy * dir.y + vz * dir.z) > 1.5 * u || Math.abs(vx * m.x + vy * m.y + vz * m.z) > 1.2 * u) continue;
+    t = po;
+  }
+  return t + px / 2;
+}
+const PALM_FAR = .09, PALM_GAP = .004;
+function vmArm(left, box, dir, low = 0, at = null, size = 1) { // at: the fist's end this far out along the arm, instead of the part in its palm; size: [thicker, longer]
   armGeos ??= [partBox(4, 12, 4, 40, 16, ARM_U), partBox(4, 12, 4, 32, 48, ARM_U)];
   const L = prof.look ?? PRESETS[0].look, k = JSON.stringify(L);
   const mat = armMats[k] ??= lam({ map: skinTexture(L) });
   dir.normalize();
-  const c = [box.c[0], box.c[1] - low * box.h[1], box.c[2]], t = at ?? fistOut(gunCells(cur), c, dir, 2.2 * ARM_U, .006);
-  const piv = new THREE.Group(); piv.position.set(...c).addScaledVector(dir, t); piv.quaternion.setFromUnitVectors(UP_V, dir); piv.rotateY(Math.PI); if (size.length) piv.scale.set(size[0], size[1], size[0]);
+  const c = [box.c[0], box.c[1] - low * box.h[1], box.c[2]];
+  const sc = size.length ? size : [size, size], u = ARM_U * sc[0];
+  const piv = new THREE.Group(); piv.quaternion.setFromUnitVectors(UP_V, dir); piv.rotateY(Math.PI); piv.scale.set(sc[0], sc[1], sc[0]);
+  if (at != null) piv.position.set(...c).addScaledVector(dir, at);
+  else { // held in the palm: the arm lies beside the part, the middle of the hand's inner face against it
+    const o = new THREE.Vector3(left ? 1 : -1, 0, 0).applyQuaternion(piv.quaternion), m = new THREE.Vector3(0, 0, 1).applyQuaternion(piv.quaternion);
+    piv.position.set(...c).addScaledVector(dir, -2 * u).addScaledVector(o, palmOut(gunCells(cur), c, dir, o, m, gunPx(cur), u) + PALM_GAP + 2 * u);
+  }
   for (let s = 0; s < 3; s++) { // the arm's front faces up at you; extra length so the arm's end never shows, every other piece turned end for end so a sleeve carries on as sleeve, not as a second hand
     const m = new THREE.Mesh(armGeos[left ? 1 : 0], mat); m.position.y = (6 + s * 12) * ARM_U; if (s & 1) m.rotation.x = Math.PI; m.userData.shared = true; piv.add(m);
   }
   vm.add(piv);
   return piv;
+}
+// your arms in first person: character size, hands where everyone else sees them, shoulders off screen
+const EYE_PX = [0, 28.5, 4];
+function vmRest(w) { // where the frame loop (main.js) holds the gun while you stand still
+  const hold = holdOf(w);
+  if (w.melee) { const lo = w.tilt ? .12 : 0; return [[.3 + lo * .3 + (w.tilt ? .23 : 0), -.22 - lo, -.5 - lo], meleeUp(w)]; }
+  if (hold === 'heavy') return [[.34, -.38, -.6], .04];
+  if (hold === 'shoulder') return [[.42, -.17, -.62], 0];
+  return [[.32, -.3 + (hold === 'pistol' ? .09 : 0), -.55], 0];
+}
+const FP_HAND_TOP = -.05; // a hand higher on screen than this would put its arm over the middle of the view
+function fpArm(left, h, fore) {
+  const S = left ? SH_L : SH_R, c = palmAt(h, left); // the middle of the palm, pushed a pixel into the gun
+  // your shoulder seen from your eye (the body turned as it is for this gun), then in the gun's frame
+  const sh = new THREE.Vector3(...S).applyAxisAngle(UP_V, -h.turn), [at, tip] = vmRest(WEAPONS[cur]);
+  if (left && fore && c.y + at[1] > FP_HAND_TOP) c.set(fore.c[0], fore.c[1] - .3 * fore.h[1], fore.c[2]); // the Eradicator's top handle: low on its front instead
+  sh.set(-(sh.x - EYE_PX[0]), sh.y - EYE_PX[1], -(sh.z - EYE_PX[2])).multiplyScalar(BOT_U).sub(new THREE.Vector3(...at)).applyAxisAngle(X_V, -tip);
+  const d0 = sh.clone().sub(c).normalize(), piv = vmArm(left, { c: c.toArray(), h: [0, 0, 0] }, d0.clone(), 0, null, BOT_U / ARM_U);
+  piv.userData.fp = { c, sh, d0, q0: piv.quaternion.clone(), off: piv.position.clone().sub(c) }; // to follow the gun
+  return piv;
+}
+// your hands on the gun this frame (held.js has the moves): the gun turns in your hand, the arms follow it and swing at your shoulders
+let gunG = null, gunArmR = null, fpTurn = 0;
+const gunHandP = new THREE.Vector3(), Q_ID = new THREE.Quaternion(), V_0 = new THREE.Vector3();
+const _fq = new THREE.Quaternion(), _fv = new THREE.Vector3(), _fd = new THREE.Vector3(), _fm = new THREE.Vector3();
+function armFollow(piv, P) { // P: where the hand goes, in the gun's frame
+  const f = piv.userData.fp; _fv.copy(P).applyMatrix4(gunG.matrix);
+  _fq.setFromUnitVectors(f.d0, _fd.copy(f.sh).sub(_fv).normalize());
+  piv.quaternion.copy(f.q0).premultiply(_fq); piv.position.copy(f.off).applyQuaternion(_fq).add(_fv);
+}
+function fpHeld(a, w, ads) {
+  if (!gunG) return;
+  heldGun(gunG.quaternion, gunG.position, Q_ID, V_0, a, gunHandP, 1, w.wand && !w.melee ? WAND_UP * (1 - a.level) * (1 - ads) : 0); // a wand rests tipped up in your hand
+  gunG.updateMatrix();
+  if (gunMag) gunMag.position.copy(gunMag.userData.rest).add(_fv.set(a.mx, a.my, a.mz));
+  if (gunArmR) armFollow(gunArmR, gunArmR.userData.fp.c);
+  if (gunArmL) { _fm.copy(gunArmL.userData.fp.c); _fm.z += a.az; if (a.left > 0 && gunMag) _fm.lerp(_fd.copy(partMid(gunMag)).add(gunMag.position), a.left); armFollow(gunArmL, _fm); }
+  if (gunHand) { // a free left hand comes up to the mag
+    gunHand.visible = a.left > .01;
+    gunHand.position.copy(gunHand.userData.rest).add(_fv.set(a.mx, a.my, a.mz)).applyMatrix4(gunG.matrix); gunHand.position.y -= (1 - a.left) * .35;
+    gunHand.quaternion.copy(gunHand.userData.q0).premultiply(gunG.quaternion);
+  }
+  if (a.sw || a.push) { // the arms swing at your shoulders, behind and below your eye
+    const c = Math.cos(fpTurn), s = Math.sin(fpTurn);
+    _fm.set(0, (SH_R[1] - EYE_PX[1]) * BOT_U, EYE_PX[2] * BOT_U);
+    _fq.setFromAxisAngle(_fd.set(-c, 0, -s), a.sw);
+    vm.position.sub(_fm).applyQuaternion(_fq).add(_fm).addScaledVector(_fd.set(s, 0, -c), a.push); vm.quaternion.premultiply(_fq);
+  }
 }
 // the Void Lantern in your view: big on the right, your fist on the right end of its handle at the screen's edge, the arm running off the screen
 const LAN = { in: -.04, up: .64, far: .9, grip: .155, dir: [.08, -.81, .58], at: -.05, size: [1.15, 1.15] }, LAN_FOV = Math.tan(75 * Math.PI / 360);
@@ -1259,35 +1315,29 @@ function lanternPose(bob = 0, kz = 0) { // vm sits at the middle of its handle
   const down = Math.tan(fovBase * Math.PI / 360), far = LAN.far * LAN_FOV / down, half = 8 * gunPx(gunShown); // farther out on a narrow view, so it looks the same size
   vm.position.set((down * camera.aspect - LAN.in) * (far - half) - half, LAN.up - down * far + bob, -far - kz); vm.rotation.set(0, 0, 0); // its near corner by the right edge
 }
-// arm directions per hold
 const X_V = new THREE.Vector3(1, 0, 0), meleeUp = w => w.tilt ? 1.2 : .22, WAND_UP = .3; // how far first person tips a melee weapon (or a wand) up
-const VM_ARMS = {
-  pistol: [[.15, -.2, 1, .3]], rifle: [[.2, -.25, 1, .5], [-.35, -.3, 1, .6]], heavy: [[.25, -.25, 1, .4], [-.4, -.3, 1, .3]],
-  shoulder: [[.2, -.25, 1, .5], [-.35, -.3, 1, .5]], melee: [[.15, -.15, 1, 0]],
-  lantern: [], // lanternPose aims its arm
-};
 function buildGun() {
   vm.traverse(o => { if (o.geometry && o !== flashMesh && !o.userData.shared) o.geometry.dispose(); });
   vm.clear(); flashMesh.visible = false;
+  gunG = new THREE.Group(); gunG.matrixAutoUpdate = false; vm.add(gunG); // the gun, moving in your hand
   gunSwing = holdOf(BASE[cur]) === 'lantern' ? new THREE.Group() : null; gunBody = null;
-  if (gunSwing) { gunBody = new THREE.Group(); gunSwing.add(gunBody); vm.add(gunSwing); } // gunSwing swings from your fist, gunBody is the lantern hung from it
-  const body = gunBody || vm, { muzzle: [my, mz], grip, fore, spin, round, mag, rounds, charges, pulse, holo } = makeGun(cur, body, lvl[cur]), arms = VM_ARMS[holdOf(BASE[cur])];
+  if (gunSwing) { gunBody = new THREE.Group(); gunSwing.add(gunBody); gunG.add(gunSwing); } // gunSwing swings from your fist, gunBody is the lantern hung from it
+  const body = gunBody || gunG, { muzzle: [my, mz], grip, fore, spin, round, mag, rounds, charges, pulse, holo } = makeGun(cur, body, lvl[cur]);
   if (chargeT) chargeEnd(); // put away mid-charge
   gunSpin = spin; gunRound = round; gunRounds = rounds; gunCharges = charges; chargeShow(charges, 0); gunPulse = pulse; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
-  const hand = WEAPONS[cur].tilt ? { ...grip, c: [grip.c[0], grip.c[1], grip.c[2] - 5 * gunPx(cur)] } : grip; // a sword's fist goes up under the guard
-  if (WEAPONS[cur].tilt) vmArm(false, hand, new THREE.Vector3(0, -.45, .9).applyAxisAngle(X_V, -meleeUp(WEAPONS[cur])), 0, .04); // a sword stands up: the arm comes straight up under it, the handle just in front of the fist
-  else if (gunSwing) { // your fist on the right end of its handle: it swings from there
+  const pose = !gunSwing && typeof holdFor === 'function' ? holdFor(cur) : null; // none yet while the game loads
+  gunArmL = gunArmR = null; fpTurn = pose ? pose.turn : 0; gunHandP.set(...grip.c);
+  if (gunSwing) { // your fist on the right end of its handle: it swings from there
     const at = [grip.c[0] + LAN.grip, grip.c[1], grip.c[2]]; gunSwing.position.set(...at); gunBody.position.set(...at).negate();
-    vmArm(false, { c: at, h: [0, 0, 0] }, new THREE.Vector3(...LAN.dir), 0, LAN.at, LAN.size);
+    gunG.add(vmArm(false, { c: at, h: [0, 0, 0] }, new THREE.Vector3(...LAN.dir), 0, LAN.at, LAN.size)); // moves with it in a reload
   }
-  else vmArm(false, grip, new THREE.Vector3(...arms[0]), arms[0][3]);
-  gunArmL = fore && arms[1] ? vmArm(true, fore, new THREE.Vector3(...arms[1]), arms[1][3]) : null;
+  else if (pose) { gunArmR = fpArm(false, pose); gunHandP.copy(gunArmR.userData.fp.c); if (pose.dL) gunArmL = fpArm(true, pose, fore); }
   // one-handed guns: the left hand only shows up to reload
-  gunHand = !gunArmL && mag && !WEAPONS[cur].melee ? vmArm(true, partBounds(mag), new THREE.Vector3(-.3, -1, .45), 1) : null;
-  if (gunHand) gunHand.visible = false;
+  gunHand = (pose || gunSwing) && !gunArmL && mag && !WEAPONS[cur].melee ? vmArm(true, partBounds(mag), new THREE.Vector3(-.3, -1, .45), 1, null, gunSwing ? LAN.size[0] : BOT_U / ARM_U) : null; // the lantern's matches its own arm
+  if (gunHand) { gunHand.visible = false; gunHand.userData.q0 = gunHand.quaternion.clone(); }
   for (const o of [gunMag, gunArmL, gunHand]) if (o) o.userData.rest = o.position.clone();
   vmRl.rk = -1;
-  flashMesh.position.set(0, my, mz - .015); flashLight.position.copy(flashMesh.position); body.add(flashMesh, flashLight); // the flash sits just past the muzzle, or the gun hides it
+  flashMesh.position.set(0, my, mz - .015); flashLight.position.copy(flashMesh.position); body.add(flashMesh, flashLight); gunG.updateMatrix(); // the flash sits just past the muzzle, or the gun hides it
   if (WEAPONS[cur].melee) return; // still marks the tip, where the Stun Wand's blast starts
   flashMesh.material = vmFlashMat(flashOf(WEAPONS[cur])); flashLight.color.setHex(FLASH_FX[WEAPONS[cur].id]?.light ?? 0xffcc66);
 }

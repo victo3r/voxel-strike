@@ -196,8 +196,9 @@ function heroGun(i) {
   chargeShow(parts.charges, 0);
   hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
-  const kind = holdOf(BASE[i]);
-  pose = { pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, sh: kind === 'shoulder', hv: kind === 'heavy' };
+  const kind = holdOf(BASE[i]), he = holdFor(i, true);
+  const asPose = h => ({ pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, hR: palmAt(h, false) });
+  pose = { ...asPose(h), sh: kind === 'shoulder', hv: kind === 'heavy', easy: h.dL && he.dL && (he.T + he.q) !== (h.T + h.q) ? asPose(he) : null }; // easy: the relaxed carry he drops to now and then
   holdG.add(g);
   fid = { k: 'heft', t0: performance.now() / 1000 + .3 };
 }
@@ -232,7 +233,7 @@ function heroShot(k = 1) {
   if (hf.rl > 0 || hf.cd > 0) return;
   if (!w.inf && hf.ammo <= 0) { hf.bn = 0; if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
   hf.cd = burstCd(w, hf); if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
-  hf.kick = w.beam ? 0 : w.flame ? .06 : 1; // a beam can't kick: its far end would jump
+  hf.kick = kickOf(w);
   if (w.melee) {
     sfx(w.swing || 'swing', { v: .7 * hv() });
     if (w.wand) { hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq); stunZap(_hm.clone(), _hm.clone().addScaledVector(_hd, w.range), lobbyScene, .7); }
@@ -282,7 +283,7 @@ function heroTick(dt) {
   const w = hf.st;
   const can = heroCan();
   if (!heroLive()) { heroFireStop(); hf.bn = 0; }
-  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1)); hf.flash -= dt;
+  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * kickFall(w)); hf.flash -= dt;
   if (w.charge) { // the Aurora Rail charges while it's held and fires when it's let go
     if (hf.held && can && hf.cd <= 0 && hf.rl <= 0 && hf.ammo > 0) {
       if (!hf.chg) hf.chgSnd = sfx('chargeUp', { v: .6 * hv() });
@@ -330,6 +331,7 @@ function lobbyGuns(t) {
   if (lob.rel && t >= lob.rel) { lob.rel = 0; heroFireStop(); }
   const busy = hf.held || hf.rl > 0 || lob.taps.length;
   if (t >= lob.until && !busy) { lob.on = false; heroFireStop(); lob.next = t + 3.5 + Math.random() * 3.5; return; }
+  if (fid?.k === 'relax') lob.act = Math.max(lob.act, fid.t0 + FID_T.relax); // lets him finish relaxing first
   if (t < lob.act || busy || holdK < .9) return;
   lob.act = t + 3 + Math.random() * 3;
   const w = hf.st, r = Math.random();
@@ -341,14 +343,14 @@ function lobbyGuns(t) {
   }
 }
 // fidgets with the gun every few seconds
-const FIDGETS = ['look', 'lower', 'shake', 'heft', 'look', 'shake', 'lower', 'heft'], FID_T = { look: 2, lower: 2.8, shake: 1, heft: .9 };
+const FIDGETS = ['look', 'lower', 'shake', 'relax', 'heft', 'look', 'shake', 'lower', 'heft', 'relax'], FID_T = { look: 2, lower: 2.8, shake: 1, heft: .9, relax: 6 };
 let fid = null, fidN = 0, fidNext = 0;
 const SH_MID = new THREE.Vector3(0, SH_R[1] / 16, 0), X_AX = new THREE.Vector3(1, 0, 0), _wq = new THREE.Quaternion(), _fr = new THREE.Vector3();
 const smooth = x => x * x * (3 - 2 * x);
-function fidgetAt(t, sh, hv) {
-  const o = { low: 0, roll: 0, wy: 0, wz: 0 };
+function fidgetAt(t, sh, hv, easy) {
+  const o = { low: 0, roll: 0, wy: 0, wz: 0, easy: 0 };
   if (hf.held || hf.rl > 0 || hf.kick > 0) { fid = null; fidNext = t + 2.5; return o; } // no fidgets while shooting
-  if (!fid && t >= fidNext) fid = { k: FIDGETS[fidN++ % FIDGETS.length], t0: t };
+  if (!fid && t >= fidNext) { fid = { k: FIDGETS[fidN++ % FIDGETS.length], t0: t }; if (fid.k === 'relax' && !easy) fid.k = FIDGETS[fidN++ % FIDGETS.length]; }
   if (!fid) return o;
   const p = (t - fid.t0) / FID_T[fid.k], big = sh || hv ? .55 : 1;
   if (p >= 1) { fid = null; fidNext = t + 1.6 + (fidN % 3) * .6; return o; }
@@ -356,6 +358,7 @@ function fidgetAt(t, sh, hv) {
   const env = Math.sin(p * Math.PI);
   if (fid.k === 'look') o.roll = sh ? 0 : .4 * env * env;
   else if (fid.k === 'lower') o.low = .65 * big * (p < .22 ? smooth(p / .22) : p > .72 ? smooth((1 - p) / .28) : 1);
+  else if (fid.k === 'relax') o.easy = p < .15 ? smooth(p / .15) : p > .85 ? smooth((1 - p) / .15) : 1;
   else if (fid.k === 'shake') { o.wy = .07 * big * env * Math.sin(p * Math.PI * 10); o.wz = .05 * big * env * Math.sin(p * Math.PI * 8 + 1); }
   else o.low = .1 * big * Math.sin(p * Math.PI * 2) ** 2 * (1 - .4 * p);
   return o;
@@ -363,10 +366,12 @@ function fidgetAt(t, sh, hv) {
 // ease between guns
 const hPos = new THREE.Vector3(-.4, .6, .2), hQ = new THREE.Quaternion(), hFR = new THREE.Vector3(-.4, .8, .3), hFL = new THREE.Vector3(.4, .8, .3);
 let hLK = 0, hTurn = 0;
+const _ezP = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), fR: new THREE.Vector3(), fL: new THREE.Vector3(), hR: new THREE.Vector3(), turn: 0 };
+function blendPose(A, B, k) { _ezP.pos.copy(A.pos).lerp(B.pos, k); _ezP.q.copy(A.q).slerp(B.q, k); _ezP.fR.copy(A.fR).lerp(B.fR, k); _ezP.fL.copy(A.fL).lerp(B.fL, k); _ezP.hR.copy(A.hR).lerp(B.hR, k); _ezP.turn = A.turn + (B.turn - A.turn) * k; return _ezP; }
 const LOW_Q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(.3, -1, .3).normalize()), LOW_P = new THREE.Vector3(-.4, .6, .2);
 const _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _l = new THREE.Vector3(), sway = new THREE.Quaternion(), _e = new THREE.Euler();
 const _lq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _aq = new THREE.Quaternion(), _ax = new THREE.Vector3();
-const _hv2 = new THREE.Vector3(), _rq2 = new THREE.Quaternion(), _q0i = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _re2 = new THREE.Euler();
+const _hv2 = new THREE.Vector3(), _hp = new THREE.Vector3(), _q0i = new THREE.Quaternion(), _q1 = new THREE.Quaternion();
 function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
@@ -526,11 +531,11 @@ function updateLobby(dt) {
   holdK += (((armOpen || lob.on) && holdKey ? 1 : 0) - holdK) * Math.min(1, dt * 9);
   const e = holdK * holdK * (3 - 2 * holdK);
   if (pose) {
-    const k = Math.min(1, dt * 12);
-    hPos.lerp(pose.pos, k); hQ.slerp(pose.q, k); hFR.lerp(pose.fR, k); hTurn += (pose.turn - hTurn) * k;
-    if (pose.fL) hFL.lerp(pose.fL, k);
+    const k = Math.min(1, dt * 12), sh = !!pose.sh, a = sh ? .35 : 1, f = fidgetAt(t, sh, pose.hv, !!pose.easy);
+    const P = pose.easy && f.easy > 0 ? blendPose(pose, pose.easy, f.easy) : pose;
+    hPos.lerp(P.pos, k); hQ.slerp(P.q, k); hFR.lerp(P.fR, k); hTurn += (P.turn - hTurn) * k;
+    if (P.fL) hFL.lerp(P.fL, k);
     hLK += ((pose.fL ? 1 : 0) - hLK) * k;
-    const sh = !!pose.sh, a = sh ? .35 : 1, f = fidgetAt(t, sh, pose.hv);
     sway.setFromEuler(_e.set(a * (.025 * Math.sin(t * .9 + 1) + .01 * Math.sin(t * 2.3)),
       a * (.04 * Math.sin(t * .7) + .015 * Math.sin(t * 1.9)) + f.wy, a * .03 * Math.sin(t * .5) + f.wz, 'YXZ'));
     _lq.setFromAxisAngle(_ax.set(0, 0, -1).applyQuaternion(hQ), f.roll);
@@ -540,29 +545,32 @@ function updateLobby(dt) {
     const gp = down(_p.copy(hPos).sub(hFR).applyQuaternion(tq).add(hFR));
     down(_l.copy(hFL).sub(hFR).applyQuaternion(tq).add(hFR)); down(_fr.copy(hFR));
     const q0 = _q.copy(_wq).multiply(tq).multiply(hQ);
-    // kick or reload animation
-    const w = hf.i >= 0 && hf.st, ra = w && hf.rl > 0 ? reloadPose(w.id, 1 - hf.rl / w.reload) : null, kk = (hf.kick || 0) * (w && heavyKick(w) ? HEAVY.lift : 1);
+    // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
+    const w = hf.i >= 0 && hf.st, rk = w && hf.rl > 0 ? 1 - hf.rl / w.reload : -1;
+    const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL }) : null;
     let leftK = hLK;
-    reloadSwap(hf.rs, w ? w.id : '', ra ? 1 - hf.rl / w.reload : -1, hf.mag, lobbyScene, .5);
-    if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(ra ? ra.mx : 0, ra ? ra.my : 0, ra ? ra.mz : 0));
-    if (ra || kk > 0) {
-      // the knife chops instead
-      const melee = w.melee, chop = melee && kk > 0 ? swingAt(1 - kk) : 0;
-      const rq = _rq2.setFromEuler(_re2.set((ra ? ra.rx : 0) + (melee ? -chop * .8 : kk * .25), ra ? ra.ry : 0, ra ? ra.rz : 0));
-      const off = _hv2.set(ra ? ra.x : 0, ra ? ra.y : 0, (ra ? ra.z : 0) + (melee ? 0 : kk * .04)).multiplyScalar(GUN_S).applyQuaternion(q0);
-      const q0i = _q0i.copy(q0).invert(), q1 = _q1.copy(q0).multiply(rq), move = v => v.sub(gp).applyQuaternion(q0i).applyQuaternion(rq).applyQuaternion(q0).add(gp).add(off);
-      move(_l); move(_fr); gp.add(off); q0.copy(q1);
-      if (chop) {
-        _wq.setFromAxisAngle(X_AX, chop * .9); const sw = v => v.sub(SHR).applyQuaternion(_wq).add(SHR);
-        sw(gp); sw(_fr); sw(_l); q0.premultiply(_wq);
+    reloadSwap(hf.rs, w ? w.id : '', rk, hf.mag, lobbyScene, .5);
+    if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(m ? m.mx : 0, m ? m.my : 0, m ? m.mz : 0));
+    if (m && !heldIdle(m)) {
+      heldGun(_q1, _hp, q0, gp, m, P.hR, GUN_S); // the gun turns in his hand, his fists go with it
+      const mv = _q0i.copy(q0).invert().premultiply(_q1), move = v => v.sub(gp).applyQuaternion(mv).add(_hp);
+      move(_fr); move(_l); gp.copy(_hp); q0.copy(_q1);
+      if (pose.fL && m.az) _l.add(_hv2.set(0, 0, m.az * GUN_S).applyQuaternion(q0));
+      if (m.level > 0) { // a wand points straight while it fires
+        const r = wandFlick(q0, m.level); _hv2.copy(P.hR).multiplyScalar(GUN_S).applyQuaternion(q0).add(gp);
+        for (const v of [gp, _fr, _l]) v.sub(_hv2).applyQuaternion(r).add(_hv2);
+        q0.premultiply(r);
       }
-      if (ra && hf.mag) {
-        const toPart = pose.fL ? Math.min(1, Math.max(0, -ra.ay / .3)) : ra.hand;
+      if (m.left > 0 && hf.mag) { // left hand to the mag
         _hv2.copy(partMid(hf.mag)).add(hf.mag.position).multiplyScalar(GUN_S).applyQuaternion(q0).add(gp);
-        if (pose.fL) _l.lerp(_hv2, toPart); else { _l.copy(_hv2); leftK = Math.max(hLK, toPart); }
+        if (pose.fL) _l.lerp(_hv2, m.left); else { _l.copy(_hv2); leftK = Math.max(hLK, m.left); }
+      }
+      if (m.sw || m.push) { // the arms swing at the shoulders
+        _wq.setFromAxisAngle(X_AX, m.sw);
+        for (const v of [gp, _fr, _l]) { v.sub(SH_MID).applyQuaternion(_wq).add(SH_MID); v.z += m.push * GUN_S; }
+        q0.premultiply(_wq);
       }
     }
-    if (w && w.wand && hf.wf > 0) { const r = wandFlick(q0, hf.wf); q0.premultiply(r); gp.sub(_fr).applyQuaternion(r).add(_fr); } // points straight while it fires
     armL.quaternion.slerp(armTo(SHR, _fr, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * leftK);
     holdG.quaternion.copy(LOW_Q).slerp(q0, e);
     holdG.position.copy(LOW_P).lerp(gp, e);

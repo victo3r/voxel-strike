@@ -521,7 +521,7 @@ net = (() => {
       if (!r.rec.bot || mine === !!r.rec.hostBot) continue;
       const b = r.body, live = !!b && !b.dead;
       const pos = live ? b.g.position.clone() : null, yaw = live ? b.aimYaw : 0, hp = live ? b.hp : 0, armor = live ? b.armor : 0;
-      if (mine) hostRec(r.rec); else { r.rec.hostBot = false; r.rec.remote = true; }
+      if (mine) { hostRec(r.rec); r.seenT = 0; } else { r.rec.hostBot = false; r.rec.remote = true; }
       if (!live) continue;
       dropBody(r); // the bot carries on from where it stands
       const nb = spawnBody(r, pos.x, pos.y, pos.z, wrapAng(yaw - Math.PI));
@@ -632,7 +632,7 @@ net = (() => {
     if (r.q & 2) { if (!W.inf) sfx('r_' + W.id, { at: pos, far: 25, v: .8 }); z.rlLeft = W.inf || W.melee ? 0 : rlT; }
     if (!r.reloadWas) z.rlLeft = 0;
     if (z.rlLeft > 0 && (z.rlLeft = Math.max(0, z.rlLeft - dt)) === 0) z.ammo = (z.rec.W?.[z.gun] ?? W).mag;
-    holdReload(z, z.rlLeft, rlT); wandHold(z, dt); z.wandT = (z.wandT || 0) - dt;
+    z.wandT = (z.wandT || 0) - dt;
     stunTick(z, dt, grounded); // just for the stars, they move themselves
     if (r.q & 64) { sfx('djump', { at: pos, far: 20, v: .7 }); burst(fv.set(pos.x, pos.y + .1, pos.z), 0xe8eef2, 5); }
     if (r.q & 256) { sfx('dash', { at: pos, far: 25, v: .8 }); burst(fv.set(pos.x, pos.y + .8, pos.z), 0xbff6fa, 6); }
@@ -648,7 +648,7 @@ net = (() => {
         sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING;
         if (W.wand && z.flashM) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); stunZap(z.flashM.getWorldPosition(fv).clone(), zapEnd(W, eyeV, dirV, z)); } // their stun blast, just for show
       }
-      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.charge ? full ? 'auroraFull' : 'aurora' : W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
+      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); z.kick = kickOf(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.charge ? full ? 'auroraFull' : 'aurora' : W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
       if ((W.wand || W.bolt) && !W.melee && !W.beam) { // a wand flicks and throws a bolt, a dart just flies (a spell comes in its own message)
         if (W.wand) z.wandT = .15;
         if (!W.spell && z.flashM) { // where it lands, just for show: the first wall or body, you included
@@ -663,7 +663,7 @@ net = (() => {
       }
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0; if (z.pulse) pulseShow(z.pulse, z.muzzle > 0);
-    z.stab = Math.max(0, z.stab - dt); knifeChop(z);
+    z.stab = Math.max(0, z.stab - dt); heldTick(z, dt, z.rlLeft, rlT); // swings, kicks, wand flicks and reloads
     if (z.spin) { if (z.muzzle > 0) z.spinV = spinKick(z.gun); spinTurn(z.spin, z.spinV + spinIdle(z.gun), dt); z.spinV = Math.max(0, z.spinV - dt * 25); }
     if (z.round) z.round.visible = true;
     // flame and heat ray stay on while they hold fire
@@ -672,7 +672,7 @@ net = (() => {
       eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); z.flashM.getWorldPosition(fv);
       if (W.flame) {
         if (!(z.fireOn > 0)) sfx('flameStart', { at: pos, far: 50 });
-        z.fireOn = .2; z.fireEnd = 'flameEnd';
+        z.fireOn = .2; z.fireEnd = 'flameEnd'; z.kick = Math.max(z.kick || 0, kickOf(W));
         for (let k = 0; k < 2; k++) {
           const m = new THREE.Mesh(flameGeo, flameMats[Math.random() * 3 | 0]); m.position.copy(fv); scene.add(m);
           const v = dirV.clone().multiplyScalar(13).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(2.5));
@@ -751,7 +751,7 @@ net = (() => {
       if (same) { same[1] += o.pellets ?? 1; return; }
     }
     // where the victim was when you saw it
-    const r = remotes.get(vp), seen = r && r.body === victim && r.seenT ? r.seenT : now();
+    const r = remotes.get(vp), seen = r && r.body === victim && !r.rec.hostBot && r.seenT ? r.seenT : now(); // a bot I run is where I see it, now
     const c = [vp, o.pellets ?? 1, o.head ? 1 : 0, r2(pt.x), r2(pt.y), r2(pt.z), kind, gun, r2(eye.x), r2(eye.y), r2(eye.z), Math.round(seen), o.pj | 0, o.thru | 0]; // thru: how a lance got there
     if (BASE[gi(gun)]?.charge) c.push(Math.round(shotCharge * 100)); // how charged the shot was
     c.s = shotN; list.push(c);

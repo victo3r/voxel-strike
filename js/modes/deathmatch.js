@@ -68,15 +68,15 @@ const STREAKS = {
 };
 // match rewards by map size: [xp, coins] per place
 const REWARDS = {
-  small:  [[30, 8], [15, 3]],
-  medium: [[40, 12], [30, 8], [30, 8], [15, 3]],
-  large:  [[40, 12], [30, 8], [30, 8], [15, 3]],
+  small:  [[40, 8], [20, 3]],
+  medium: [[50, 12], [40, 8], [40, 8], [20, 3]],
+  large:  [[50, 12], [40, 8], [40, 8], [20, 3]],
 };
 // blitz is shorter, so it pays about half
 const BLITZ_REWARDS = {
-  small:  [[15, 5], [8, 2]],
-  medium: [[20, 6], [15, 5], [15, 5], [8, 2]],
-  large:  [[20, 6], [15, 5], [15, 5], [8, 2]],
+  small:  [[20, 5], [10, 2]],
+  medium: [[25, 6], [20, 5], [20, 5], [10, 2]],
+  large:  [[25, 6], [20, 5], [20, 5], [10, 2]],
 };
 const rewardTable = () => (mode === 'blitz' || mode === 'blitzTeam' ? BLITZ_REWARDS : REWARDS)[MAP.size];
 const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t.length) - 1]; };
@@ -312,55 +312,53 @@ function holdGun(b) {
   b.flashM ??= makeFlash(.1); b.flashM.material = flashOf(BASE[b.gun]);
   b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
-  b.gunM = gunM; b.spin = spin; b.spinV = 0; b.wf = 0;
+  b.gunM = gunM; b.spin = spin; b.spinV = 0; b.wf = 0; b.kick = 0;
   // reload start pose
   b.mag = mag; b.rl = { rk: -1, on: false, p: gunM.position.clone(), q: gunM.quaternion.clone(), qR: b.armR.quaternion.clone(), qL: b.armL.quaternion.clone(), magAt: mag && mag.position.clone(), oneHand: !h.dL };
   gunM.updateMatrix(); const inv = gunM.matrix.clone().invert(), fist = (a, d) => a.position.clone().addScaledVector(_hv.fromArray(d), ARM_LEN * u).applyMatrix4(inv);
   b.rl.fR = fist(b.armR, h.dR); b.rl.fL = h.dL ? fist(b.armL, h.dL) : null;
-  b.rl.fA = b.armR.position.clone().addScaledVector(_hv.fromArray(h.dR), ARM_LEN * u);
+  b.rl.hR = palmAt(h, false);
 }
-// a wand tips down to point straight while it fires (k = how far), turning round the fist
+// a wand tips down to point straight while it fires (k = how far)
 const _wfq = new THREE.Quaternion(), _wfI = new THREE.Quaternion(), _wfd = new THREE.Vector3(), _wfl = new THREE.Vector3(), _lnE = new THREE.Euler();
 function wandFlick(q, k) { _wfd.set(0, 0, -1).applyQuaternion(q); _wfl.set(_wfd.x, 0, _wfd.z).normalize(); return _wfq.setFromUnitVectors(_wfd, _wfl).slerp(_wfI, 1 - k); }
-function wandHold(b, dt) {
-  const R = b.rl, g = b.gunM; if (!R || !g || R.on) return;
-  if (BASE[b.gun].hold === 'lantern') { // a lantern swings from the fist: back when it fires, a little with every step
-    b.lanT = b.muzzle > 0 ? 0 : (b.lanT ?? 9) + dt;
-    const sp = Math.min(1, Math.hypot(b.vx || 0, b.vz || 0) / 5);
-    g.quaternion.copy(R.q).multiply(_wfq.setFromEuler(_lnE.set(-.45 * Math.exp(-3 * b.lanT) * Math.sin(9 * b.lanT), 0, .09 * sp * Math.sin(performance.now() * .006)))); return;
-  }
-  if (!BASE[b.gun].wand) return;
-  b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 || b.wandT > 0 ? 14 : -4)));
-  const r = wandFlick(R.q, b.wf); g.quaternion.copy(R.q).premultiply(r); g.position.copy(R.p).sub(R.fA).applyQuaternion(r).add(R.fA);
-}
-// knife swing for bots and other players
-function knifeChop(b) { const s = b.stab > 0 ? swingAt(1 - b.stab / KNIFE_SWING) : 0; b.aim.rotation.x += s * .9; b.aim.position.z = Math.max(0, s) * .12; }
-// reload animation for bots and other players
-const _rlE = new THREE.Euler(), _rlQ = new THREE.Quaternion(), _rlV = new THREE.Vector3(), _rlM = new THREE.Vector3(), _rlF = new THREE.Vector3();
-function holdReload(b, left, total) {
+// a bot's or another player's weapon this frame (left, total: its reload): the same moves as yours in first person (held.js)
+const _rlV = new THREE.Vector3(), _rlM = new THREE.Vector3(), _rlF = new THREE.Vector3();
+function heldTick(b, dt, left, total) {
   const R = b.rl, g = b.gunM; if (!R || !g) return;
-  const id = BASE[b.gun].id, k = left > 0 && total > 0 ? Math.max(0, 1 - left / total) : -1, ra = k >= 0 ? reloadPose(id, k) : null;
-  reloadSwap(R, id, k, b.mag, scene);
-  if (BASE[b.gun].flare && b.mag) b.mag.visible = b.ammo > 0 || k > .4;
+  const W = BASE[b.gun], k = left > 0 && total > 0 ? Math.max(0, 1 - left / total) : -1, lan = W.hold === 'lantern', wand = W.wand && !W.melee;
+  reloadSwap(R, W.id, k, b.mag, scene);
+  if (W.flare && b.mag) b.mag.visible = b.ammo > 0 || k > .4;
   if (b.rounds) roundsShow(b.rounds, b.ammo, k);
-  if (!ra) {
+  if (wand) b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 || b.wandT > 0 ? 14 : -4)));
+  if (lan) b.lanT = b.muzzle > 0 ? 0 : (b.lanT ?? 9) + dt;
+  b.kick = Math.max(0, (b.kick || 0) - dt * kickFall(W));
+  const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / KNIFE_SWING : -1, rl: k, level: wand ? b.wf : 0, two: !!R.fL });
+  b.aim.rotation.x += a.sw; b.aim.position.z = a.push; // the arms swing at the shoulders
+  if (heldIdle(a) && !lan) {
     if (R.on) { R.on = false; g.position.copy(R.p); g.quaternion.copy(R.q); b.armR.quaternion.copy(R.qR); b.armL.quaternion.copy(R.qL); if (b.mag) b.mag.position.copy(R.magAt); }
     return;
   }
   R.on = true;
-  g.quaternion.copy(R.q).multiply(_rlQ.setFromEuler(_rlE.set(ra.rx, ra.ry, ra.rz)));
-  g.position.copy(R.p).add(_rlV.set(ra.x, ra.y, ra.z).applyQuaternion(R.q));
-  if (b.mag) b.mag.position.copy(R.magAt).add(_rlV.set(ra.mx, ra.my, ra.mz));
+  heldGun(g.quaternion, g.position, R.q, R.p, a, R.hR);
+  if (a.level > 0) { const r = wandFlick(g.quaternion, a.level); _rlF.copy(R.hR).applyQuaternion(g.quaternion).add(g.position); g.quaternion.premultiply(r); g.position.sub(_rlF).applyQuaternion(r).add(_rlF); } // turning in the hand
+  if (b.mag) b.mag.position.copy(R.magAt).add(_rlV.set(a.mx, a.my, a.mz));
   g.updateMatrix();
   const aimAt = (arm, p) => arm.quaternion.setFromUnitVectors(ARM_DOWN, _rlV.copy(p).sub(arm.position).normalize());
   aimAt(b.armR, _rlF.copy(R.fR).applyMatrix4(g.matrix));
-  // left hand on the grip, then to the mag
-  const toPart = R.oneHand ? ra.hand : Math.min(1, Math.max(0, -ra.ay / .3));
-  if (!b.mag || (!R.fL && toPart <= 0)) { if (R.fL) aimAt(b.armL, _rlF.copy(R.fL).applyMatrix4(g.matrix)); else b.armL.quaternion.copy(R.qL); return; }
-  _rlM.copy(partMid(b.mag)).add(b.mag.position).applyMatrix4(g.matrix);
-  if (R.fL) _rlF.copy(R.fL).applyMatrix4(g.matrix).lerp(_rlM, toPart); else _rlF.copy(_rlM);
-  if (R.fL || toPart > .01) aimAt(b.armL, _rlF);
-  if (!R.fL) b.armL.quaternion.slerp(R.qL, 1 - toPart);
+  // left hand on the gun, then to the mag
+  const to = a.left;
+  if (!b.mag || (!R.fL && to <= 0)) { if (R.fL) aimAt(b.armL, _rlF.copy(R.fL).setZ(R.fL.z + a.az).applyMatrix4(g.matrix)); else b.armL.quaternion.copy(R.qL); }
+  else {
+    _rlM.copy(partMid(b.mag)).add(b.mag.position).applyMatrix4(g.matrix);
+    if (R.fL) _rlF.copy(R.fL).setZ(R.fL.z + a.az).applyMatrix4(g.matrix).lerp(_rlM, to); else _rlF.copy(_rlM);
+    if (R.fL || to > .01) aimAt(b.armL, _rlF);
+    if (!R.fL) b.armL.quaternion.slerp(R.qL, 1 - to);
+  }
+  if (lan && k < 0) { // a lantern swings from the fist: back when it fires, a little with every step
+    const sp = Math.min(1, Math.hypot(b.vx || 0, b.vz || 0) / 5);
+    g.quaternion.multiply(_wfq.setFromEuler(_lnE.set(-.45 * Math.exp(-3 * b.lanT) * Math.sin(9 * b.lanT), 0, .09 * sp * Math.sin(performance.now() * .006))));
+  }
 }
 // best gun for this distance (empty guns count for less)
 function pickGun(b, d) {
@@ -656,7 +654,7 @@ function botFlame(b, W) {
 }
 function botFire(b, W, dist) {
   botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);
-  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); net.shot(W, b);
+  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); b.kick = kickOf(W); net.shot(W, b);
   const bolt = W.wand && !W.beam; if (bolt) b.wandT = .15; // a wand flicks forward
   muzzleBits(W, b.flashM);
   // beams in long sweeps, everything else in short bursts
@@ -827,11 +825,11 @@ function updateBot(b, dt) {
 
   b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.wandT = (b.wandT || 0) - dt; b.flashM.visible = b.muzzle > 0; if (b.pulse) pulseShow(b.pulse, b.muzzle > 0);
   if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx(b.fireEnd, { at: pos, far: 50 });
-  b.stab = Math.max(0, b.stab - dt); knifeChop(b); // knife chop
+  b.stab = Math.max(0, b.stab - dt);
   if (b.spin) { if (b.muzzle > 0) b.spinV = spinKick(b.gun); spinTurn(b.spin, b.spinV + spinIdle(b.gun), dt); b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
-  holdReload(b, b.reload, rlOf(W, b.rec.fx)); wandHold(b, dt);
+  heldTick(b, dt, b.reload, rlOf(W, b.rec.fx)); // swings, kicks, wand flicks and reloads
   // in range for this gun
   const inRange = !sees ? false : W.melee ? dist <= W.range && Math.abs(tp.y - pos.y) < 1.6 : W.flame ? dist < W.range + .5 : W.beam ? dist < W.range : W.rocket ? dist > 4 : W.spell ? dist > 2.5 : W.vortex ? dist > 5 : true;
   const ready = sees && b.seeT >= S.react && b.reload <= 0 && b.swap <= 0 && (W.inf || b.ammo > 0) && inRange;
@@ -1027,17 +1025,17 @@ function endMatch(results) {
   const won = results ? results.won : MR.team ? lead > 0 : place === 1;
   const key = !!results && !results.priv && place === 1; // keys come from public online wins
   if (key) prof.keys = (prof.keys | 0) + 1;
-  missionEnd(won); dailyPlayed(); funnelEnd();
-  const [xp, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), { ups, bonus, boostUp, bars, boxes } = grant(xp, gold); // doubled with a booster
-  eventEnd(xp, won);
+  missionEnd(won); achEnd(won, key); dailyPlayed(); funnelEnd();
+  const [xp0, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), xp = xp0 + missionXpTake(), { ups, bonus, boostUp, bars, boxes } = grant(xp, gold); // doubled with a booster, plus the missions' XP
+  eventEnd(xp0, won);
   $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), barTile(bars), boxTile(boxes), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile(), ...eventTiles()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
-    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + unlockRow(ups) + missionsRow() + dailyRow();
+    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + unlockRow(ups) + achRow() + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(won ? 'win' : 'lose'); musicEnd();
   if (!MR.starter) setTimeout(cgMidgame, 1500); // CrazyGames midgame ad, not after your first game
-  if (ups || bars || boxes) setTimeout(() => sfx('levelUp'), 700);
+  setTimeout(() => { if (!lvlShow() && (ups || bars || boxes)) sfx('levelUp'); }, 700);
   unlockMouse();
 }
 $('againBtn').addEventListener('click', () => { if (net.on) { net.again(); return; } restart(); lockMouse(); });
@@ -1069,5 +1067,5 @@ function setupMode() {
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
   musicMatch(mapId, pvp() ? 'dm' : mode); // bot matches use the deathmatch music
-  tipStart(); missionMark(); eventMark();
+  tipStart(); missionMark(); achMark(); eventMark();
 }

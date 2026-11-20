@@ -130,7 +130,7 @@ async function checkPrizes(force = false) {
 }
 function showPrize(force = false) {
   const p = prizeQ[0]; if (!p || $('prize').style.display === 'flex') return;
-  const busy = !inLobby || [$('binds'), $('armory'), $('boost'), $('pick'), $('daily'), $('chests'), $('lb'), $('card')].some(el => el && getComputedStyle(el).display !== 'none');
+  const busy = !inLobby || [$('binds'), $('armory'), $('boost'), $('pick'), $('daily'), $('chests'), $('lb'), $('ach'), $('card')].some(el => el && getComputedStyle(el).display !== 'none');
   if ((busy || navigator.webdriver) && !force) { setTimeout(showPrize, 2000); return; }
   $('prize').style.display = 'flex'; renderPrize(); sfx('ui');
 }

@@ -145,7 +145,7 @@ function update(dt) {
   }
   aiming = opts.toggleAim || TOUCH ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
-  kick = Math.max(0, kick - dt * (w.melee ? 1 / KNIFE_SWING : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1)); // gun settles after a shot
+  kick = Math.max(0, kick - dt * kickFall(w)); // gun settles after a shot
   wandOn -= dt; wandK = Math.max(0, Math.min(1, wandK + dt * (wandOn > 0 && gunShown === cur ? 14 : -4)));
   tickCross(dt, BASE[cur]);
   if (gunSpin) { spinTurn(gunSpin, gunSpinV + spinIdle(gunShown), dt); gunSpinV = Math.max(0, gunSpinV - dt * 25); } // barrels wind down
@@ -177,42 +177,31 @@ function update(dt) {
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
   const sw = swapTick(dt); // first, so a gun built this frame gets its own pose
   const vw = WEAPONS[gunShown] ?? w, vhold = holdOf(vw); // pose the gun on screen: the old one while it lowers
-  if (vw.melee) { // knife swing
-    const c = kick > 0 ? knifeChopFP(1 - kick) : 0;
-    const up = meleeUp(vw), lo = vw.tilt ? .12 : 0, out = vw.tilt ? .23 : 0; // swords stand up, lower in the hand and out to the right
-    vm.rotation.set(up + c * .95, Math.abs(c) * .2, -c * .4);
-    knifeRest.set(up, 0, 0); _kp.copy(KNIFE_PIV).applyEuler(knifeRest); _kq.copy(KNIFE_PIV).applyEuler(vm.rotation);
-    vm.position.set(.3 + lo * .3 + out + Math.min(0, c) * .18, -.22 - lo + bob + Math.max(0, c) * .1, -.5 - lo).add(_kp).sub(_kq);
+  if (vw.melee) { // swords stand up, lower in the hand and out to the right
+    const up = meleeUp(vw), lo = vw.tilt ? .12 : 0, out = vw.tilt ? .23 : 0;
+    vm.rotation.set(up, 0, 0); vm.position.set(.3 + lo * .3 + out, -.22 - lo + bob, -.5 - lo);
   } else if (vhold === 'heavy') { // low at the hip
-    vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob, -.6 + kick * .06);
-    vm.rotation.set(.04 + kick * .1, 0, 0);
+    vm.position.set(.34 - adsT * .12, -.38 + adsT * .06 + bob, -.6);
+    vm.rotation.set(.04, 0, 0);
   } else if (vhold === 'shoulder') { // on the shoulder
-    vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob, -.62 + kick * .1);
-    vm.rotation.set(kick * .2, 0, 0);
+    vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob, -.62);
+    vm.rotation.set(0, 0, 0);
   } else if (vhold === 'lantern') { // carried by its handle on the right of your view; it swings back when it's thrust out to fire, and with your steps
     lanV.x += ((-kick * .45 - lanA.x) * 90 - lanV.x * 7) * dt; lanA.x += lanV.x * dt;
     lanV.z += ((-mx * .12 - lanA.z) * 60 - lanV.z * 6) * dt; lanA.z += lanV.z * dt;
     if (gunBody) lanternPose(bob, kick * .09);
     if (gunSwing) gunSwing.rotation.set(lanA.x, 0, lanA.z + bob * 1.5);
   } else {
-    const kk = kick * (heavyKick(vw) ? HEAVY.lift : 1);
-    vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob, -.55 + kk * .08);
-    vm.rotation.set(kk * .25 * (1 - adsT * .85), 0, 0); // less muzzle climb while aiming
+    vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob, -.55);
+    vm.rotation.set(0, 0, 0);
     if (vhold === 'pistol') vm.position.y += .09 * (1 - adsT); // pistols sit higher
     if (vw.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // holo sight to the middle
-    if (vw.wand) vm.rotation.x += WAND_UP * (1 - wandK) * (1 - adsT); // a wand rests tipped up, points straight while it fires
   }
-  // reload animation
-  const ra = reloading > 0 && gunShown === cur ? reloadPose(w.id, 1 - reloading / reloadFull) : null;
-  if (ra) { vm.position.x += ra.x; vm.position.y += ra.y; vm.position.z += ra.z; vm.rotation.x += ra.rx; vm.rotation.y += ra.ry; vm.rotation.z += ra.rz; }
-  if (gunMag) { const r = gunMag.userData.rest; gunMag.position.set(r.x + (ra ? ra.mx : 0), r.y + (ra ? ra.my : 0), r.z + (ra ? ra.mz : 0)); }
-  if (gunArmL) { const r = gunArmL.userData.rest; gunArmL.position.set(r.x, r.y + (ra ? ra.ay : 0), r.z + (ra ? ra.az : 0)); }
-  if (gunHand) { // left hand
-    const r = gunHand.userData.rest, hd = ra ? ra.hand : 0; gunHand.visible = hd > .01;
-    if (ra) gunHand.position.set(r.x + ra.mx, r.y + ra.my - (1 - hd) * .35, r.z + ra.mz);
-  }
-  reloadSwap(vmRl, w.id, ra ? 1 - reloading / reloadFull : -1, gunMag, scene); // mag swap
-  if (ra && w.id === 'eradicator' && reloading / reloadFull < .12) gunSpinV = Math.max(gunSpinV, 16);
+  // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
+  const rk = reloading > 0 && gunShown === cur ? 1 - reloading / reloadFull : -1;
+  fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, rl: rk, level: wandK, two: !!gunArmL, ads: adsT }), vw, adsT);
+  reloadSwap(vmRl, w.id, rk, gunMag, scene); // mag swap
+  if (rk >= 0 && w.id === 'eradicator' && reloading / reloadFull < .12) gunSpinV = Math.max(gunSpinV, 16);
   // weapon swap
   if (sw > 0) { const e = sw * sw * (3 - 2 * sw); vm.position.y -= e * .5; vm.rotation.x -= e * .9; }
   // reload ring
@@ -438,9 +427,6 @@ function update(dt) {
   if (!pvp()) setHTML($('top'), net.coop && coopTop() || `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead && z.type !== 'bot').length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`);
 }
 
-// knife swing curve
-const knifeChopFP = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); }; return t < .22 ? .6 * e(t / .22) : t < .5 ? .6 - 1.15 * e((t - .22) / .28) : -.55 * (1 - e((t - .5) / .5)); };
-const KNIFE_PIV = new THREE.Vector3(.04, -.06, .22), knifeRest = new THREE.Euler(), _kp = new THREE.Vector3(), _kq = new THREE.Vector3(); // knife pivot
 const lanA = { x: 0, z: 0 }, lanV = { x: 0, z: 0 }; // the Void Lantern's swing
 const clock = new THREE.Clock();
 // fade the buttons in once the lobby is drawn

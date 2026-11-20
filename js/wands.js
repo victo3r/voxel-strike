@@ -172,7 +172,7 @@ const ORB_MATS = [0xff5a2a, 0x8fe0ff, 0xf4fff8].map(c => { const m = bitMat(c, P
 const spellOrb = new THREE.Sprite(ORB_MATS[0]); spellOrb.renderOrder = 8; spellOrb.userData.shared = true;
 function spellOrbTick() {
   const on = !inLobby && !!BASE[cur]?.spell && gunShown === cur && vm.visible;
-  if (on && spellOrb.parent !== vm) vm.add(spellOrb);
+  if (on && spellOrb.parent !== gunG) gunG.add(spellOrb);
   spellOrb.visible = on; if (!on) return;
   spellOrb.material = ORB_MATS[spellNext];
   spellOrb.position.copy(flashMesh.position); spellOrb.position.z += .015 + 5.5 * gunPx(cur);

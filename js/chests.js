@@ -60,6 +60,7 @@ function openChest(c) {
   for (const x of list) { if ((r -= x.p) <= 0) { l = x; break; } }
   if (free) prof.box = { ...prof.box, [c.id]: boxN(c) - 1 }; else prof.keys = keyCount() - c.cost;
   const got = { ...l, n: rollN(l.n) };
+  achChest(c.id);
   if (got.k === 'coins') { prof.coins += got.n; prof.earned = (prof.earned ?? 0) + got.n; }
   else if (got.k === 'boosts') prof.boosts = (prof.boosts | 0) + got.n;
   else if (got.k === 'star') { // each star on a random gun that can take one (they can split); the card lists them all
@@ -126,6 +127,7 @@ $('chests').addEventListener('click', e => {
     const got = openChest(CHESTS[i]); if (!got) return;
     chestBusy = true; chestGot = got; sfx('ui'); renderChests();
     setTimeout(() => { chestBusy = false; renderChests(); sfx(got.r && got.r !== 'common' ? 'levelUp' : 'buy'); }, 900);
+    setTimeout(lvlShow, 2200); // XP from a chest can level you up
     return;
   }
   else if (id === 'keyAd') {

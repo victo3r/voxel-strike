@@ -491,7 +491,7 @@ $('next').addEventListener('click', () => {
 // what clearing a wave pays: shop coins, then XP and coins up to PAY_WAVES (boosters double it)
 function wavePay() {
   shopWave = wave; bonus = 5 + wave * 2; coins += bonus;
-  const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 3 + (bossW ? 15 : 0) : 0, pay ? 2 + (bossW ? 5 : 0) : 0), r = grant(xp, gold);
+  const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 5 + (bossW ? 20 : 0) : 0, pay ? 2 + (bossW ? 5 : 0) : 0), r = grant(xp, gold);
   runXp += xp; runCoins += gold + r.bonus; runBars += r.bars; runBoxes += r.boxes; eventWave(xp);
   waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp, bars: r.bars, boxes: r.boxes };
 }
@@ -514,11 +514,13 @@ function zombiesOver() {
   else $('postBoard').innerHTML = row('WAVE REACHED', wave) + row('KILLS', kills) + row('BOSSES DOWN', bossKills) + row('BEST RUN', `wave ${best.wave} · ${best.kills} kills`)
     + (auth ? '' : row('TOP PLAYERS', sign));
   if (co) { coopRank(); if (typeof frPostButtons === 'function') frPostButtons(); } else zRankRow();
-  missionEnd(false); dailyPlayed(); funnelEnd();
+  missionEnd(false); achEnd(false); dailyPlayed(); funnelEnd();
+  const mx = missionXpTake(); if (mx) { const r = grant(mx, 0); runXp += mx; runBars += r.bars; runBoxes += r.boxes; }
   $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), barTile(runBars), boxTile(runBoxes), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}${unlockRow()}`
-    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + missionsRow() + dailyRow();
+    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + achRow() + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');
+  setTimeout(lvlShow, 700); // any levels this run reached
   setTimeout(cgMidgame, 1500); // CrazyGames midgame ad
   unlockMouse();
 }
