@@ -78,6 +78,15 @@ async function resolve(r) {
   }
 }
 
+// the server wouldn't take this save: back to its copy, yours is kept aside
+function refused(r) {
+  try { localStorage.setItem('voxelstrike-profile-refused', JSON.stringify(prof)); } catch {}
+  applySave(r.save || { prof: {}, name: myName });
+  sync.rev = r.rev | 0; sync.dirty = false; saveSync(); setState('saved');
+  netToast("That save didn't add up, so you're back on your last good one");
+  if (!r.save) markDirty();
+}
+
 async function push(keepalive = false) {
   if (!auth || busy) return;
   busy = true;
@@ -86,6 +95,7 @@ async function push(keepalive = false) {
     const r = await api('PUT', '/save', { base: sync.rev, save: snapshot() }, keepalive);
     if (r.status === 401) { signedOut(); return; }
     if (r.status === 409) { busy = false; await resolve(r); return; }
+    if (r.status === 422 && r.refused) { refused(r); return; }
     if (r.status !== 200) throw 0;
     sync.rev = r.rev;
     if (changes === sent) sync.dirty = false;
@@ -165,6 +175,7 @@ async function signedIn(r, fresh) {
   sync = { user: acctKey(auth), rev: 0, dirty: false };
   if (auth.cg) cgLook();
   if (typeof checkPrizes === 'function') setTimeout(() => checkPrizes(true), 1500); // last week's board prizes
+  if (r.refused) { refused({ save: r.save, rev: r.rev }); return; }
   if (fresh || !r.save) { sync.rev = r.rev; saveSync(); if (!r.save) await push(); else setState('saved'); return; }
   // the bigger save wins, unless this device belonged to another account
   if (otherAccount || progress(r.save.prof) >= progress(prof)) { applySave(r.save); sync.rev = r.rev; saveSync(); setState('saved'); }

@@ -18,11 +18,12 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
   under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
   `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `keyboards.mjs`, `arsenal.mjs`, `skins.mjs`, `sides.mjs`, `mythics.mjs`, `crystal.mjs`, `titanium.mjs`, `welcome.mjs`, `treasure.mjs`, `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
-  keeps your score and `node test/band.mjs` checks the level bands for matchmaking (both run the server's code directly, no servers or browser); `node test/measure-bots.mjs ladder` measures bot hit rates per
-  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards, `test/zboard.mjs` for the zombie board, `test/prizes.mjs` for the weekly prizes, `test/coop.mjs` for co-op zombie waves, `test/coopback.mjs` for coming back to a co-op run after a reload) also need the local dev server described in the server README; run
+  keeps your score, `node test/band.mjs` checks the level bands for matchmaking and `node test/audit.mjs` checks the save check's rules (all three run the server's code directly, no servers or browser); `node test/measure-bots.mjs ladder` measures bot hit rates per
+  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards, `test/zboard.mjs` for the zombie board, `test/prizes.mjs` for the weekly prizes, `test/coop.mjs` for co-op zombie waves, `test/coopback.mjs` for coming back to a co-op run after a reload, `test/saves.mjs` for the save check) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
 - `node ../voxel-strike-server/scripts/check-tables.mjs` must pass after changing any number the server also uses (weapon stats,
   match rules, rewards, armor, gear, map sizes/pads, zombie wave sizes and timing): the server keeps its own copy in `tables.js`.
+  After changing a price or an unlock level, run `node ../voxel-strike-server/scripts/make-prices.mjs` too (the save check's `prices.js`).
 
 ## Shipping
 
@@ -53,7 +54,8 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
   `stats_week` and `stats_guns`; `GET /stats/<id>` (a player card) and `GET /boards`
   (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`; a new player's first seven are the welcome week, each after a game that day), daily missions (`js/missions.js`) and weekly events (`js/events.js`) are client-side, in `prof.daily`, `prof.missions` and `prof.event`.
 - **Account** (`js/profile.js`, synced by `js/cloud.js`): level, coins, owned guns and stars, loadout, armor, boots and hats in
-  `prof`, saved to localStorage and to the server when signed in. At the top level XP makes titanium bars instead (`prof.bars`, one per `BAR_XP`),
+  `prof`, saved to localStorage and to the server when signed in. The server checks each save against its last copy (`audit.js`
+  there: XP and worth may only grow as fast as play allows) and the game goes back to the server's copy when one is refused. At the top level XP makes titanium bars instead (`prof.bars`, one per `BAR_XP`),
   which craft the pieces that have `bars`. Zombie-wave shop coins are separate from account coins.
 - **Maps** (`js/maps/*.js`) register with `startMap`, build meshes plus collision `solids` (`addBlock`/`addSlab`/`addSolid` in
   `world.js`) and `cover` (what stops bullets). Decorative detail goes through `detail()` so the low graphics setting can hide it.

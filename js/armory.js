@@ -615,7 +615,7 @@ function hskClick(d) {
   if (d.hsko) { hskOpen = hskShow = !hskOpen; hskSel = null; sfx('ui'); return; }
   const id = d.hsk;
   if (id && !prof.skins?.[id]) { hskSel = id; sfx('ui'); return; } // not yours yet: just a look
-  prof.hatSkin = { ...prof.hatSkin }; if (id) prof.hatSkin[B.id] = id; else delete prof.hatSkin[B.id];
+  prof.hatSkin = { ...prof.hatSkin, [B.id]: id || '' }; // '' = you picked the hat's own look
   hskSel = null; saveProf(); sfx('equip');
 }
 function renderGearAct() {
@@ -632,17 +632,19 @@ function renderGearAct() {
   setAct(actCard(B.name + ' ' + rarTag(B), gearStarTxt(G, B.id), body, pick, btns));
   placeAct();
 }
+// a hat you never picked a skin for takes the one you were wearing
+function skinOver(to) { const s = hatSkin(prof.hatOn); if (s && prof.hatSkin[to] === undefined) prof.hatSkin = { ...prof.hatSkin, [to]: s }; }
 // boots and hats buttons
 function gearClick(d) {
   const G = GEAR[wearCat], B = G?.list[gearSel]; if (!B) return;
   const st = G.stars(B.id), own = prof[G.own] ??= {}, use = prof[G.use] ??= {};
   if (d.gbuy) {
     if (st || prof.coins < B.price || prof.lv < B.unlock || barShort(B)) return;
-    prof.coins -= B.price; if (B.bars) prof.bars -= B.bars; own[B.id] = 1; prof[G.on] = B.id; unhide(wearCat); sfx('buy');
+    prof.coins -= B.price; if (B.bars) prof.bars -= B.bars; own[B.id] = 1; if (G.look) skinOver(B.id); prof[G.on] = B.id; unhide(wearCat); sfx('buy');
   } else if (d.gup) {
     if (!st || st >= 3 || prof.coins < gearUpg(G, B)) return;
     prof.coins -= gearUpg(G, B); own[B.id] = st + 1; delete use[B.id]; sfx('upgrade');
-  } else if (d.gwear) { prof[G.on] = B.id; unhide(wearCat); sfx('equip'); }
+  } else if (d.gwear) { if (G.look) skinOver(B.id); prof[G.on] = B.id; unhide(wearCat); sfx('equip'); }
   else if (d.goff) { prof[G.on] = ''; armBare = true; sfx('equip'); }
   else if (d.gu) {
     const u = Math.max(1, Math.min(st, G.using(B.id) + +d.gu));
