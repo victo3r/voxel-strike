@@ -2,8 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Blockslingers (called Voxel Strike until Alpha 13.1, which is still the name of the repos, the save keys and the server) is a browser FPS (three.js 0.160, plain JavaScript, no build step) served by GitHub Pages from `main` at
-https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, friends, online rooms) is a separate repo at
+Blockslingers (called Voxel Strike until Alpha 13.1, which is still the name of the repos, the save keys and the server) is a browser FPS (three.js 0.160, plain JavaScript, no build step) served from `main` by Cloudflare Pages at
+https://blockslingers.com/ (project `blockslingers`, on the user's Cloudflare account). The old GitHub Pages copy at https://victo3r.github.io/voxel-strike/
+builds from `main` too and shows the move popup (`js/moved.js`) until it is taken down, around 2026-12-04. Its server (accounts, cloud saves, friends, online rooms) is a separate repo at
 `../voxel-strike-server` (Cloudflare Worker + Durable Objects + D1 at sync.gemforge.org); its README has the server commands.
 
 ## Running and testing
@@ -29,7 +30,7 @@ https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, frie
 
 - Updates are named Alpha N: a new whole number for one that adds real content, N.1, N.2 for small ones (fixes, a visual
   change). Alpha 10 was v208, the last of the old numbers. The name is also the cache key: set `const V = 'alpha-N'` and the
-  `style.css?v=alpha-N` query in `index.html` on every update. Commit messages end with "Alpha N". Pushing `main` deploys the game.
+  `style.css?v=alpha-N` query in `index.html` on every update. Commit messages end with "Alpha N". Pushing `main` deploys the game (both sites).
 - Server changes need `npx wrangler deploy` in the server repo (Node 26 here; `npx wrangler` runs the repo's own wrangler 4); the user
   runs production deploys themselves.
 

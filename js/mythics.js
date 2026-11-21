@@ -65,7 +65,7 @@ function updateWisps(dt) {
 }
 
 // ---- the Void Lantern: a slow orb that opens a void where it lands. The void pulls in whoever was near when it opened, then bursts
-const VOID_SPD = 20, VOID_LIFE = 2, VOID_T = 1.2, VOID_R = 3.5, VOID_PULL_R = 6, VOID_PULL = 6; // orb speed and flight time, how long it pulls, burst radius, pull reach and speed
+const VOID_SPD = 20, VOID_LIFE = 2, VOID_T = 1.2, VOID_R = 3.5, VOID_PULL_R = 6, VOID_PULL = 10; // orb speed and flight time, how long it pulls, burst radius, pull reach and speed
 const orbs = [], voids = [], orbGeo = new THREE.BoxGeometry(.24, .24, .24), ORB_MAT = new THREE.MeshBasicMaterial({ color: 0x1c0b30 }), ORB_GLOW = bitMat(0x9a5aff, PUFF_TEX), VOID_IN = bitMat(0xc89aff, PUFF_TEX);
 const VOID_HALO = new THREE.SpriteMaterial({ map: PUFF_TEX, color: 0x5a24a8, depthWrite: false, fog: false, opacity: .9 }); // dark, not glowing: it's a hole
 function fireVoid(w, from = null, dir = null, by = null, opts = {}) {

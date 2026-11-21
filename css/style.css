@@ -50,8 +50,8 @@ canvas{width:100vw!important;height:100vh!important;display:block}
 #top{position:absolute;left:0;right:0;top:12px;text-align:center;color:#fff;text-shadow:2px 2px 0 var(--acc-dk)}
 #banner{position:absolute;left:0;right:0;top:30%;text-align:center;font-size:64px;color:#fff;text-shadow:4px 4px 0 var(--acc-dk);opacity:0;transition:opacity .4s;white-space:pre-line}
 #banner small{display:block;font-size:22px;color:#e8e8e8;text-shadow:2px 2px 0 #000}#banner .rvbar{display:block;width:min(300px,70vw);height:16px;margin:10px auto 0;background:rgba(0,0,0,.55);border:3px solid #000;box-shadow:3px 3px 0 rgba(0,0,0,.45)}#banner .rvbar i{display:block;height:100%;background:#8ff0b6}
-#kcard{position:absolute;left:50%;top:calc(30% + 170px);transform:translateX(-50%);display:flex;align-items:flex-start;gap:14px;pointer-events:none;opacity:0;transition:opacity .4s}
-#kcard.show{opacity:1}
+#kcard{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;align-items:flex-start;gap:14px;pointer-events:none;opacity:0;transition:opacity .4s}
+#kcard.show{opacity:1}#hud:has(#kcard.show) #hotbar{visibility:hidden} /* in the hotbar's place, below whoever got you */
 #kcard .ki{position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;gap:2px;width:104px;height:112px;box-sizing:border-box;padding:6px 4px 5px;text-align:center;background:rgba(0,0,0,.45);border:3px solid #555;border-bottom-color:var(--rc);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
 #kcard .ki::after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,var(--rc),transparent 60%);opacity:.25}
 #kcard .ki img{flex:1;min-height:0;width:100%;object-fit:contain}
@@ -605,7 +605,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
   #shop h1{font-size:36px}#binds h1{font-size:28px}#menu p{font-size:14px;margin:3px}#menu #msg{font-size:22px}
   #bindList,.sliders{font-size:13px;gap:3px 6px}#binds button{font-size:12px;padding:3px 6px}#setHead h1{font-size:24px}
   #shop button{font-size:14px;padding:6px}#items{gap:6px;margin:6px}#banner{font-size:36px}
-  #kcard{top:calc(30% + 92px);gap:8px}#kcard .ki{width:72px;height:70px;padding:3px 2px;border-width:2px}#kcard .ki.kg{width:110px}#kcard .kr{gap:5px}#kcard .kw{gap:5px}
+  #kcard{gap:8px}#kcard .ki{width:72px;height:70px;padding:3px 2px;border-width:2px}#kcard .ki.kg{width:110px}#kcard .kr{gap:5px}#kcard .kw{gap:5px}
   #kcard .ki b{font-size:9px}#kcard .ki span{min-height:10px;font-size:8px}#kcard .ks{font-size:9px;padding:1px 6px}
 }
 
@@ -850,7 +850,7 @@ body:not(.touchOnly) .tonly{display:none!important}
 body.touchOnly #feed{top:64px}
 body.touchOnly .vb .bar{width:min(230px,22vw)}body.touchOnly #top{left:calc(22vw + 62px);right:70px;font-size:17px} /* clear of the health bars */
 body.touchOnly #ammo{right:auto;left:50%;bottom:66px;transform:translateX(-50%);text-align:center;font-size:17px}
-body.touchOnly #hotbar{bottom:14px}body.touchOnly #hud:has(#hotbar.aimed) #ammo,body.touchOnly #hud:has(#kcard.show) #ammo{visibility:hidden}
+body.touchOnly #hotbar,body.touchOnly #kcard{bottom:14px}body.touchOnly:has(#kcard.show) #tc>:is(#tStick,.tb){visibility:hidden} /* nothing to press while you're down */body.touchOnly #hud:has(#hotbar.aimed) #ammo,body.touchOnly #hud:has(#kcard.show) #ammo{visibility:hidden}
 body.touchOnly .slot{width:50px;height:38px}body.touchOnly .slot .s{font-size:8px;top:1px;right:2px}body.touchOnly .slot img{width:44px;height:22px}body.touchOnly .slot .c,body.touchOnly .slot .k{display:none}
 body.touchOnly #chat{bottom:auto;top:72px;width:min(300px,36vw);font-size:13px}
 body.touchOnly .kb{display:none!important}
