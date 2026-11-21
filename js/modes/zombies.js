@@ -130,7 +130,7 @@ function riseTick(z, dt) {
 function hitFx(zz, point, head, quiet, w) { // w: what hit it
   if (quiet) { burst(point, 0xff7a1a, 2); return; }
   const big = zz.type === 'brute' || zz.boss;
-  zz.flash = .1; if (zz.type === 'bot') hitBits(w, point, head); else burst(point, 0x3a8a2a, head ? 8 : 4);
+  zz.flash = .1; hitBits(w, point, head);
   hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
 }
 // quiet = burn tick, by = the bot that did it (null = you)
@@ -167,8 +167,8 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
     zz.hitBy = who; zz.hitByT = 2; zz.hitDmg += dmg;
     (zz.helpers ??= new Set()).add(by ? by.rec : youRec); // for assists
   }
-  const big = zz.type === 'brute' || zz.boss;
-  hitFx(zz, point, head, quiet, hw);
+  const big = zz.type === 'brute' || zz.boss, mate = zFrom && net.recOf(zFrom)?.b; // co-op: a teammate's hit shows their gun
+  hitFx(zz, point, head, quiet, mate ? BASE[mate.gun] : hw);
   // hit marker: red kill, gold headshot, white body
   const mine = !by && !zFrom; // a teammate's hit on the host's zombie pays them
   if (mine && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
