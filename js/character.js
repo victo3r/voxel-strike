@@ -36,7 +36,7 @@ const SECRET_OWNER = { evergreen: { id: 3, user: 'victor' } }; // a skin that be
 const SECRETS = {
   creature: { name: "VICTOR'S CREATURE", sk: [204, 192, 128], sleeve: 8, eye: 0xb4ecff, zap: 0xcdf3ff, paint: paintCreature,
     look: { skin: 2, eyes: 'blue', hair: 'long', hairC: 'black', top: 'jacket', topC: 0x3a3630, top2: 0xb3a88e, bottom: 'pants', bottomC: 0x2f2b27, shoes: 'boots', shoeC: 0x2a2119, secret: 'creature' } },
-  evergreen: { name: 'EVERGREEN', sk: [178, 130, 106], eye: 0x3dff6a, halo: false, eyes: [[2, 4, 1], [5, 4, 1]], whites: [[1, 4], [6, 4]], glint: 0xffcc33, star: [0, 3.5, 2], paint: paintEvergreen,
+  evergreen: { name: 'EVERGREEN', sk: [178, 130, 106], eye: 0x3dff6a, halo: false, eyes: [[2, 4, 1], [5, 4, 1]], whites: [[1, 4], [6, 4]], glint: 0xffcc33, star: [0, 3.5, 2], sheen: 0xffd36a, paint: paintEvergreen,
     look: { skin: 2, eyes: 'green', brows: 'none', hair: 'side', hairC: 'dark', top: 'long', topC: 0x19a020, top2: 0xebebeb, bottom: 'pants', bottomC: 0x4d4d4d, shoes: 'plain', shoeC: 0x3d3d3d, secret: 'evergreen' } },
 };
 
@@ -405,7 +405,7 @@ function secretFx(ch, S) {
   }
   for (const [x, y] of S.whites ?? []) { const e = new THREE.Mesh(EYE_GEO, M.white); e.position.set((x - 3.5) * U, (3.5 - y) * U, 4.02 * U); e.scale.set(U, U, 1); eyes.add(e); } // lit whites
   ch.head.add(eyes);
-  ch.zap = S.glint ? { parts: ch.parts, eyes, U, mats: M, star: S.star, gl: null, t: .3 + Math.random(), tick: glintTick, off: glintOff }
+  ch.zap = S.glint ? { parts: ch.parts, eyes, U, mats: M, star: S.star, gl: null, t: .3 + Math.random(), root: ch.g, sheen: S.sheen ? sheenOn(ch, S.sheen) : null, tick: glintTick, off: glintOff }
     : { parts: ch.parts, eyes, U, mat: M.zap, segs: null, t: .4 + Math.random() * 2, on: 0, k: 0, site: [], tick: zapTick, off: zapOff };
 }
 // part, height and ring size in skin pixels (0: along the forehead seam)
@@ -444,7 +444,7 @@ function zapTick(z, dt) {
   z.site = Math.random() < .35 ? [pick(), pick()] : [pick()];
 }
 // gold glints: a little star twinkles somewhere on the body now and then
-const GLINT_N = 3, GLINT_PARTS = [0, 0, 0, 2, 2, 2, 3, 4, 5, 6]; // head, body, arms, legs
+const GLINT_N = 5, GLINT_PARTS = [0, 0, 0, 2, 2, 2, 3, 4, 5, 6]; // head, body, arms, legs
 const GLINT_FACES = ['fbrlt', '', 'fb', 'fbrt', 'fblt', 'fbr', 'fbl']; // the faces that show on each part
 function glintMake(z) {
   const g = new THREE.Group(), M = z.mats;
@@ -453,7 +453,7 @@ function glintMake(z) {
   g.visible = false; g.userData = { life: 0, L: 1, y: 0 };
   return g;
 }
-const glintOff = z => z.gl?.forEach(g => { g.visible = false; g.userData.life = 0; });
+const glintOff = z => { z.gl?.forEach(g => { g.visible = false; g.userData.life = 0; }); if (z.sheen) z.sheen.uSheenOn.value = 0; };
 function glintAt(z) {
   const g = z.gl.find(g => g.userData.life <= 0); if (!g) return;
   const U = z.U, st = z.star && Math.random() < .25, pi = st ? 2 : GLINT_PARTS[Math.random() * GLINT_PARTS.length | 0], part = z.parts[pi];
@@ -468,16 +468,50 @@ function glintAt(z) {
 }
 function glintTick(z, dt) {
   z.gl ??= Array.from({ length: GLINT_N }, () => glintMake(z));
-  if ((z.t -= dt) <= 0) { z.t = .3 + Math.random() * 1.4; glintAt(z); }
+  if ((z.t -= dt) <= 0) { z.t = .12 + Math.random() * .45; glintAt(z); }
   const U = z.U;
   for (const g of z.gl) {
     const d = g.userData; if (d.life <= 0) continue;
     if ((d.life -= dt) <= 0) { g.visible = false; continue; }
-    const k = 1 - d.life / d.L, s = Math.sin(Math.PI * k), r = 3.6 * s * U, t = .4 * U, [a, b, c, core, glow] = g.children;
+    const k = 1 - d.life / d.L, s = Math.sin(Math.PI * k), r = 4.4 * s * U, t = .45 * U, [a, b, c, core, glow] = g.children;
     a.scale.set(r, t, t); b.scale.set(t, r, t); c.scale.set(t, t, r);
-    core.scale.setScalar(1.1 * s * U); glow.scale.setScalar(5 * s * U);
+    core.scale.setScalar(1.2 * s * U); glow.scale.setScalar(6 * s * U);
     g.rotation.y += dt * 2.5; g.position.y = d.y + k * U;
   }
+  if (z.sheen) sheenTick(z, dt);
+}
+// a glint that sweeps over the whole skin now and then, like polished titanium, a little different every time
+function sheenOn(ch, color) {
+  const u = { uSheenOn: { value: 0 }, uSheenC: { value: new THREE.Color(color) }, uSheenDir: { value: new THREE.Vector3(0, 1, 0) }, uSheenAt: { value: 0 },
+    uSheenW: { value: 2 }, uSheen2: { value: new THREE.Vector2() }, uRootInv: { value: new THREE.Matrix4() }, uPx: { value: 1 / ch.U }, base: new THREE.Color(color) };
+  ch.mats[0].onBeforeCompile = s => {
+    const { base, ...uni } = u; Object.assign(s.uniforms, uni);
+    s.vertexShader = 'uniform mat4 uRootInv;\nuniform float uPx;\nvarying vec3 vSheenP;\n' + s.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\n  vSheenP = (uRootInv * modelMatrix * vec4(transformed, 1.)).xyz * uPx;'); // where on the body, in skin pixels
+    s.fragmentShader = 'uniform float uSheenOn, uSheenAt, uSheenW;\nuniform vec3 uSheenC, uSheenDir;\nuniform vec2 uSheen2;\nvarying vec3 vSheenP;\n' + s.fragmentShader.replace('#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\n  float shD = dot(vSheenP, uSheenDir) - uSheenAt;\n'
+      + '  totalEmissiveRadiance += uSheenC * uSheenOn * (smoothstep(uSheenW, 0., abs(shD)) + uSheen2.y * smoothstep(uSheenW * .4, 0., abs(shD - uSheen2.x)));');
+  };
+  return u;
+}
+const SHEEN_WHITE = new THREE.Color(0xfff6e0);
+// a new pass: its own slant, way, speed, width, strength and tint, and sometimes a thin second line behind it
+function sheenPass(z) {
+  const s = z.sheen, p = z.sp, d = s.uSheenDir.value.set((Math.random() - .5) * 1.6, 1, (Math.random() - .5) * .8).normalize();
+  const down = Math.random() < .75, w = 1.4 + Math.random() * 1.4, off = Math.random() < .55 ? 3 + Math.random() * 3 : 0;
+  const mid = 17 * d.y, half = 17 * d.y + 8 * Math.abs(d.x) + 4 * Math.abs(d.z) + w + off + 1; // the body's reach along the line's way
+  [p.from, p.to] = down ? [mid + half, mid - half] : [mid - half, mid + half];
+  p.t = 0; p.dur = .55 + Math.random() * .6; p.amp = .38 + Math.random() * .27;
+  s.uSheenW.value = w; s.uSheen2.value.set(off * (down ? 1 : -1), off ? .4 + Math.random() * .25 : 0);
+  s.uSheenC.value.copy(s.base).lerp(SHEEN_WHITE, Math.random() * .5);
+}
+function sheenTick(z, dt) {
+  const s = z.sheen, p = z.sp ??= { wait: .3 + Math.random() * 1.5 };
+  s.uRootInv.value.copy(z.root.matrixWorld).invert();
+  if (p.wait > 0) { s.uSheenOn.value = 0; if ((p.wait -= dt) <= 0) sheenPass(z); return; }
+  const k = (p.t += dt) / p.dur;
+  if (k >= 1) { p.wait = 1.2 + Math.random() * 2.6; s.uSheenOn.value = 0; return; }
+  s.uSheenAt.value = p.from + (p.to - p.from) * k; s.uSheenOn.value = p.amp * Math.min(1, Math.sin(Math.PI * k) * 3); // eases in and out at the edges
 }
 // yours in the lobby, and everyone else's in a match
 function secretTick(dt) {
