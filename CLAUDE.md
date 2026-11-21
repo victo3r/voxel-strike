@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Voxel Strike is a browser FPS (three.js 0.160, plain JavaScript, no build step) served by GitHub Pages from `main` at
+Blockslingers (called Voxel Strike until Alpha 13.1, which is still the name of the repos, the save keys and the server) is a browser FPS (three.js 0.160, plain JavaScript, no build step) served by GitHub Pages from `main` at
 https://victo3r.github.io/voxel-strike/. Its server (accounts, cloud saves, friends, online rooms) is a separate repo at
 `../voxel-strike-server` (Cloudflare Worker + Durable Objects + D1 at sync.gemforge.org); its README has the server commands.
 

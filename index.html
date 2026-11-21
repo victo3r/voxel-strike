@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Voxel Strike</title>
+<html><head><meta charset="utf-8"><title>Blockslingers</title>
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!-- added to a phone's home screen it opens fullscreen, like an app -->
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Voxel Strike"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
-<link id="css" rel="stylesheet" href="css/style.css?v=alpha-13">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blockslingers"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
+<link id="css" rel="stylesheet" href="css/style.css?v=alpha-13.1">
 </head>
 <body class="boot">
 <!-- phones and tablets: this note while held upright -->
-<div id="noTouch"><div><h1 class="logo">VOXEL STRIKE</h1><p>Turn your phone sideways to play!</p></div></div>
+<div id="noTouch"><div><h1 class="logo">BLOCKSLINGERS</h1><p>Turn your phone sideways to play!</p></div></div>
 <script>if (!matchMedia('(any-pointer: fine)').matches && matchMedia('(any-pointer: coarse)').matches) document.body.classList.add('touchOnly');</script>
 <div id="hud">
   <div id="hit"></div><canvas id="scope"></canvas><canvas id="holo"></canvas><canvas id="cross"></canvas><svg id="rl" viewBox="0 0 80 80" style="display:none"><circle class="bg" cx="40" cy="40" r="34"/><circle id="rlFg" cx="40" cy="40" r="34"/></svg><div id="hm"><i></i><i></i><i></i><i></i></div>
@@ -166,8 +166,8 @@
         </section>
         <section data-t="privacy" id="privacy">
           <h2>PRIVACY</h2>
-          <p class="when">Last updated November 8, 2026</p>
-          <p>Here's what Voxel Strike keeps about you, why, and how to get rid of it. We keep as little as we can.</p>
+          <p class="when">Last updated November 20, 2026</p>
+          <p>Here's what Blockslingers keeps about you, why, and how to get rid of it. We keep as little as we can.</p>
           <h2>IF YOU JUST PLAY</h2>
           <p>Your level, coins, guns, look and settings are saved in your browser on your own device. On CrazyGames they're also saved to your CrazyGames account through their system.</p>
           <p>When you play online without an account, the game sends your in-game name and a random ID so the match can tell players apart. That ID isn't linked to you.</p>
@@ -186,7 +186,7 @@
           <h2>HOW LONG WE KEEP IT</h2>
           <p>Account data stays until you ask us to delete it. Reports are kept as long as we need them. Anything saved on your device stays until you clear your browser data.</p>
           <h2>DELETING YOUR DATA</h2>
-          <p>Email <b>victorbrooks413@gmail.com</b> with your username or player ID (your # number on the FRIENDS page) and we'll delete your account and everything tied to it. You can also ask us what we have about you.</p>
+          <p>Email <b>hello@borealpixelgames.com</b> with your username or player ID (your # number on the FRIENDS page) and we'll delete your account and everything tied to it. You can also ask us what we have about you.</p>
           <h2>KIDS AND PARENTS</h2>
           <p>Lots of our players are young, so we don't collect anything we don't need. If you're a parent and want your kid's account removed, just send us an email.</p>
           <h2>CHANGES</h2>
@@ -216,7 +216,7 @@
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
 // the update's name: change it (and the css ?v=) on every update to skip old caches
-const V = 'alpha-13';
+const V = 'alpha-13.1';
 const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js', 'js/held.js',
   'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/mythics.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/achievements.js', 'js/levelup.js', 'js/funnel.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/coop.js', 'js/friends.js', 'js/boards.js', 'js/touch.js'];
 // crazy.js first, so CrazyGames saves are in place before the rest

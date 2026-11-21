@@ -766,7 +766,7 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 #noTouch{display:none}
 @media (orientation:portrait){body.touchOnly #noTouch{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2f5a3a,#14241a);font-family:monospace;color:#fff;text-align:center;text-shadow:3px 3px 0 #000}
 body.touchOnly #noTouch>div{padding:24px 20px;border:4px solid #fff;background:rgba(0,0,0,.35);box-shadow:6px 6px 0 rgba(0,0,0,.45);max-width:420px}
-body.touchOnly #noTouch h1{margin:0 0 14px;font-size:clamp(30px,9vw,46px);--ls:2px}
+body.touchOnly #noTouch h1{margin:0 0 14px;font-size:clamp(24px,7.4vw,42px);--ls:2px}
 body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:1.4}}
 /* game title */
 .logo{font-family:monospace;font-weight:bold;background:linear-gradient(135deg,#fff 0%,#fff 38%,#a8f2b8 50%,#3fd45e 66%,#1fae3f 100%) 0 0/calc(1ch + var(--ls)) 100% repeat-x;--ls:3px;letter-spacing:var(--ls);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;
