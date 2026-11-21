@@ -12,6 +12,45 @@ const TI_MATS = [0xeaf4ff, 0x8fc4ff, 0xffffff].map(c => bitMat(c, SHARD_TEX)), C
 // bits off a wand: [mats, count, speed, spread, life, size, gravity]
 const WAND_BITS = { ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0],
   crystal: [CRYSTAL_MATS, 3, 4, 2.6, .4, .08, 5], ti: [TI_MATS, 5, 4, 3, .25, .07, 4], wisp: [WISP_MATS, 6, 1.6, 1.4, .5, .08, -2], void: [VOID_MATS, 8, 2.2, 2, .4, .1, 0], aurora: [AURORA_MATS, 8, 3, 2.2, .45, .1, -1] };
+// what flies off a bot or player when hit, by what hit them: lasers break off pixels in their own colour, guns throw sparks
+const PIXEL_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 4; const g = c.getContext('2d');
+  g.fillStyle = '#bbb'; g.fillRect(0, 0, 4, 4); g.fillStyle = '#fff'; g.fillRect(0, 0, 3, 1); g.fillRect(0, 0, 1, 3);
+  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
+})();
+const solid = m => { const n = m.clone(); n.blending = THREE.NormalBlending; return n; }; // solid so they show against a bright sky
+const solidMats = (cs, map) => cs.map(c => solid(bitMat(c, map)));
+const pixelMats = {}, _hitW = new THREE.Color(0xffffff), _hitP = new THREE.Vector3();
+const laserMats = cs => pixelMats[cs] ??= [].concat(cs).flatMap(c => [solid(bitMat(c, PIXEL_TEX)), solid(bitMat(new THREE.Color(c).lerp(_hitW, .5).getHex(), PIXEL_TEX)), bitMat(c, PIXEL_TEX)]);
+const AURORA_COLS = [0x4dff9a, 0x3dffd6, 0x4ab8ff, 0xa07bff];
+const laserOf = w => w.lance ? (w.charge ? AURORA_COLS : w.lance) : w.laser ? 0xd47bff : w.chain ? 0xa07bff : w.beam && !w.frost && !w.water ? (w.shock ? 0x4fc8ff : 0xff9a2a) : 0;
+// [mats, spread, life, size, gravity]
+const HIT_BITS = {}, hitBitsOf = k => HIT_BITS[k] ??= k === 'spark' ? [solidMats([0xffd23a, 0xfff6c8, 0xff9a1a], SHARD_TEX), 4.5, .25, .09, 6]
+  : k === 'steel' ? [solidMats([0xffffff, 0xd8e2ec, 0xffe9a0], SHARD_TEX), 3.2, .3, .11, 4]
+  : k === 'star' ? [solidMats([0xffe27a, 0xffffff, 0xffc84a], STAR_MATS[0].map), 2.6, .4, .12, 0]
+  : [WAND_BITS[k][0].map(solid), WAND_BITS[k][3], WAND_BITS[k][4], WAND_BITS[k][5] * 1.35, WAND_BITS[k][6]];
+const hitKind = w => {
+  if (!w) return 'spark';
+  if (w.frost || w.water) return 'ice';
+  const k = FLASH_FX[w.id]?.bits; if (WAND_BITS[k]) return k;
+  if (w.burn || w.flame || w.flare || w.grenade || w.rocket && !w.gust) return 'ember';
+  if (w.gust || w.id === 'windsaber') return 'wind';
+  if (w.saw) return 'ti';
+  if (w.starFx || w.stun || w.melee && w.knock) return 'star';
+  return w.melee ? 'steel' : 'spark';
+};
+function hitBits(w, at, head) {
+  const n = (head ? 11 : 7) >> (w?.beam ? 1 : 0), cs = w && laserOf(w); // a beam hits every frame
+  if (cs) { // pixels drifting up off them, as if the beam is taking them apart
+    const mats = laserMats(cs);
+    for (let i = fxN(n + 2); i > 0; i--) fxBit(mats[Math.random() * mats.length | 0], scene, _hitP.set(at.x + (Math.random() - .5) * .5, at.y + (Math.random() - .5) * .6, at.z + (Math.random() - .5) * .5),
+      .06 + Math.random() * .05, new THREE.Vector3((Math.random() - .5) * .8, .4 + Math.random() * .8, (Math.random() - .5) * .8), .5 + Math.random() * .4, -1.5);
+    return;
+  }
+  const [mats, spread, life, sz, g] = hitBitsOf(hitKind(w));
+  for (let i = fxN(n); i > 0; i--)
+    fxBit(mats[Math.random() * mats.length | 0], scene, at, sz * (.7 + Math.random() * .6), new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread), life * (.8 + Math.random() * .4), g);
+}
 function wandBits(k, at, sc, n, spread, size = 1) {
   const [mats, , , , life, sz, g] = WAND_BITS[k];
   for (let i = fxN(n); i > 0; i--)

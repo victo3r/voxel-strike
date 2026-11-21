@@ -84,7 +84,7 @@ net = (() => {
     return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load, lv: prof.lv }; // lv: how grown a gun that grows is
   }
   function hello(rejoin = null) {
-    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookSent(), gear: myGear(), lv: prof.lv }; // a drawn skin follows in its own message
+    const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookSent(), gear: myGear(), lv: prof.lv, boost: boostSet() > 0 }; // a drawn skin follows in its own message
     if (auth?.token) m.token = auth.token; else m.guest = guestId;
     if (rejoin) m.rejoin = rejoin;
     send(m);
@@ -414,7 +414,7 @@ net = (() => {
     }
     if (m.kind === 'thorns') stingFx(b.g.position);
     if (m.by === pid) return; // your own hits already showed
-    hitFx(b, pt ? pt.clone() : b.g.position.clone().setY(b.g.position.y + 1.1), !!m.head, m.kind === 'burn');
+    hitFx(b, pt ? pt.clone() : b.g.position.clone().setY(b.g.position.y + 1.1), !!m.head, m.kind === 'burn', BASE[gi(m.gun)]);
   }
   // slows, the Ancient Wand's ice and the Stun Wand's stun land on whoever the server says got hit (long: the Arcane set)
   function wandFx(o, m) {

@@ -18,13 +18,15 @@ builds from `main` too and shows the move popup (`js/moved.js`) until it is take
   play at another server (the tests use `?srv=http://127.0.0.1:9` to force offline).
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
   under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
-  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `keyboards.mjs`, `arsenal.mjs`, `skins.mjs`, `sides.mjs`, `mythics.mjs`, `crystal.mjs`, `titanium.mjs`, `welcome.mjs`, `treasure.mjs`, `achievements.mjs`, `levelup.mjs`, `views.mjs` (first and third person show the same moves), `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
+  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `keyboards.mjs`, `arsenal.mjs`, `skins.mjs`, `sides.mjs`, `mythics.mjs`, `crystal.mjs`, `titanium.mjs`, `welcome.mjs`, `treasure.mjs`, `achievements.mjs`, `levelup.mjs`, `views.mjs` (first and third person show the same moves), `hits.mjs` (what flies off a hit, by gun), `flying.mjs` (the server's flying check against the real movement on every map), `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
   keeps your score, `node test/band.mjs` checks the level bands for matchmaking and `node test/audit.mjs` checks the save check's rules (all three run the server's code directly, no servers or browser); `node test/measure-bots.mjs ladder` measures bot hit rates per
   skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards, `test/zboard.mjs` for the zombie board, `test/prizes.mjs` for the weekly prizes, `test/coop.mjs` for co-op zombie waves, `test/coopback.mjs` for coming back to a co-op run after a reload, `test/saves.mjs` for the save check, `test/hostback.mjs` for a host coming back to its bots) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
 - `node ../voxel-strike-server/scripts/check-tables.mjs` must pass after changing any number the server also uses (weapon stats,
-  match rules, rewards, armor, gear, map sizes/pads, zombie wave sizes and timing): the server keeps its own copy in `tables.js`.
-  After changing a price or an unlock level, run `node ../voxel-strike-server/scripts/make-prices.mjs` too (the save check's `prices.js`).
+  match rules, rewards, armor, gear, jumps and launches, map sizes/pads, zombie wave sizes and timing): the server keeps its own copy in `tables.js`.
+  After changing a price, an unlock level or a reward (level-ups, achievements, daily gifts, event prizes, chest loot), run
+  `node ../voxel-strike-server/scripts/make-prices.mjs` too (the save check's `prices.js`); after changing a map or the collision code,
+  `node ../voxel-strike-server/scripts/make-heights.mjs` (the flying check's `heights.js`, where you can stand; needs the 8010 server).
 
 ## Shipping
 
@@ -56,7 +58,9 @@ builds from `main` too and shows the move popup (`js/moved.js`) until it is take
   (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`; a new player's first seven are the welcome week, each after a game that day), daily missions (`js/missions.js`), weekly events (`js/events.js`) and achievements (`js/achievements.js`: one-time goals claimed in the lobby for XP and more) are client-side, in `prof.daily`, `prof.missions`, `prof.event` and `prof.ach`.
 - **Account** (`js/profile.js`, synced by `js/cloud.js`): level, coins, owned guns and stars, loadout, armor, boots and hats in
   `prof`, saved to localStorage and to the server when signed in. The server checks each save against its last copy (`audit.js`
-  there: XP and worth may only grow as fast as play allows) and the game goes back to the server's copy when one is refused. At the top level XP makes titanium bars instead (`prof.bars`, one per `BAR_XP`),
+  there: XP and worth may only grow by what the server saw earned, written to its ledger as matches, waves and prizes pay, plus
+  rewards it can price and a daily allowance for offline play) and the game goes back to the server's copy when one is refused.
+  So anything new that pays XP or coins online has to pay the ledger too, before the save that holds it. At the top level XP makes titanium bars instead (`prof.bars`, one per `BAR_XP`),
   which craft the pieces that have `bars`. Zombie-wave shop coins are separate from account coins.
 - **Maps** (`js/maps/*.js`) register with `startMap`, build meshes plus collision `solids` (`addBlock`/`addSlab`/`addSolid` in
   `world.js`) and `cover` (what stops bullets). Decorative detail goes through `detail()` so the low graphics setting can hide it.

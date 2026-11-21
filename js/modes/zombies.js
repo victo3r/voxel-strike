@@ -127,10 +127,10 @@ function riseTick(z, dt) {
   if (!z.rise) z.g.rotation.x = 0;
 }
 // hit effects on a zombie or bot
-function hitFx(zz, point, head, quiet) {
+function hitFx(zz, point, head, quiet, w) { // w: what hit it
   if (quiet) { burst(point, 0xff7a1a, 2); return; }
   const big = zz.type === 'brute' || zz.boss;
-  zz.flash = .1; burst(point, zz.type === 'bot' ? 0xb01818 : 0x3a8a2a, head ? 8 : 4);
+  zz.flash = .1; if (zz.type === 'bot') hitBits(w, point, head); else burst(point, 0x3a8a2a, head ? 8 : 4);
   hurtSfx(zz, head ? 'hurtHead' : 'hurt', zz.g.position, { rate: zz.type === 'bot' ? 1 : big ? .6 : .78 });
 }
 // quiet = burn tick, by = the bot that did it (null = you)
@@ -138,17 +138,18 @@ function hitFx(zz, point, head, quiet) {
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0, thru = 0) {
   if (!Number.isFinite(dmg)) return; // a bad number would make it unkillable
   if (zz.type === 'bot' && friendly(by, zz)) return; // no friendly fire
+  const hw = by ? BASE[by.gun] : BASE[cur];
   if (net.pvp && (zz.remote || zz.pid)) { // online the server owns its health
-    if (!quiet) { hitFx(zz, point, head, false); if (!by) hitMarker(head ? 'head' : 'body'); }
+    if (!quiet) { hitFx(zz, point, head, false, hw); if (!by) hitMarker(head ? 'head' : 'body'); }
     net.claim(zz, { kind, head, point, gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
   }
   if (zz.type === 'bot' && !quiet) [dmg, head] = gearHit(zz.rec.fx, dmg, head); // hats can block or soften headshots
   // damage boots, the Sharpshooter perk, the Arcane set on wands (not thorns)
-  const fx = by ? by.rec?.fx : youFx(), wand = !quiet && (by ? BASE[by.gun] : BASE[cur])?.wand;
+  const fx = by ? by.rec?.fx : youFx(), wand = !quiet && hw?.wand;
   if (kind !== 8 && !zFrom) dmg *= 1 + (fx?.dmg ?? 0) + (by ? 0 : perk.dmg * .1) + (wand ? fx?.wand ?? 0 : 0);
   if (zz.mirror) { // co-op: the host's zombie, so the hit goes to the host
-    if (!quiet) { hitFx(zz, point, head, false); hitMarker(head ? 'head' : 'body'); }
+    if (!quiet) { hitFx(zz, point, head, false, hw); hitMarker(head ? 'head' : 'body'); }
     net.zHit(zz, { d: dmg, h: head ? 1 : 0, q: quiet ? 1 : 0 });
     return;
   }
@@ -167,7 +168,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
     (zz.helpers ??= new Set()).add(by ? by.rec : youRec); // for assists
   }
   const big = zz.type === 'brute' || zz.boss;
-  hitFx(zz, point, head, quiet);
+  hitFx(zz, point, head, quiet, hw);
   // hit marker: red kill, gold headshot, white body
   const mine = !by && !zFrom; // a teammate's hit on the host's zombie pays them
   if (mine && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
@@ -270,8 +271,9 @@ function saveBest(gone) {
 // the zombie board (signed in): the server times each run from its first wave; leaving counts the same as dying
 let zRun = 0, zRank = null, zLive = false;
 function zRunNew() { zRun++; zRank = null; }
-function zRunStart() { zLive = !!auth; if (auth) api('POST', '/zombies/start').catch(() => {}); }
+function zRunStart() { zLive = !!auth; if (auth) api('POST', '/zombies/start', { boost: gameBoost }).catch(() => {}); }
 function zRunWave(keep = false) { if (zLive && auth && wave > 1) api('POST', '/zombies/score', { wave, kills, live: true }, keep).catch(() => {}); } // the run so far
+function zRunPaid() { if (zLive && auth) api('POST', '/zombies/score', { wave, kills, live: true, clear: true }).catch(() => {}); } // a wave cleared: the server pays it before the save that has it
 function zRunScore() {
   const run = zRun; if (!zLive || !auth || !wave) return;
   zLive = false;
@@ -494,6 +496,7 @@ function wavePay() {
   const pay = wave <= PAY_WAVES, bossW = wave % 5 === 0, [xp, gold] = boostPay(pay ? 5 + (bossW ? 20 : 0) : 0, pay ? 2 + (bossW ? 5 : 0) : 0), r = grant(xp, gold);
   runXp += xp; runCoins += gold + r.bonus; runBars += r.bars; runBoxes += r.boxes; eventWave(xp);
   waveReward = { pay, gold, xp, ups: r.ups, lv: prof.lv, bonus: r.bonus, boost: r.boostUp, bars: r.bars, boxes: r.boxes };
+  if (!net.coop) zRunPaid();
 }
 function waveStartFx() { // hordes and boss waves get a heads up
   const news = { 3: 'RUNNERS!', 5: 'BRUTES!', 7: 'EXPLODERS!', 9: 'SPITTERS!' };

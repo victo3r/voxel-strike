@@ -197,6 +197,7 @@ const starBits = [], STAR_MATS = [0xffe27a, 0xffffff, 0xffc84a].map(color => new
 })() }));
 // effect bits (sparks, puffs, shards, stars) are drawn in batches: one draw call per look and scene instead of one each
 const FX_CAP = 2048, fxLayers = new Map(), _fxV = new THREE.Vector4();
+const fxKey = (map, solid) => solid ? (map.userData.solid ??= {}) : map; // solid bits (hits) get their own layer
 const FX_VS = `attribute float size; attribute float rot; attribute vec3 tint; uniform float halfH; varying vec3 vT; varying float vR;
   void main() { vT = tint; vR = rot; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = size * projectionMatrix[1][1] * halfH / -mv.z; }`;
 const FX_FS = `uniform sampler2D map; varying vec3 vT; varying float vR;
@@ -208,15 +209,15 @@ const FX_FS = `uniform sampler2D map; varying vec3 vT; varying float vR;
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }`;
-function fxLayer(sc, map) {
+function fxLayer(sc, map, solid) {
   let byMap = fxLayers.get(sc); if (!byMap) fxLayers.set(sc, byMap = new Map());
-  let L = byMap.get(map); if (L) return L;
+  let L = byMap.get(fxKey(map, solid)); if (L) return L;
   const g = new THREE.BufferGeometry(), at = (k, n) => { const a = new THREE.BufferAttribute(new Float32Array(FX_CAP * n), n).setUsage(THREE.DynamicDrawUsage); g.setAttribute(k, a); return a; };
   L = { pos: at('position', 3), tint: at('tint', 3), size: at('size', 1), rot: at('rot', 1), n: 0, was: 0 };
-  const mat = new THREE.ShaderMaterial({ uniforms: { map: { value: map }, halfH: { value: 300 } }, vertexShader: FX_VS, fragmentShader: FX_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const mat = new THREE.ShaderMaterial({ uniforms: { map: { value: map }, halfH: { value: 300 } }, vertexShader: FX_VS, fragmentShader: FX_FS, transparent: true, depthWrite: false, blending: solid ? THREE.NormalBlending : THREE.AdditiveBlending });
   L.m = new THREE.Points(g, mat); L.m.frustumCulled = false; L.m.userData.shared = true;
   L.m.onBeforeRender = r => { r.getCurrentViewport(_fxV); mat.uniforms.halfH.value = _fxV.w / 2; };
-  sc.add(L.m); byMap.set(map, L);
+  sc.add(L.m); byMap.set(fxKey(map, solid), L);
   return L;
 }
 // a bit flying off from `at` (mat: a SpriteMaterial for its colour and look, k: its size)
@@ -224,7 +225,7 @@ function fxBit(mat, sc, at, k, v, life, g) { starBits.push({ p: at.clone(), mat,
 function fxDraw() {
   for (const byMap of fxLayers.values()) for (const L of byMap.values()) L.n = 0;
   for (const b of starBits) {
-    const L = fxLayer(b.sc, b.mat.map); if (L.n >= FX_CAP) continue;
+    const L = fxLayer(b.sc, b.mat.map, b.mat.blending === THREE.NormalBlending); if (L.n >= FX_CAP) continue;
     const i = L.n++, c = b.mat.color;
     L.pos.setXYZ(i, b.p.x, b.p.y, b.p.z); L.tint.setXYZ(i, c.r, c.g, c.b);
     L.size.setX(i, b.k * Math.max(0, Math.min(1, b.life * 4))); L.rot.setX(i, b.rot);
