@@ -77,7 +77,7 @@ setInterval(() => {
   renderDaily();
   const s = dailyNow(), key = dayKey() + (s.wait ? ' wait' : '');
   if (navigator.webdriver || dailyShown === key || !inLobby || document.body.classList.contains('boot') || s.claimed || needStarter()) return;
-  if ([$('binds'), $('armory'), $('boost'), $('pick')].some(el => el && getComputedStyle(el).display !== 'none')) return; // not over another screen
+  if ([$('binds'), $('armory'), $('boost'), $('pick'), $('moved')].some(el => el && getComputedStyle(el).display !== 'none')) return; // not over another screen
   dailyShown = key; openDaily();
 }, 1000);
 renderDaily();
