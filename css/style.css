@@ -848,7 +848,7 @@ body:not(.touchOnly) .tonly{display:none!important}
 #tTop .tb{position:static;width:42px;height:42px;font-size:20px}
 /* phones: the HUD makes room for the controls */
 body.touchOnly #feed{top:64px}
-body.touchOnly .vb .bar{width:min(230px,22vw)}body.touchOnly #top{left:calc(22vw + 62px);right:70px;font-size:17px} /* clear of the health bars */
+body.touchOnly{--vbw:min(230px,22vw)}body.touchOnly .vb .bar{width:var(--vbw)}body.touchOnly #top{left:calc(var(--vbw) + 62px);right:calc(var(--vbw) + 62px);font-size:17px}body.touchOnly #bossbar{top:58px} /* the top line in the middle, as far in from both sides as the health bars reach; the boss bar under its two rows */
 body.touchOnly #ammo{right:auto;left:50%;bottom:66px;transform:translateX(-50%);text-align:center;font-size:17px}
 body.touchOnly #hotbar,body.touchOnly #kcard{bottom:14px}body.touchOnly:has(#kcard.show) #tc>:is(#tStick,.tb){visibility:hidden} /* nothing to press while you're down */body.touchOnly #hud:has(#hotbar.aimed) #ammo,body.touchOnly #hud:has(#kcard.show) #ammo{visibility:hidden}
 body.touchOnly .slot{width:50px;height:38px}body.touchOnly .slot .s{font-size:8px;top:1px;right:2px}body.touchOnly .slot img{width:44px;height:22px}body.touchOnly .slot .c,body.touchOnly .slot .k{display:none}
@@ -901,4 +901,6 @@ body.touchOnly #pickList .mc{padding-bottom:50px}
   body.touchOnly #heroAct{flex-direction:row;transform:none}
   body.touchOnly #lobbyTop>#event{width:clamp(250px,42vmin,340px)}
   body.touchOnly #heroHide,body.touchOnly #heroHide button{width:42px}body.touchOnly #heroHide button{height:42px}body.touchOnly #heroHide img{width:34px;height:34px}
+  body.touchOnly{--vbw:16vw} /* smaller health bars, so the top line fits between them and the buttons */
 }
+@media (orientation:landscape) and (max-height:500px) and (max-width:700px){body.touchOnly #top .clock{font-size:26px}} /* the smallest phones: WAITING FOR PLAYERS stays on one line */

@@ -359,7 +359,7 @@ function readyN() {
 function coopTop() {
   if (zph !== 2 || shopOpen) return null;
   const [ready, all] = readyN();
-  return `NEXT WAVE IN ${Math.max(0, Math.ceil((zphEnd - net.now()) / 1000))}   ·   ${ready}/${all} READY   ·   <span class="pc">${COIN}${coins}</span>`;
+  return topRow(`NEXT WAVE IN ${Math.max(0, Math.ceil((zphEnd - net.now()) / 1000))}`, `${ready}/${all} READY`, `<span class="pc">${COIN}${coins}</span>`);
 }
 // the Tab board and the results: the team and their kills
 function coopTeam() {

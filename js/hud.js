@@ -171,3 +171,5 @@ function vitBar(id, v, max, icon) {
   num.textContent = Math.ceil(Math.max(0, v));
   if (id === 'arm') { fill.style.background = armorFill(); ic.style.color = armorCss(); }
 }
+// a top line from its parts: one row, or two on a phone so it fits in the middle between the health bars and the buttons
+const topRow = (...p) => TOUCH ? `<div>${p.slice(0, p.length >> 1).join('   ·   ')}</div><div>${p.slice(p.length >> 1).join('   ·   ')}</div>` : p.join('   ·   ');

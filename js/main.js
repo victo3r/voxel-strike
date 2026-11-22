@@ -71,6 +71,7 @@ function drawHolo(zoom, col = '255,60,60') {
 }
 drawScope('scope'); drawHolo(2);
 addEventListener('resize', () => { drawScope(scopeKind); drawHolo(holoZoom, holoCol); });
+const zTop = () => topRow(`WAVE ${wave}`, `${toSpawn + zombies.filter(z => !z.dead && z.type !== 'bot').length} LEFT`, `KILLS ${kills}`, `<span class="pc">${COIN}${coins}</span>`); // zombie waves' top line
 function update(dt) {
   if (P.slowT > 0) P.slowT -= dt;
   if (net.coop) coopTick(dt);
@@ -424,7 +425,7 @@ function update(dt) {
   $('arm').classList.toggle('grow', (P.growA = (P.growA || 0) - dt) > 0); $('hp').classList.toggle('grow', (P.growH = (P.growH || 0) - dt) > 0);
   const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
   setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : w.pool ? ammo[cur] : ammo[cur] + ' / ' + spare}`);
-  if (!pvp()) setHTML($('top'), net.coop && coopTop() || `WAVE ${wave}   ·   ${toSpawn + zombies.filter(z => !z.dead && z.type !== 'bot').length} LEFT   ·   KILLS ${kills}   ·   <span class="pc">${COIN}${coins}</span>`);
+  if (!pvp()) setHTML($('top'), net.coop && coopTop() || zTop());
 }
 
 const lanA = { x: 0, z: 0 }, lanV = { x: 0, z: 0 }; // the Void Lantern's swing
