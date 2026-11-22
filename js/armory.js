@@ -261,11 +261,17 @@ function renderAct() {
 function placeAct() {
   placeHide();
   if (!armOpen) return;
-  const h = $('heroAct'), on = inLobby && armPage !== 'wear' && armPage !== 'index' && innerWidth > 700;
+  const h = $('heroAct'), on = inLobby && armPage !== 'wear' && armPage !== 'index' && wideArm();
   h.style.display = on ? 'flex' : 'none';
   $('heroReload').style.display = BASE[armSel]?.inf || BASE[armSel]?.pool ? 'none' : ''; // nothing to reload: melee, wands
-  if (on) { const edge = $('armory').getBoundingClientRect().right; h.style.left = Math.max(edge, heroScreen.x - innerHeight * .2 - 50) + 'px'; h.style.top = heroScreen.y + 'px'; }
+  if (!on) return;
+  const edge = zRect($('armory')).right;
+  if (TOUCH && phoneSide.matches) { // phones: a row under him, between the list and the card
+    const c = zRect($('armAct')), right = c.width ? c.left : scr.w;
+    h.style.left = Math.max(edge + 6, Math.min(right - 6 - h.offsetWidth, heroScreen.x - h.offsetWidth / 2)) + 'px'; h.style.top = scr.h - 10 - h.offsetHeight + 'px';
+  } else { h.style.left = Math.max(edge, heroScreen.x - scr.h * .2 - 50) + 'px'; h.style.top = heroScreen.y + 'px'; }
 }
+const wideArm = () => TOUCH ? scr.w > scr.h : scr.w > 700; // room for him beside the list
 function renderDetail() {
   const i = armSel, w = BASE[i], u = gunUse(i), rows = w.start ? [] : starTable(i);
   const table = rows.length ? `<div class="sk"><span></span>${[1, 2, 3].map(s => `<b class="h${s === u ? ' on' : ''}">${starRow(s)}</b>`).join('')}` +
@@ -279,7 +285,7 @@ function renderDetail() {
 
 // ---- WEAR page: hiding what you wear (you keep its stats, and kill cards still show it)
 const wearTag = k => 'WEARING' + (hidOn(k) ? ' ' + ico('eyeShut') : '');
-const hideOk = () => inLobby && innerWidth > 700; // he's in view, with the eyes beside him
+const hideOk = () => inLobby && wideArm(); // he's in view, with the eyes beside him
 const hideBtn = k => inLobby && !hideOk() ? `<button data-hide="${k}">${ico(hidOn(k) ? 'eye' : 'eyeShut')} ${hidOn(k) ? 'SHOW' : 'HIDE'}</button>` : '';
 function hideToggle(k) { prof.hide = (prof.hide | 0) ^ HIDE_BIT[k]; saveProf(); sfx('equip'); }
 const HIDE_AT = [['hats', 'hat', 1.78], ['armor', 'armor', 1.1], ['boots', 'boots', .2]]; // [slot, name, height on him]
@@ -293,12 +299,12 @@ function placeHide() {
   const el = $('heroHide'), on = armOpen && hideOk() && armPage === 'wear' && !!el.firstChild;
   el.style.display = on ? 'block' : 'none';
   if (!on) return;
-  const px = (x, y) => (_hideV.set(x, hero.position.y + y, 0).project(lobbyCam), (_hideV.x + 1) / 2 * innerWidth);
-  el.style.left = Math.max($('armory').getBoundingClientRect().right - 44, 2 * px(0, 1.1) - px(.7, 1.1) - 74) + 'px'; // past the cards (the panel fades out), clear of his shoulders
+  const px = (x, y) => (_hideV.set(x, hero.position.y + y, 0).project(lobbyCam), (_hideV.x + 1) / 2 * scr.w);
+  el.style.left = Math.max(zRect($('armory')).right + (TOUCH && phoneSide.matches ? 6 : -44), 2 * px(0, 1.1) - px(.7, 1.1) - 74) + 'px'; // past the cards (the panel fades out), clear of his shoulders
   let last = -1e9;
   for (const btn of el.children) { // each beside what it hides, never on top of each other
     _hideV.set(0, hero.position.y + HIDE_AT.find(([k]) => k === btn.dataset.hide)[2], 0).project(lobbyCam);
-    last = Math.max(last + 62, (1 - _hideV.y) / 2 * innerHeight); btn.style.top = last + 'px';
+    last = Math.max(last + 62, (1 - _hideV.y) / 2 * scr.h); btn.style.top = last + 'px';
   }
 }
 $('heroHide').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; hideToggle(b.dataset.hide); renderArmory(); });

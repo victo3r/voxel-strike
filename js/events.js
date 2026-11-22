@@ -76,3 +76,6 @@ $('event').addEventListener('click', e => { e.stopPropagation(); openEvCard(); }
 $('evCard').addEventListener('click', e => { e.stopPropagation(); if (e.target.id === 'evCard' || e.target.closest('#evX')) $('evCard').style.display = 'none'; });
 setInterval(() => { if (inLobby && !document.hidden) renderEvent(); }, 30000);
 renderEvent();
+// a phone held sideways: the event card goes left under your name, so the right side isn't crowded
+function placeEvent() { const p = TOUCH && phoneSide.matches ? $('lobbyTop') : $('side'); if ($('event').parentElement !== p) p.id === 'side' ? p.prepend($('event')) : p.append($('event')); }
+placeEvent(); phoneSide.addEventListener('change', placeEvent);

@@ -20,7 +20,7 @@ if (TOUCH) {
   try { const t = JSON.parse(localStorage.getItem('voxelstrike-touch')); if (t?.pos && t?.size) lay = { ...lay, ...t }; } catch {}
   const saveLay = () => { try { localStorage.setItem('voxelstrike-touch', JSON.stringify(lay)); } catch {} };
   function layout() {
-    const W = innerWidth, H = innerHeight;
+    const W = scr.w, H = scr.h;
     for (const id in PADS) {
       const s = PADS[id].s * (lay.size[id] || 1), p = lay.pos[id], [x, y] = p ? [p[0] * W, p[1] * H] : PADS[id].at(W, H);
       const cx = Math.max(s / 2, Math.min(W - s / 2, x)), cy = Math.max(s / 2, Math.min(H - s / 2, y));
@@ -69,9 +69,9 @@ if (TOUCH) {
       if (a === 'aim') b.classList.toggle('on', aimOn);
       return;
     }
-    if (e.clientX < innerWidth * .42) { // the stick starts under your thumb
+    if (e.clientX < scr.w * .42) { // the stick starts under your thumb
       drop('stick');
-      const x = Math.max(R + 8, e.clientX), y = Math.min(innerHeight - R - 8, Math.max(R + 8, e.clientY));
+      const x = Math.max(R + 8, e.clientX), y = Math.min(scr.h - R - 8, Math.max(R + 8, e.clientY));
       stick.style.left = x + 'px'; stick.style.top = y + 'px'; stick.classList.add('on');
       own.set(e.pointerId, { a: 'stick', x, y }); moveStick({ x, y }, e.clientX, e.clientY);
     } else { drop('look'); own.set(e.pointerId, { a: 'look', x: e.clientX, y: e.clientY }); lookT = e.timeStamp; }
@@ -113,7 +113,7 @@ if (TOUCH) {
   }
   function editMove(e) {
     if (!drag || e.pointerId !== drag.id) return;
-    lay.pos[sel] = [(e.clientX - drag.dx) / innerWidth, (e.clientY - drag.dy) / innerHeight]; layout();
+    lay.pos[sel] = [(e.clientX - drag.dx) / scr.w, (e.clientY - drag.dy) / scr.h]; layout();
   }
   function editUp(e) { if (drag && e.pointerId === drag.id) { drag = null; saveLay(); } }
   function editTouch(on) {
@@ -130,7 +130,7 @@ if (TOUCH) {
   addEventListener('pointerup', () => touchFull(), { once: true }); // Android: fullscreen from the first tap
   // held upright: pause under the turn-sideways note, and play on once it's sideways again
   addEventListener('resize', () => {
-    if (innerHeight > innerWidth) { if (locked) { unlockMouse(); turnWait = true; } }
+    if (scr.h > scr.w) { if (locked) { unlockMouse(); turnWait = true; } }
     else if (turnWait) { turnWait = false; if (!inLobby && !matchOver && !dead) lockMouse(); }
   });
 }

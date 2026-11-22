@@ -4,7 +4,7 @@ const RL_C = 2 * Math.PI * 34; // reload ring length
 const runMul = w => (mobMul(w) + youFx().spd + perk.spd * .1) * slowMul(P); // run speed: gun, boots and perks, slowed by shocks
 
 // scope and holo sight overlay
-const RPX = () => Math.max(2, Math.round(innerHeight / 240));
+const RPX = () => Math.max(2, Math.round(scr.h / 240));
 let scopeKind = '';
 // zoom in and out sounds
 let zoomedGun = null, zoomSeen = 0;
@@ -19,7 +19,7 @@ function zoomSound(w) {
 }
 function drawScope(kind) {
   scopeKind = kind;
-  const c = $('scope'), px = RPX(), W = Math.ceil(innerWidth / px) | 1, H = Math.ceil(innerHeight / px) | 1;
+  const c = $('scope'), px = RPX(), W = Math.ceil(scr.w / px) | 1, H = Math.ceil(scr.h / px) | 1;
   c.width = W; c.height = H; c.style.setProperty('width', W * px + 'px', 'important'); c.style.setProperty('height', H * px + 'px', 'important');
   const holo = kind === 'holo', R = Math.round(H * (holo ? .45 : .4)); // holo windows are bigger
   const g = c.getContext('2d'), img = g.createImageData(W, H), d = img.data, cx = (W - 1) / 2, cy = (H - 1) / 2;

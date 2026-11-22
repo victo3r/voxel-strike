@@ -8,6 +8,11 @@ const GFX_Q = {
 };
 // phones and tablets: touch controls, and the mouse lock is pretend
 const TOUCH = document.body.classList.contains('touchOnly');
+if (TOUCH) { // no pinch zoom, and the page never stays scrolled (iOS lets you drag it, and can leave it shifted after the keyboard)
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  const unscroll = () => { if ((scrollX || scrollY) && !document.activeElement?.matches('input,textarea')) scrollTo(0, 0); };
+  addEventListener('scroll', unscroll); addEventListener('focusout', () => setTimeout(unscroll, 100));
+}
 let touchLock = false;
 const tStick = { x: 0, y: 0 }; // move stick, -1 to 1
 const gfx = { q: TOUCH ? 'low' : /CrOS/.test(navigator.userAgent) ? 'medium' : 'high', res: 1, fps: false, auto: true }; // auto: turns itself down when the game runs slow
@@ -18,28 +23,41 @@ const renderer = new THREE.WebGLRenderer({ antialias: gfxQ().aa, powerPreference
 const gfxAA = gfxQ().aa; // antialias only changes on reload
 const pixelRatio = () => Math.min(devicePixelRatio, gfxQ().maxRatio) * gfx.res;
 renderer.setPixelRatio(pixelRatio());
-renderer.setSize(innerWidth, innerHeight);
+renderer.domElement.id = 'view';
 document.body.prepend(renderer.domElement);
+// the 3D view's size on screen: every screen sum uses this, not innerWidth (phone browsers can report something else)
+const scr = { get w() { return renderer.domElement.clientWidth || innerWidth; }, get h() { return renderer.domElement.clientHeight || innerHeight; } };
+let scrWas = '';
+function scrFit() { const k = scr.w + 'x' + scr.h; if (k === scrWas) return false; scrWas = k; return true; } // true when it changed
+scrFit(); renderer.setSize(scr.w, scr.h, false);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 scene.fog = new THREE.Fog(0x87ceeb, 35, 120);
-const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 200);
+const camera = new THREE.PerspectiveCamera(75, scr.w / scr.h, 0.05, 200);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 1.1); scene.add(hemi); // each map sets its own lighting
 const sun = new THREE.DirectionalLight(0xffffff, 1.3); sun.position.set(10, 20, 5); scene.add(sun);
 hemi.layers.enableAll(); sun.layers.enableAll(); // lights on every layer, so the glow passes see the same lights (a change re-checks every material)
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('resize', () => { scrFit(); camera.aspect = scr.w / scr.h; camera.updateProjectionMatrix(); renderer.setSize(scr.w, scr.h, false); });
+new ResizeObserver(() => { if (scrFit()) dispatchEvent(new Event('resize')); }).observe(renderer.domElement); // a phone's toolbars can change it without a resize event
 // menus shrink to fit a phone: --z for the big ones, --z2 for the rest (--uw/--uh: 1% of the screen inside them); the lobby shrinks in any small window
 function fitUI() {
-  const st = document.documentElement.style, tall = TOUCH && innerHeight > innerWidth; // a phone held upright fits its width
+  const st = document.documentElement.style, tall = TOUCH && scr.h > scr.w; // a phone held upright fits its width
   [['', 500, 860], ['2', 420, 760]].forEach(([n, h, w]) => {
     if (tall) [h, w] = [w, h];
-    const z = Math.max(.5, Math.min(1, innerHeight / h, innerWidth / w));
-    st.setProperty('--z' + n, z); st.setProperty('--uw' + n, innerWidth / z / 100 + 'px'); st.setProperty('--uh' + n, innerHeight / z / 100 + 'px');
+    const z = Math.max(.5, Math.min(1, scr.h / h, scr.w / w));
+    st.setProperty('--z' + n, z); st.setProperty('--uw' + n, scr.w / z / 100 + 'px'); st.setProperty('--uh' + n, scr.h / z / 100 + 'px');
   });
 }
 fitUI(); addEventListener('resize', fitUI);
+// where a zoomed menu really is: Safari before 26 measured zoomed elements in unzoomed px
+const zoomBug = (() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:0;top:0;width:100px;height:1px;zoom:.5;visibility:hidden'; document.body.append(d); const w = d.getBoundingClientRect().width; d.remove(); return w > 75; })();
+function zRect(el) {
+  const r = el.getBoundingClientRect(); if (!zoomBug) return r;
+  let z = 1; for (let a = el; a; a = a.parentElement) z *= parseFloat(getComputedStyle(a).zoom) || 1;
+  return z === 1 ? r : new DOMRect(r.left * z, r.top * z, r.width * z, r.height * z);
+}
 
 const allTex = []; // so a quality change can update every texture
 // item rarity: name and colour

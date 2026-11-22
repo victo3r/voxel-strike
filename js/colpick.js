@@ -57,10 +57,10 @@ function colorPick(anchor, c, onInput, onDone) {
   if (!cpk.el) cpkBuild();
   [cpk.h, cpk.s, cpk.v] = rgb2hsv(c); cpk.anchor = anchor; cpk.done = onDone;
   cpk.el.style.display = 'flex'; cpkDraw(); $('cpNow').style.background = cpHex(c); $('cpHex').value = cpHex(c).toUpperCase();
-  const a = anchor.getBoundingClientRect(), w = cpk.el.offsetWidth, h = cpk.el.offsetHeight;
+  const a = zRect(anchor), w = cpk.el.offsetWidth, h = cpk.el.offsetHeight;
   let x = a.right + 10, y = a.top + a.height / 2 - h / 2;
-  if (x + w > innerWidth - 8) { x = Math.min(innerWidth - w - 8, a.left); y = a.top - h - 10; if (y < 8) y = a.bottom + 10; }
-  cpk.el.style.left = Math.max(8, x) + 'px'; cpk.el.style.top = Math.max(8, Math.min(innerHeight - h - 8, y)) + 'px';
+  if (x + w > scr.w - 8) { x = Math.min(scr.w - w - 8, a.left); y = a.top - h - 10; if (y < 8) y = a.bottom + 10; }
+  cpk.el.style.left = Math.max(8, x) + 'px'; cpk.el.style.top = Math.max(8, Math.min(scr.h - h - 8, y)) + 'px';
   cpk.on = onInput; sfx('ui');
 }
 function cpkClose(outside = false) {

@@ -1,6 +1,6 @@
 // lobby scene
 const lobbyScene = new THREE.Scene();
-const lobbyCam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, .1, 300);
+const lobbyCam = new THREE.PerspectiveCamera(30, scr.w / scr.h, .1, 300);
 {
   const c = document.createElement('canvas'); c.width = 2; c.height = 256;
   const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
@@ -474,31 +474,33 @@ const REST = .45;
 const ARM_REST = 1.45; // armory view angle
 let wasArm = false;
 let spin = REST, spinV = 0, dragX = null, lastDrag = -1e9, mNX = 0, mNY = 0;
-const heroScreen = { x: innerWidth * .7, y: innerHeight / 2 };
+const heroScreen = { x: scr.w * .7, y: scr.h / 2 };
 const stage = $('stage');
 stage.addEventListener('pointerdown', e => { dragX = e.clientX; spinV = 0; stage.setPointerCapture(e.pointerId); });
 const endDrag = () => { if (dragX !== null) { dragX = null; lastDrag = performance.now(); } };
 stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
 addEventListener('pointermove', e => {
   if (!inLobby) return;
-  mNX = Math.max(-1, Math.min(1, (e.clientX - heroScreen.x) / (innerWidth * .4)));
-  mNY = Math.max(-1, Math.min(1, (heroScreen.y - e.clientY) / (innerHeight * .4)));
+  mNX = Math.max(-1, Math.min(1, (e.clientX - heroScreen.x) / (scr.w * .4)));
+  mNY = Math.max(-1, Math.min(1, (heroScreen.y - e.clientY) / (scr.h * .4)));
   if (dragX !== null) { const d = (e.clientX - dragX) * .012; spin += d; spinV = d * 30; dragX = e.clientX; }
 });
 
 // keep the character centered in the stage area
+const phoneSide = matchMedia('(orientation:landscape) and (max-height:500px)'); // a phone held sideways (the armory goes list, him, card)
 let frameCur = null;
 const _fc = new THREE.Vector3(), _fs = new THREE.Vector3();
 function frameLobby(dt = 0) {
-  const W = innerWidth, H = innerHeight, r = stage.getBoundingClientRect();
+  const W = scr.w, H = scr.h, r = stage.getBoundingClientRect();
   let left = r.left, sw = r.width || W, top = r.top, sh = r.height || H;
   if (TOUCH && H > W && !$('lobby').classList.contains('cust')) { // a phone held upright: between the menus above and below
-    const ui = !armOpen && $('lobbyUI').style.display !== 'none', t = ui ? $('side').getBoundingClientRect().bottom : top;
-    const b = armOpen ? $('armory').getBoundingClientRect().top : ui ? Math.min($('lobbyArm').getBoundingClientRect().top, $('boostBtn').getBoundingClientRect().top || H) : r.bottom;
+    const ui = !armOpen && $('lobbyUI').style.display !== 'none', t = ui ? zRect($('side')).bottom : top;
+    const b = armOpen ? zRect($('armory')).top : ui ? Math.min(zRect($('lobbyArm')).top, zRect($('boostBtn')).top || H) : r.bottom;
     if (b - t > 60) { top = t; sh = b - t; }
-  } else if (armOpen && W > 700) {
-    const a = $('armory').getBoundingClientRect().right - 40; if (a > left) { sw = r.right - a; left = a; }
-    const c = $('armAct').getBoundingClientRect(); if (c.width) sw = Math.max(sw * .5, sw - c.width * .55);
+  } else if (armOpen && (W > 700 || TOUCH && W > H)) {
+    const ph = TOUCH && phoneSide.matches, a = zRect($('armory')).right - (ph ? 0 : 40); if (a > left) { sw = r.right - a; left = a; }
+    const c = zRect($('armAct'));
+    if (c.width) sw = ph ? Math.max(sw * .4, c.left + c.width * .2 - left) : Math.max(sw * .5, sw - c.width * .55); // phones: between the list and the card
   }
   const tan = Math.tan(THREE.MathUtils.degToRad(lobbyCam.fov / 2));
   const visH = Math.max(3.6 / (sh / H * .9), 2.2 / (sw / W * .9) / (W / H));

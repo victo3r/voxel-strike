@@ -278,7 +278,7 @@ addEventListener('mouseup', e => keys['Mouse' + e.button] = false);
 addEventListener('contextmenu', e => e.preventDefault());
 // lock the mouse, asking for raw input to avoid camera snaps
 function lockMouse() {
-  if (TOUCH) { touchFull(true); turnWait = innerHeight > innerWidth; if (!turnWait) setTouchLock(true); return; } // held upright: wait for it to turn
+  if (TOUCH) { touchFull(true); turnWait = scr.h > scr.w; if (!turnWait) setTouchLock(true); return; } // held upright: wait for it to turn
   const el = renderer.domElement;
   clearTimeout(relockT); relockT = 0;
   let p;

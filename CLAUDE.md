@@ -62,6 +62,7 @@ builds from `main` too and shows the move popup (`js/moved.js`) until it is take
   rewards it can price and a daily allowance for offline play) and the game goes back to the server's copy when one is refused.
   So anything new that pays XP or coins online has to pay the ledger too, before the save that holds it. At the top level XP makes titanium bars instead (`prof.bars`, one per `BAR_XP`),
   which craft the pieces that have `bars`. Zombie-wave shop coins are separate from account coins.
+- **Screen sums.** Anything placed on screen uses `scr` (core.js: the 3D view's own size), never `innerWidth`/`innerHeight`, and a zoomed menu's rect comes from `zRect(el)` (phone menus are zoomed, and Safari before 26 measured them unzoomed); iPhone browsers disagree with both.
 - **Maps** (`js/maps/*.js`) register with `startMap`, build meshes plus collision `solids` (`addBlock`/`addSlab`/`addSolid` in
   `world.js`) and `cover` (what stops bullets). Decorative detail goes through `detail()` so the low graphics setting can hide it.
 - **Voxel models.** Guns (`GUN_MODELS` in weapons.js), armor, boots and hats are pixel boxes turned into geometry by `voxelGeos`,

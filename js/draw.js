@@ -165,7 +165,7 @@ const drawMsg = t => { $('drawMsg').textContent = t; };
 
 // on the sheet
 const sheetXY = e => {
-  const r = $('drawSheet').getBoundingClientRect(), { K, W, H, blocks } = dr.view;
+  const r = zRect($('drawSheet')), { K, W, H, blocks } = dr.view;
   const cx = (e.clientX - r.left) / r.width * W, cy = (e.clientY - r.top) / r.height * H;
   const b = blocks.find(([, , w, h, ox, oy]) => cx >= ox && cy >= oy && cx < ox + w * K && cy < oy + h * K);
   return b ? [b[0] + Math.floor((cx - b[4]) / K), b[1] + Math.floor((cy - b[5]) / K)] : [-1, -1];

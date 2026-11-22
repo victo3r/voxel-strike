@@ -376,7 +376,7 @@ function applyView() {
 }
 // apply graphics settings
 function applyGfx() {
-  renderer.setPixelRatio(pixelRatio()); renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(pixelRatio()); renderer.setSize(scr.w, scr.h, false);
   const an = Math.min(gfxQ().aniso, renderer.capabilities.getMaxAnisotropy());
   for (const t of allTex) if (t.anisotropy !== an) { t.anisotropy = an; t.needsUpdate = true; }
   for (const o of detailObjs) o.visible = gfxQ().detail;
