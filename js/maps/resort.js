@@ -3,8 +3,7 @@ startMap('resort', {
   env: { sky: 0x8fd4ff, fog: 0xc4e8ff, fogNear: 50, fogFar: 160, hemiSky: 0xffffff, hemiGround: 0xd9c38e, hemi: 1.05, sunColor: 0xfff0d8, sun: 1.4, sunDir: [14, 22, 9] },
   pads: [[24, -22], [26, 4], [-18, 14], [-18, -14], [0, 30], [2, -30], [-33.5, -3], [12, 14]], // one pad is inside the hotel
   crates: [], // crates don't suit a resort
-});
-{
+}, () => {
 const M = MAPS.resort, RA = M.half, rnd = seeded(777);
 const G = 200;
 const LX = 29, LZ = -31; // the lighthouse
@@ -1030,4 +1029,4 @@ M.tick = dt => {
   foam.material[0].opacity = .55 + Math.sin(t * .7 + 1.2) * .25;
   lampHalo.material.opacity = .55 + Math.sin(t * 2) * .1;
 };
-}
+});

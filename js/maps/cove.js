@@ -3,8 +3,7 @@ startMap('cove', {
   env: { sky: 0x93c7ea, fog: 0xd2e2e8, fogNear: 45, fogFar: 150, hemiSky: 0xfff2e0, hemiGround: 0x7f8d84, hemi: 1.05, sunColor: 0xffdfb0, sun: 1.35, sunDir: [-22, 15, 9] },
   pads: [[-1, -26, 0], [1, -5, 0], [21, -31, 6.3], [-11.5, 28.4, 4.05], [-29, -6, 3.15], [29, 6, 3.6]],
   crates: [[-6.2, -13.6, 1], [-5, -12.9, 0], [4.6, -14.2, 0], [5.8, -13.5, 0], [-7.6, 2.6, 0], [-7.9, 3.9, 1], [14.4, -2.4, 0], [15.6, -2.2, 0], [-5, -26.8, 1], [-3.8, -27.6, 0], [3.4, -27.2, 0]],
-});
-{
+}, () => {
 const M = MAPS.cove, CA = M.half, rnd = seeded(1717);
 const N = 72, O = 36, LV = .45, PLAT = 6.3, RIDGE = 3.15, HEAD = 3.6, WATER_Y = -.05, SEA_D = 3; // grid, step height, the three land levels, water
 const ci = x => Math.floor(x + O), inGrid = (i, j) => i >= 0 && j >= 0 && i < N && j < N, at = (i, j) => j * N + i;
@@ -764,4 +763,4 @@ M.tick = dt => {
     for (const [p, s] of G.wings) p.rotation.z = s * flap;
   }
 };
-}
+});

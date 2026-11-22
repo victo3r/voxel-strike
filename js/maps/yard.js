@@ -5,8 +5,7 @@ startMap('yard', {
   // [x, z, tall]
   crates: [[-20, 17, 1], [-11.5, 9, 0], [-7, 10, 0], [1.5, 7.5, 0], [12.5, -10.5, 0], [8.5, 8, 1], [7.5, -1.5, 0], [12.5, -15, 0], [17, 7.5, 0],
     [3, 16.5, 0], [-5, -6.5, 0], [-6.5, -14, 1], [-3, -8, 0], [15, -17.5, 1], [-3, -12.5, 0], [-18, -5.5, 0], [6.5, 17, 0], [-13.5, -4, 1]],
-});
-{
+}, () => {
 const YA = 24; // fence line
 const G = 160;
 addGround(G, lam({ map: tex(g => noise(g, [90, 160, 60], 40), G * 2, G * 2) }));
@@ -117,4 +116,4 @@ for (let tries = 0; yardTufts.length < 300 && tries < 6000; tries++) {
 grassTufts(yardTufts);
 MAPS.yard.tufts = yardTufts.length;
 addSky(seeded(4242), [3, 17, -36], 14, 45, 140, 38, 52);
-}
+});

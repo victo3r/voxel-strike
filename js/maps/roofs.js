@@ -3,8 +3,7 @@ startMap('roofs', {
   env: { sky: 0xf2a878, fog: 0xe7a07c, fogNear: 30, fogFar: 110, hemiSky: 0xffd6b0, hemiGround: 0x5a4660, hemi: 1, sunColor: 0xffb47a, sun: 1.25, sunDir: [-24, 8, 3] },
   pads: [[-12, -11, 6], [9, -9, 3], [-12, 10, 4.5], [0, 14, 0]],
   crates: [[-20, 21.5, 1], [-18.8, 22, 0], [-8, 22.5, 0], [-12, -22.5, 0], [15, -22.5, 1], [16.2, -22.6, 0], [22.6, -15, 0], [22.6, -13.8, 0], [22.5, 12, 1]],
-});
-{
+}, () => {
 const M = MAPS.roofs, RA = M.half, rnd = seeded(5150);
 const G = 140, RING = 31.5; // ground size, the ring road round the fence
 const wall = (rgb, k = 12, lines) => tex(g => { noise(g, rgb, k); if (lines) lines(g); });
@@ -424,4 +423,4 @@ M.ways = CONNS;
 M.top = (x, z) => roofAt(x, z)?.h ?? 0;
 M.land = (x, z) => !!roofAt(x, z) || Math.random() < .35; // spawns: mostly up on the roofs
 M.surfAt = (x, z, y, base, s) => s ? base : 'stone';
-}
+});

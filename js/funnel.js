@@ -13,7 +13,7 @@ function funnel(step) {
 function funnelBoot() {
   funnel('load');
   if (performance.now() > 10000) funnel('slow');
-  if (TOUCH && innerHeight > innerWidth) funnel('tall'); // a phone held upright only sees "turn your phone"
+  if (TOUCH && innerHeight > innerWidth) funnel('tall'); // a phone held upright
   if (fun.d0 && fun.d0 !== dayKey()) { funnel('back'); if (fun.d0 === dayBefore()) funnel('d1'); }
 }
 // seconds actually played

@@ -278,7 +278,7 @@ addEventListener('mouseup', e => keys['Mouse' + e.button] = false);
 addEventListener('contextmenu', e => e.preventDefault());
 // lock the mouse, asking for raw input to avoid camera snaps
 function lockMouse() {
-  if (TOUCH) { touchFull(); setTouchLock(true); return; }
+  if (TOUCH) { touchFull(true); turnWait = innerHeight > innerWidth; if (!turnWait) setTouchLock(true); return; } // held upright: wait for it to turn
   const el = renderer.domElement;
   clearTimeout(relockT); relockT = 0;
   let p;
@@ -288,10 +288,12 @@ function lockMouse() {
 }
 function unlockMouse() { if (TOUCH) setTouchLock(false); else document.exitPointerLock(); }
 function setTouchLock(on) { if (touchLock === on) return; touchLock = on; document.dispatchEvent(new Event('pointerlockchange')); }
-// phones: fullscreen and sideways while you play (CrazyGames does its own)
-function touchFull() {
-  if (cg.on || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
-  document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+// phones: fullscreen from a tap, and turned sideways to play (CrazyGames does its own)
+let fullP = null, turnWait = false;
+function touchFull(turn) {
+  if (cg.on || !document.documentElement.requestFullscreen) return;
+  if (!document.fullscreenElement && !fullP) fullP = document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}).then(() => { fullP = null; });
+  if (turn) Promise.resolve(fullP).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && TOUCH) unlockMouse(); });
 // Chrome refuses to relock right after Esc, so keep retrying for a bit
@@ -368,7 +370,7 @@ document.addEventListener('pointerlockerror', () => {
 });
 
 function showLobby(on) {
-  inLobby = on;
+  inLobby = on; document.body.classList.toggle('inGame', !on);
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
   vm.visible = !on;
@@ -452,7 +454,7 @@ function showPick(on) {
   $('lobbyUI').style.display = on ? 'none' : '';
   if (on) { pickMode = null; pickPriv = false; renderPick(); }
 }
-$('playBtn').addEventListener('click', () => { sfx('ui'); if (needStarter()) return startStarter(); showPick(true); net.probe?.(); }); // your first game skips the picker
+$('playBtn').addEventListener('click', () => { sfx('ui'); if (TOUCH) touchFull(true); if (needStarter()) return startStarter(); showPick(true); net.probe?.(); }); // your first game skips the picker
 $('pickBack').addEventListener('click', () => {
   const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
   if (pickMode === 'private') pickMode = null;

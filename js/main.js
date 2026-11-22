@@ -433,7 +433,7 @@ const clock = new THREE.Clock();
 let bootFrames = 0;
 function bootDone() {
   if (bootFrames < 0 || ++bootFrames < 3) return;
-  bootFrames = -1; cgLoaded(); funnelBoot(); // tell CrazyGames loading is done
+  bootFrames = -1; cgLoaded(); funnelBoot(); soundsLater(); // loaded: tell CrazyGames, then make the rest of the sounds
   document.body.classList.replace('boot', 'booting');
   setTimeout(() => document.body.classList.remove('booting'), 600);
 }

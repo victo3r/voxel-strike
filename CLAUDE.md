@@ -31,7 +31,7 @@ builds from `main` too and shows the move popup (`js/moved.js`) until it is take
 ## Shipping
 
 - Updates are named Alpha N: a new whole number for one that adds real content, N.1, N.2 for small ones (fixes, a visual
-  change). Alpha 10 was v208, the last of the old numbers. The name is also the cache key: set `const V = 'alpha-N'` and the
+  change). Alpha 10 was v208, the last of the old numbers. The name is also the cache key: set `const GAME_V = 'alpha-N'` and the
   `style.css?v=alpha-N` query in `index.html` on every update. Commit messages end with "Alpha N". Pushing `main` deploys the game (both sites).
 - Server changes need `npx wrangler deploy` in the server repo (Node 26 here; `npx wrangler` runs the repo's own wrangler 4); the user
   runs production deploys themselves.

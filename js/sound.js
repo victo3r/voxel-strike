@@ -18,6 +18,8 @@ function cgHush() { if (hush) hush.gain.value = cgQuiet() ? 0 : 1; }
 function setVolume(v) { volume = v; if (outGain) outGain.gain.value = sfxGain(); try { localStorage.setItem('voxelstrike-vol', v); } catch {} }
 
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// the i-th number rng(seed) gives, without the ones before it
+function rngAt(seed, i) { const s = seed + (i + 1) * 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
 function audio() {
   if (!ac) {
     ac = new AudioContext();
@@ -41,9 +43,14 @@ addEventListener('pointerdown', audio); addEventListener('keydown', audio); addE
 
 // building blocks for the sounds below
 function kit(c, seed) {
-  const r = rng(seed), out = c.destination;
-  const nb = c.createBuffer(1, SR * 2, SR), nd = nb.getChannelData(0);
-  for (let i = 0; i < nd.length; i++) nd[i] = r() * 2 - 1;
+  const r = rng(seed + SR * 2 * 0x6D2B79F5 | 0), out = c.destination; // where rng(seed) would be after drawing the noise
+  // two seconds of noise, filled only where a hiss reads it
+  let nb = null, nd = null;
+  const noise = (i0, i1) => {
+    if (!nb) { nb = c.createBuffer(1, SR * 2, SR); nd = nb.getChannelData(0); }
+    for (let i = Math.max(0, i0), e = Math.min(nd.length, i1); i < e; i++) nd[i] = rngAt(seed, i) * 2 - 1;
+    return nb;
+  };
   function env(node, t, a, d, v) {
     const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + d);
     node.connect(g).connect(out);
@@ -64,9 +71,10 @@ function kit(c, seed) {
       env(n, t, a, d, v); o.start(t); o.stop(t + a + d + .02);
     },
     hiss({ t = 0, a = .001, d = .1, v = .5, ft = 'lowpass', f = 2000, f2 = f, q = 1, sweep = a + d }) {
-      const n = c.createBufferSource(); n.buffer = nb;
+      const n = c.createBufferSource(), from = r() * 1.5;
+      n.buffer = noise(Math.floor(from * SR) - 128, Math.ceil((from + a + d + .02) * SR) + 128);
       env(n.connect(filt(ft, f, f2, q, t, sweep)), t, a, d, v);
-      n.start(t, r() * 1.5); n.stop(t + a + d + .02);
+      n.start(t, from); n.stop(t + a + d + .02);
     },
     // metal ring
     ring({ f, t = 0, d = .3, v = .5, ratios = [1, 2.76, 5.4, 8.93] }) {
@@ -962,21 +970,43 @@ const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
 // close-up sounds get less echo
 const CLOSE = /^(r_|zin_|zout_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$)/;
-// render every sound at load
-const soundsReady = Promise.all(Object.entries(SOUNDS).map(async ([name, [len, v, build]], i) => {
-  const c = new OfflineAudioContext(1, Math.ceil(SR * len), SR);
-  build(kit(c, 1000 + i));
-  const buf = await c.startRendering(), d = buf.getChannelData(0);
-  let peak = 0; for (let k = 0; k < d.length; k++) peak = Math.max(peak, Math.abs(d[k]));
-  if (peak > 0) for (let k = 0; k < d.length; k++) d[k] /= peak;
-  BUF[name] = { buf, v, echo: CLOSE.test(name) ? .2 : 1 };
-}));
-soundsReady.catch(e => console.warn('sound setup failed', e));
+// each sound is made once, the first time it's needed or after the lobby is up
+const SOUND_I = Object.fromEntries(Object.keys(SOUNDS).map((k, i) => [k, i])), making = {};
+let soundQ = null, soundsDone;
+const soundsReady = new Promise(res => soundsDone = res);
+function makeSound(name) {
+  if (BUF[name] || making[name] || !SOUNDS[name]) return making[name];
+  const [len, v, build] = SOUNDS[name], c = new OfflineAudioContext(1, Math.ceil(SR * len), SR);
+  build(kit(c, 1000 + SOUND_I[name]));
+  return making[name] = c.startRendering().then(buf => {
+    const d = buf.getChannelData(0);
+    let peak = 0; for (let k = 0; k < d.length; k++) peak = Math.max(peak, Math.abs(d[k]));
+    if (peak > 0) for (let k = 0; k < d.length; k++) d[k] /= peak;
+    BUF[name] = { buf, v, echo: CLOSE.test(name) ? .2 : 1 };
+  }).catch(e => console.warn('sound setup failed', name, e));
+}
+const soundNow = name => BUF[name] || void makeSound(name);
+// once the lobby is up: all the rest, a few at a time, what a first game needs first
+function soundsLater() {
+  if (soundQ) return;
+  const mine = new Set(Object.values(prof.loadout || {}));
+  const rank = n => n === 'ui' ? 0 : /^(step_|land_|hurt|die$|armorHit$|kill$|pick|equip$|dry$|swing$|slash$)/.test(n) || mine.has(n.replace(/^(r_|zin_|zout_)/, '')) ? 1 : 2;
+  soundQ = Object.keys(SOUNDS).sort((a, b) => rank(a) - rank(b));
+  const step = () => {
+    if (!inLobby) return setTimeout(step, 250); // a match only makes what it plays (hitches otherwise)
+    const t0 = performance.now();
+    while (soundQ.length && performance.now() - t0 < 8) makeSound(soundQ.shift());
+    if (soundQ.length) setTimeout(step, 16); else Promise.all(Object.values(making)).then(soundsDone);
+  };
+  step();
+}
 
 // play a sound, optionally out in the world at a position
-function sfx(name, { at = null, v = 1, rate = 1, far = 60 } = {}) {
+function sfx(name, o = {}) {
+  const { at = null, v = 1, rate = 1, far = 60 } = o;
   if (self.event) tapN++; // played by a click or key handler
-  if (!ac || ac.state !== 'running' || !BUF[name]) return null;
+  if (!BUF[name]) { const t = performance.now(); if (!o.late) makeSound(name)?.then(() => performance.now() - t < 150 && sfx(name, { ...o, late: true })); return null; } // not made yet: play it if that's quick
+  if (!ac || ac.state !== 'running') return null;
   let gain = BUF[name].v * v, pan = 0, cut = 20000, send = .1;
   if (at) {
     const dx = at.x - camera.position.x, dz = at.z - camera.position.z, dy = (at.y || 0) + 1 - camera.position.y;
@@ -1088,21 +1118,21 @@ function soundTick(dt, live) {
   // frost wand: crackling ice
   frostHeld = live || inLobby ? frostHeld - dt : 0;
   const fzOn = frostHeld > 0;
-  if (fzOn && !frostGain && BUF.iceLoop) {
+  if (fzOn && !frostGain && soundNow('iceLoop')) {
     frostGain = ac.createGain(); frostGain.gain.value = 0;
     const ice = ac.createBufferSource(); ice.buffer = BUF.iceLoop.buf; ice.loop = true;
     ice.connect(frostGain).connect(bus); ice.start();
   }
-  if (fzOn !== frostOn) { frostOn = fzOn; sfx(fzOn ? 'frostStart' : 'frostEnd'); frostGain?.gain.setTargetAtTime(fzOn ? BUF.iceLoop.v : 0, t, fzOn ? .03 : .06); }
+  if (fzOn !== frostOn && (frostGain || !fzOn)) { frostOn = fzOn; sfx(fzOn ? 'frostStart' : 'frostEnd'); frostGain?.gain.setTargetAtTime(fzOn ? BUF.iceLoop.v : 0, t, fzOn ? .03 : .06); } // waits for the loop if it isn't made yet
   // tempest coil: a buzzing storm
   stormHeld = live || inLobby ? stormHeld - dt : 0;
   const stOn = stormHeld > 0;
-  if (stOn && !stormGain && BUF.stormLoop) {
+  if (stOn && !stormGain && soundNow('stormLoop')) {
     stormGain = ac.createGain(); stormGain.gain.value = 0;
     const st = ac.createBufferSource(); st.buffer = BUF.stormLoop.buf; st.loop = true;
     st.connect(stormGain).connect(bus); st.start();
   }
-  if (stOn !== stormOn) { stormOn = stOn; sfx(stOn ? 'stormStart' : 'stormEnd'); stormGain?.gain.setTargetAtTime(stOn ? BUF.stormLoop.v : 0, t, stOn ? .03 : .06); }
+  if (stOn !== stormOn && (stormGain || !stOn)) { stormOn = stOn; sfx(stOn ? 'stormStart' : 'stormEnd'); stormGain?.gain.setTargetAtTime(stOn ? BUF.stormLoop.v : 0, t, stOn ? .03 : .06); }
   // siren shell: rushing water
   waterHeld = live || inLobby ? waterHeld - dt : 0;
   const wOn = waterHeld > 0;

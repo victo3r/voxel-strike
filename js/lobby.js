@@ -491,15 +491,18 @@ let frameCur = null;
 const _fc = new THREE.Vector3(), _fs = new THREE.Vector3();
 function frameLobby(dt = 0) {
   const W = innerWidth, H = innerHeight, r = stage.getBoundingClientRect();
-  let left = r.left, sw = r.width || W;
-  const sh = r.height || H;
-  if (armOpen && W > 700) {
+  let left = r.left, sw = r.width || W, top = r.top, sh = r.height || H;
+  if (TOUCH && H > W && !$('lobby').classList.contains('cust')) { // a phone held upright: between the menus above and below
+    const ui = !armOpen && $('lobbyUI').style.display !== 'none', t = ui ? $('side').getBoundingClientRect().bottom : top;
+    const b = armOpen ? $('armory').getBoundingClientRect().top : ui ? Math.min($('lobbyArm').getBoundingClientRect().top, $('boostBtn').getBoundingClientRect().top || H) : r.bottom;
+    if (b - t > 60) { top = t; sh = b - t; }
+  } else if (armOpen && W > 700) {
     const a = $('armory').getBoundingClientRect().right - 40; if (a > left) { sw = r.right - a; left = a; }
     const c = $('armAct').getBoundingClientRect(); if (c.width) sw = Math.max(sw * .5, sw - c.width * .55);
   }
   const tan = Math.tan(THREE.MathUtils.degToRad(lobbyCam.fov / 2));
   const visH = Math.max(3.6 / (sh / H * .9), 2.2 / (sw / W * .9) / (W / H));
-  const want = { cx: left + sw / 2, cy: r.top + sh * .5, dist: Math.max(5, Math.min(20, visH / 2 / tan)), lx: 0, ly: 1.4, lz: 0 };
+  const want = { cx: left + sw / 2, cy: top + sh * .5, dist: Math.max(5, Math.min(20, visH / 2 / tan)), lx: 0, ly: 1.4, lz: 0 };
   const fb = drawFocus(); // drawing: zoom on the part
   if (fb) { fb.getCenter(_fc); fb.getSize(_fs); want.dist = Math.max(2, Math.max(_fs.y * 3 / (sh / H), _fs.x * 1.7 / (sw / W) / (W / H)) / 2 / tan); want.lx = _fc.x; want.ly = _fc.y; want.lz = _fc.z; }
   if (!frameCur || !dt) frameCur = want;

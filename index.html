@@ -6,10 +6,20 @@
 <!-- added to a phone's home screen it opens fullscreen, like an app -->
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blockslingers"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
-<link id="css" rel="stylesheet" href="css/style.css?v=alpha-13.6">
+<link id="css" rel="stylesheet" href="css/style.css?v=alpha-13.7">
+<script>
+// the update's name: change it (and the css ?v=) on every update to skip old caches
+const GAME_V = 'alpha-13.7';
+// the game files in the order they run, once three.js is in (the module at the end)
+const GAME_FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js', 'js/held.js',
+  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/mythics.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/achievements.js', 'js/levelup.js', 'js/funnel.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/coop.js', 'js/friends.js', 'js/boards.js', 'js/touch.js', 'js/moved.js'];
+// fetch them all now, alongside three.js, instead of after it
+for (const f of ['js/crazy.js', ...GAME_FILES]) { const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = f + '?v=' + GAME_V; document.head.append(l); }
+</script>
+<link rel="modulepreload" href="lib/three.module.js">
 </head>
 <body class="boot">
-<!-- phones and tablets: this note while held upright -->
+<!-- phones and tablets: this note in a match held upright -->
 <div id="noTouch"><div><h1 class="logo">BLOCKSLINGERS</h1><p>Turn your phone sideways to play!</p></div></div>
 <script>if (!matchMedia('(any-pointer: fine)').matches && matchMedia('(any-pointer: coarse)').matches) document.body.classList.add('touchOnly');</script>
 <div id="hud">
@@ -214,19 +224,15 @@
   <button id="next">NEXT WAVE</button>
 </div>
 <script type="module">
-// load three.js as a module, then the game files in order
+// three.js as a module, then the game files in order (GAME_FILES, at the top)
 import * as THREE from './lib/three.module.js'; // three.js r160 (MIT)
 window.THREE = THREE;
-// the update's name: change it (and the css ?v=) on every update to skip old caches
-const V = 'alpha-13.6';
-const FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js', 'js/held.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/mythics.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/achievements.js', 'js/levelup.js', 'js/funnel.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/coop.js', 'js/friends.js', 'js/boards.js', 'js/touch.js', 'js/moved.js'];
 // crazy.js first, so CrazyGames saves are in place before the rest
-await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + V; s.onload = s.onerror = res; document.body.append(s); });
+await new Promise(res => { const s = document.createElement('script'); s.src = 'js/crazy.js?v=' + GAME_V; s.onload = s.onerror = res; document.body.append(s); });
 await (window.cgReady || Promise.resolve());
-for (const src of FILES) {
+for (const src of GAME_FILES) {
   const s = document.createElement('script');
-  s.src = src + '?v=' + V; s.async = false; // keep them in list order
+  s.src = src + '?v=' + GAME_V; s.async = false; // keep them in list order
   document.body.append(s);
 }
 </script>

@@ -535,7 +535,7 @@ function inView(b, t) {
 }
 function enemiesOf(b) {
   const out = [];
-  if (respawnT <= 0 && !friendly(b, YOU_T)) out.push(YOU_T);
+  if (respawnT <= 0 && !friendly(b, YOU_T) && !grace()) out.push(YOU_T);
   for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) out.push(z);
   return out;
 }
@@ -552,7 +552,7 @@ function pickTarget(b) {
   const pos = b.g.position, enemies = enemiesOf(b);
   if (!enemies.length) return null;
   const d = t => Math.hypot(tPos(t).x - pos.x, tPos(t).z - pos.z);
-  const shooter = b.hitBy && b.hitByT > 0 && b.hitBy !== b.tgt && tAlive(b.hitBy) && canSee(b.hitBy) ? b.hitBy : null;
+  const shooter = b.hitBy && b.hitByT > 0 && b.hitBy !== b.tgt && tAlive(b.hitBy) && canSee(b.hitBy) && !(b.hitBy === YOU_T && grace()) ? b.hitBy : null;
   if (b.tgt && tAlive(b.tgt) && b.engaged && b.lostT < LOSE_T) {
     if (shooter && (b.hitDmg >= SWITCH_DMG || b.lostT > 0)) return shooter;
     const dt0 = d(b.tgt), near = enemies.filter(t => t !== b.tgt && d(t) < NEAR_SWITCH && d(t) < dt0 * .5 && inView(b, t) && canSee(t)).sort((a, c) => d(a) - d(c))[0];
@@ -992,6 +992,8 @@ const TIPS = [
   { pc: () => '<b>Most points wins, go get them!</b>', done: t => t.t > 4 },
 ];
 let tip = null;
+// your first game: bots leave you be for 10 s, and until you've moved and looked around
+const grace = () => MR.starter && !net.on && pvp() && (MATCH_T - matchT < 10 || !!tip && tip.i < 2);
 function tipStart() {
   $('tip').classList.remove('on');
   tip = MR.starter && !net.on ? { i: 0, t: 0, moved: 0, turned: 0, x: P.pos.x, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, gun: cur, shown: -1 } : null;

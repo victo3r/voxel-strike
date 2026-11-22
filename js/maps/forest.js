@@ -5,8 +5,7 @@ startMap('forest', {
   crates: [[4.8, 4.2, 0], [5.4, 5.6, 0], [-5.2, -4.4, 1], [-6, 4.4, 0], [5.6, -4.8, 0],
     [16.8, 16.6, 0], [17.2, 15.2, 1], [21.6, 20.8, 0], [15.6, 21, 0], [22.4, 16.4, 0],
     [-21.2, -16.8, 1], [-16.4, -20.8, 0], [-17.8, -21.8, 0], [-21.6, -21.4, 0]],
-});
-{
+}, () => {
 const M = MAPS.forest, FA = M.half, rnd = seeded(4242);
 const G = 140;
 addGround(G, lam({ map: tex(g => {
@@ -303,5 +302,5 @@ M.tick = () => { // every frame
   for (const s of shafts) s.m.material.opacity = .07 + Math.sin(t * .4 + s.x) * .02;
   moon.position.copy(camera.position).addScaledVector(MOON, 150); moonGlow.position.copy(moon.position);
 };
-}
+});
 useMap('yard'); // default map

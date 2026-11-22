@@ -3,8 +3,7 @@ startMap('farm', {
   env: { sky: 0x9ccbe6, fog: 0xd4e2e2, fogNear: 45, fogFar: 140, hemiSky: 0xfff0d2, hemiGround: 0x7a6a3a, hemi: 1.05, sunColor: 0xffd49a, sun: 1.4, sunDir: [-18, 12, 10] },
   pads: [[-3.4, -13, 2.7], [17, 17], [-16.6, 14, 2.9], [-20, -4]],
   crates: [],
-});
-{
+}, () => {
 const M = MAPS.farm, GA = M.half, rnd = seeded(4242);
 const inR = ([x0, x1, z0, z1], x, z, m = 0) => x > x0 - m && x < x1 + m && z > z0 - m && z < z1 + m;
 
@@ -406,4 +405,4 @@ M.tick = dt => {
   swing.rotation.z = Math.sin(t * 1.3) * .12;
   for (const o of chickens) { o.t -= dt; o.head.rotation.x = o.t % 2.4 < .5 ? .9 : 0; if (o.t < 0) { o.t = 2 + Math.random() * 4; o.c.rotation.y += (Math.random() - .5) * 2; } }
 };
-}
+});

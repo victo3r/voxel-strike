@@ -128,6 +128,9 @@ if (TOUCH) {
   $('tSize').addEventListener('change', saveLay);
 
   addEventListener('pointerup', () => touchFull(), { once: true }); // Android: fullscreen from the first tap
-  // held upright: pause under the turn-sideways note
-  addEventListener('resize', () => { if (innerHeight > innerWidth && locked) unlockMouse(); });
+  // held upright: pause under the turn-sideways note, and play on once it's sideways again
+  addEventListener('resize', () => {
+    if (innerHeight > innerWidth) { if (locked) { unlockMouse(); turnWait = true; } }
+    else if (turnWait) { turnWait = false; if (!inLobby && !matchOver && !dead) lockMouse(); }
+  });
 }

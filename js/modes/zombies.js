@@ -193,6 +193,7 @@ function youHitFx(head, armorOnly, silver = armorOnly) {
 }
 // pierce skips armor, by = the bot that shot you
 function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0, thru = 0) {
+  if (by?.type === 'bot' && grace()) return; // stray shots in your first game's first moments
   if (respawnT > 0 || matchOver || !pvp() && dead || P.downed || P.waiting || by && friendly(by, YOU_T)) return; // your own rocket still hurts
   if (net.pvp) { // online the server decides the damage
     net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });

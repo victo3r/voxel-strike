@@ -3,8 +3,7 @@ startMap('graveyard', {
   env: { sky: 0x121828, fog: 0x1a2030, fogNear: 12, fogFar: 58, hemiSky: 0x93a6d6, hemiGround: 0x1c2118, hemi: .8, sunColor: 0xbccbf2, sun: .55, sunDir: [.4, 1, -.6] }, // sun = moon
   pads: [[-13, 12.5], [12.5, 12.5], [-13, -13], [16, -5, -2.7]],
   crates: [],
-});
-{
+}, () => {
 const M = MAPS.graveyard, GA = M.half, rnd = seeded(6661);
 // the chapel, its bell tower, the crypt and its two stairways
 const CH = [-5, 5, -22, -10.05], TX = 0, TZ = -7.45, // stair edges kept off the nav grid's cell centres
@@ -295,4 +294,4 @@ M.tick = dt => {
   if (!gfxQ().detail) return;
   for (const o of mists) { o.x += o.v * dt; if (o.x > GA + 6) o.x = -GA - 6; o.m.position.set(o.x, o.y + Math.sin(t * .3 + o.z) * .08, o.z); }
 };
-}
+});

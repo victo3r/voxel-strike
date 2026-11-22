@@ -767,9 +767,9 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 .cFav,.cZom{display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(0,0,0,.25);border:2px solid var(--line-dim)}.cFav span,.cZom span{font-size:11px;color:var(--muted)}.cFav img{height:30px;image-rendering:pixelated}.cZom b{color:#ffd75e}
 .lr .v small{display:block;font-size:11px;font-weight:normal;color:var(--muted)}
 #postBoard [data-fid],#friends .pn{cursor:pointer}#postBoard [data-fid]:hover,#friends .pn:hover{text-decoration:underline}
-/* phones and tablets: turn sideways */
+/* phones and tablets: turn sideways for a match */
 #noTouch{display:none}
-@media (orientation:portrait){body.touchOnly #noTouch{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2f5a3a,#14241a);font-family:monospace;color:#fff;text-align:center;text-shadow:3px 3px 0 #000}
+@media (orientation:portrait){body.touchOnly.inGame #noTouch{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2f5a3a,#14241a);font-family:monospace;color:#fff;text-align:center;text-shadow:3px 3px 0 #000}
 body.touchOnly #noTouch>div{padding:24px 20px;border:4px solid #fff;background:rgba(0,0,0,.35);box-shadow:6px 6px 0 rgba(0,0,0,.45);max-width:420px}
 body.touchOnly #noTouch h1{margin:0 0 14px;font-size:clamp(24px,7.4vw,42px);--ls:2px}
 body.touchOnly #noTouch p{margin:0;font-size:clamp(16px,4.6vw,20px);line-height:1.4}}
@@ -876,3 +876,21 @@ body.touchOnly #lobbyTop{flex-direction:column;align-items:flex-start;gap:8px;ma
 body.touchOnly #pickList{gap:10px;flex-wrap:nowrap}
 body.touchOnly #pickList :is([data-mode],[data-map]){width:clamp(96px,calc((var(--uw2) * 100 - 90px) / 5),200px);font-size:14px;padding:10px 6px}
 body.touchOnly #pickList .mc{padding-bottom:50px}
+/* phones held upright: the lobby stacks, the character between the menus above and below */
+@media (orientation:portrait){
+  body.touchOnly #lobbyTop{left:12px;top:12px;gap:8px}body.touchOnly #nameRow{width:180px}body.touchOnly #prof .lv .xp{width:120px}
+  body.touchOnly #dailyTmw{flex-wrap:wrap;justify-content:center;width:84px;white-space:normal;text-align:center;row-gap:1px}
+  body.touchOnly #lobbySet{right:12px;top:12px;width:48px}
+  body.touchOnly #coinRow{top:12px;right:68px;gap:8px}
+  body.touchOnly #lobbyCoins{position:absolute;top:calc(100% + 8px);right:-56px;height:auto;min-height:44px;max-width:130px;flex-wrap:wrap;justify-content:flex-end;padding:4px 12px}body.touchOnly #lobbyCoins .tbr{margin-left:0}
+  body.touchOnly #lobbyUI>#side{left:12px;right:12px;top:150px;width:auto;max-width:480px;margin-left:auto}body.touchOnly #misDraw{margin-left:28px}
+  body.touchOnly #lobbyArm{left:12px;bottom:12px}body.touchOnly #playBtn{right:12px;bottom:12px}body.touchOnly #boostBtn{right:12px;bottom:calc(24px + clamp(100px,17vmin,230px))}
+  body.touchOnly #pickList{flex-wrap:wrap}body.touchOnly #pickList :is([data-mode],[data-map]){width:calc((var(--uw2) * 100 - 64px) / 3)}
+  body.touchOnly #setMain{flex-direction:column}body.touchOnly #setTabs{flex-direction:row;flex-wrap:wrap;width:auto;border-right:0;border-bottom:3px solid var(--line-dim);padding:8px}body.touchOnly #binds #setTabs button{flex:1 0 28%;text-align:center;padding:6px 2px;font-size:12px}body.touchOnly #setBody{padding:4px 12px 12px}
+  body.touchOnly :is(#lbBox,#cardBox,#achBox){width:calc(var(--uw2) * 96)}
+  body.touchOnly #armory{top:calc(var(--uh) * 34);width:calc(var(--uw) * 100);-webkit-mask-image:none;mask-image:none;padding:12px 14px 300px;border-top:3px solid var(--line-dim)}
+  body.touchOnly #armBody{flex-direction:column}body.touchOnly #armPages{flex-direction:row;width:auto;align-self:stretch;position:static}body.touchOnly #armory #armPages button{flex:1}body.touchOnly #armMain{width:100%}
+  body.touchOnly #armAct{right:12px;bottom:12px;width:calc(var(--uw) * 100 - 24px)}
+  body.touchOnly #lobby.cust{flex-direction:column}body.touchOnly #lobby.cust #stage{order:-1;flex:none;height:34vh}
+  body.touchOnly :is(#custPanel,#drawPanel){width:calc(var(--uw) * 100);flex:1;-webkit-mask-image:none;mask-image:none;padding:12px 16px}
+}

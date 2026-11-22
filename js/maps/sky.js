@@ -4,8 +4,7 @@ startMap('sky', {
   pads: [[-30, 14, 0], [-17, 1, 0], [24, -9, 3], [35, 2, 3], [0, 3, 1.5], [3, -31, 5], [6, 33, 1], [-38, -30, 3]],
   crates: [[-35, 15, 0], [-25, -5, 1], [22, -14, 0], [37, -3, 1], [4, -34, 0], [8, 37, 0], [41, 30, 1]],
   void: true,
-});
-{
+}, () => {
 const M = MAPS.sky, SA = M.half, rnd = seeded(2077);
 const N = 100, O = 50; // grid size and offset
 const ci = x => Math.floor(x + O), inGrid = (i, j) => i >= 0 && j >= 0 && i < N && j < N, at = (i, j) => j * N + i;
@@ -478,4 +477,4 @@ M.tick = () => {
   for (const w of waters) w.map.offset.set(t * .05, t * .02);
   M.fall.map.offset.set(0, -t * 1.6);
 };
-}
+});

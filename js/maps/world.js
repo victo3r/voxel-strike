@@ -7,9 +7,15 @@ const MAPS = {};
 let MAP = null, A = 24, solids = [], ground = null, crateMeshes = [];
 
 let building = null;
-function startMap(id, def) {
-  building = MAPS[id] = { id, root: new THREE.Group(), solids: [], cover: [], ground: null, ...def };
+function startMap(id, def, build) {
+  building = MAPS[id] = { id, root: new THREE.Group(), solids: [], cover: [], ground: null, ...def, build };
   return building;
+}
+// a map's meshes are made the first time it's played
+function buildMap(m) {
+  if (m.built) return m;
+  const was = building; building = m; m.built = true; m.build?.(); building = was;
+  return m;
 }
 const add = (...objs) => building.root.add(...objs);
 // footstep sound for a material
@@ -380,6 +386,7 @@ function applyGfx() {
 function useMap(id) {
   const m = MAPS[id];
   if (MAP === m) return;
+  buildMap(m);
   if (!m.baked) bakeMap(m);
   if (MAP) scene.remove(MAP.root);
   MAP = m; scene.add(m.root);

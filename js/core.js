@@ -32,8 +32,9 @@ hemi.layers.enableAll(); sun.layers.enableAll(); // lights on every layer, so th
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 // menus shrink to fit a phone: --z for the big ones, --z2 for the rest (--uw/--uh: 1% of the screen inside them); the lobby shrinks in any small window
 function fitUI() {
-  const st = document.documentElement.style;
+  const st = document.documentElement.style, tall = TOUCH && innerHeight > innerWidth; // a phone held upright fits its width
   [['', 500, 860], ['2', 420, 760]].forEach(([n, h, w]) => {
+    if (tall) [h, w] = [w, h];
     const z = Math.max(.5, Math.min(1, innerHeight / h, innerWidth / w));
     st.setProperty('--z' + n, z); st.setProperty('--uw' + n, innerWidth / z / 100 + 'px'); st.setProperty('--uh' + n, innerHeight / z / 100 + 'px');
   });
