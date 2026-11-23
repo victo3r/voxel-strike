@@ -11,6 +11,7 @@ const TRAILS = {
   windsaber: { a: [1, -8], b: [1, -44], band: [.06, 1.04], op: .32, life: .11, inner: .45, cols: [0xeefaff, 0xb8e4ff, 0x8fd0ff], edges: [[1, .85], [.75, .45, .025], [.5, .3, .02], [.25, .2, .02]] },
   tisword: { a: [2, -8], b: [5, -44], band: [.5, 1.03], op: .4, life: .09, inner: 0, cols: [0xdcecff, 0x8fc0ff, 0x4f9dff], edges: [[1, 1, .035]], bits: 'glint' },
   stunwand: { a: [0, -20], b: [0, -33], band: [.3, 1.12], op: .55, life: .1, inner: .15, cols: [0xfff6a0, 0xffd23a, 0xffa020], edge: 0xfffbe0, edges: [[1, 1, .08], [.6, .6, .06]], zap: true, bits: 'sparks' },
+  monarch: { a: [.5, -2], b: [.5, -16.5], band: [.4, 1.06], op: .5, life: .09, inner: .15, cols: [0xffd88a, 0xf9a23c, 0xf28c1e, 0xb8500a], edge: 0xfff4dc, edges: [[1, .6], [.62, .22, .03]], bits: 'fly' },
 };
 for (const T of Object.values(TRAILS)) { T.cols = (T.cols || [0xffffff]).map(c => new THREE.Color(c)); T.edge = new THREE.Color(T.edge ?? 0xffffff); }
 const DROP_MATS = puffMats([0x9ff4ea, 0xe8fffb, 0x4fe0d0]);
@@ -59,6 +60,11 @@ function trailSample(t, g) {
 const _bw = new THREE.Vector3(), _bv = new THREE.Vector3();
 function trailShed(t, p, prev) { // bits off the blade as it slashes (sparks, drops, stars)
   const T = t.T, sc = t.sp.isScene ? t.sp : scene, toW = o => t.sp.isScene ? o : t.sp.localToWorld(o);
+  if (T.bits === 'fly') { // now and then a little monarch flutters off the end of the slash
+    if (t.v.glint || t.s < .46) return; t.v.glint = true; if (Math.random() > .3 * trailBits()) return;
+    flyOff(sc, toW(_bw.lerpVectors(p.i, p.o, .55 + Math.random() * .4)), t.near);
+    return;
+  }
   if (T.bits === 'glint') { // one glint off the edge near the end of the slash
     if (t.v.glint || t.s < .46) return; t.v.glint = true; if (Math.random() > trailBits()) return;
     fxBit(STAR_MATS[1], sc, toW(_bw.lerpVectors(p.i, p.o, .7 + Math.random() * .3)), (.1 + Math.random() * .05) * t.near, new THREE.Vector3(), .22);
@@ -74,6 +80,27 @@ function trailShed(t, p, prev) { // bits off the blade as it slashes (sparks, dr
     _bv.x += (Math.random() - .5) * 1.4; _bv.y += (Math.random() - .3) * 1.4; _bv.z += (Math.random() - .5) * 1.4;
     fxBit(mats[Math.random() * mats.length | 0], sc, _bw, sz * t.near * (.7 + Math.random() * .6), _bv.clone(), life * (.8 + Math.random() * .4), gr);
   }
+}
+// a tiny pixel monarch: its wings in three frames, open to edge on, flapping as it flutters up and away
+const FLY_MATS = (() => {
+  const W = ['.KKK...KKK.', 'KOOOK.KOOOK', 'KOKOOKOOKOK', 'KOOOOKOOOOK', '.KKOOKOOKK.', '..KOOKOOK..', '.KOOKKKOOK.', '.KWOK.KOWK.', '..KK...KK..'], C = { K: '#1d1712', O: '#f28c1e', W: '#f6f1e4' };
+  return [1, .55, .2].map(f => {
+    const c = document.createElement('canvas'); c.width = c.height = 11; const g = c.getContext('2d');
+    for (let y = 0; y < 9; y++) for (let x = 0; x < 11; x++) { const ch = W[y][Math.round(5 + (x - 5) / f)]; if (C[ch]) { g.fillStyle = C[ch]; g.fillRect(x, y + 1, 1, 1); } }
+    const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.SpriteMaterial({ map: t, depthWrite: false, fog: false, blending: THREE.NormalBlending });
+  });
+})();
+function flyTick(b, dt) { // each beat lifts it a little, and it wanders
+  b.ph += dt * 20; const c = Math.abs(Math.cos(b.ph));
+  b.mat = FLY_MATS[c > .7 ? 0 : c > .3 ? 1 : 2];
+  b.v.y += (1.5 + Math.max(0, Math.sin(b.ph)) * 3) * dt;
+  b.v.x += Math.sin(b.ph * .13 + b.seed) * 2.2 * dt; b.v.z += Math.cos(b.ph * .11 + b.seed * 1.7) * 2.2 * dt;
+  b.rot = .3 * Math.sin(b.ph * .09 + b.seed);
+}
+function flyOff(sc, at, near) {
+  const b = fxBit(FLY_MATS[0], sc, at, (.07 + Math.random() * .025) * (near < 1 ? .7 : 1), new THREE.Vector3((Math.random() - .5) * .8, .9, (Math.random() - .5) * .8), 1.5 + Math.random() * .5, 0);
+  Object.assign(b, { tick: flyTick, spin: 0, rot: 0, ph: Math.random() * 6, seed: Math.random() * 6 });
 }
 // the ribbon between two blade positions, smoothed with the ones either side (so a slow frame still draws an arc)
 const trCR = (a, b, c, d, u, out) => { const u2 = u * u, u3 = u2 * u;

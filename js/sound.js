@@ -362,12 +362,13 @@ const SOUNDS = {
     s.tone({ type: 'sawtooth', f: 160, f2: 70, d: .22, v: .3, lp: 700 }); // a growl under the crack
     s.clack({ t: .12, f: 2000, d: .014, v: .5, body: .4 });
   }],
-  apex: [1.05, 1, s => { // a heavy crack with a snarl under it
-    s.hiss({ ft: 'highpass', f: 2600, d: .035, v: 1 });
-    s.hiss({ f: 3600, f2: 130, d: .6, v: .95 });
-    s.tone({ f: 85, f2: 26, d: .55, v: 1 }); s.thud({ d: .06, f: 90, v: .8 });
-    s.tone({ type: 'sawtooth', f: 150, f2: 55, d: .3, v: .34, lp: 650 }); s.tone({ type: 'sawtooth', f: 157, f2: 58, d: .3, v: .22, lp: 650 });
-    s.clack({ t: .13, f: 1900, d: .014, v: .5, body: .4 });
+  apex: [1.4, 1, s => { // a sniper's crack, only bigger: a deeper boom and a longer blast
+    s.hiss({ ft: 'highpass', f: 2800, d: .04, v: 1 });
+    s.hiss({ f: 4200, f2: 100, d: 1, v: 1 });
+    s.tone({ f: 82, f2: 22, d: .8, v: 1 }); s.thud({ f: 58, d: .1, v: .9 });
+    s.tone({ type: 'square', f: 260, f2: 50, d: .24, v: .34, lp: 700 });
+    s.hiss({ ft: 'bandpass', f: 1000, f2: 220, q: .7, d: .38, v: .8 }); // a heavier body under it
+    s.clack({ t: .1, f: 1700, d: .016, v: .45, body: .5 });
   }],
   executioner: [.4, .5, s => {
     s.tone({ type: 'square', f: 2600, f2: 380, d: .16, v: .32, lp: 5000 });
@@ -975,6 +976,38 @@ SOUNDS.splash = [1.1, .8, s => {
 SOUNDS.flick = [.24, .45, s => { s.hiss({ ft: 'bandpass', f: 800, f2: 3800, q: 3.2, a: .025, d: .08, v: 1, sweep: .1 }); s.tone({ type: 'triangle', t: .01, f: 2637, f2: 2600, d: .09, v: .04 }); }];
 SOUNDS.flipSwish = [.22, .3, s => { s.hiss({ ft: 'bandpass', f: 650, f2: 2600, q: 2.6, a: .04, d: .1, v: .9, sweep: .13 }); }];
 SOUNDS.flipShut = [.2, .55, s => { s.clack({ f: 3300, d: .012, v: .8, body: .15 }); s.clack({ t: .03, f: 2600, d: .016, v: 1, body: .35 }); }];
+// the Monarch: a slash with a flutter of wings in it, and the toss and catch of its tricks
+SOUNDS.wingFlick = [.26, .45, s => {
+  s.hiss({ ft: 'bandpass', f: 700, f2: 3600, q: 3, a: .022, d: .085, v: 1, sweep: .1 });
+  for (const t of [.035, .058, .081]) s.hiss({ ft: 'bandpass', f: 1500 + s.r() * 400, q: 1.4, t, a: .004, d: .014, v: .3 });
+  s.tone({ type: 'triangle', t: .012, f: 3136, f2: 3100, d: .1, v: .035 });
+}];
+SOUNDS.flipToss = [.62, .3, s => { for (let i = 0; i < 4; i++) s.hiss({ ft: 'bandpass', f: 600, f2: 1900, q: 2.4, t: .02 + i * .17, a: .03, d: .07, v: .75 - i * .08, sweep: .08 }); }]; // end over end
+SOUNDS.flipCatch = [.2, .5, s => { s.thud({ f: 190, d: .045, v: .6 }); s.hiss({ ft: 'lowpass', f: 1600, d: .03, v: .55 }); s.clack({ t: .008, f: 2500, d: .01, v: .3, body: .3 }); }];
+// the Quasar: a deep thrum and a bright zap, the plasma sizzling out, then its core whirring back up
+SOUNDS.quasar = [1.1, .9, s => {
+  s.tone({ f: 130, f2: 38, d: .32, v: .85 }); s.thud({ f: 70, d: .06, v: .6 });
+  s.tone({ f: 3400, f2: 700, d: .08, v: .28 });
+  s.beam({ f: 560, f2: 290, d: .5, v: .45, wob: 54, lp: .3 }); s.beam({ f: 572, f2: 296, d: .5, v: .35, wob: 47, lp: .3 });
+  s.crunch({ t: .02, a: .01, d: .4, dens: .03, lo: 1200, hi: 7000, v: .35 });
+  s.tone({ type: 'sine', t: .42, f: 240, f2: 1150, a: .25, d: .6, v: .1, glide: .55 });
+}];
+SOUNDS.zin_quasar = [.26, .34, s => { s.hiss({ ft: 'bandpass', f: 900, f2: 2400, q: 2, a: .012, d: .05, v: .3, sweep: .05 }); s.tone({ type: 'sine', f: 520, f2: 1560, t: .01, a: .004, d: .08, v: .16, glide: .07 }); s.ring({ f: 2093, t: .08, d: .12, v: .05 }); }];
+SOUNDS.zout_quasar = [.22, .3, s => { s.tone({ type: 'sine', f: 1500, f2: 480, a: .003, d: .06, v: .14, glide: .05 }); s.hiss({ ft: 'bandpass', f: 2200, f2: 700, q: 2, a: .01, d: .05, v: .28, sweep: .05 }); }];
+SOUNDS.r_quasar = [1.6, .45, s => {
+  s.magOut(.1); s.magIn(.62);
+  s.tone({ type: 'sine', t: .85, f: 180, f2: 900, a: .3, d: .45, v: .2, glide: .4 }); s.ring({ f: 2093, t: 1.32, d: .22, v: .1 }); s.ring({ f: 2637, t: 1.38, d: .2, v: .08 });
+}];
+// the Wildfire: a bigger whump as it lights, crackles as it roars, a soft whoomph where the floor catches, and its fuel can
+SOUNDS.wildStart = [.6, .55, s => { s.thud({ f: 85, d: .14, v: .8 }); s.hiss({ f: 220, f2: 2400, a: .04, d: .4, v: 1, sweep: .16 }); s.tone({ f: 60, f2: 110, a: .05, d: .35, v: .6 }); s.crunch({ t: .05, a: .01, d: .35, dens: .012, lo: 1500, hi: 6500, v: .45 }); }];
+SOUNDS.fireCrackle = [.2, .3, s => { for (let i = 0; i < 3; i++) s.clack({ t: s.r() * .12, f: 1800 + s.r() * 3000, d: .006, v: .25 + s.r() * .3, body: .1 }); }];
+SOUNDS.fireCatch = [.5, .3, s => { s.thud({ f: 110, d: .1, v: .4 }); s.hiss({ ft: 'bandpass', f: 500, f2: 1600, q: 1, a: .04, d: .3, v: .5, sweep: .2 }); s.crunch({ t: .06, a: .02, d: .3, dens: .01, lo: 1200, hi: 5000, v: .3 }); }];
+SOUNDS.r_wildfire = [2.2, .45, s => { s.latch(.15); s.hiss({ ft: 'highpass', f: 2800, t: .3, a: .04, d: .3, v: .45 }); s.thunk(1.15); s.latch(1.7); s.click({ t: 1.92, f: 3400, v: .5 }); s.hiss({ t: 1.96, f: 300, f2: 1500, d: .2, v: .55, sweep: .15 }); s.thud({ t: 1.98, f: 90, d: .08, v: .35 }); }];
+// the Grand Finale: a mortar's thoomp and a whistle as the shell goes up, its burst, each bomblet's pop and crackle, and a new shell dropped in
+SOUNDS.finale = [.9, .8, s => { s.thud({ f: 62, d: .16, v: 1 }); s.hiss({ ft: 'lowpass', f: 900, f2: 300, a: .005, d: .22, v: .7 }); s.tone({ type: 'sine', t: .04, f: 1300, f2: 2900, a: .03, d: .55, v: .11, glide: .55 }); s.crunch({ t: .02, a: .01, d: .25, dens: .015, lo: 2000, hi: 7000, v: .3 }); }];
+SOUNDS.finaleBoom = [1.3, 1, s => { s.thud({ f: 52, d: .4, v: 1 }); s.hiss({ ft: 'lowpass', f: 1400, f2: 250, a: .005, d: .5, v: .8 }); s.crunch({ t: .08, a: .03, d: 1, dens: .02, lo: 1500, hi: 7000, v: .5 }); }];
+SOUNDS.finalePop = [.8, .6, s => { s.clack({ f: 1200, d: .03, v: .9, body: .6 }); s.thud({ f: 120, d: .08, v: .55 }); s.crunch({ t: .03, a: .01, d: .6, dens: .015, lo: 2000, hi: 8000, v: .45 }); }];
+SOUNDS.r_finale = [2.4, .45, s => { s.scrape({ t: .3, d: .25, f: 900, v: .4 }); s.thunk(.8); s.latch(1.5); s.hiss({ ft: 'highpass', f: 4000, t: 1.75, a: .02, d: .4, v: .3 }); s.click({ t: 2.05, f: 2600, v: .4 }); }];
 const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
 // close-up sounds get less echo
@@ -1070,7 +1103,7 @@ function hurtSfx(who, name, at, opts = {}) {
 }
 
 // looping sounds: flamethrower, eradicator motor, heat ray
-let flameHeld = 0, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null, spinBp = null, spinLfo = null;
+let flameHeld = 0, flameHot = 0, flameLp = null, flameOn = false, flameLoop = null, flameGain = null, spinOsc = null, spinGain = null, spinBp = null, spinLfo = null;
 let beamHeld = 0, beamOn = false, beamGain = null, frostHeld = 0, frostOn = false, frostGain = null, stormHeld = 0, stormOn = false, stormGain = null, waterHeld = 0, waterOn = false, waterGain = null;
 function flameBuffer() { // fire loop
   const n = SR * 2, x = SR / 10, r = rng(99), raw = new Float32Array(n + x);
@@ -1089,14 +1122,16 @@ function soundTick(dt, live) {
   if (!ac || ac.state !== 'running') return;
   const t = ac.currentTime;
   flameHeld = live || inLobby ? flameHeld - dt : 0; // also plays in the armory
-  const fOn = flameHeld > 0;
+  flameHot = flameHeld > 0 ? flameHot - dt : 0; // the Wildfire roars brighter and louder, and crackles
+  const fOn = flameHeld > 0, hot = flameHot > 0;
   if (fOn && !flameLoop) {
     flameLoop = ac.createBufferSource(); flameLoop.buffer = flameBuffer(); flameLoop.loop = true;
-    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200;
+    flameLp = ac.createBiquadFilter(); flameLp.type = 'lowpass'; flameLp.frequency.value = 2200;
     flameGain = ac.createGain(); flameGain.gain.value = 0;
-    flameLoop.connect(lp).connect(flameGain).connect(bus); flameLoop.start();
+    flameLoop.connect(flameLp).connect(flameGain).connect(bus); flameLoop.start();
   }
-  if (fOn !== flameOn) { flameOn = fOn; sfx(fOn ? 'flameStart' : 'flameEnd'); flameGain?.gain.setTargetAtTime(fOn ? .45 : 0, t, fOn ? .04 : .08); }
+  if (fOn !== flameOn) { flameOn = fOn; sfx(fOn ? hot ? 'wildStart' : 'flameStart' : 'flameEnd'); flameGain?.gain.setTargetAtTime(fOn ? hot ? .55 : .45 : 0, t, fOn ? .04 : .08); }
+  if (fOn) { flameLp.frequency.setTargetAtTime(hot ? 3400 : 2200, t, .05); if (hot && Math.random() < dt * 7) sfx('fireCrackle', { v: .7 }); }
   // eradicator motor
   const spin = live && gunSpin && !spinIdle(gunShown) ? gunSpinV / 30 : inLobby && hf.spin && !spinIdle(hf.i) ? hf.spinV / 30 : 0; // yours, or the armory's (magic parts make no whine)
   if (spin > 0 && !spinOsc) { // a whine plus rushing air, pulsing as the barrels go round

@@ -292,16 +292,17 @@ function explode(z) {
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // explosion effect
-function blastFx(p, R, gust = false) {
+function blastFx(p, R, gust = false, cl = false) {
   if (gust) { burst(p, 0xffffff, 24); burst(p, 0x9fdcff, 16); burst(p, 0xffd45a, 6); sfx('gust', { at: p, far: 120 }); } // a burst of wind instead of fire
+  else if (cl) { burst(p, 0xffd23a, 22); burst(p, 0xffffff, 10); burst(p, 0xff8800, 10); sfx('finaleBoom', { at: p, far: 120 }); } // a firework's gold burst (the bomblets bring the colours)
   else { burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 }); }
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : cl ? 0xffe08a : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
 }
 // el: the Ancient Wand's spell (0 fire, 1 ice, 2 wind), which never hurts whoever cast it
-function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -1) {
-  const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', W = BASE[gi(gun)], lk = W?.launch ?? 1, spell = !!W?.spell, vortex = !!W?.vortex, noSelf = spell || vortex; // a spell or a void never touches whoever made it
-  if (spell) spellFx(p, el); else if (!vortex) blastFx(p, R, !!W?.gust); // a void has its own (voidPop)
+function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -1, lk0 = 0) { // lk0: a cluster bomblet's own push (it draws its own pop)
+  const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', W = BASE[gi(gun)], lk = lk0 || (W?.launch ?? 1), spell = !!W?.spell, vortex = !!W?.vortex, noSelf = spell || vortex; // a spell or a void never touches whoever made it
+  if (spell) spellFx(p, el); else if (!vortex && !lk0) blastFx(p, R, !!W?.gust, !!W?.cluster); // a void has its own (voidPop)
   const k = spell ? longOf(by ? by.rec?.fx : youFx(), W) : 1, push = self => !self && spell && el === 2 ? SPELL_GUST : 1;
   const hex = o => { if (el === 0) applyBurn(o, W.burnT * k, W.burn, by, W.id, true, pj); else if (el === 1 && !net.pvp) shockHit(o, FROST, k); }; // online the server sends the ice
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
@@ -348,6 +349,7 @@ const SHOP = [
   { gun: 'semisniper', price: 200, desc: `${BASE[gi('semisniper')].dmg} dmg, 10 shot semi-auto` },
   { gun: 'heatray', price: 160, desc: 'a beam that cooks them' },
   { gun: 'flame', price: 200, desc: 'burns everything in front of you' },
+  { gun: 'wildfire', price: 400, desc: 'a hotter, longer blaze that sets the floor alight' },
   { gun: 'flare', price: 120, desc: 'one fiery shot that sets them on fire' },
   { gun: 'eradicator', price: 280, desc: '120 round bullet hose' },
   { gun: 'rocket', price: 450, desc: 'big splash damage' },
@@ -359,6 +361,7 @@ const SHOP = [
   { gun: 'grenade', price: 300, desc: 'bouncy grenades, big booms' },
   { gun: 'aerial', price: 360, desc: 'blasts of wind that throw you sky high' },
   { gun: 'rubypierce', price: 420, desc: 'a red beam through walls and whole rows of them' },
+  { gun: 'quasar', price: 500, desc: 'a green plasma lance that hits harder than the ruby' },
   { gun: 'paragon', price: 400, desc: `${BASE[gi('paragon')].dmg} dmg beam that goes through the lot` },
   { gun: 'trex', price: 250, desc: 'six big pellets and a dino bite' },
   { gun: 'starsmasher', price: 380, desc: 'stars out of the muzzle, 3x sight' },
@@ -373,6 +376,7 @@ const SHOP = [
   { gun: 'ancientwand', price: 520, desc: 'fire, ice or wind, never the same twice' },
   { gun: 'hornet', price: 130, desc: 'stings in bursts of three' },
   { gun: 'salvo', price: 520, desc: 'four rockets before a reload' },
+  { gun: 'finale', price: 560, desc: 'one big bang, then six little ones' },
   { gun: 'apex', price: 440, desc: `${BASE[gi('apex')].dmg} dmg, top of the food chain` },
   { gun: 'tracker', price: 200, desc: 'darts that show them through walls' },
   { gun: 'tempest', price: 460, desc: 'lightning that jumps from one to the next' },
@@ -384,6 +388,7 @@ const SHOP = [
   { gun: 'highnoon', price: 300, desc: 'a lever rifle that drops them one by one' },
   { gun: 'cutlass', price: 160, desc: 'a quick blade from a wreck' },
   { gun: 'balisong', price: 150, desc: 'a butterfly knife that cuts quick' },
+  { gun: 'monarch', price: 340, desc: 'light as a wing and never the same swing twice' },
   { gun: 'harpoon', price: 380, desc: 'spears one and reels it in' },
   { gun: 'conch', price: 480, desc: 'a jet of water that shoves them back' },
   { gun: 'tipistol', price: 520, desc: 'a hand cannon that hits like a rifle' },

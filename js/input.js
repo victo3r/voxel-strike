@@ -616,8 +616,8 @@ function restart(spot) {
   boostStart();
   zombies.forEach(z => { scene.remove(z.g); if (z.rock) scene.remove(z.rock); }); zombies.length = 0;
   booms.forEach(b => scene.remove(b.m)); booms.length = 0;
-  rockets.forEach(r => scene.remove(r.m)); rockets.length = 0;
-  flames.forEach(f => scene.remove(f.m)); flames.length = 0;
+  rockets.forEach(r => scene.remove(r.m)); rockets.length = 0; bomblets.forEach(b => scene.remove(b.m)); bomblets.length = 0;
+  flames.forEach(f => scene.remove(f.m)); flames.length = 0; clearPatches();
   flares.forEach(f => scene.remove(f.m)); flares.length = 0; grenades.forEach(g => scene.remove(g.m)); grenades.length = 0; clearBeams(); clearTracers(); clearLances(); clearBolts(scene); clearMyths(); recoilReset();
   parts.length = 0; partsDraw(); clearDrops(scene);
   useMap(mapId); setupPads();

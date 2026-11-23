@@ -84,6 +84,7 @@ function gunAttrs(w) {
   if (w.stun) a.push('STUN');
   if (w.soul) a.push('HEALS ON KILL');
   if (w.rocket) a.push(...w.gust ? ['WIND BLAST', 'BIG LAUNCH'] : ['ROCKET', 'EXPLOSIVE']);
+  if (w.cluster) a.push('CLUSTER BOMB');
   if (w.spell) a.push('FIRE ICE OR WIND', 'EXPLOSIVE', 'NO SELF DAMAGE');
   else if (w.flame || w.flare || w.burn) a.push('FIRE');
   if (w.jump) a.push('JUMP BOOST');
@@ -104,7 +105,9 @@ const DESC = {
   eradicator: 'A minigun that shreds everything in front of it',
   knife: 'A trusty knife that never leaves your side.',
   flame: 'Sprays fire up close and leaves everything burning',
+  wildfire: 'A roaring blaze that leaves the ground burning wherever it lands',
   rocket: 'One rocket, one big boom, and anyone near it feels it',
+  finale: 'One big bang, then six more in every colour of the sky',
   flare: 'One burning flare that sets whoever it hits on fire',
   herosword: 'A bronze blade with a gem in the guard and the pommel, made for heroes',
   shockbeam: 'A crackling bolt of electricity that leaves whoever it touches slow and twitchy',
@@ -120,6 +123,7 @@ const DESC = {
   executioner: 'Quick purple laser bolts that hit hard, shot after shot',
   aerial: 'A cannon full of wind that blows foes away and throws you sky high',
   rubypierce: 'One red beam from a glowing ruby core, through walls and anyone behind them',
+  quasar: 'A little quasar spins at its heart and fires a green lance through anything',
   paragon: 'Line them up and one blue beam goes through the lot, walls included',
   windwand: 'A pale wand that throws gusts of wind and blows foes back a step',
   stunwand: 'A crackling wand that zaps foes back and leaves them stuck in place',
@@ -140,6 +144,7 @@ const DESC = {
   highnoon: 'A lever rifle that settles things at midday, a first week keepsake',
   cutlass: 'A quick blade pulled up from a wreck, still sharp',
   balisong: 'A butterfly knife that cuts quick and flips even quicker',
+  monarch: 'The king of butterfly knives, light as a wing and full of tricks',
   harpoon: 'A speargun whose line reels them in to you',
   conch: 'A shell with the sea inside, and its jet shoves them back',
   tipistol: 'A heavy titanium hand cannon that hits like a rifle',
@@ -156,6 +161,7 @@ function gunSpecs(i) {
   if (!w.melee && w.start) out.push(['RELOAD', rl + 's']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
   if (w.rocket || w.grenade || w.spell) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
+  if (w.cluster) out.push(['BOMBLETS', `${CLUSTER_N}, ${Math.round(CLUSTER_K * 100)}% DAMAGE EACH`]);
   if (w.grenade) out.push(['FUSE', GREN_FUSE + 's']);
   if (w.launch && !w.vortex) out.push(['ROCKET JUMP', `${Math.round((w.launch - 1) * 100)}% STRONGER`]);
   if (w.headMul) out.push(['HEADSHOT', 'X' + w.headMul]);
@@ -194,7 +200,7 @@ const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIV
 const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare', 'eradicator', 'rocket', 'hitman', 'heatray', 'thrasher', 'semisniper', 'herosword', 'shockbeam', 'tigerbite', 'executioner',
   'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
   'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
-  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong'];
+  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong', 'monarch', 'quasar', 'wildfire', 'finale'];
 const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
 function renderIndex() {
   const list = indexList(), have = list.filter(hasGun).length;

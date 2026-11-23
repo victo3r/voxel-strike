@@ -64,7 +64,7 @@ function trim(ax, face, holes, ox, oz) {
     const at = (along, y, dw, dh, dd) => ax === 'z' ? piece(dd, dh, dw, beam, face + ox * dd / 2, y, along) : piece(dw, dh, dd, beam, along, y, face + oz * dd / 2);
     detail(at(mid, y1 + .06, w + .24, .12, .1));
     for (const e of [-1, 1]) detail(at(mid + e * (w / 2 + .06), (y0 + y1) / 2, .12, y1 - y0, .08));
-    if (y0 > .1) detail(at(mid, y0 - .04, w + .3, .08, .16)); // a sill
+    if (y0 > .1 && y1 - y0 < 2) detail(at(mid, y0 - .04, w + .3, .08, .16)); // a sill (not under a door: it flickered in the balcony floor)
   }
 }
 // a building's walls h high with holes (front and back: middle along z; south and north: middle as u), its floor, the door sills
@@ -110,7 +110,7 @@ function gable(ax, x0, x1, z0, z1, h, y1, m, o = .3, th = .2) {
     add(r); building.cover.push(r);
   }
   const rc = AX ? box(len, .14, .28, beam) : box(.28, .14, len, beam); rc.position.set(AX ? cl : mid, y1 + .03, AX ? mid : cl); add(rc); // the ridge
-  const sh = new THREE.Shape([[c0, h], [c1, h], [c1, yw], [mid, y1], [c0, yw]].map(([p, q]) => new THREE.Vector2(p, q)));
+  const d = th / 2 / Math.cos(a), sh = new THREE.Shape([[c0, h], [c1, h], [c1, yw - d], [mid, y1 - d], [c0, yw - d]].map(([p, q]) => new THREE.Vector2(p, q))); // the ends stop inside the roof: level with its face they flickered through it
   for (const at of [l0, l1 - T]) {
     const g = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }), m); g.userData.uvk = 1;
     if (AX) { g.rotation.y = -Math.PI / 2; g.position.x = at + T; } else g.position.z = at;
@@ -169,9 +169,9 @@ function signTex(text, fg, bg) {
   g.fillStyle = fg; [...text].forEach((ch, i) => { const f = FONT[ch]; if (f) for (let k = 0; k < 15; k++) if (f[k] === '1') g.fillRect(2 + i * 4 + k % 3, 2 + (k / 3 | 0), 1, 1); });
   const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-// a painted board w wide facing ry (0: toward +z), painted on both sides when two
+// a painted board w wide facing ry (0: toward +z), painted on both sides when two (as a decal: a hair off the board it flickered from far off)
 function sign(text, w, x, y, z, ry, fg = '#f2e4c2', bg = '#4a2c1a', two = false, parent = null) {
-  const h = w * 9 / (text.length * 4 + 3), g = new THREE.Group(), mat = lam({ map: signTex(text, fg, bg) }); g.position.set(x, y, z); g.rotation.y = ry; (parent || building.root).add(g);
+  const h = w * 9 / (text.length * 4 + 3), g = new THREE.Group(), mat = decal({ map: signTex(text, fg, bg) }); g.position.set(x, y, z); g.rotation.y = ry; (parent || building.root).add(g);
   g.add(box(w + .12, h + .12, .06, beam));
   for (const e of two ? [1, -1] : [1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); p.position.z = e * .035; p.rotation.y = e > 0 ? 0 : Math.PI; g.add(p); }
   return g;
@@ -292,7 +292,7 @@ railing(-10.6, -.69, -10.6, 8.45, 3.6, [true, false]);
 gable('x', -15, -7, -1, 10, 5.6, 8, W_GREY); porch(-1, -1, 10, 3.3);
 sign('STABLE', 3.2, -6.9, 6.15, 4.5, FACE(-1));
 piece(1.4, .2, .2, beam, -6.4, 7.3, 4.5); piece(.14, .3, .3, iron, -5.85, 7.05, 4.5); // the hay hoist
-for (const [z0, z1] of [[1.5, 3], [6, 7.5]]) slab(-6.97, -6.89, z0, z1, FL, FL + 2.9, W_RED); // the barn doors
+for (const [z0, z1] of [[1.5, 2.95], [6.05, 7.5]]) slab(-6.97, -6.89, z0, z1, FL, FL + 2.9, W_RED); // the barn doors, their edges tucked into the frame
 for (const z of [3.2, 6.6]) slab(-14.75, -12.4, z - .08, z + .08, FL, 1.5, beam); // stalls
 for (const [x, z] of [[-13.6, 1], [-14.2, 2.1], [-13.6, 7.8], [-8.3, 9.2]]) addBlock(x, z, 1.1, .8, FL + .8, hay);
 addBlock(-9.3, 1.2, 1.1, .8, 3.6 + .8, hay); // hay up in the loft

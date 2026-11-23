@@ -10,7 +10,9 @@ const SPARK_MATS = [0xffe14a, 0xffffff, 0xfff08a].map(c => bitMat(c, SHARD_TEX))
 const ICE_MATS = [0x9fe8ff, 0xe8fbff, 0x5fb8ff].map(c => bitMat(c, SHARD_TEX)), RUNE_MATS = [0xffe08a, 0xffd060, 0xfff4c0].map(c => bitMat(c, STAR_MATS[0].map));
 const TI_MATS = [0xeaf4ff, 0x8fc4ff, 0xffffff].map(c => bitMat(c, SHARD_TEX)), CRYSTAL_MATS = [0x8ff2ff, 0xff7fd4, 0xffffff].map(c => bitMat(c, SHARD_TEX)), WISP_MATS = puffMats([0x5fe8d8, 0xeafffb, 0x9ff6ea]), VOID_MATS = puffMats([0xb46bff, 0xe8d2ff, 0x6a2fd0]), AURORA_MATS = puffMats([0x4dff9a, 0x3dffd6, 0x4ab8ff, 0xa07bff]);
 // bits off a wand: [mats, count, speed, spread, life, size, gravity]
-const WAND_BITS = { ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0],
+const PLASMA_MATS = puffMats([0x8aff3a, 0xc8ff8a, 0xf2ffe0]); // the Quasar's
+const CONFETTI_MATS = [0xff3a5a, 0x3aff7a, 0x4aa8ff, 0xffd23a, 0xc86aff].map(c => bitMat(c, SHARD_TEX)); // the Grand Finale's
+const WAND_BITS = { plasma: [PLASMA_MATS, 7, 3.2, 2.4, .3, .085, 0], confetti: [CONFETTI_MATS, 10, 4, 3, .5, .08, 6], ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0],
   crystal: [CRYSTAL_MATS, 3, 4, 2.6, .4, .08, 5], ti: [TI_MATS, 5, 4, 3, .25, .07, 4], wisp: [WISP_MATS, 6, 1.6, 1.4, .5, .08, -2], void: [VOID_MATS, 8, 2.2, 2, .4, .1, 0], aurora: [AURORA_MATS, 8, 3, 2.2, .45, .1, -1] };
 // what flies off a bot or player when hit, by what hit them: lasers break off pixels in their own colour, guns throw sparks
 const PIXEL_TEX = (() => {

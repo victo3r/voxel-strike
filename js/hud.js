@@ -67,6 +67,7 @@ const CROSSES = {
   tisniper: () => [...xDot(), ...xLines(10, 6, 2, 'lrd')],
   tirocket: () => [...xDot(), ...xCorners(14, 5)],
   flame: () => [...xDot(), ...xArcs(18, DIAG, 40)],
+  wildfire: () => [...xDot(), ...xArcs(19, DIAG, 48), ...xArcs(25, DIAG, 18)], // a hotter ring round the flamethrower's
   heatray: () => [...xDot(), ...xLines(3, 3), ...xArcs(10, DIAG, 44)],
   shockbeam: () => [...xDot(), ...xLines(3, 4), ...xTicks(9, 12)],
   frostwand: () => [...xDot(), ...xLines(3, 3), ...xCorners(9, 3)],
@@ -76,6 +77,7 @@ const CROSSES = {
   tigerbite: () => [...xDot(), ...xLines(9, 6, 2, 'lrd')],
   flare: () => [...xDot(), ...xCorners(8, 4)], // explosives: corners, bigger blast = bigger square
   rocket: () => [...xDot(), ...xCorners(13, 5)],
+  finale: () => [...xDot(), ...xCorners(13, 5), ...xTicks(17, 19)], // a launcher's corners and a burst around them
   grenade: () => [...xDot(), ...xCorners(11, 4)],
   aerial: () => [...xDot(), ...xCorners(13, 5)],
   salvo: () => [...xDot(), ...xCorners(14, 5)],
@@ -86,6 +88,7 @@ const CROSSES = {
   voidlantern: () => [...xDot(), ...xCorners(13, 4), ...xArcs(6, DIAG, 40)],
   aurora: () => [...xDot(), ...xLines(10, 6, 2, 'lrd'), ...xTicks(12, 15)],
   rubypierce: () => [...xDot(), ...xLines(6, 6), ...xTicks(9, 11)],
+  quasar: () => [...xDot(), ...xLines(5, 5, 2, 'ud'), ...xArcs(9, [0, 180], 60), ...xLines(11, 4, 2, 'lr')], // its jets and disc
   paragon: () => [...xDot(), ...xLines(10, 6, 2, 'lrd')],
   crossbow: () => [...xDot(), ...xLines(7, 4, 2, 'lrd')],
   // wands: rings for the spells

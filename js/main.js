@@ -201,7 +201,7 @@ function update(dt) {
   }
   // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
   const rk = reloading > 0 && gunShown === cur ? 1 - reloading / reloadFull : -1;
-  fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, rl: rk, level: wandK, two: !!gunArmL, ads: adsT, insp: vw === w ? inspT : -1 }), vw, adsT);
+  fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, sv: swingV, rl: rk, level: wandK, two: !!gunArmL, ads: adsT, insp: vw === w ? inspT : -1 }), vw, adsT);
   bladeTrail(gunG, vw, vw.melee && kick > 0 ? 1 - kick : -1, camera); // a swing's trail stays in your view
   reloadSwap(vmRl, w.id, rk, gunMag, scene); // mag swap
   if (rk >= 0 && w.id === 'eradicator' && reloading / reloadFull < .12) gunSpinV = Math.max(gunSpinV, 16);
@@ -394,22 +394,24 @@ function update(dt) {
       scene.remove(r.m); rockets.splice(i, 1);
       if (r.ghost) continue; // the server places other players' blasts
       const at = onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone();
-      net.boom(r.id, at, r.by);
+      const fn = r.cluster && (hit?.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : r.dir.clone().negate()).toArray().map(v => Math.round(v * 100) / 100), seed = Math.random() * 65536 | 0; // a cluster shell's bomblets fly out from what it hit
+      net.boom(r.id, at, r.by, fn && { s: seed, n: fn });
       // rocket self damage
       blast(at, ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, r.g, r.id);
+      if (fn) clusterBurst(at, new THREE.Vector3(...fn).normalize(), seed, r.by, false, r.id, r.g, r.dmg);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);
     if (r.gust) r.m.rotateZ(dt * 18);
-    if ((r.smoke -= dt) <= 0) { r.smoke = .03; burst(r.m.position, r.gust ? 0xe8f7ff : 0x888888, 1); }
+    if ((r.smoke -= dt) <= 0) { r.smoke = .03; if (r.cluster) fxBit(CLUSTER_BITS[Math.random() * CLUSTER_N | 0], scene, r.m.position, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5), .4, 3); else burst(r.m.position, r.gust ? 0xe8f7ff : 0x888888, 1); } // a firework sparkles
   }
 
-  updateFlares(dt); updateGrenades(dt); mythTick(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt);
+  updateFlares(dt); updateGrenades(dt); mythTick(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt); patchTick(dt); bombletTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;
     f.m.position.addScaledVector(f.v, dt); f.v.y += 2 * dt;
-    f.m.scale.setScalar(1 + (.45 - f.life) * 7);
+    f.m.scale.setScalar(f.rise ? f.rise * Math.min(1, 1.6 * f.life / f.life0) : 1 + ((f.life0 ?? .45) - f.life) * 7); if (f.mats) f.m.material = flameAge(f); // rise: a little flame off a burning floor, dying as it goes up
     if (f.life <= 0) { scene.remove(f.m); flames.splice(i, 1); }
   }
 

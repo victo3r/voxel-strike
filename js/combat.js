@@ -173,7 +173,8 @@ function fireLance(w, k = 1) {
 }
 // knife: a few rays around the crosshair so aim can be a bit off
 function stab(w) {
-  cd = w.rate; kick = 1; sfx(w.swing || 'swing'); crossKick(kickFor(w)); net.shot(w);
+  if (w.swings) swingV = nextSwing(swingV, w.swings); // a blade with several swings picks another
+  cd = w.rate; kick = 1; sfx(w.swing || 'swing', { rate: swingRate(w, swingV) }); crossKick(kickFor(w)); net.shot(w);
   const zap = p => { if (w.wand) stunZap(flashMesh.getWorldPosition(new THREE.Vector3()), p); }; // the Stun Wand throws a little blast
   const knock = (o, from) => { if (w.knock && !net.pvp && !o.dead) launch(o, o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); }; // online the server sends the push
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
@@ -222,7 +223,7 @@ function fxLayer(sc, map, solid) {
   return L;
 }
 // a bit flying off from `at` (mat: a SpriteMaterial for its colour and look, k: its size)
-function fxBit(mat, sc, at, k, v, life, g) { starBits.push({ p: at.clone(), mat, sc, k, v, life, g, rot: Math.random() * 6.28 }); }
+function fxBit(mat, sc, at, k, v, life, g) { const b = { p: at.clone(), mat, sc, k, v, life, g, rot: Math.random() * 6.28 }; starBits.push(b); return b; }
 function fxDraw() {
   for (const byMap of fxLayers.values()) for (const L of byMap.values()) L.n = 0;
   for (const b of starBits) {
@@ -278,7 +279,7 @@ function muzzleBits(w, from, sc = scene, size = 1) {
 }
 function starTick(dt) {
   for (let i = starBits.length - 1; i >= 0; i--) {
-    const b = starBits[i]; b.life -= dt; b.p.addScaledVector(b.v, dt); b.v.multiplyScalar(Math.exp(-3 * dt)); if (b.g) b.v.y -= b.g * dt; b.rot += dt * 4;
+    const b = starBits[i]; b.life -= dt; b.p.addScaledVector(b.v, dt); b.v.multiplyScalar(Math.exp(-3 * dt)); if (b.g) b.v.y -= b.g * dt; b.rot += dt * (b.spin ?? 4); b.tick?.(b, dt);
     if (b.life <= 0) { starBits[i] = starBits[starBits.length - 1]; starBits.pop(); }
   }
   fxDraw();
@@ -290,17 +291,15 @@ function starTick(dt) {
   }
 }
 const BURN_T = 2.5; // burn time after the flames stop
+const PATCH_T = 2.5, PATCH_R = 1.1, PATCH_DROP = 2.2; // the Wildfire's burning floor: how long, how wide, and how far its flames fall to catch
 const flames = [], flameGeo = new THREE.BoxGeometry(.18, .18, .18);
 const flameMats = [0xffdd55, 0xff8a1a, 0xff4a1a].map(color => new THREE.MeshBasicMaterial({ color }));
 function flame(w) {
-  kick = .3; flameHeld = .12; crossKick(.5, 2); recoilKick(w); // keeps the fire sound going
+  kick = .3; flameHeld = .12; if (w.patch) flameHot = .12; crossKick(.5, 2); recoilKick(w); // keeps the fire sound going
   camera.getWorldDirection(fwd);
   flashMesh.getWorldPosition(tmp);
-  for (let k = 0; k < 2; k++) {
-    const m = new THREE.Mesh(flameGeo, flameMats[Math.random() * 3 | 0]); m.position.copy(tmp); scene.add(m);
-    const v = fwd.clone().multiplyScalar(13).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(2.5));
-    flames.push({ m, v, life: .45 });
-  }
+  flameBits(tmp, fwd, w);
+  let near = Infinity;
   for (const zz of zombies) {
     if (zz.dead || zz.type === 'bot' && friendly(null, zz)) continue; // no friendly fire
     const c = zz.g.position.clone().setY(zz.g.position.y + zz.scale * 1.1), to = c.clone().sub(camera.position), d = to.length(), along = to.dot(fwd);
@@ -310,7 +309,85 @@ function flame(w) {
     ray2.set(camera.position, to.divideScalar(d)); ray2.far = d;
     if (ray2.intersectObjects(coverAlong(ray2.ray.origin, ray2.ray.direction, d), false).length) continue;
     hurtZombie(zz, w.dmg, c, false, false, null, 3);
-    applyBurn(zz, BURN_T, w.dmg * .6, null, 'flame');
+    applyBurn(zz, BURN_T, w.dmg * .6, null, w.id);
+    near = Math.min(near, along);
+  }
+  if (w.patch) firePatch(camera.position, fwd, w, null, near);
+}
+// a puff of flame out of a nozzle; the Wildfire's fly faster and farther, white-hot burning down to red
+const WILD_MATS = [0xfff8e0, 0xffe680, 0xffc030, 0xff8a1a, 0xff5a14, 0xc8280e].map(color => new THREE.MeshBasicMaterial({ color })), _fbV = new THREE.Vector3();
+const flameAge = f => f.mats[Math.min(f.mats.length - 1, Math.max(0, (1 - f.life / f.life0 + f.off) * f.mats.length | 0))];
+function flameBits(at, dir, w) {
+  const hot = !!w.patch;
+  for (let k = 0, n = hot && gfx.q !== 'low' ? 3 : 2; k < n; k++) {
+    const m = new THREE.Mesh(flameGeo, hot ? WILD_MATS[0] : flameMats[Math.random() * 3 | 0]); m.position.copy(at); scene.add(m);
+    const v = dir.clone().multiplyScalar(hot ? 17 : 13).add(_fbV.set(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(hot ? 2.2 : 2.5));
+    flames.push(hot ? { m, v, life: .55, life0: .55, mats: WILD_MATS, off: Math.random() * .25 } : { m, v, life: .45 });
+  }
+}
+// ground fire: where the Wildfire's flames come down the floor keeps burning, and burns whoever stands in it
+const patches = [], youPatch = {}, _pt = new THREE.Vector3();
+let patchSeq = 0, catchAt = -9;
+const PATCH_GEO = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), PATCH_GLOW = (() => { // a stepped glow, hottest in the middle
+  const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d');
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = Math.hypot(x - 7.5, y - 7.5) / 8; if (r > 1) continue; g.fillStyle = r < .35 ? '#ffb040' : r < .6 ? '#ff7a1a' : r < .82 ? '#b8380e' : '#4a1404'; g.fillRect(x, y, 1, 1); }
+  const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: t, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+})();
+function addPatch(at, by, own, key, w) { // key: someone else's, as the server sent it
+  let f = key !== undefined && patches.find(x => x.key === key);
+  if (f) { f.t = PATCH_T; f.p.copy(at); f.m.position.copy(at).y += .04; return f; }
+  if (patches.filter(x => x.by === by).length >= 12) dropPatch(patches.findIndex(x => x.by === by));
+  const m = new THREE.Mesh(PATCH_GEO, PATCH_GLOW); m.position.copy(at).y += .04; m.rotation.y = Math.random() * 6.28; m.renderOrder = 2; scene.add(m);
+  f = { p: at.clone(), t: PATCH_T, by, own, key, id: ++patchSeq, m, acc: 0, fl: 0, tick: 0, sent: -9, dmg: w ? w.dmg * .6 : 0, gun: w?.id };
+  patches.push(f);
+  if (fxClock - catchAt > .3) { catchAt = fxClock; sfx('fireCatch', { at, far: 30 }); }
+  return f;
+}
+function dropPatch(i) { if (i < 0) return; scene.remove(patches[i].m); patches.splice(i, 1); }
+function clearPatches() { for (const f of patches) scene.remove(f.m); patches.length = 0; }
+function firePatch(eye, dir, w, by, near = Infinity) { // where the stream comes down (a wall, the floor, or whoever it hit), the floor catches
+  const o = by || youPatch;
+  if (fxClock - (o.patchAt ?? -9) < .15) return; o.patchAt = fxClock;
+  ray2.set(eye, dir); ray2.far = w.range;
+  const hit = ray2.intersectObjects([ground, ...coverAlong(eye, dir, w.range)], false)[0];
+  _pt.copy(eye).addScaledVector(dir, Math.min(hit ? hit.distance : w.range, near) - .3);
+  const fy = groundAt(_pt.x, _pt.z, .2, _pt.y + .1);
+  if (_pt.y - fy > PATCH_DROP || inSea(_pt.x, _pt.z, fy + .05)) return;
+  _pt.y = fy;
+  let f = patches.find(x => x.own && x.by === by && Math.hypot(x.p.x - _pt.x, x.p.z - _pt.z) < .9 && Math.abs(x.p.y - _pt.y) < .5);
+  if (f) f.t = PATCH_T; else f = addPatch(_pt, by, true, undefined, w);
+  if (net.on && fxClock - f.sent > .3) { f.sent = fxClock; net.patch(f.id, f.p, by); }
+}
+function burnIn(f) { // whoever stands in it catches fire (yours never burns you)
+  const by = f.by, inIt = (p, r) => Math.hypot(p.x - f.p.x, p.z - f.p.z) < PATCH_R + r && p.y > f.p.y - .5 && p.y < f.p.y + 1.2;
+  if (by && respawnT <= 0 && !friendly(by, YOU_T) && inIt(tPos(YOU_T), .3)) applyBurn(P, BURN_T, f.dmg, by, f.gun, true, f.id);
+  for (const z of zombies) {
+    if (z === by || z.dead || (by ? friendly(by, z) : z.type === 'bot' && friendly(null, z)) || !inIt(z.g.position, z.r ?? .3)) continue;
+    if (fxClock - (z.litAt ?? -9) < .2) continue; z.litAt = fxClock;
+    applyBurn(z, BURN_T, f.dmg, by, f.gun, true, f.id);
+  }
+}
+function patchTick(dt) {
+  for (let i = patches.length - 1; i >= 0; i--) {
+    const f = patches[i];
+    if ((f.t -= dt) <= 0) { dropPatch(i); continue; }
+    const k = Math.min(1, f.t / .6); // dying down at the end
+    f.m.scale.setScalar(PATCH_R * (.4 + .6 * k) * (.92 + .08 * Math.random()));
+    f.fl += dt * (gfx.q === 'low' ? 4 : 9) * k; // flames licking up off it, and embers
+    for (; f.fl >= 1; f.fl--) {
+      const a = Math.random() * 6.28, r = PATCH_R * .7 * Math.sqrt(Math.random()), m = new THREE.Mesh(flameGeo, WILD_MATS[2]);
+      m.position.set(f.p.x + Math.cos(a) * r, f.p.y + .1, f.p.z + Math.sin(a) * r); scene.add(m);
+      flames.push({ m, v: new THREE.Vector3((Math.random() - .5) * .3, .8 + Math.random() * .8, (Math.random() - .5) * .3), life: .5, life0: .5, mats: WILD_MATS, off: .25 + Math.random() * .2, rise: .7 + Math.random() * .7 });
+    }
+    f.acc += dt * (gfx.q === 'low' ? 7 : 14) * k;
+    for (; f.acc >= 1; f.acc--) {
+      const a = Math.random() * 6.28, r = PATCH_R * .85 * Math.sqrt(Math.random());
+      _pt.set(f.p.x + Math.cos(a) * r, f.p.y + .08, f.p.z + Math.sin(a) * r);
+      fxBit(EMBER_MATS[Math.random() * 3 | 0], scene, _pt, .1 + Math.random() * .08, new THREE.Vector3((Math.random() - .5) * .4, .9 + Math.random() * 1.1, (Math.random() - .5) * .4), .3 + Math.random() * .35, -2);
+    }
+    if (!f.own || (f.tick -= dt) > 0) continue;
+    f.tick = .25; burnIn(f);
   }
 }
 // heat ray beam
@@ -533,10 +610,55 @@ function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   if (w.gust) { m.add(box(.18, .18, .18, GUST_MATS[0])); for (const r of [0, Math.PI / 2]) { const b = box(.42, .06, .06, GUST_MATS[1]); b.rotation.z = r; m.add(b); } } // a ball of wind
   else { const [bc, tc] = ROCKET_COLS[w.id] ?? ROCKET_COLS.rocket, body = box(.1, .1, .4, lam({ color: bc })), tip = box(.12, .12, .12, lam({ color: tc })); tip.position.z = .24; m.add(body, tip); }
   m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
-  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust });
+  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust, cluster: !!w.cluster });
 }
 const GUST_MATS = [new THREE.MeshBasicMaterial({ color: 0xc8f0ff }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
-const ROCKET_COLS = { rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c], tirocket: [0xaab5c2, 0x4f8fe0] }; // body, tip
+const ROCKET_COLS = { rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c], tirocket: [0xaab5c2, 0x4f8fe0], finale: [0x2a46b0, 0xf2c230] }; // body, tip
+// cluster bombs (the Grand Finale): the shell bursts into bomblets that go off in every colour
+const CLUSTER_N = 6, CLUSTER_R = 2.2, CLUSTER_K = .35, CLUSTER_PUSH = .35, CLUSTER_LIFE = 1.4, CLUSTER_REACH = 10; // how many, their blast, their share of the damage and the push, their fuse, how far from the burst they can get
+const CLUSTER_G = 14, CLUSTER_COLS = [0xff3a5a, 0x3aff7a, 0x4aa8ff, 0xffd23a, 0xc86aff, 0xffffff];
+const CLUSTER_MATS = CLUSTER_COLS.map(color => new THREE.MeshBasicMaterial({ color })), CLUSTER_BITS = CLUSTER_COLS.map(c => bitMat(c, STAR_MATS[0].map));
+const bomblets = [], _bU = new THREE.Vector3(), _bV = new THREE.Vector3();
+function clusterBurst(at, n, seed, by, ghost, pj, g, dmg = 0, pid = 0) { // n: the way out from what it hit; seed: so everyone throws them alike; ghost: someone else's (pid), drawn only
+  const r = rng(seed);
+  _bU.set(Math.abs(n.y) > .9 ? 1 : 0, Math.abs(n.y) > .9 ? 0 : 1, 0).cross(n).normalize(); _bV.crossVectors(n, _bU); // two ways across what it hit
+  const from = at.clone().addScaledVector(n, .3), turn = r() * 6.28;
+  for (let k = 0; k < CLUSTER_N; k++) {
+    const a = turn + (k + r() * .5) / CLUSTER_N * 6.28, h = 3 + r() * 2, v = n.clone().multiplyScalar(2.5 + r()).addScaledVector(_bU, Math.cos(a) * h).addScaledVector(_bV, Math.sin(a) * h);
+    v.y += 2 + r();
+    const m = box(.13, .13, .13, CLUSTER_MATS[k]); m.position.copy(from); scene.add(m);
+    const id = -(pj * 8 + k + 1); // the shell's own number, and which bomblet
+    bomblets.push({ m, v, life: CLUSTER_LIFE, k, by, ghost, id, key: ghost ? pid + ':' + id : null, pj, g, dmg, tr: 0 });
+  }
+}
+function bombletTick(dt) {
+  for (let i = bomblets.length - 1; i >= 0; i--) {
+    const b = bomblets[i]; b.life -= dt; b.v.y -= CLUSTER_G * dt;
+    const step = b.v.length() * dt;
+    ray2.set(b.m.position, tmp.copy(b.v).normalize()); ray2.far = step;
+    let hit = ray2.intersectObjects(targetsFor(b.by, ray2), false)[0];
+    const onYou = !b.ghost && b.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
+    if (onYou) hit = null;
+    if (hit || onYou || b.life <= 0) {
+      scene.remove(b.m); bomblets.splice(i, 1);
+      if (b.ghost) continue; // its shooter says where it went off
+      const at = onYou ? youHitP.clone() : hit ? hit.point.clone() : b.m.position.clone();
+      net.boom(b.id, at, b.by, { of: b.pj });
+      popFx(at, b.k);
+      blast(at, CLUSTER_R, b.dmg * CLUSTER_K, b.by ? b.dmg * CLUSTER_K : ROCKET_SELF * CLUSTER_K, null, b.by, b.g, b.id, -1, CLUSTER_PUSH);
+      continue;
+    }
+    b.m.position.addScaledVector(b.v, dt); b.m.rotation.x += dt * 11; b.m.rotation.y += dt * 8;
+    if ((b.tr -= dt) <= 0) { b.tr = .035; fxBit(CLUSTER_BITS[b.k], scene, b.m.position, .07, new THREE.Vector3((Math.random() - .5) * .6, (Math.random() - .5) * .6, (Math.random() - .5) * .6), .35, 2); } // a sparkling trail
+  }
+}
+function popFx(at, k) { // a bomblet going off: a starburst in its own colour
+  burst(at, CLUSTER_COLS[k], 8); burst(at, 0xffffff, 3);
+  for (let j = 0, n = fxN(22); j < n; j++) fxBit(CLUSTER_BITS[k], scene, at, .14 + Math.random() * .06, new THREE.Vector3(Math.random() - .5, Math.random() - .35, Math.random() - .5).normalize().multiplyScalar(6 + Math.random() * 3), .8 + Math.random() * .5, 4);
+  for (let j = 0, n = fxN(6); j < n; j++) fxBit(STAR_MATS[1], scene, at, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .2, Math.random() - .5).normalize().multiplyScalar(3 + Math.random() * 2), .5, 3); // and a little white crackle
+  fxBit(CLUSTER_BITS[k], scene, at, .9, new THREE.Vector3(), .16, 0); fxBit(STAR_MATS[1], scene, at, .45, new THREE.Vector3(), .1, 0); // its flash
+  sfx('finalePop', { at, far: 90, rate: .9 + Math.random() * .25 });
+}
 const FLARE_SPD = 60, FLARE_DROP = 2.5; // speed, drop
 const FLARE_R = 2.5, FLARE_SPLASH = 14; // splash radius and damage
 const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });

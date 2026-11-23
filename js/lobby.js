@@ -237,16 +237,17 @@ function heroShot(k = 1) {
   hf.cd = burstCd(w, hf); if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
   hf.kick = kickOf(w); coreFire(hf.core);
   if (w.melee) {
-    sfx(w.swing || 'swing', { v: .7 * hv() });
+    if (w.swings) hf.sv = nextSwing(hf.sv, w.swings);
+    sfx(w.swing || 'swing', { v: .7 * hv(), rate: swingRate(w, hf.sv) });
     if (w.wand) { hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq); stunZap(_hm.clone(), _hm.clone().addScaledVector(_hd, w.range), lobbyScene, .7); }
     return;
   }
   hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq);
   if (w.flame) {
-    flameHeld = .12;
+    flameHeld = .12; if (w.patch) flameHot = .12;
     for (let k = 0; k < 2; k++) {
-      const m = new THREE.Mesh(flameGeo, flameMats[Math.random() * 3 | 0]); m.position.copy(_hm); m.scale.setScalar(.6); lobbyScene.add(m);
-      heroFx.push({ m, v: _hd.clone().multiplyScalar(6).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5)), life: .4, grow: 2 });
+      const m = new THREE.Mesh(flameGeo, w.patch ? WILD_MATS[0] : flameMats[Math.random() * 3 | 0]); m.position.copy(_hm); m.scale.setScalar(.6); lobbyScene.add(m);
+      heroFx.push({ m, v: _hd.clone().multiplyScalar(w.patch ? 7.5 : 6).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5)), life: .4, grow: 2, ...(w.patch && { life0: .4, mats: WILD_MATS, off: Math.random() * .25 }) });
     }
     return;
   }
@@ -278,7 +279,7 @@ function heroShot(k = 1) {
 function heroTick(dt) {
   lanceTick(dt); arcTick(dt);
   for (let k = heroFx.length - 1; k >= 0; k--) {
-    const f = heroFx[k]; f.life -= dt; f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt);
+    const f = heroFx[k]; f.life -= dt; f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt); if (f.mats) f.m.material = flameAge(f);
     if (f.life <= 0) { lobbyScene.remove(f.m); heroFx.splice(k, 1); }
   }
   if (hf.i < 0) return;
@@ -374,7 +375,7 @@ function blendPose(A, B, k) { _ezP.pos.copy(A.pos).lerp(B.pos, k); _ezP.q.copy(A
 const LOW_Q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(.3, -1, .3).normalize()), LOW_P = new THREE.Vector3(-.4, .6, .2);
 const _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _l = new THREE.Vector3(), sway = new THREE.Quaternion(), _e = new THREE.Euler();
 const _lq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _aq = new THREE.Quaternion(), _ax = new THREE.Vector3();
-const _hv2 = new THREE.Vector3(), _hp = new THREE.Vector3(), _q0i = new THREE.Quaternion(), _q1 = new THREE.Quaternion();
+const _hv2 = new THREE.Vector3(), _hp = new THREE.Vector3(), _q0i = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _hcT = new THREE.Vector3(), _hcV = new THREE.Vector3();
 function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
@@ -555,16 +556,19 @@ function updateLobby(dt) {
     const q0 = _q.copy(_wq).multiply(tq).multiply(hQ);
     // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
     const w = hf.i >= 0 && hf.st, rk = w && hf.rl > 0 ? 1 - hf.rl / w.reload : -1;
-    const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL, insp: hf.insp ?? -1 }) : null;
+    const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, sv: hf.sv, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL, insp: hf.insp ?? -1 }) : null;
     flipShow(hf.flips, m);
     if (w) bladeTrail(hf.g, w, w.melee && hf.kick > 0 ? 1 - hf.kick : -1, lobbyScene);
     let leftK = hLK;
     reloadSwap(hf.rs, w ? w.id : '', rk, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(m ? m.mx : 0, m ? m.my : 0, m ? m.mz : 0));
     if (m && !heldIdle(m)) {
+      const cl = w.melee && hf.insp >= 0 ? bladeClear(hf.i) : null; // a blade played with: his fist only lifts, the blade keeps clear of it
+      if (cl) { _hcT.set(m.x, m.y, m.z).multiplyScalar(GUN_S).applyQuaternion(q0); bladeClearAt(cl, hf.insp, _hcV); m.x += _hcV.x; m.y += _hcV.y; m.z += _hcV.z; }
       heldGun(_q1, _hp, q0, gp, m, P.hR, GUN_S); // the gun turns in his hand, his fists go with it
       const mv = _q0i.copy(q0).invert().premultiply(_q1), move = v => v.sub(gp).applyQuaternion(mv).add(_hp);
-      move(_fr); move(_l); gp.copy(_hp); q0.copy(_q1);
+      if (cl) _fr.add(_hcT); else move(_fr);
+      move(_l); gp.copy(_hp); q0.copy(_q1);
       if (pose.fL && m.az) _l.add(_hv2.set(0, 0, m.az * GUN_S).applyQuaternion(q0));
       if (m.level > 0) { // a wand points straight while it fires
         const r = wandFlick(q0, m.level); _hv2.copy(P.hR).multiplyScalar(GUN_S).applyQuaternion(q0).add(gp);
@@ -584,6 +588,7 @@ function updateLobby(dt) {
     armL.quaternion.slerp(armTo(SHR, _fr, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * leftK);
     holdG.quaternion.copy(LOW_Q).slerp(q0, e);
     holdG.position.copy(LOW_P).lerp(gp, e);
+    if (w) heldToss(holdG.quaternion, holdG.position, m, w, GUN_S); // up out of his hand
   }
   holdG.visible = e > .01; holdG.scale.setScalar(Math.min(1, e * 2.5));
   torso.scale.z = 1 + Math.sin(t * 1.6) * .02;

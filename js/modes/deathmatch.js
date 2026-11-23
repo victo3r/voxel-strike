@@ -89,9 +89,9 @@ const botGun = c => pickRare(BASE.filter(w => w.cat === c && (w.unlock || 0) <= 
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], hornet: [8, 18], salvo: [9, 18], apex: [18, 36], tracker: [6, 16], tempest: [6, 16], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
-  knife: [.9, 1.6], balisong: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
+  knife: [.9, 1.6], balisong: [.9, 1.6], monarch: [.9, 1.7], flame: [2, 5], wildfire: [2.5, 6.5], heatray: [6, 18], rocket: [9, 18], finale: [9, 18], flare: [7, 16],
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
-  rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
+  rubypierce: [10, 24], quasar: [10, 26], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
   wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
   daybreak: [6, 18], highnoon: [12, 28], cutlass: [1, 1.9], harpoon: [14, 30], conch: [5, 14], tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
 };
@@ -99,6 +99,7 @@ const BOT_KEEP = {
 const GUN_FIT = {
   knife: d => d < 2.2 ? 1.25 : d < 4 ? .35 : 0,
   balisong: d => d < 2.2 ? 1.3 : d < 4 ? .35 : 0,
+  monarch: d => d < 2.3 ? 1.33 : d < 4 ? .38 : 0,
   herosword: d => d < 2.8 ? 1.3 : d < 4.5 ? .4 : 0,
   blazesaber: d => d < 2.8 ? 1.32 : d < 4.5 ? .4 : 0,
   warhammer: d => d < 2.6 ? 1.3 : d < 4.2 ? .35 : 0,
@@ -108,11 +109,13 @@ const GUN_FIT = {
   starsmasher: d => d < 3 ? .6 : d < 28 ? .95 : .7,
   executioner: d => d < 24 ? .75 : .55,
   rubypierce: d => d < 4 ? .5 : d < 30 ? .85 : .7,
+  quasar: d => d < 4 ? .5 : d < 30 ? .88 : .72,
   paragon: d => d > 20 ? 1.2 : d > 14 ? .7 : d > 8 ? .3 : .1,
   shockbeam: d => d < 3 ? .55 : d < 24 ? .88 : .2,
   tigerbite: d => d > 20 ? 1.15 : d > 14 ? .65 : d > 8 ? .25 : .1,
   shotgun: d => d < 5 ? 1 : d < 9 ? .85 : d < 14 ? .3 : .05,
   flame: d => d < 5 ? 1.05 : d < 6.5 ? .5 : 0,
+  wildfire: d => d < 7 ? 1.1 : d < 9 ? .55 : 0,
   voxel: d => d < 14 ? .5 : .3,
   hitman: d => d < 18 ? .55 : .4,
   heatray: d => d < 3 ? .5 : d < 25 ? .85 : .2,
@@ -127,6 +130,7 @@ const GUN_FIT = {
   sniper: d => d > 20 ? 1.1 : d > 14 ? .6 : d > 8 ? .25 : .1,
   semisniper: d => d > 18 ? 1.05 : d > 12 ? .7 : d > 7 ? .35 : .15,
   rocket: d => d < 5 ? 0 : d < 22 ? .72 : .4,
+  finale: d => d < 5 ? 0 : d < 22 ? .8 : .42,
   grenade: d => d < 5 ? 0 : d < 18 ? .75 : .2,
   aerial: d => d < 5 ? 0 : d < 22 ? .8 : .45,
   crossbow: d => d > 14 ? .95 : d > 8 ? .55 : .2,
@@ -328,7 +332,7 @@ function holdGun(b) {
 const _wfq = new THREE.Quaternion(), _wfI = new THREE.Quaternion(), _wfd = new THREE.Vector3(), _wfl = new THREE.Vector3(), _lnE = new THREE.Euler();
 function wandFlick(q, k) { _wfd.set(0, 0, -1).applyQuaternion(q); _wfl.set(_wfd.x, 0, _wfd.z).normalize(); return _wfq.setFromUnitVectors(_wfd, _wfl).slerp(_wfI, 1 - k); }
 // a bot's or another player's weapon this frame (left, total: its reload): the same moves as yours in first person (held.js)
-const _rlV = new THREE.Vector3(), _rlM = new THREE.Vector3(), _rlF = new THREE.Vector3();
+const _rlV = new THREE.Vector3(), _rlM = new THREE.Vector3(), _rlF = new THREE.Vector3(), _rlK = new THREE.Vector3();
 function heldTick(b, dt, left, total) {
   const R = b.rl, g = b.gunM; if (!R || !g) return;
   const W = BASE[b.gun], k = left > 0 && total > 0 ? Math.max(0, 1 - left / total) : -1, lan = W.hold === 'lantern', wand = W.wand && !W.melee;
@@ -338,7 +342,7 @@ function heldTick(b, dt, left, total) {
   if (wand) b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 || b.wandT > 0 ? 14 : -4)));
   if (lan) b.lanT = b.muzzle > 0 ? 0 : (b.lanT ?? 9) + dt;
   b.kick = Math.max(0, (b.kick || 0) - dt * kickFall(W));
-  const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, rl: k, level: wand ? b.wf : 0, two: !!R.fL, insp: b.insp ?? -1 });
+  const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, sv: b.sv, rl: k, level: wand ? b.wf : 0, two: !!R.fL, insp: b.insp ?? -1 });
   bladeTrail(g, W, W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, scene); flipShow(b.flips, a);
   b.aim.rotation.x += a.sw; b.aim.position.z = a.push; // the arms swing at the shoulders
   if (heldIdle(a) && !lan) {
@@ -346,12 +350,14 @@ function heldTick(b, dt, left, total) {
     return;
   }
   R.on = true;
+  const cl = W.melee && b.insp >= 0 ? bladeClear(b.gun) : null; // a blade played with: the fist only lifts, the blade keeps clear of it
+  if (cl) { _rlK.copy(R.fR).add(_rlV.set(a.x, a.y, a.z)).applyQuaternion(R.q).add(R.p); bladeClearAt(cl, b.insp, _rlV); a.x += _rlV.x; a.y += _rlV.y; a.z += _rlV.z; }
   heldGun(g.quaternion, g.position, R.q, R.p, a, R.hR);
   if (a.level > 0) { const r = wandFlick(g.quaternion, a.level); _rlF.copy(R.hR).applyQuaternion(g.quaternion).add(g.position); g.quaternion.premultiply(r); g.position.sub(_rlF).applyQuaternion(r).add(_rlF); } // turning in the hand
   if (b.mag) b.mag.position.copy(R.magAt).add(_rlV.set(a.mx, a.my, a.mz));
   g.updateMatrix();
   const aimAt = (arm, p) => arm.quaternion.setFromUnitVectors(ARM_DOWN, _rlV.copy(p).sub(arm.position).normalize());
-  aimAt(b.armR, _rlF.copy(R.fR).applyMatrix4(g.matrix));
+  aimAt(b.armR, cl ? _rlK : _rlF.copy(R.fR).applyMatrix4(g.matrix));
   // left hand on the gun, then to the mag
   const to = a.left;
   if (!b.mag || (!R.fL && to <= 0)) { if (R.fL) aimAt(b.armL, _rlF.copy(R.fL).setZ(R.fL.z + a.az).applyMatrix4(g.matrix)); else b.armL.quaternion.copy(R.qL); }
@@ -361,6 +367,7 @@ function heldTick(b, dt, left, total) {
     if (R.fL || to > .01) aimAt(b.armL, _rlF);
     if (!R.fL) b.armL.quaternion.slerp(R.qL, 1 - to);
   }
+  if (heldToss(g.quaternion, g.position, a, W)) g.updateMatrix(); // up out of the hand
   if (lan && k < 0) { // a lantern swings from the fist: back when it fires, a little with every step
     const sp = Math.min(1, Math.hypot(b.vx || 0, b.vz || 0) / 5);
     g.quaternion.multiply(_wfq.setFromEuler(_lnE.set(-.45 * Math.exp(-3 * b.lanT) * Math.sin(9 * b.lanT), 0, .09 * sp * Math.sin(performance.now() * .006))));
@@ -621,7 +628,8 @@ function burnTick(dt) {
 }
 // bot knife
 function botStab(b, W, t, dist) {
-  b.cd = W.rate; b.stab = swingT(W); b.insp = -1; sfx(W.swing || 'swing', { at: b.g.position, far: 20 }); net.shot(W, b);
+  if (W.swings) b.sv = nextSwing(b.sv, W.swings);
+  b.cd = W.rate; b.stab = swingT(W); b.insp = -1; sfx(W.swing || 'swing', { at: b.g.position, far: 20, rate: swingRate(W, b.sv) }); net.shot(W, b);
   const p = tPos(t), pos = b.g.position, want = Math.atan2(p.x - pos.x, p.z - pos.z);
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
   const miss = dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing, at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
@@ -637,16 +645,13 @@ function botStab(b, W, t, dist) {
 // bot flamethrower
 const coneV = new THREE.Vector3(), flameV = new THREE.Vector3();
 function botFlame(b, W) {
-  if (!(b.fireOn > 0)) sfx('flameStart', { at: b.g.position, far: 50 });
+  if (!(b.fireOn > 0)) sfx(W.patch ? 'wildStart' : 'flameStart', { at: b.g.position, far: 50 });
   b.fireOn = .2; b.fireEnd = 'flameEnd';
   aimDir(b.aimYaw, b.aimPitch, dirV);
   b.flashM.getWorldPosition(flameV);
-  for (let k = 0; k < 2; k++) {
-    const m = new THREE.Mesh(flameGeo, flameMats[Math.random() * 3 | 0]); m.position.copy(flameV); scene.add(m);
-    const v = dirV.clone().multiplyScalar(13).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(2.5));
-    flames.push({ m, v, life: .45 });
-  }
+  flameBits(flameV, dirV, W);
   const hits = respawnT <= 0 && !friendly(b, YOU_T) ? [YOU_T] : [];
+  let near = Infinity;
   for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) hits.push(z);
   for (const o of hits) {
     const p = tPos(o), c = new THREE.Vector3(p.x, p.y + 1.1, p.z);
@@ -654,9 +659,11 @@ function botFlame(b, W) {
     if (along <= 0 || along > W.range) continue;
     if (Math.sqrt(Math.max(0, d * d - along * along)) > .5 + along * .15 + .3) continue;
     if (!clearLine(eye, c)) continue;
-    if (o.you) { hurtPlayer(W.dmg, false, b, false, 3); applyBurn(P, BURN_T, W.dmg * .6, b, 'flame'); }
-    else { hurtZombie(o, W.dmg, c, false, false, b, 3); applyBurn(o, BURN_T, W.dmg * .6, b, 'flame'); }
+    if (o.you) { hurtPlayer(W.dmg, false, b, false, 3); applyBurn(P, BURN_T, W.dmg * .6, b, W.id); }
+    else { hurtZombie(o, W.dmg, c, false, false, b, 3); applyBurn(o, BURN_T, W.dmg * .6, b, W.id); }
+    near = Math.min(near, along);
   }
+  if (W.patch) firePatch(eye, dirV, W, b, near);
 }
 function botFire(b, W, dist) {
   botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);

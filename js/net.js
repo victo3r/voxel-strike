@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 9; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 10; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -231,6 +231,7 @@ net = (() => {
       case 'rdy': { const r = m.pid === pid ? roster.youRec : remotes.get(m.pid)?.rec; if (r) r.rdy = true; if (standoff) duelRdy(m.pid); return; }
       case 'fire': return remoteFire(m);
       case 'boom': return remoteBoom(m);
+      case 'patch': if (Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) addPatch(new THREE.Vector3(...m.p), bodyOf(m.pid), false, m.pid * 100000 + (m.id | 0)); return; // someone's Wildfire set the floor alight
       case 'gear': return gearMsg(m);
       case 'look': return lookMsg(m);
       case 'pad': return padMsg(m);
@@ -570,6 +571,7 @@ net = (() => {
     (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : w.wisp ? fireWisp : w.vortex ? fireVoid : w.saw ? fireSaw : null)?.(w, from, dir, by, { ghost: true, id });
   }
   function remoteBoom(m) {
+    if (m.of !== undefined) return remoteBomblet(m);
     const id = m.pid * 100000 + m.id, p = new THREE.Vector3(...m.p);
     const sb = bolts.findIndex(b => b.ghost === id);
     if (sb >= 0) { const b = bolts[sb]; b.ms.forEach(x => b.sc.remove(x)); bolts.splice(sb, 1); spellFx(p, b.el); return; }
@@ -579,8 +581,17 @@ net = (() => {
       const k = list.findIndex(x => x.ghost && x.id === id);
       if (k >= 0) { kind = list === flares ? 'flare' : 'rocket'; gust = !!list[k].gust; scene.remove(list[k].m); list.splice(k, 1); break; }
     }
-    if (kind === 'rocket') blastFx(p, ROCKET_R, gust);
+    const cl = !!BASE[gi(m.g)]?.cluster; // a cluster shell: a gold burst, then its bomblets
+    if (kind === 'rocket') blastFx(p, ROCKET_R, gust, cl);
     else flareFx(p);
+    if (cl && Number.isFinite(m.s) && Array.isArray(m.n) && m.n.length === 3 && m.n.every(Number.isFinite)) { // its bomblets, thrown just as the shooter's were
+      const n = new THREE.Vector3(...m.n); clusterBurst(p, n.lengthSq() > .01 ? n.normalize() : n.set(0, 1, 0), m.s, bodyOf(m.pid), true, m.id, m.g, 0, m.pid);
+    }
+  }
+  function remoteBomblet(m) { // one of a cluster shell's bomblets going off where its shooter says
+    const k = -m.id - 1 - m.of * 8; if (!(k >= 0 && k < CLUSTER_N)) return;
+    const j = bomblets.findIndex(b => b.key === m.pid + ':' + m.id); if (j >= 0) { scene.remove(bomblets[j].m); bomblets.splice(j, 1); }
+    popFx(new THREE.Vector3(...m.p), k);
   }
 
   // positions coming in, drawn a little in the past
@@ -596,7 +607,7 @@ net = (() => {
       if (buf.length && ts <= buf[buf.length - 1].ts) continue; // out of order
       buf.push({ ts, x, y, z, yaw: bodyYaw(yaw), pitch, gun, flags });
       while (buf.length > 2 && buf[1].ts < st - NET_HIST) buf.shift();
-      r.fired += fd | 0; r.burn = burn | 0;
+      r.fired += fd | 0; r.burn = burn | 0; if (fd) r.sv = flags >> 13 & 3; // which swing, for a blade with several
       const rl = !!(flags & 2); if (rl && !r.reloadWas) r.q |= 2; r.reloadWas = rl;
       if (flags & 64) r.q |= 64; if (flags & 256) r.q |= 256; if (flags & 4096) r.q |= 4096;
       r.charging = !!(flags & 2048); // the Aurora Rail
@@ -657,7 +668,7 @@ net = (() => {
       const n = Math.min(r.fired, 3); r.fired = 0; z.ammo = Math.max(0, z.ammo - n); // just for the rockets in a Salvo's tubes
       if (!W.melee) coreFire(z.core);
       if (W.melee) {
-        sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = swingT(W); z.insp = -1;
+        z.sv = r.sv | 0; sfx(W.swing || 'swing', { at: pos, far: 20, rate: swingRate(W, z.sv) }); z.stab = swingT(W); z.insp = -1;
         if (W.wand && z.flashM) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); stunZap(z.flashM.getWorldPosition(fv).clone(), zapEnd(W, eyeV, dirV, z)); } // their stun blast, just for show
       }
       else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); z.kick = kickOf(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.charge ? full ? 'auroraFull' : 'aurora' : W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
@@ -686,13 +697,9 @@ net = (() => {
     if (firing) {
       eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); z.flashM.getWorldPosition(fv);
       if (W.flame) {
-        if (!(z.fireOn > 0)) sfx('flameStart', { at: pos, far: 50 });
+        if (!(z.fireOn > 0)) sfx(W.patch ? 'wildStart' : 'flameStart', { at: pos, far: 50 });
         z.fireOn = .2; z.fireEnd = 'flameEnd'; z.kick = Math.max(z.kick || 0, kickOf(W));
-        for (let k = 0; k < 2; k++) {
-          const m = new THREE.Mesh(flameGeo, flameMats[Math.random() * 3 | 0]); m.position.copy(fv); scene.add(m);
-          const v = dirV.clone().multiplyScalar(13).add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(2.5));
-          flames.push({ m, v, life: .45 });
-        }
+        flameBits(fv, dirV, W);
       } else {
         if (!(z.fireOn > 0)) sfx(beamSnd(W) + 'Start', { at: pos, far: 50 });
         z.fireOn = .2; z.fireEnd = beamSnd(W) + 'End';
@@ -720,6 +727,7 @@ net = (() => {
     if (WEAPONS[cur].melee ? inspT >= 0 : aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8; if (P.gliding) flags |= 16; // 1: aiming, or playing with a blade
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
     if (P.downed) flags |= 512; if (P.waiting) flags |= 1024; if (chargeT > 0) flags |= 2048; // 2048 charging, 4096 (an event) a full charge went off
+    if (WEAPONS[cur].swings) flags |= (swingV & 3) << 13; // 8192, 16384: which of a blade's swings
     const h = hits; hits = [];
     const f = fired; fired = 0;
     clock.off += Math.max(-3, Math.min(3, clock.target - clock.off)); // slide, don't jump
@@ -733,6 +741,7 @@ net = (() => {
       let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (BASE[b.gun].melee ? b.insp >= 0 : b.aimT > 0) bf |= 1; if (b.gliding) bf |= 16;
       if (b.dashFlag) { bf |= 256; b.dashFlag = false; }
       if (b.chargeK > 0) bf |= 2048; if (b.fullFlag) { bf |= 4096; b.fullFlag = false; }
+      if (BASE[b.gun].swings) bf |= (b.sv & 3) << 13;
       if (b.drownFlag) { bf |= 128; b.drownFlag = false; }
       const q = b.g.position;
       botRows.push([r.rec.pid, r3(q.x), r3(q.y), r3(q.z), r3(wrapAng(b.aimYaw - Math.PI)), r3(b.aimPitch), BASE[b.gun].id, bf, r.fired, r.hits]);
@@ -781,7 +790,8 @@ net = (() => {
     send(m);
     return id;
   }
-  const boom = (id, p, by) => { if (!api.on || !id) return; const m = { t: 'boom', id, p: [r2(p.x), r2(p.y), r2(p.z)] }; if (by && by.pid) m.by = by.pid; send(m); };
+  const patch = (id, p, by) => { if (!api.on) return; const m = { t: 'patch', id, p: [r2(p.x), r2(p.y), r2(p.z)] }; if (by && by.pid) m.by = by.pid; send(m); }; // where the Wildfire's flames came down
+  const boom = (id, p, by, x) => { if (!api.on || !id) return; const m = { t: 'boom', id, p: [r2(p.x), r2(p.y), r2(p.z)] }; if (by && by.pid) m.by = by.pid; if (x) Object.assign(m, x); send(m); }; // x: a Grand Finale shell's seed and way out, or which shell a bomblet came from
 
   // spawning: once your mouse is locked
   function tryReady() {
@@ -902,7 +912,7 @@ net = (() => {
   Object.assign(api, {
     selfRec: () => makeRemoteRec({ pid, name: myName, css: '#8ff0b6', look: prof.look.px ? { ...lookSent(), px: prof.look.px } : lookSent(), gear: myGear() }), rival: rivalRec, rdy: () => send({ t: 'rdy' }),
     coopTick, mates: () => mateList, recOf, zHit, zEvent: e => { if (zev.length < 60) zev.push(e); }, zHurt: h => { if (zhurts.length < 20) zhurts.push(h); }, zSend: send,
-    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : k === 'full' ? 4096 : 32; },
+    now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, patch, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : k === 'full' ? 4096 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
   Object.defineProperties(api, { // read live
