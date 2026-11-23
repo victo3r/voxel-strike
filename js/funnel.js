@@ -3,13 +3,23 @@ let fun = null;
 try { fun = JSON.parse(localStorage.getItem('voxelstrike-funnel')); } catch {}
 if (!fun) fun = prof.lv === 1 && !prof.xp && !localStorage.getItem('voxelstrike-starter') && !DEV_ALL ? { d0: dayKey(), s: [], t: 0, g: 0 } : { s: [] }; // only players who start out now
 const funnelSave = () => { try { localStorage.setItem('voxelstrike-funnel', JSON.stringify(fun)); } catch {} };
+const FUN_BOTS = /[a-z]bot\/|crawler|spider|slurp|facebookexternalhit|headlesschrome|lighthouse|pagespeed/i, FUN_BOT = FUN_BOTS.test(navigator.userAgent); // crawlers that say so
+let funAct = false; const funWait = [];
 function funnel(step) {
   if (!fun.d0 || fun.s.includes(step)) return;
+  if (!funAct && step !== 'load') { if (!funWait.includes(step)) funWait.push(step); return; } // the rest waits for a real click or key
   fun.s.push(step); funnelSave();
-  if (navigator.webdriver && !window.funnelTest) return; // not from automated tests
+  if ((navigator.webdriver || FUN_BOT) && !window.funnelTest) return; // not from automated tests or crawlers
   fetch(CLOUD + '/funnel', { method: 'POST', keepalive: true, body: JSON.stringify({ s: step, d: (TOUCH ? 'p' : 'd') + (cg.on ? 'c' : 'w') }) }).catch(() => {});
 }
-// the game is up: how it loaded, and whether they've come back
+// someone's really there: crawlers that open the page never click or press a key
+function funnelAct(e) {
+  if (funAct || !e.isTrusted) return;
+  funAct = true; for (const k of ['pointerdown', 'keydown', 'touchend']) removeEventListener(k, funnelAct, true);
+  funnel('act'); for (const s of funWait.splice(0)) funnel(s);
+}
+for (const k of ['pointerdown', 'keydown', 'touchend']) addEventListener(k, funnelAct, true);
+// the game is up: how it loaded, and whether they've come back (all but the load itself sent once they act)
 function funnelBoot() {
   funnel('load');
   if (performance.now() > 10000) funnel('slow');
