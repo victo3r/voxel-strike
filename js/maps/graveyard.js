@@ -109,7 +109,7 @@ piece(DOOR * 2 + .5, .3, .22, darkStone, TX, DOOR_H + .15, TZ + TO + .11);
 for (const [u, v] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) tw(u * TO - (u > 0 ? .55 : 0), u * TO + (u < 0 ? .55 : 0), v * TO - (v > 0 ? .55 : 0), v * TO + (v < 0 ? .55 : 0), DECK + PAR, DECK + 3); // belfry pillars
 for (const s of [-1, 1]) { piece(TO * 2, .3, .55, darkStone, TX, DECK + 3.15, TZ + s * (TO - .275)); piece(.55, .3, TO * 2 - 1.1, darkStone, TX + s * (TO - .275), DECK + 3.15, TZ); }
 { const roof = new THREE.Mesh(new THREE.ConeGeometry(TO * 1.45, 3.2, 4), slate); roof.rotation.y = Math.PI / 4; roof.position.set(TX, DECK + 4.9, TZ); add(roof); building.cover.push(roof); }
-piece(.12, 1.2, .12, iron, TX, DECK + 7.1, TZ); piece(.7, .1, .1, iron, TX, DECK + 7.2, TZ);
+piece(.12, 1.5, .12, iron, TX, DECK + 6.95, TZ); piece(.7, .1, .1, iron, TX, DECK + 7.2, TZ); // a cross out of the spire's tip
 // the bell
 piece(.2, .2, TO * 2 - .5, wood, TX, DECK + 3.15, TZ); // the yoke rests in the belfry's beams
 for (const [w, y] of [[.5, 2.9], [.8, 2.7], [.95, 2.45], [1.1, 2.25]]) { const b = piece(w, .25, w, bronze, TX, DECK + y, TZ); building.cover.push(b); }

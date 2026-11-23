@@ -46,13 +46,14 @@ const CONNS = []; // for bots: [from region, to region, points along the way]
 function steps(x, z, ax, dir, y0, y1, n, side) { // foot at (x, z), climbing along ax ('x' or 'z') in dir; side points at the wall
   const run = n * .5, P = (d, s = 0) => ax === 'x' ? [x + dir * d + side[0] * s, z + side[1] * s] : [x + side[0] * s, z + dir * d + side[1] * s];
   const k = (y1 - y0) / run, half = .14 / Math.cos(Math.atan2(y1 - y0, run)), top = d => y0 + k * (d - .35) + (y1 - y0) / n - .08; // the side board's top edge runs under the front of every step
-  const end = run + .35 - Math.min(.3 / k, .5), bm = (.35 + end) / 2; // it stops short of the landing so it doesn't stick up past it
+  const end = run + .35 - Math.min(.3 / k, .5), start = .35 - ((y1 - y0) / n - .08) / k, bm = (start + end) / 2; // it runs from the floor and stops short of the landing so it doesn't stick up past it
   for (let k = 0; k < n; k++) { const [tx, tz] = P(.6 + k * .5), t = y0 + (y1 - y0) * (k + 1) / n; addSlab(tx, tz, ax === 'x' ? .5 : 1.4, ax === 'x' ? 1.4 : .5, t - .1, t, metal); }
   const [lx, lz] = P(.6 + run + .45); addSlab(lx, lz, 1.4, 1.4, y1 - .15, y1, metal); // landing
-  const len = Math.hypot(run, y1 - y0), blen = (end - .35) * Math.hypot(1, k), [bx, bz] = P(bm, -.76), [mx, mz] = P(.35 + run / 2, -.76), r = box(ax === 'x' ? blen : .1, .28, ax === 'x' ? .1 : blen, metal); // the outer side board
+  const blen = (end - start) * Math.hypot(1, k), [bx, bz] = P(bm, -.76), r = box(ax === 'x' ? blen : .1, .28, ax === 'x' ? .1 : blen, metal); // the outer side board
   r.position.set(bx, top(bm) - half, bz); if (ax === 'x') r.rotation.z = dir * Math.atan2(y1 - y0, run); else r.rotation.x = -dir * Math.atan2(y1 - y0, run); add(r);
-  const rail = box(ax === 'x' ? len : .06, .06, ax === 'x' ? .06 : len, dark); rail.position.set(mx, top(.35 + run / 2) + .8, mz); rail.rotation.copy(r.rotation); add(rail);
-  for (let j = 0; j <= n; j += 3) { const d = Math.min(.6 + j * .5, end - .1), [px, pz] = P(d, -.76), p = box(.06, .86, .06, dark); p.position.set(px, top(d) + .4, pz); add(p); } // posts from the board up to the rail
+  const p0 = .6, p1 = end - .1, np = Math.max(1, Math.round((p1 - p0) / 1.5)), len = (p1 - p0) * Math.hypot(1, k) + .06, [mx, mz] = P((p0 + p1) / 2, -.76);
+  for (let j = 0; j <= np; j++) { const d = p0 + (p1 - p0) * j / np, [px, pz] = P(d, -.76), p = box(.06, .86, .06, dark); p.position.set(px, top(d) + .4, pz); add(p); } // posts from the board up to the rail
+  const rail = box(ax === 'x' ? len : .06, .06, ax === 'x' ? .06 : len, dark); rail.position.set(mx, top((p0 + p1) / 2) + .8, mz); rail.rotation.copy(r.rotation); add(rail); // from the first post to the last
   if (y0 < .1) for (const f of [.45, .85]) { const d = Math.min(.6 + run * f, end - .1), [px, pz] = P(d, -.76), h = top(d) - 2 * half + .04, p = box(.12, h, .12, metal); p.position.set(px, h / 2, pz); add(p); } // legs up to the board
   const [ex, ez] = P(.6 + run + .45, 1.5);
   GAPS.push([lx + side[0] * .9, lz + side[1] * .9]);

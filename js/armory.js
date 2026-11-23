@@ -139,6 +139,7 @@ const DESC = {
   daybreak: 'A six shooter the colour of sunrise, for players who came back',
   highnoon: 'A lever rifle that settles things at midday, a first week keepsake',
   cutlass: 'A quick blade pulled up from a wreck, still sharp',
+  balisong: 'A butterfly knife that cuts quick and flips even quicker',
   harpoon: 'A speargun whose line reels them in to you',
   conch: 'A shell with the sea inside, and its jet shoves them back',
   tipistol: 'A heavy titanium hand cannon that hits like a rifle',
@@ -193,7 +194,7 @@ const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIV
 const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare', 'eradicator', 'rocket', 'hitman', 'heatray', 'thrasher', 'semisniper', 'herosword', 'shockbeam', 'tigerbite', 'executioner',
   'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
   'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
-  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch'];
+  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong'];
 const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
 function renderIndex() {
   const list = indexList(), have = list.filter(hasGun).length;
@@ -263,7 +264,9 @@ function placeAct() {
   if (!armOpen) return;
   const h = $('heroAct'), on = inLobby && armPage !== 'wear' && armPage !== 'index' && wideArm();
   h.style.display = on ? 'flex' : 'none';
-  $('heroReload').style.display = BASE[armSel]?.inf || BASE[armSel]?.pool ? 'none' : ''; // nothing to reload: melee, wands
+  const W = BASE[armSel], rb = $('heroReload'), insp = !!W?.melee, kind = insp ? 'flair' : 'reload';
+  rb.style.display = !insp && (W?.inf || W?.pool) ? 'none' : ''; // nothing to reload: wands; a blade gets inspected instead
+  if (rb.dataset.k !== kind) { rb.dataset.k = kind; rb.innerHTML = ico(kind); rb.title = insp ? 'Inspect' : 'Reload'; }
   if (!on) return;
   const edge = zRect($('armory')).right;
   if (TOUCH && phoneSide.matches) { // phones: a row under him, between the list and the card

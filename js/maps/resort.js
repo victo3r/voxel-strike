@@ -429,7 +429,7 @@ for (let s = 0; s < PSTEPS; s++) {
   const m = tbox(w, h, PS.z1 - PS.z0, tile, 2); m.position.set(PS.x0 + w * (s + .5), POOL_F + h / 2, 0); add(m); building.cover.push(m);
 }
 const chrome = surf(plain(0xd6dde3), 'metal');
-for (const z of [PS.z0 - .12, PS.z1 + .12]) { // handrails
+for (const z of [PS.z0 - .04, PS.z1 + .04]) { // handrails, the pool end fixed to the steps' side
   const up = box(.07, 1, .07, chrome); up.position.set(PS.x0 - .55, DECK_Y + .5, z); add(up);
   const top = box(.9, .07, .07, chrome); top.position.set(PS.x0 - .1, DECK_Y + 1, z); add(top);
   const down = box(.07, 1.3, .07, chrome); down.position.set(PS.x0 + .35, DECK_Y + .35, z); add(down);
@@ -793,6 +793,7 @@ const benchB = box(.16, .42, SB.w - .52, seatMat); benchB.position.set(SB.x0 + .
   const band = box(.64, .08, .58, hullWhite); band.position.set(mx, 1.2, SB.z); add(band);
   const leg = box(.22, 1.5, .18, motorM); leg.position.set(mx + .05, .32, SB.z); add(leg);
   const plate = box(.55, .04, .32, motorM); plate.position.set(mx + .05, -.2, SB.z); add(plate);
+  const hub = box(.12, .08, .08, motorM); hub.position.set(mx - .1, -.36, SB.z); add(hub); // the propeller on its shaft
   for (let i = 0; i < 3; i++) { const b = box(.04, .34, .1, chromeM); b.position.set(mx - .14, -.36, SB.z); b.rotation.x = i * 2.094; add(b); }
 }
 // lights, cleats, fenders and ropes
@@ -823,6 +824,7 @@ rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
   // swim platform
   const plat = box(1, .12, W - .6, plank); plat.position.set(X0 - .5, .55, Z); add(plat);
   for (const s of [-1, 1]) rod([X0 - .8, .1, Z + s * .3], [X0 - .8, .95, Z + s * .3], chromeM, .045);
+  rod([X0 - .8, .95, Z - .3], [X0 - .8, .95, Z + .3], chromeM, .045); // the handles join over the top
   for (const y of [.25, .45]) rod([X0 - .8, y, Z - .3], [X0 - .8, y, Z + .3], chromeM, .04);
   // cabin
   hullPiece(hullShape(7.6, 3.2, 2.4), 1.72, 3, hullWhite, X0 + 1.8, Z, false);
@@ -857,7 +859,7 @@ rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
   hullPiece(hullShape(L, W, 1.3, 1.1), .12, .42, boards([92, 168, 176]), X0, Z);
   hullPiece(hullShape(L - .2, W - .25, 1.2, 1, .1), .42, .62, boards([170, 64, 44]), X0, Z);
   hullPiece(hullShape(L - .6, W - .7, 1, .85, .3), .62, .78, boards([170, 64, 44]), X0, Z);
-  const keel = box(L - .5, .08, .1, plain(0x4a2e18)); keel.position.set(X0 + L / 2, .82, Z); add(keel);
+  const keel = box(L - .6, .08, .1, plain(0x4a2e18)); keel.position.set(X0 + L / 2, .82, Z); add(keel);
   for (const [oz, ry] of [[Z + 1.35, .08], [Z + 1.7, -.05]]) {
     const oar = new THREE.Group(), wd = plain(0xb08a58);
     const shaft = box(2.3, .07, .07, wd); oar.add(shaft);

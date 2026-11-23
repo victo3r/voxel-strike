@@ -34,6 +34,8 @@ const RULES = {
   team:      { name: 'TEAM FIGHT', t: 240, you: 3, bot: 1.5, join: 60, kills: true,  team: true,  players: { small: 4, medium: 6, large: 8 } },
   blitz:     { name: 'BLITZ',      t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: false, players: { small: 4, medium: 6, large: 8 } },
   blitzTeam: { name: 'TEAM BLITZ', t: 90,  you: 1.5, bot: .5, join: 20, kills: true,  team: true,  players: { small: 4, medium: 6, large: 6 } },
+  // one on one, online only (js/duel.js): first to `win` kills with a lead of `by` ends it early, a tie at the end plays `sudden` more seconds for the next kill
+  duel:      { name: 'DUEL',       t: 240, you: 3, bot: 0, join: 0,   kills: true,  team: false, duel: true, win: 10, by: 2, sudden: 60, players: { small: 2, medium: 2, large: 2 } },
 };
 // a new player's first game: short, easy bots in common gear, with tips
 const STARTER = { ...RULES.dm, t: 120, join: 30, starter: true }, STARTER_MAP = 'roofs', STARTER_SKILLS = [0, 1, 0, 1, 0, 1, 0];
@@ -87,7 +89,7 @@ const botGun = c => pickRare(BASE.filter(w => w.cat === c && (w.unlock || 0) <= 
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], hornet: [8, 18], salvo: [9, 18], apex: [18, 36], tracker: [6, 16], tempest: [6, 16], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
-  knife: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
+  knife: [.9, 1.6], balisong: [.9, 1.6], flame: [2, 5], heatray: [6, 18], rocket: [9, 18], flare: [7, 16],
   herosword: [1, 2], warhammer: [1, 2], frostwand: [6, 16], blazesaber: [1, 2], windsaber: [1, 2.2], trex: [2.5, 6.5], starsmasher: [9, 20], shockbeam: [6, 16], tigerbite: [18, 34], executioner: [8, 20], crossbow: [12, 28], grenade: [7, 16], aerial: [8, 18],
   rubypierce: [10, 24], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
   wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
@@ -96,6 +98,7 @@ const BOT_KEEP = {
 // how good each gun is at a distance
 const GUN_FIT = {
   knife: d => d < 2.2 ? 1.25 : d < 4 ? .35 : 0,
+  balisong: d => d < 2.2 ? 1.3 : d < 4 ? .35 : 0,
   herosword: d => d < 2.8 ? 1.3 : d < 4.5 ? .4 : 0,
   blazesaber: d => d < 2.8 ? 1.32 : d < 4.5 ? .4 : 0,
   warhammer: d => d < 2.6 ? 1.3 : d < 4.2 ? .35 : 0,
@@ -204,6 +207,7 @@ function tagMat(name, css) { // name tag over its head
 
 const YOU_T = { you: true }; // stands in for you when a bot picks a target
 let recs = [], youRec = null, matchT = 0, killedBy = '', joins = [];
+let standoff = null; // a duel's standoff before the fight (duel.js)
 const youHelpers = new Set(); // for assists
 // killCam: the bot that killed you, the camera watches it
 let killCam = null;
@@ -301,14 +305,15 @@ const ARM_DOWN = new THREE.Vector3(0, -1, 0), _hv = new THREE.Vector3();
 function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag, rounds, charges, pulse } = makeGun(b.gun, gunM, b.rec.stars[b.gun], growStage(b.gun, b.rec.lv));
+  b.core?.dispose();
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag, rounds, charges, pulse, core, flips } = makeGun(b.gun, gunM, b.rec.stars[b.gun], growStage(b.gun, b.rec.lv));
   // the hold pose from hold.js
   const h = holdFor(b.gun);
   gunM.position.set(h.T[0] * u, (h.T[1] - 22) * u, h.T[2] * u); gunM.quaternion.fromArray(h.q);
   b.armR.quaternion.setFromUnitVectors(ARM_DOWN, _hv.fromArray(h.dR));
   b.armL.quaternion.setFromUnitVectors(ARM_DOWN, h.dL ? _hv.fromArray(h.dL) : _hv.set(.08, -.95, .3).normalize());
   b.holdTurn = h.turn; // sideways stance so the gun points where it aims
-  b.round = round; b.rounds = rounds; b.bn = 0; b.charges = charges; b.chargeK = 0; chargeShow(charges, 0); b.pulse = pulse;
+  b.round = round; b.rounds = rounds; b.bn = 0; b.charges = charges; b.chargeK = 0; chargeShow(charges, 0); b.pulse = pulse; b.core = core; b.flips = flips; b.insp = -1;
   b.flashM ??= makeFlash(.1); b.flashM.material = flashOf(BASE[b.gun]);
   b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
   gunM.add(b.flashM); b.aim.add(gunM);
@@ -333,7 +338,8 @@ function heldTick(b, dt, left, total) {
   if (wand) b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 || b.wandT > 0 ? 14 : -4)));
   if (lan) b.lanT = b.muzzle > 0 ? 0 : (b.lanT ?? 9) + dt;
   b.kick = Math.max(0, (b.kick || 0) - dt * kickFall(W));
-  const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / KNIFE_SWING : -1, rl: k, level: wand ? b.wf : 0, two: !!R.fL });
+  const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, rl: k, level: wand ? b.wf : 0, two: !!R.fL, insp: b.insp ?? -1 });
+  bladeTrail(g, W, W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, scene); flipShow(b.flips, a);
   b.aim.rotation.x += a.sw; b.aim.position.z = a.push; // the arms swing at the shoulders
   if (heldIdle(a) && !lan) {
     if (R.on) { R.on = false; g.position.copy(R.p); g.quaternion.copy(R.q); b.armR.quaternion.copy(R.qR); b.armL.quaternion.copy(R.qL); if (b.mag) b.mag.position.copy(R.magAt); }
@@ -615,7 +621,7 @@ function burnTick(dt) {
 }
 // bot knife
 function botStab(b, W, t, dist) {
-  b.cd = W.rate; b.stab = KNIFE_SWING; sfx(W.swing || 'swing', { at: b.g.position, far: 20 }); net.shot(W, b);
+  b.cd = W.rate; b.stab = swingT(W); b.insp = -1; sfx(W.swing || 'swing', { at: b.g.position, far: 20 }); net.shot(W, b);
   const p = tPos(t), pos = b.g.position, want = Math.atan2(p.x - pos.x, p.z - pos.z);
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
   const miss = dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing, at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
@@ -654,7 +660,7 @@ function botFlame(b, W) {
 }
 function botFire(b, W, dist) {
   botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);
-  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); b.kick = kickOf(W); net.shot(W, b);
+  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); b.kick = kickOf(W); coreFire(b.core); net.shot(W, b);
   const bolt = W.wand && !W.beam; if (bolt) b.wandT = .15; // a wand flicks forward
   muzzleBits(W, b.flashM);
   // beams in long sweeps, everything else in short bursts
@@ -756,6 +762,7 @@ function updateBot(b, dt) {
     if (t !== was) {
       if (!t && was && tAlive(was) && b.engaged) b.roam = { x: b.lk.x, y: b.lk.y, z: b.lk.z, t: 5 + Math.random() * 3 }; // lost it: go look where it was
       b.tgt = t; b.seeT = 0; b.aimT = 0; b.lostT = 0; b.engaged = false; b.pvx = b.pvz = 0;
+      b.inspNext = !t && was && !tAlive(was) && W.melee && Math.random() < .5 ? .3 + Math.random() * .3 : 0; // won with a blade: now and then it shows off
       if (t) { const q = tPos(t); b.lpx = b.lk.x = q.x; b.lpz = b.lk.z = q.z; b.lk.y = q.y; b.idle = 0; }
     }
   }
@@ -781,7 +788,7 @@ function updateBot(b, dt) {
   const dx = go.x - pos.x, dz = go.z - pos.z, dist = Math.hypot(dx, dz) || .001;
 
   // pick the best gun for the distance
-  if ((b.pickT -= dt) <= 0) {
+  if ((b.pickT -= dt) <= 0 && !(b.insp >= 0) && !(b.inspNext > 0)) { // a blade gets put away after its flourish
     b.pickT = sees ? .5 + Math.random() * .7 : 2 + Math.random() * 2;
     botEquip(b, pickGun(b, t && (sees || b.lostT < 1.5) ? dist : HUNT_D));
     W = b.rec.W[b.gun];
@@ -826,6 +833,8 @@ function updateBot(b, dt) {
   b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.wandT = (b.wandT || 0) - dt; b.flashM.visible = b.muzzle > 0; if (b.pulse) pulseShow(b.pulse, b.muzzle > 0);
   if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx(b.fireEnd, { at: pos, far: 50 });
   b.stab = Math.max(0, b.stab - dt);
+  if (b.inspNext > 0 && (b.inspNext -= dt) <= 0 && W.melee && !t && b.stab <= 0) b.insp = 0; // the flourish
+  if (b.insp >= 0) { const t0 = b.insp; b.insp += dt; if (sees || b.stab > 0 || b.insp >= inspLen(W)) b.insp = -1; else inspSnd(W, t0, b.insp, pos); }
   if (b.spin) { if (b.muzzle > 0) b.spinV = spinKick(b.gun); spinTurn(b.spin, b.spinV + spinIdle(b.gun), dt); b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
@@ -936,6 +945,7 @@ function updateBot(b, dt) {
 
 // while you're dead: count down, then respawn
 function dmDown(dt) {
+  if (standoff) { duelCam(dt); return true; }
   if (respawnT <= 0) return false;
   respawnT -= dt;
   if (net.on) respawnT = Math.max(respawnT, .01); // online the server respawns you
@@ -967,6 +977,7 @@ function updateDM(dt) {
   while (joins.length && MATCH_T - matchT >= joins[0].at) joinBot(joins.shift());
   chatTick(dt); burnTick(dt); tipTick(dt);
   for (const r of recs) if (!r.you && (!r.b || r.b.dead) && (r.wait -= dt) <= 0) makeBot(r);
+  if (walkMap) { if (!lastTop) $('top').innerHTML = lastTop = `<div class="place">${MAP.name.toUpperCase()}  ·  LOOKING AROUND</div>`; return; } // ?walk: no clock, no end
   matchT -= dt;
   const sec = Math.max(0, Math.ceil(matchT));
   if (sec <= 10 && sec !== lastSec && sec > 0) sfx('tick');
@@ -1020,18 +1031,21 @@ function tipTick(dt) {
 // match results (online they come from the server)
 function endMatch(results) {
   matchOver = true; closeChat(); tip = null; $('tip').classList.remove('on'); closeArmory(); $('board').style.display = 'none'; $('menu').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard();
-  const place = results ? results.place : ranked().indexOf(youRec) + 1, lead = results ? results.lead : teamLead();
+  const place = results ? results.place : ranked().indexOf(youRec) + 1, lead = results ? results.lead : teamLead(), D = results?.duel;
   $('postSub').textContent = MR.name + ' OVER';
-  $('postPlace').textContent = MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
+  $('postPlace').textContent = D ? (D.draw ? 'DRAW' : results.won ? 'VICTORY!' : 'DEFEAT') : MR.team ? (lead > 0 ? 'VICTORY!' : lead < 0 ? 'DEFEAT' : 'DRAW') : place === 1 ? '1ST PLACE!' : ord(place) + ' PLACE';
   $('postBoard').innerHTML = boardHTML();
   const won = results ? results.won : MR.team ? lead > 0 : place === 1;
-  const key = !!results && !results.priv && place === 1; // keys come from public online wins
+  const key = !!results && !results.priv && place === 1 && !D; // keys come from public online wins (not duels)
   if (key) prof.keys = (prof.keys | 0) + 1;
-  missionEnd(won); achEnd(won, key); dailyPlayed(); funnelEnd();
+  const quick = !!D && !results.xp && !results.gold; // a duel over before 30 s of fighting pays nothing and doesn't count (room.js duelOver)
+  if (!quick) { missionEnd(won); achEnd(won, key || !!D && won && !results.priv); dailyPlayed(); }
+  funnelEnd();
   const [xp0, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), xp = xp0 + missionXpTake(), { ups, bonus, boostUp, bars, boxes } = grant(xp, gold); // doubled with a booster, plus the missions' XP
-  eventEnd(xp0, won);
+  if (!quick) eventEnd(xp0, won);
   $('rewards').innerHTML = rewardRow([xpTile(xp), coinTile(gold), barTile(bars), boxTile(boxes), key && [ico('key'), 'KEY', '+1', 'tk'], boostTile(), ...eventTiles()])
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
+    + (D?.forfeit && results.won ? `<div class="rl">${D.rival || 'Your rival'} ${quick ? 'left too soon for this one to count' : 'left, so the win is yours'}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
     + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + unlockRow(ups) + achRow() + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
@@ -1040,7 +1054,7 @@ function endMatch(results) {
   setTimeout(() => { if (!lvlShow() && (ups || bars || boxes)) sfx('levelUp'); }, 700);
   unlockMouse();
 }
-$('againBtn').addEventListener('click', () => { if (net.on) { net.again(); return; } restart(); lockMouse(); });
+$('againBtn').addEventListener('click', () => { if (net.on || MR.duel) { net.again(); return; } restart(); lockMouse(); }); // a duel is only ever online
 $('postLobby').addEventListener('click', () => { net.leave(); restart(); showLobby(true); });
 
 // a gun from your account, at your chosen stars
@@ -1052,7 +1066,7 @@ function giveGun(g) {
 function setupMode() {
   matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = ''; youHelpers.clear(); killCam = null;
   MR = starterNext && !net.on ? STARTER : RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join; starterNext = false;
-  BOT_COUNT = net.on ? 0 : MR.players[MAP.size] - 1;
+  BOT_COUNT = net.on || walkMap ? 0 : MR.players[MAP.size] - 1; // ?walk (input.js): nobody else
   $('post').style.display = 'none'; document.body.classList.remove('results'); $('board').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard(); // clears "KILLED BY"
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
   $('chat').style.display = pvp() || net.coop ? '' : 'none';

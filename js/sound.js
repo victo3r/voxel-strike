@@ -913,6 +913,11 @@ const SOUNDS = {
   upgrade: [.6, .45, s => { s.arp(0, [523, 659, 784, 1046, 1318], { gap: .05, d: .25, v: .4 }); }],
   join: [.3, .25, s => { s.tone({ type: 'triangle', f: 660, d: .1, v: .5 }); s.tone({ type: 'triangle', f: 880, t: .08, d: .15, v: .5 }); }],
   tick: [.1, .3, s => { s.tone({ type: 'square', f: 1000, d: .05, v: .5, lp: 2000 }); }],
+  noonBell: [2.6, .55, s => { // a church bell tolls noon: the draw
+    s.clack({ f: 1300, d: .02, v: .5, body: .9 });
+    s.ring({ f: 220, d: 2.5, v: .55, ratios: [.5, 1, 1.19, 1.5, 2, 2.52, 3.01] });
+    s.ring({ f: 221.2, t: .01, d: 1.6, v: .2, ratios: [1, 2, 3.01] });
+  }],
   waveStart: [.9, .5, s => { s.tone({ type: 'sawtooth', f: 220, a: .02, d: .6, v: .5, lp: 1200 }); s.tone({ type: 'sawtooth', f: 330, t: .2, a: .02, d: .5, v: .5, lp: 1200 }); }],
   win: [1.1, .5, s => { s.arp(0, [523, 659, 784], { gap: .1, d: .25, v: .45 }); s.tone({ type: 'triangle', f: 1046, t: .3, d: .7, v: .5 }); }],
   lose: [1, .45, s => { s.arp(0, [523, 440, 349], { gap: .15, d: .35, v: .45 }); }],
@@ -966,10 +971,14 @@ SOUNDS.splash = [1.1, .8, s => {
   s.crunch({ t: .03, a: .02, d: .32, dens: .02, lo: 900, hi: 6500, v: .5 });
   for (let i = 0; i < 16; i++) { const t = .04 + s.r() ** 1.5 * .75, f = 380 + s.r() * 900; s.tone({ f, f2: f * 1.7, t, a: .003, d: .03 + s.r() * .05, v: .22 * (1 - t * .9) }); }
 }];
+// a balisong: its quick slash, and the flips when you play with it
+SOUNDS.flick = [.24, .45, s => { s.hiss({ ft: 'bandpass', f: 800, f2: 3800, q: 3.2, a: .025, d: .08, v: 1, sweep: .1 }); s.tone({ type: 'triangle', t: .01, f: 2637, f2: 2600, d: .09, v: .04 }); }];
+SOUNDS.flipSwish = [.22, .3, s => { s.hiss({ ft: 'bandpass', f: 650, f2: 2600, q: 2.6, a: .04, d: .1, v: .9, sweep: .13 }); }];
+SOUNDS.flipShut = [.2, .55, s => { s.clack({ f: 3300, d: .012, v: .8, body: .15 }); s.clack({ t: .03, f: 2600, d: .016, v: 1, body: .35 }); }];
 const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
 // close-up sounds get less echo
-const CLOSE = /^(r_|zin_|zout_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$)/;
+const CLOSE = /^(r_|zin_|zout_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$|flip)/;
 // each sound is made once, the first time it's needed or after the lobby is up
 const SOUND_I = Object.fromEntries(Object.keys(SOUNDS).map((k, i) => [k, i])), making = {};
 let soundQ = null, soundsDone;

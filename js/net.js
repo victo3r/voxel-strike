@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 8; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 9; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -49,6 +49,7 @@ net = (() => {
   let ws = null, welcomed = false, pid = 0, key = '', room = '', code = null, myTeamRaw = 0;
   let hostPid = 0; // whose client runs the room's bots
   let phase = 'wait', matchEnd = 0, rulesCap = 0;
+  let sudden = false, firstSpawn = true, lastRival = null; // duels: a tie played on, the first spawn goes to your end of the map, who you faced
   let alive = false, respawnAt = 0, readySent = false, readyT = 0;
   let seq = 0, fired = 0, hits = [], evFlags = 0, pjSeq = 0, renderT = 0, shotN = 0; // shotN counts every shot, yours and your bots'
   let last = null; // for PLAY AGAIN
@@ -94,6 +95,7 @@ net = (() => {
   const findingEl = $('finding'), findingMsg = $('findingMsg');
   function showFinding(text) { findingMsg.textContent = text; findingEl.style.display = 'flex'; }
   function hideFinding() { findingEl.style.display = 'none'; }
+  const errText = e => e instanceof TypeError ? 'Could not reach the servers' : e?.message; // fetch's own words are no use to a player
   async function fetchJson(path, opts) {
     const r = await fetch(NET_HTTP + path, { ...opts, headers: { 'Content-Type': 'application/json' } });
     let j = {}; try { j = await r.json(); } catch {}
@@ -101,7 +103,7 @@ net = (() => {
   }
   // the public match you were last in (this tab), so a drop or a reload can take you back to it
   const BACK = 'voxelstrike-back';
-  function markBack() { if (api.on && room && !code && phase !== 'over') try { sessionStorage.setItem(BACK, JSON.stringify({ room, mode: roomMode, map: mapId, gen: NET_GEN, t: Date.now() })); } catch {} }
+  function markBack() { if (api.on && room && !code && phase !== 'over' && roomMode !== 'duel') try { sessionStorage.setItem(BACK, JSON.stringify({ room, mode: roomMode, map: mapId, gen: NET_GEN, t: Date.now() })); } catch {} }
   function forgetBack() { try { sessionStorage.removeItem(BACK); } catch {} }
   function backRoom(o) {
     let b = null; try { b = JSON.parse(sessionStorage.getItem(BACK)); } catch {}
@@ -116,7 +118,7 @@ net = (() => {
     const job = starting = { o, not: [], tries: 0, dead: false, timer: 0 };
     showFinding(o.friend ? `JOINING ${o.friend.toUpperCase()}…` : o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…');
     job.timer = setTimeout(() => fail(job, 'Took too long to reach the servers'), 8000);
-    findRoom(job).catch(e => fail(job, e?.message || 'Could not reach the servers'));
+    findRoom(job).catch(e => fail(job, errText(e) || 'Could not reach the servers'));
   }
   async function findRoom(job) {
     const { o } = job;
@@ -159,6 +161,7 @@ net = (() => {
       const err = $('codeErr'); if (err) err.textContent = why; else netToast(why);
       return;
     }
+    if (o.mode === 'duel') { netToast(why, 4000); return; } // a duel needs someone real
     netToast(`${why}, ${o.mode === 'coop' ? 'playing solo' : 'playing against bots'}`, 4000);
     mode = o.mode === 'coop' ? 'zombies' : o.mode; mapId = o.map;
     showPick(false); restart(); showLobby(false); lockMouse();
@@ -177,7 +180,7 @@ net = (() => {
     if (job && !job.dead && !welcomed) { // never got in
       if (codeNum === 4001 && job.tries++ < 3 && !job.o.code) { // room full: try another
         if (job.o.room) { job.o.room = null; netToast('That room is full, finding another', 3000); } else job.not.push(room);
-        findRoom(job).catch(e => fail(job, e?.message || 'No room found')); return;
+        findRoom(job).catch(e => fail(job, errText(e) || 'No room found')); return;
       }
       const why = { 4000: 'The game was updated, reload the page to play online', 4001: 'That room is full', 4002: 'The server did not like that request', 4003: 'You were removed from that room', 4005: 'You joined from another tab', 4006: GEN_MSG }[codeNum];
       fail(job, why || 'Could not connect');
@@ -196,7 +199,8 @@ net = (() => {
     restart(); showLobby(true);
   }
   function endOnline() {
-    api.on = false; api.banner = ''; api.code = null; api.serverPads = false; rejoinInfo = null; alive = false; respawnAt = 0; readySent = false; hostPid = 0;
+    if (standoff) duelExit();
+    api.on = false; api.banner = ''; api.code = null; api.serverPads = false; rejoinInfo = null; alive = false; respawnAt = 0; readySent = false; hostPid = 0; sudden = false;
     for (const r of remotes.values()) dropBody(r);
     remotes.clear(); hits = []; fired = 0; evFlags = 0; roomMode = ''; zhits = []; zev = []; zhurts = []; mateList = [];
     $('roomRow').style.display = 'none';
@@ -223,7 +227,8 @@ net = (() => {
       case 'dmg': return damage(m);
       case 'die': return died(m);
       case 'score': return score(m.rows);
-      case 'phase': phase = m.phase; if (m.matchEnd) matchEnd = m.matchEnd; lastTop = ''; if (m.solo) netToast('Everyone else left, so the match ends in 30 seconds unless someone joins', 5000); return;
+      case 'phase': phase = m.phase; if (m.matchEnd) matchEnd = m.matchEnd; lastTop = ''; if (m.solo) netToast('Everyone else left, so the match ends in 30 seconds unless someone joins', 5000); if (roomMode === 'duel') duelMsg(m); return;
+      case 'rdy': { const r = m.pid === pid ? roster.youRec : remotes.get(m.pid)?.rec; if (r) r.rdy = true; if (standoff) duelRdy(m.pid); return; }
       case 'fire': return remoteFire(m);
       case 'boom': return remoteBoom(m);
       case 'gear': return gearMsg(m);
@@ -251,7 +256,7 @@ net = (() => {
     const rejoining = api.on;
     if (job) { job.dead = true; clearTimeout(job.timer); starting = null; }
     welcomed = true; pid = w.pid; key = w.key; room = w.room; code = w.code || null; myTeamRaw = w.me?.team ?? 0; hostPid = w.host | 0; skillPool = null;
-    phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8; api.lvBase = w.lv | 0;
+    phase = w.phase; matchEnd = w.matchEnd || 0; rulesCap = w.rules?.cap || 8; api.lvBase = w.lv | 0; sudden = !!w.duel?.sudden; lastRival = null;
     rejoinInfo = { room, pid, key, until: 0 };
     clock.off = clock.target = (w.now ?? now()) - localNow(); clock.samples = []; lastTc = 0;
     roomMode = w.mode; mode = w.mode === 'coop' ? 'zombies' : w.mode; mapId = w.map;
@@ -265,7 +270,7 @@ net = (() => {
     roster.recs = [roster.youRec];
     let me = null;
     for (const p of w.players || []) {
-      if (p.pid === pid) { me = p; Object.assign(roster.youRec, { score: p.score | 0, kills: p.kills | 0, deaths: p.deaths | 0, assists: p.assists | 0, streak: p.streak | 0 }); continue; }
+      if (p.pid === pid) { me = p; Object.assign(roster.youRec, { score: p.score | 0, kills: p.kills | 0, deaths: p.deaths | 0, assists: p.assists | 0, streak: p.streak | 0, rdy: !!p.rdy }); continue; }
       addRemote(p, false);
     }
     if (!rejoining) {
@@ -275,11 +280,12 @@ net = (() => {
     } else restart();
     if (api.serverPads) w.pads.forEach((type, i) => { const p = pads[i]; if (p) { clearPad(p); if (type) spawnPickup(p, type); } }); // what the pads hold right now
     for (const r of remotes.values()) if (r.rec.alive && r.pos) spawnBody(r, ...r.pos);
-    if (me?.alive && me.pos) { alive = true; readySent = false; respawnYou(me.pos[0], me.pos[2], me.pos[3]); P.pos.y = me.pos[1]; }
-    else { alive = false; respawnT = .01; api.banner = 'JOINING…'; }
+    if (me?.alive && me.pos) { alive = true; readySent = false; firstSpawn = false; respawnYou(me.pos[0], me.pos[2], me.pos[3]); P.pos.y = me.pos[1]; }
+    else { alive = false; respawnT = .01; api.banner = 'JOINING…'; firstSpawn = !(me?.deaths | 0); }
     const rr = $('roomRow'); rr.style.display = code ? '' : 'none'; if (code) $('roomCode').textContent = 'ROOM CODE ' + code;
     lastTop = lastBoard = ''; lastSec = 0;
-    if (!rejoining) lockMouse(); else if (locked) tryReady();
+    if (roomMode === 'duel' && (phase === 'wait' || phase === 'count')) { api.banner = ''; duelStand(w.duel || {}); } // the standoff, till the draw
+    else if (!rejoining) lockMouse(); else if (locked) tryReady();
     markBack();
     send({ t: 'ping', c: localNow() });
     cgRoom();
@@ -321,6 +327,7 @@ net = (() => {
     const L = { ...r.rec.look }; if (m.px) L.px = m.px; else delete L.px;
     r.rec.look = L;
     if (r.body?.mats?.[0]) { r.body.mats[0].map = skinTexture(L); r.body.mats[0].needsUpdate = true; }
+    if (standoff) duelRoster(true);
   }
   function makeRemoteRec(p) {
     const name = cleanName(p.name) || 'Player';
@@ -332,7 +339,7 @@ net = (() => {
     if (team !== undefined && !co) look.topC = ((TEAMS[team].shirts[0][0] << 16) | (TEAMS[team].shirts[0][1] << 8) | TEAMS[team].shirts[0][2]); // team shirt colour
     const tag = tagMat(name, css);
     if (team === 0) { tag.mat.depthTest = false; tag.mat.opacity = .85; } // teammates' tags show through walls
-    return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, bot: !!p.bot, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {},
+    return { pid: p.pid, fid: Number.isInteger(p.fid) ? p.fid : 0, bot: !!p.bot, name, lang: 'en', quiet: true, team, css, look, tag: tag.mat, tagW: tag.w, ...gearFields(p.gear), taste: {}, rdy: !!p.rdy,
       score: p.score | 0, kills: p.kills | 0, deaths: p.deaths | 0, assists: p.assists | 0, streak: p.streak | 0, alive: !!p.alive, b: null, wait: Infinity, remote: true };
   }
   function addRemote(p, announce) {
@@ -341,7 +348,7 @@ net = (() => {
     if (rec.bot && hostPid === pid) hostRec(rec); // a bot I host
     remotes.set(p.pid, r); roster.recs.push(rec);
     if (recs !== roster.recs) recs.push(rec);
-    if (announce) { feed(`${nameTag(rec)} joined`); sfx('join'); }
+    if (announce && !standoff) { feed(`${nameTag(rec)} joined`); sfx('join'); } // a duel's rival turns up in the standoff instead
     return r;
   }
   function join(p) {
@@ -349,6 +356,7 @@ net = (() => {
     const r = addRemote(p, true);
     if (p.alive && p.pos) spawnBody(r, ...p.pos);
     if (!p.bot) cgRoom();
+    if (standoff) duelRoster();
   }
   function left(who, reason) {
     const r = remotes.get(who); if (!r) return;
@@ -359,6 +367,7 @@ net = (() => {
     if (reason !== 'replaced') feed(`${nameTag(r.rec)} left`);
     if (r.rec.tag?.map) { r.rec.tag.map.dispose(); r.rec.tag.dispose(); }
     if (!r.rec.bot) cgRoom();
+    if (roomMode === 'duel' && !r.rec.bot && reason !== 'replaced') { lastRival = r.rec; if (phase !== 'play') roster.youRec.rdy = false; if (standoff) duelRoster(); } // a standoff starts over for the next one
   }
   // bodies: built like a bot's, driven by the network
   function spawnBody(r, x, y, z, yaw = 0) {
@@ -379,7 +388,7 @@ net = (() => {
   }
   function spawn(m) {
     if (m.pid === pid) {
-      alive = true; readySent = false; respawnAt = 0; api.banner = '';
+      alive = true; readySent = false; respawnAt = 0; api.banner = ''; firstSpawn = false;
       respawnYou(m.x, m.z, m.yaw ?? 0); respawnT = 0; P.pos.y = m.y ?? P.pos.y;
       P.hp = m.hp ?? P.max; P.armor = m.armor ?? P.armor;
       return;
@@ -471,9 +480,11 @@ net = (() => {
     score(m.rows);
     const ranks = m.ranks || [], place = Math.max(1, ranks.indexOf(pid) + 1);
     const lead = m.teams ? Math.sign((m.teams[myTeamRaw] | 0) - (m.teams[1 - myTeamRaw] | 0)) : 0;
-    const won = MR.team ? lead > 0 : place === 1, [xp, gold] = m.rewards?.[pid] || [0, 0];
+    const won = m.duel ? m.duel.win === pid : MR.team ? lead > 0 : place === 1, [xp, gold] = m.rewards?.[pid] || [0, 0];
     phase = 'over'; alive = false; api.banner = ''; forgetBack();
-    endMatch({ place, won, xp, gold, lead, priv: !!m.priv });
+    if (standoff) duelExit();
+    const riv = rivalRec() || lastRival;
+    endMatch({ place, won, xp, gold, lead, priv: !!m.priv, duel: m.duel ? { draw: !m.duel.win, forfeit: !!m.duel.forfeit, rival: riv ? nameTag(riv) : '' } : null });
     if (typeof frPostButtons === 'function') frPostButtons(); // + ADD buttons
   }
   // pickup pads: the server stocks them and says who got what
@@ -644,8 +655,9 @@ net = (() => {
     const full = !!(r.q & 4096); r.q = 0;
     if (r.fired) {
       const n = Math.min(r.fired, 3); r.fired = 0; z.ammo = Math.max(0, z.ammo - n); // just for the rockets in a Salvo's tubes
+      if (!W.melee) coreFire(z.core);
       if (W.melee) {
-        sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = KNIFE_SWING;
+        sfx(W.swing || 'swing', { at: pos, far: 20 }); z.stab = swingT(W); z.insp = -1;
         if (W.wand && z.flashM) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); stunZap(z.flashM.getWorldPosition(fv).clone(), zapEnd(W, eyeV, dirV, z)); } // their stun blast, just for show
       }
       else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); z.kick = kickOf(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.charge ? full ? 'auroraFull' : 'aurora' : W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
@@ -663,6 +675,9 @@ net = (() => {
       }
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0; if (z.pulse) pulseShow(z.pulse, z.muzzle > 0);
+    const ins = W.melee && !!(cur.flags & 1); // playing with a blade: from when the flag comes on
+    if (!ins) z.inspOn = false; else if (!z.inspOn) { z.inspOn = true; z.insp = z.stab > 0 ? -1 : 0; }
+    if (z.insp >= 0) { const t0 = z.insp; z.insp += dt; if (!ins || z.stab > 0 || z.insp >= inspLen(W)) z.insp = -1; else inspSnd(W, t0, z.insp, pos); }
     z.stab = Math.max(0, z.stab - dt); heldTick(z, dt, z.rlLeft, rlT); // swings, kicks, wand flicks and reloads
     if (z.spin) { if (z.muzzle > 0) z.spinV = spinKick(z.gun); spinTurn(z.spin, z.spinV + spinIdle(z.gun), dt); z.spinV = Math.max(0, z.spinV - dt * 25); }
     if (z.round) z.round.visible = true;
@@ -702,7 +717,7 @@ net = (() => {
     if (!api.on || !ws || ws.readyState !== 1 || !welcomed || inLobby || document.hidden) return; // hidden tab sends nothing, the server marks you afk
     if (ws.bufferedAmount > (roomMode === 'coop' && hostPid === pid ? 32768 : 8192)) return; // the connection is stuck: don't pile up moves behind it
     let flags = evFlags; evFlags = 0;
-    if (aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8; if (P.gliding) flags |= 16;
+    if (WEAPONS[cur].melee ? inspT >= 0 : aiming) flags |= 1; if (reloading > 0) flags |= 2; if (locked && held('shoot')) flags |= 4; if (P.onGround) flags |= 8; if (P.gliding) flags |= 16; // 1: aiming, or playing with a blade
     if (P.drownFlag) { flags |= 128; P.drownFlag = false; }
     if (P.downed) flags |= 512; if (P.waiting) flags |= 1024; if (chargeT > 0) flags |= 2048; // 2048 charging, 4096 (an event) a full charge went off
     const h = hits; hits = [];
@@ -715,7 +730,7 @@ net = (() => {
       if (!r.rec.hostBot) continue;
       const b = r.body;
       if (!b || b.dead) { r.fired = 0; r.hits = []; continue; }
-      let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (b.aimT > 0) bf |= 1; if (b.gliding) bf |= 16;
+      let bf = 0; if (!b.vy) bf |= 8; if (b.fireOn > 0) bf |= 4; if (b.reload > 0) bf |= 2; if (BASE[b.gun].melee ? b.insp >= 0 : b.aimT > 0) bf |= 1; if (b.gliding) bf |= 16;
       if (b.dashFlag) { bf |= 256; b.dashFlag = false; }
       if (b.chargeK > 0) bf |= 2048; if (b.fullFlag) { bf |= 4096; b.fullFlag = false; }
       if (b.drownFlag) { bf |= 128; b.drownFlag = false; }
@@ -770,10 +785,11 @@ net = (() => {
 
   // spawning: once your mouse is locked
   function tryReady() {
-    if (!api.on || alive || readySent && localNow() - readyT < 3000 || !welcomed) return;
+    if (!api.on || alive || readySent && localNow() - readyT < 3000 || !welcomed || standoff || roomMode === 'duel' && phase !== 'play') return;
     if (respawnAt && now() < respawnAt - 150) return;
-    // a few free spots, the server picks the farthest from enemies
-    const spots = (roomMode === 'coop' ? coopSpots() : spawnSpots(YOU_T, 5)).map(([x, z, y]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(y ?? groundAt(x, z, .35, floorY(x, z)))]);
+    // a few free spots, the server picks the farthest from enemies (a duel starts at either end of the map, yours first)
+    const ends = roomMode === 'duel' && firstSpawn && MAP.duel?.ends, k = duelSlot();
+    const spots = (ends ? [ends[k], ends[1 - k]] : roomMode === 'coop' ? coopSpots() : spawnSpots(YOU_T, 5)).map(([x, z, y]) => [r2(x), r2(z), r3(Math.atan2(x, z)), r2(y ?? groundAt(x, z, .35, floorY(x, z)))]);
     send({ t: 'ready', spots, x: spots[0][0], z: spots[0][1], yaw: spots[0][2], y: spots[0][3] });
     readySent = true; readyT = localNow(); api.banner = 'SPAWNING…';
   }
@@ -791,12 +807,13 @@ net = (() => {
         respawnT = Math.max(left, .01);
         if (left <= .15) { api.banner = locked ? 'RESPAWNING…' : TAP.toUpperCase() + ' TO RESPAWN'; if (locked) tryReady(); }
         else api.banner = '';
-      } else if (!readySent) api.banner = locked ? 'JOINING…' : TAP.toUpperCase() + ' TO PLAY';
+      } else if (!readySent) api.banner = standoff ? '' : locked ? 'JOINING…' : TAP.toUpperCase() + ' TO PLAY';
       if (respawnT <= 0) respawnT = .01;
     }
     const sec = Math.max(0, Math.ceil(matchT));
     if (phase === 'play' && sec <= 10 && sec !== lastSec && sec > 0) sfx('tick');
     lastSec = sec;
+    if (roomMode === 'duel') { duelTop(sec); return; }
     const place = ranked().indexOf(youRec) + 1, others = remotes.size;
     const clockHtml = (phase !== 'play' ? `<div class="clock">${others ? 'STARTING SOON' : 'WAITING FOR PLAYERS'}</div>` : `<div class="clock${sec <= 10 ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div>`)
       + (phase === 'play' && !others ? '<div class="place">WAITING FOR PLAYERS</div>' : ''); // alone: the server ends the match in 30 s unless someone joins
@@ -808,6 +825,30 @@ net = (() => {
     const show = held('board');
     $('board').style.display = show ? 'grid' : 'none';
     if (show) { const h = boardHTML(); if (h !== lastBoard) $('board').innerHTML = lastBoard = h; }
+  }
+
+  // duels: who you're up against, which end is yours (the lower pid takes the first), the top line
+  const rivalRec = () => { for (const r of remotes.values()) if (!r.rec.bot) return r.rec; return null; };
+  const duelSlot = () => { const r = rivalRec(); return r && r.pid < pid ? 1 : 0; };
+  function duelTop(sec) {
+    const riv = rivalRec(), yk = youRec.kills | 0, rk = riv?.kills | 0;
+    const clock = phase !== 'play' ? '' : `<div class="clock${sec <= 10 || sudden ? ' low' : ''}">${sec / 60 | 0}:${String(sec % 60).padStart(2, '0')}</div>`;
+    const top = clock + `<div class="teams"><b style="color:${youRec.css}">YOU ${yk}</b>–<b style="color:${riv ? riv.css : '#e8e8e8'}">${rk} ${riv ? riv.name : '???'}</b></div>`
+      + `<div class="place">${sudden ? 'SUDDEN DEATH  ·  NEXT KILL WINS' : Math.max(yk, rk) >= MR.win ? `WIN BY ${MR.by}` : `FIRST TO ${MR.win}`}</div>`;
+    if (top !== lastTop) { $('top').innerHTML = lastTop = top; }
+    const show = held('board');
+    $('board').style.display = show ? 'grid' : 'none';
+    if (show) { const h = boardHTML(); if (h !== lastBoard) $('board').innerHTML = lastBoard = h; }
+  }
+  // the server's duel phases: the standoff's clock, then the fight, and a tie at the whistle plays on
+  function duelMsg(m) {
+    if (m.phase === 'play') {
+      if (m.sudden) { sudden = true; duelFlash('SUDDEN DEATH', true); sfx('waveStart'); return; }
+      if (standoff) duelGo();
+      if (locked) tryReady();
+      return;
+    }
+    if (standoff) duelPhase(m);
   }
 
   // lobby: join links and the room code
@@ -859,13 +900,14 @@ net = (() => {
   }
 
   Object.assign(api, {
+    selfRec: () => makeRemoteRec({ pid, name: myName, css: '#8ff0b6', look: prof.look.px ? { ...lookSent(), px: prof.look.px } : lookSent(), gear: myGear() }), rival: rivalRec, rdy: () => send({ t: 'rdy' }),
     coopTick, mates: () => mateList, recOf, zHit, zEvent: e => { if (zev.length < 60) zev.push(e); }, zHurt: h => { if (zhurts.length < 20) zhurts.push(h); }, zSend: send,
     now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : k === 'full' ? 4096 : 32; },
     matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
   Object.defineProperties(api, { // read live
     pvp: { get: () => api.on && roomMode !== 'coop' }, coop: { get: () => api.on && roomMode === 'coop' }, renderT: { get: () => renderT },
-    pid: { get: () => pid }, phase: { get: () => phase }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' }, host: { get: () => api.on && hostPid === pid },
+    pid: { get: () => pid }, phase: { get: () => phase }, slot: { get: duelSlot }, sudden: { get: () => sudden }, alive: { get: () => alive }, players: { get: () => remotes.size + 1 }, rtt: { get: () => clock.rtt }, room: { get: () => api.on ? room : '' }, host: { get: () => api.on && hostPid === pid },
   });
   return api;
 })();

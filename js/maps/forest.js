@@ -178,15 +178,18 @@ function bigTree(x, z, inside) {
   const [A, B] = TH, steps = 7;
   const stairs = (x, edge, dir, y, n) => { // open wooden steps on two side boards
     for (let k = 0; k < n; k++) deck(x, edge + dir * (n - k - .5) * .5, 1.4, .5, y * (k + 1) / n, .12);
-    const run = n * .5, k = y / run, end = run - Math.min(.3 / k, .5), len = end * Math.hypot(1, k), mid = y / n - .1 + k * end / 2 - .15 * Math.hypot(1, k); // the boards' top edge runs under the front of every step, stopping short of the top
-    for (const ox of [-.76, .76]) { const r = box(.12, .3, len, postMat); r.position.set(x + ox, mid, edge + dir * (run - end / 2)); r.rotation.x = dir * Math.atan2(y, run); add(r); }
+    const run = n * .5, k = y / run, end = run - Math.min(.3 / k, .5), start = -(y / n - .1) / k, c = (start + end) / 2; // the boards' top edge runs under the front of every step, from the ground to just short of the top
+    const len = (end - start) * Math.hypot(1, k), mid = y / n - .1 + k * c - .15 * Math.hypot(1, k);
+    for (const ox of [-.76, .76]) { const r = box(.12, .3, len, postMat); r.position.set(x + ox, mid, edge + dir * (run - c)); r.rotation.x = dir * Math.atan2(y, run); add(r); }
   };
   stairs(A.x, A.z - TH_R, -1, A.y, steps); // up the south side of the first
   stairs(B.x, B.z + TH_R, 1, B.y, steps + 1); // and the north side of the second
   for (let k = 0; k < 6; k++) deck(A.x + TH_R + .5 + k, A.z, 1.05, 1.3, A.y + (B.y - A.y) * (k + .5) / 6, .15); // the bridge
-  for (const x of [A.x + TH_R + .2, B.x - TH_R - .2]) for (const oz of [-.75, .75]) { const p = box(.12, 1, .12, postMat); p.position.set(x, A.y + .5 + (x > 21 ? B.y - A.y : 0), A.z + oz); add(p); }
-  const rope = lam({ color: 0xc8b48a });
-  for (const oz of [-.75, .75]) { const len = B.x - A.x - TH_R * 2 + .4, r = box(len, .05, .05, rope); r.position.set((A.x + B.x) / 2, (A.y + B.y) / 2 + .95, A.z + oz); r.rotation.z = Math.atan2(B.y - A.y, len); add(r); }
+  const xa = A.x + TH_R - .1, xb = B.x - TH_R + .1, rope = lam({ color: 0xc8b48a }); // a post on each deck's edge, a rope from top to top
+  for (const oz of [-.75, .75]) {
+    for (const [x, y] of [[xa, A.y], [xb, B.y]]) { const p = box(.12, 1, .12, postMat); p.position.set(x, y + .5, A.z + oz); add(p); }
+    const r = box(Math.hypot(xb - xa, B.y - A.y), .05, .05, rope); r.position.set((xa + xb) / 2, (A.y + B.y) / 2 + .95, A.z + oz); r.rotation.z = Math.atan2(B.y - A.y, xb - xa); add(r);
+  }
   // grass on the hill
   const ht = [];
   for (let k = 0; k < 170; k++) { const x = HX + hr() * HN * HC, z = HZ + hr() * HN * HC, y = hillTop(x, z); if (y) { const s = .6 + hr() * .5; ht.push([x, y, z, 1.1 * s, .9 * s, 1, hr() * Math.PI, pick([0x8fb07a, 0x7a9c6a, 0xa0bf86])]); } }

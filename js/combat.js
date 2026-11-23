@@ -58,6 +58,7 @@ function shoot(k) { // k: how charged the Aurora Rail was
   if (w.charge && k === undefined && ammo[cur] > 0) return; // it fires when you let go (chargeTick)
   if (ammo[cur] <= 0) { myBurst.bn = 0; if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
   ammo[cur]--; cd = burstCd(w, myBurst); net.shot(w); botHear(P.pos.x, P.pos.z, YOU_T, w.quiet); // bots hear it
+  if (gunShown === cur) coreFire(gunCore);
   if (gunSpin) gunSpinV = spinKick(cur);
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);

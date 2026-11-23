@@ -70,7 +70,7 @@ const achChest = id => achCount(n => { n.ch = (n.ch | 0) + 1; if (id === 'gold')
 const achMission = () => achCount(n => { n.ms = (n.ms | 0) + 1; });
 function achMark() { achNew = []; }
 // the results screen: what this game finished
-const achRow = () => achNew.length ? `<div class="rl acr">${ico('star')} ${achNew.length > 1 ? achNew.length + ' ACHIEVEMENTS' : achNew[0].name.toUpperCase()} · CLAIM IN THE LOBBY</div>` : '';
+const achRow = () => achNew.length ? `<div class="rl acr">${ico('ach')} ${achNew.length > 1 ? achNew.length + ' ACHIEVEMENTS' : achNew[0].name.toUpperCase()} · CLAIM IN THE LOBBY</div>` : '';
 
 const achPayTags = a => [a.xp && `<span class="ax">+${a.xp} XP</span>`, a.c && `<span class="ay">${COIN}${a.c}</span>`, a.k && `<span class="ak">${ico('key')}${a.k}</span>`, a.b && `<span class="ak">${ico('bolt')}${a.b}</span>`,
   a.box && `<span class="ak"><img src="${chestPic(CHESTS.findIndex(c => c.id === a.box))}"></span>`].filter(Boolean).join('');
@@ -88,14 +88,14 @@ function achClaim(id) {
 }
 function renderAchBtn() {
   const n = achReady().length;
-  $('achBtn').innerHTML = ico('star') + `<i id="achBadge">${n || ''}</i>`;
+  $('achBtn').innerHTML = ico('ach') + `<i id="achBadge">${n || ''}</i>`;
   $('achBtn').classList.toggle('new', n > 0);
 }
 function renderAch() {
   if ($('ach').style.display !== 'flex') return;
   const rank = a => achGot(a) ? 2 : achDone(a) ? 0 : 1, list = ACH.map((a, i) => [a, i]).sort((x, y) => rank(x[0]) - rank(y[0]) || x[1] - y[1]).map(x => x[0]);
   const keep = $('achBox').querySelector('.acList')?.scrollTop | 0;
-  $('achBox').innerHTML = `<div class="lbTop"><h1>${ico('star')} ACHIEVEMENTS</h1><span class="acN">${ACH.filter(achGot).length} / ${ACH.length}</span></div>` +
+  $('achBox').innerHTML = `<div class="lbTop"><h1>${ico('ach')} ACHIEVEMENTS</h1><span class="acN">${ACH.filter(achGot).length} / ${ACH.length}</span></div>` +
     '<div class="acList">' + list.map(a => {
       const at = achAt(a), got = achGot(a), done = at >= a.g;
       return `<div class="ac${got ? ' got' : done ? ' ok' : ''}"><span class="aci">${ico(a.ic)}</span><div class="act"><b>${a.name}</b><small>${a.text}</small><u><i style="width:${at / a.g * 100}%"></i></u></div>` +

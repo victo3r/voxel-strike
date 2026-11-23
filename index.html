@@ -6,13 +6,13 @@
 <!-- added to a phone's home screen it opens fullscreen, like an app -->
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blockslingers"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
-<link id="css" rel="stylesheet" href="css/style.css?v=alpha-13.9">
+<link id="css" rel="stylesheet" href="css/style.css?v=alpha-14">
 <script>
 // the update's name: change it (and the css ?v=) on every update to skip old caches
-const GAME_V = 'alpha-13.9';
+const GAME_V = 'alpha-14';
 // the game files in the order they run, once three.js is in (the module at the end)
-const GAME_FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js', 'js/held.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/mythics.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/achievements.js', 'js/levelup.js', 'js/funnel.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/coop.js', 'js/friends.js', 'js/boards.js', 'js/touch.js', 'js/moved.js'];
+const GAME_FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/maps/ghosttown.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js', 'js/held.js',
+  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/mythics.js', 'js/weaponfx.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/achievements.js', 'js/levelup.js', 'js/funnel.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/coop.js', 'js/duel.js', 'js/friends.js', 'js/boards.js', 'js/touch.js', 'js/moved.js'];
 // fetch them all now, alongside three.js, instead of after it
 for (const f of ['js/crazy.js', ...GAME_FILES]) { const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = f + '?v=' + GAME_V; document.head.append(l); }
 </script>
@@ -216,6 +216,11 @@ for (const f of ['js/crazy.js', ...GAME_FILES]) { const l = document.createEleme
   <div><button id="againBtn">PLAY AGAIN</button> <button id="postLobby">EXIT TO LOBBY</button></div>
 </div>
 <div id="finding"><p id="findingMsg">FINDING MATCH…</p><button id="findingX">CANCEL</button></div>
+<div id="duel">
+  <div id="duelTop"><small>DUEL</small><div id="duelRow"><div class="dpl" id="duelA"></div><b id="duelVs">VS</b><div class="dpl" id="duelB"></div></div></div>
+  <div id="duelMid"></div>
+  <div id="duelFoot"><p id="duelMsg"></p><div><button id="duelGo">READY</button><button id="duelInv">INVITE</button><button id="duelX">LEAVE</button></div></div>
+</div>
 <div id="netToast"></div>
 <div id="shop">
   <h1 id="shopH">SHOP</h1>

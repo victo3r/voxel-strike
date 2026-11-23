@@ -133,7 +133,7 @@ const leaf = (x, z, w, h, nx) => { // a plank door leaf against a wall facing x 
   const p = (a, b, c, m, dx, dy, o) => piece(nx ? c : a, b, nx ? a : c, m, x + (nx ? nx * o : dx), dy, z + (nx ? dx : o));
   building.cover.push(p(w, h, .1, barnRed, 0, h / 2 + .02, .08));
   for (const s of [-1, 1]) { const b = p(Math.hypot(w, h) - .3, .14, .04, trim, 0, h / 2, .165 + s * .005); if (nx) b.rotation.x = s * Math.atan2(h, w); else b.rotation.z = s * Math.atan2(h, w); }
-  p(w + .1, .14, .04, trim, 0, h - .05, .15); p(w + .1, .14, .04, trim, 0, .12, .15);
+  p(w, .14, .04, trim, 0, h - .05, .15); p(w, .14, .04, trim, 0, .12, .15);
 };
 leaf(-12.05, BZ1, 2, 3.6, 0); leaf(-5.95, BZ1, 2, 3.6, 0); leaf(-1.05, BZ1, 1.9, 2.4, 0); leaf(BX0, -17.05, 2, 3.6, -1);
 piece(9.2, .12, .12, iron, -9, 3.74, BZ1 + .08); piece(3.8, .12, .12, iron, -2.1, 2.54, BZ1 + .08); piece(.12, .12, 4.2, iron, BX0 - .08, 3.74, -16);
@@ -296,7 +296,7 @@ const WM = [24, -7.5], WT = 9;
     solid(bx - .12, bx + .12, bz - .12, bz + .12, 0, 1.2, 'metal');
   }
   for (const y of [2.5, 5, 7.4]) { const w = 2.8 * (1 - y / WT * .79); for (const s of [-1, 1]) { piece(w, .08, .08, steel, WM[0], y, WM[1] + s * w / 2); piece(.08, .08, w, steel, WM[0] + s * w / 2, y + .08, WM[1]); } }
-  piece(.8, .4, .8, steel, WM[0], WT, WM[1]);
+  piece(.8, .6, .8, steel, WM[0], WT + .1, WM[1]); // the head holds the fan and the tail
   const fan = live(new THREE.Group()); fan.position.set(WM[0], WT + .3, WM[1] + .5); add(fan);
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, b = box(.3, 1.4, .03, steel); b.position.set(Math.cos(a) * 1.05, Math.sin(a) * 1.05, 0); b.rotation.set(0, .4, a - Math.PI / 2, 'ZYX'); fan.add(b); }
   fan.add(box(.3, .3, .3, iron));
@@ -339,7 +339,7 @@ const WM = [24, -7.5], WT = 9;
   slab(x - 1.5, x + 1.5, z - .8, z + .8, .6, .9, oldWood); solid(x - 1.5, x + 1.5, z - .8, z + .8, 0, .6, 'wood');
   for (const [dx, dz] of [[-1, -.86], [1, -.86], [-1, .86], [1, .86]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.4, .4, .12, 12), oldWood); w.rotation.x = Math.PI / 2; w.position.set(x + dx, .4, z + dz); add(w); }
   for (const [bx, bz, y, a] of [[-19.3, -6.5, .9, 'x'], [-19.3, -5.9, .9, 'x'], [-18, -6.2, .9, 'z'], [-19.3, -6.2, 1.4, 'x']]) bale(bx, y, bz, a);
-  const tongue = piece(1.6, .1, .1, oldWood, x + 2.2, .5, z); tongue.rotation.z = .25;
+  const tongue = piece(1.72, .1, .1, oldWood, x + 2.28, .3, z); tongue.rotation.z = -.29; // from under the front down to the ground
 }
 trough(-15.8, -14.6, -13.6, -11); trough(-23, -20.6, 6.4, 7.2);
 for (const [x, z, n, a] of [[2.4, 2.6, 2, 'x'], [-11, -3.4, 1, 'z'], [14.6, -2.4, 2, 'z'], [-3, 6.6, 1, 'x'], [8.2, 1.6, 1, 'x'], [-25, -12, 2, 'x']]) for (let j = 0; j < n; j++) bale(x, j * .5, z, a);

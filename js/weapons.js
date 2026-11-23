@@ -61,6 +61,7 @@ const BASE = [
   { id: 'cutlass', rar: 'rare', hold: 'melee', name: 'Sunken Cutlass', cat: 'melee', unlock: 8, price: 180, chest: true, inf: true, melee: true, tilt: 1.1, swing: 'cutSwing', mob: 85, dmg: 45, rate: .38, range: 2.9, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0x9fc4c0, len: .4 },
   { id: 'harpoon', rar: 'epic', hold: 'rifle', name: 'Riptide Harpoon', cat: 'sniper', unlock: 18, price: 520, chest: true, mob: 58, zoom: 4, irons: true, action: 'SPEARGUN', bolt: 'harpoon', reel: .6, spare: 10, dmg: 115, rate: .5, mag: 1, reload: 1.7, pellets: 1, spread: 0, auto: false, color: 0x2f7f86, len: .9 },
   { id: 'conch', rar: 'legend', hold: 'pistol', name: 'Siren Shell', cat: 'special', unlock: 30, price: 1150, chest: true, mob: 65, beam: true, water: true, knock: .18, dmg: 11, rate: 1 / 15, range: 26, mag: 110, reload: 2.2, pellets: 1, spread: 0, auto: true, color: 0xf2c8a8, len: .45 },
+  { id: 'balisong', rar: 'epic', hold: 'melee', name: 'Balisong', cat: 'melee', unlock: 11, price: 325, inf: true, melee: true, flip: true, swing: 'flick', swingT: .28, mob: 85, dmg: 40, rate: .3, range: 2.6, mag: 1, reload: 0, pellets: 1, spread: 0, auto: true, color: 0xb89cf0, len: .32 },
 ];
 const mobMul = w => 1 + ((w.mob ?? 60) - 60) / 100; // run speed multiplier from mobility
 const autoFire = w => !!w.auto || w.rate < .25; // fast guns fire while the trigger is held
@@ -226,6 +227,40 @@ const FLASH_FX = {
   for (const id of ['harpoon', 'conch']) FLASH_FX[id] = { spr, light: 0x8fe0ff, t: .06, bits: 'ice' };
 }
 const flashOf = w => FLASH_FX[w.id]?.spr || FLASH_SPR, flashTime = w => FLASH_FX[w.id]?.t ?? (w.scope ? .1 : .05);
+// glowing parts that light up when a gun fires: their colours, how bright, how long; dim and back: it dims, then charges back up for the next shot; flick: flickers while it fires
+const CORE_FX = {
+  rubypierce: { cols: [0xff4a64, 0xffc2cc], k: 2.6, t: .3, dim: .45, back: .5 },
+  paragon: { cols: [0x4aa8ff, 0xd2ecff], k: 2.4, t: .35, dim: .45, back: .75 },
+  executioner: { cols: [0xd47bff], k: 2.3, t: .22, dim: .5, back: .28 },
+  soulwand: { cols: [0x6fffd8, 0xe0fff6], k: 2.2, t: .3, dim: .5, back: .4 },
+  ancientwand: { cols: [0xff4a3a, 0x8fe0ff, 0xeefff6, 0xf0ecff, 0xffffff], k: 2, t: .3, dim: .5, back: .55 },
+  voidlantern: { cols: [0xb46bff, 0xe8d2ff], k: 2.3, t: .35, dim: .4, back: .9 },
+  harpoon: { cols: [0x4fe0d0], k: 2, t: .3, dim: .5, back: .8 },
+  aerial: { cols: [0xd8f6ff], k: 2, t: .2, dim: .5, back: .6 },
+  wisp: { cols: [0x5fe8d8, 0xeafffb], k: 2, t: .2 },
+  windwand: { cols: [0xc8f0ff], k: 1.9, t: .22 },
+  flamewand: { cols: [0xff6a1a, 0xffc04a, 0xfff0b0], k: 1.8, t: .15 },
+  voxel: { cols: [0x2ee6d6], k: 1.8, t: .15 },
+  starsmasher: { cols: [0xffe68a], k: 1.9, t: .12, flick: .25 },
+  daybreak: { cols: [0xfff0a0], k: 1.7, t: .2 }, highnoon: { cols: [0xfff0a0], k: 1.7, t: .2 },
+  frostwand: { cols: [0x9fe8ff, 0xe8fbff], k: 1.6, t: .15, flick: .15 },
+  conch: { cols: [0x3fc8ec, 0xf0ffff], k: 1.6, t: .15, flick: .15 },
+  heatray: { cols: [0xfff2a8, 0xffd27a, 0xffb347, 0xffd23f], k: 1.7, t: .15, flick: .2 },
+  shockbeam: { cols: [0x8fe9ff], k: 2.1, t: .12, flick: .5 },
+  tempest: { cols: [0xb69bff, 0xf3eeff], k: 2.1, t: .12, flick: .5 },
+  flame: { cols: [0xffaa33], k: 1.8, t: .12, flick: .3 },
+};
+for (const id of ['tishot', 'tipistol', 'tisniper', 'tirocket', 'tisaw']) CORE_FX[id] = { cols: [0x4f9dff], k: 1.8, t: .2 }; // the titanium set's blue
+const coreOf = i => CORE_FX[BASE[i].id] && new Set(CORE_FX[BASE[i].id].cols.map(c => palIdx(c, true)));
+let fxClock = 0; // seconds, moved on each frame (trailTick)
+function coreAt(u) { // how bright, this long after the last shot
+  const f = u.fx, s = fxClock - u.at, dim = f.dim ?? 1;
+  if (s < f.t) { const k = 1 - s / f.t; return dim + (u.pk - dim) * k * k * (f.flick ? 1 - f.flick * Math.random() : 1); }
+  if (!f.back) return 1;
+  const e = Math.min(1, (s - f.t) / f.back); return dim + (1 - dim) * e * e * (3 - 2 * e);
+}
+function coreLit() { const m = this.material; if (m.userData.fx) m.color.setScalar(coreAt(m.userData)); } // a mesh's own, not an outline pass's stand-in
+function coreFire(mat) { if (!mat) return; const u = mat.userData; u.at = fxClock; u.pk = 1 + (u.fx.k - 1) * (.85 + Math.random() * .3); } // a little brighter or softer each time
 function makeFlash(size = .1, mat = FLASH_SPR) {
   const s = new THREE.Sprite(mat); s.scale.setScalar(size);
   s.onBeforeRender = () => { const m = s.material, u = m.userData; m.rotation = (Math.random() - .5) * (u.jit ?? 7); s.scale.setScalar(size * (u.k || 1) * (.75 + Math.random() * .5)); };
@@ -250,9 +285,9 @@ let gunHolo = null;
 // barrels spin about the bore; a flat part (the Ripsaw's blade) turns like a record; a hovering part (the Crystal Companion's crystal) turns upright and bobs
 function spinTurn(s, v, dt) { if (s.userData.flat) { s.rotation.y += v * dt; return; } if (s.userData.hover === undefined) { s.rotation.z += v * dt; return; } s.rotation.y += v * dt; s.position.y = s.userData.hover + Math.sin(performance.now() * .003) * .01; }
 // the Crystal Companion's crystals: while it fires, a white-hot light runs along them toward the muzzle
-let gunPulse = null;
+let gunPulse = null, gunCore = null;
 function pulseShow(ps, on) { const hot = on ? Math.floor(performance.now() / 45) % ps.length : -1; ps.forEach((c, i) => { for (const m of c.children) if (m.material === gunGlow || m.material === gunGlowHot) m.material = i === hot ? gunGlowHot : gunGlow; }); }
-let gunMag = null, gunArmL = null, gunHand = null; // parts a reload moves
+let gunMag = null, gunArmL = null, gunHand = null, gunFlips = null; // parts a reload moves, a balisong's blade and handle
 let gunSwing = null; // the Void Lantern hangs from your fist and swings
 const vmRl = {};
 // switching guns (lighter guns come up faster)
@@ -344,7 +379,7 @@ function partMid(part) {
 const partBounds = part => { const m = partMid(part); return { c: [part.position.x + m.x, part.position.y + m.y, part.position.z + m.z], h: part.userData.half }; };
 
 // voxel models: boxes filled into a pixel grid, edges drawn black
-const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, windwand: .6, stunwand: .6, flamewand: .6, soulwand: .6, ancientwand: .6, grenade: .85, salvo: .75, voidlantern: .9, tisword: .75, tirocket: .85, cutlass: .75, conch: .7 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
+const GPX = .02, GUN_SCALE = { knife: .75, herosword: .75, blazesaber: .75, windsaber: .75, warhammer: .65, frostwand: .6, windwand: .6, stunwand: .6, flamewand: .6, soulwand: .6, ancientwand: .6, grenade: .85, salvo: .75, voidlantern: .9, tisword: .75, tirocket: .85, cutlass: .75, conch: .7, balisong: .75 }, GUN_DARK = 0x4a4a52, GUN_STEEL = 0x62626a;
 const gunPal = [null], gunPalI = {};
 function palIdx(col, glow = false, shine = false, even = shine) { // even: polished, no grain
   const k = (glow ? 'g' : shine ? 's' : even ? 'e' : '') + col;
@@ -366,10 +401,10 @@ function voxelGrid(pieces) {
   const at = (x, y, z) => x < 0 || y < 0 || z < 0 || x >= NX || y >= NY || z >= NZ ? 0 : cell[(z * NY + y) * NX + x];
   return { lo, NX, NY, NZ, cell, at };
 }
-// turn a model's pixels into geometry
-function voxelGeos(pieces, px) {
-  const { lo, NX, NY, NZ, cell, at } = voxelGrid(pieces);
-  const out = { lit: [[], [], []], glow: [[], [], []], shine: [[], [], []] };
+// turn a model's pixels into geometry (core: the glowing colours that light up when it fires, kept apart)
+function voxelGeos(pieces, px, core, near) { // near: other parts it sits against (a balisong's), so no outline runs between them
+  const { lo, NX, NY, NZ, cell, at } = voxelGrid(pieces), by = near ? (x, y, z) => at(x, y, z) || near(x + lo[0], y + lo[1], z + lo[2]) : at;
+  const out = { lit: [[], [], []], glow: [[], [], []], shine: [[], [], []], core: [[], [], []] };
   const CORNER = [0, 1, 2, 0, 2, 3], ca = [0, 1, 1, 0], cb = [0, 0, 1, 1];
   for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
     const m = cell[(z * NY + y) * NX + x]; if (!m) continue;
@@ -381,7 +416,7 @@ function voxelGeos(pieces, px) {
       let black = false;
       for (let e = 0; e < 8 && !black && !P.glow; e++) {
         const sa = VOX_RING[e][0], sb = VOX_RING[e][1];
-        if (!at(x + sa * a[0] + sb * b[0], y + sa * a[1] + sb * b[1], z + sa * a[2] + sb * b[2])) black = true;
+        if (!by(x + sa * a[0] + sb * b[0], y + sa * a[1] + sb * b[1], z + sa * a[2] + sb * b[2])) black = true;
       }
       let r = 0, g = 0, bl = 0;
       if (!black) {
@@ -389,7 +424,7 @@ function voxelGeos(pieces, px) {
         const sh = P.glow ? 1 : P.even ? .95 + (h % 1000) / 1000 * .05 : .82 + (h % 1000) / 1000 * .18;
         r = P.c.r * sh; g = P.c.g * sh; bl = P.c.b * sh;
       }
-      const [pos, nor, col] = out[P.glow ? 'glow' : P.shine ? 'shine' : 'lit'];
+      const [pos, nor, col] = out[P.glow ? (core?.has(m) ? 'core' : 'glow') : P.shine ? 'shine' : 'lit'];
       const ox = x + lo[0] + (n[0] > 0), oy = y + lo[1] + (n[1] > 0), oz = z + lo[2] + (n[2] > 0);
       for (let q = 0; q < 6; q++) {
         const k = CORNER[q], i = ca[k], j = cb[k];
@@ -406,7 +441,7 @@ function voxelGeos(pieces, px) {
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.computeBoundingSphere(); return g;
   };
-  return { lit: geo(out.lit), glow: geo(out.glow), shine: geo(out.shine) };
+  return { lit: geo(out.lit), glow: geo(out.glow), shine: geo(out.shine), core: geo(out.core) };
 }
 
 // gun models (grip and fore are where the hands go)
@@ -1154,6 +1189,16 @@ const GUN_MODELS = {
     const rounds = [-2, 4].map(y => { const r = sub(0, y, 0); at(r)(4, 4, 6, mat(0x4f8fe0), 0, 0, -24); return r; }); // a rocket in each tube, the top one fires first
     return { muzzle: [1, -28], grip: [4, 8, 5, 0, -11, -3.5], fore: [4, 8, 4, 0, -11, -14], bands: [8, 12], band: [10, 14, 1], rounds };
   },
+  balisong({ p, mat, sub, at }) { // a butterfly knife: the blade and the bite handle turn on their pins (flips)
+    const vio = mat(0x7a4fd0), dvio = mat(0x35215e), seam = mat(0x4a2e86), steel = mat(0xaeb6c0), lsteel = mat(0xd2d8df), edge = mat(0xf2f5f9), brass = mat(0xd9a520);
+    const handle = (P, h, y, slot, pin) => { P(4, h, 17, vio, 0, y, 8.5); for (const z of [5, 9, 13]) P(4, 1, 2, dvio, 0, slot, z); P(4, h, 1, steel, 0, y, 16.5); P(4, 1, 1, brass, 0, pin, 1.5); }; // skeleton slots, a steel end, a brass pin by the pivot
+    handle(p, 4, 2, 2.5, 1.5); p(4, 1, 15, seam, 0, .5, 8.5); // the safe handle stays in your hand, dark where the two meet
+    const blade = sub(0, 0, 0, [0, 2, .5]), bite = sub(0, 0, 0, [0, -1.5, .5]), B = at(blade); // each turns on its pin
+    B(2, 5, 1, steel, 0, .5, -.5); B(2, 2, 12, steel, 0, 2, -7); B(2, 1, 12, lsteel, 0, .5, -7); B(2, 2, 12, edge, 0, -1, -7); // tang, then steel, a lighter grind and a bright edge
+    B(2, 4, 1, lsteel, 0, 0, -13.5); B(2, 2, 1, edge, 0, -1, -13.5); B(2, 3, 1, edge, 0, -.5, -14.5); // a clipped point, short enough to close inside the handles
+    handle(at(bite), 3, -1.5, -1.5, -1.5);
+    return { muzzle: [0, -15], grip: [6, 9, 12, 0, .5, 9], fore: null, bands: [3, 14], band: [6, 6, 2], flips: [blade, bite] };
+  },
 };
 // shared gun geometry (never dispose meshes marked shared)
 const gunGeoCache = {};
@@ -1183,30 +1228,33 @@ function gunPieces(i, stars, grow = BASE[i].grow ? GROW_MAX : 0) { // grow: full
   return { m, main, subs };
 }
 function gunGeos(i, stars, grow) {
-  const { m, main } = gunPieces(i, stars, grow), px = gunPx(i);
-  const part = s => {
+  const { m, main } = gunPieces(i, stars, grow), px = gunPx(i), core = coreOf(i);
+  const all = m.flips && voxelGrid([...main, ...m.flips.flatMap(s => s.list)]), near = all && ((x, y, z) => all.at(x - all.lo[0], y - all.lo[1], z - all.lo[2])); // a balisong's parts, together as it rests
+  const part = (s, nb) => {
     if (!s) return null;
-    const geos = voxelGeos(s.list, px);
-    for (const g of [geos.lit, geos.glow, geos.shine]) if (g) { g.translate(-s.off[0] * px, -s.off[1] * px, -s.off[2] * px); g.computeBoundingSphere(); }
+    const geos = voxelGeos(s.list, px, core, nb);
+    for (const g of [geos.lit, geos.glow, geos.shine, geos.core]) if (g) { g.translate(-s.off[0] * px, -s.off[1] * px, -s.off[2] * px); g.computeBoundingSphere(); }
     return { at: s.at.map((v, k) => v + s.off[k]), geos };
   };
-  return { m, main: voxelGeos(main, px), spin: part(m.spin), round: part(m.round), mag: part(m.mag), rounds: m.rounds?.map(part), charges: m.charges?.map(part), bar: part(m.bar), pulse: m.pulse?.map(part) };
+  return { m, main: voxelGeos(main, px, core, near), spin: part(m.spin), round: part(m.round), mag: part(m.mag), rounds: m.rounds?.map(s => part(s)), charges: m.charges?.map(s => part(s)), bar: part(m.bar), pulse: m.pulse?.map(s => part(s)), flips: m.flips?.map(f => part(f, near)) };
 }
 // gun pictures (hotbar, armory, chests): muzzle turned away a little, seen from above
 const gunPicAt = (i, yaw = .4, tilt = .36, w = 320, h = 160) => modelPic(null, g => makeGun(i, g, 0), { yaw: yaw - Math.PI / 2, tilt, w, h });
 const gunPic = i => modelPic('gun:' + i + (BASE[i].grow ? ':' + growStage(i) : ''), g => makeGun(i, g, 0), { yaw: .4 - Math.PI / 2, tilt: .36 }); // a growing gun as grown as yours
 const gunBox = (b, px) => b && { c: [b[3] * px, b[4] * px, b[5] * px], h: [b[0] / 2 * px, b[1] / 2 * px, b[2] / 2 * px] };
 function makeGun(i, g, stars, grow = growStage(i)) {
-  const b = gunGeoCache[BASE[i].id + ':' + stars + ':' + grow] ??= gunGeos(i, stars, grow), px = gunPx(i);
+  const b = gunGeoCache[BASE[i].id + ':' + stars + ':' + grow] ??= gunGeos(i, stars, grow), px = gunPx(i), fx = CORE_FX[BASE[i].id];
+  const core = fx && Object.assign(gunGlow.clone(), { userData: { fx, at: -1e9, pk: fx.k } }); // its own, so each gun lights up on its own
   const add = (parent, geos) => {
-    for (const [geo, mat] of [[geos.lit, gunLit], [geos.glow, gunGlow], [geos.shine, gunShine]]) if (geo) { const m = new THREE.Mesh(geo, mat); m.userData.shared = true; parent.add(m); }
+    for (const [geo, mat] of [[geos.lit, gunLit], [geos.glow, gunGlow], [geos.shine, gunShine], [geos.core, core]]) if (geo) { const m = new THREE.Mesh(geo, mat); m.userData.shared = true; if (mat === core) m.onBeforeRender = coreLit; parent.add(m); }
   };
   add(g, b.main);
   const sub = s => { if (!s) return null; const grp = new THREE.Group(); grp.position.set(...s.at.map(n => n * px)); add(grp, s.geos); g.add(grp); return grp; };
   const charges = b.charges?.map(sub), bar = sub(b.bar);
   if (charges && bar) { for (const m of bar.children) m.material = gunGlow.clone(); charges.bar = bar; } // its own material, so each gun's bar has its own brightness
   const spin = sub(b.spin); if (spin && b.m.hover) spin.userData.hover = spin.position.y; if (spin && b.m.flat) spin.userData.flat = true;
-  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin, round: sub(b.round), mag: sub(b.mag), rounds: b.rounds?.map(sub), charges, pulse: b.pulse?.map(sub), holo: b.m.holo && b.m.holo.map(n => n * px) };
+  const flips = b.flips?.map(sub); if (flips?.[1]) { flips[1].position.sub(flips[0].position); flips[0].add(flips[1]); } // a balisong's bite handle rides on the blade's tang
+  return { muzzle: b.m.muzzle.map(n => n * px), grip: gunBox(b.m.grip, px), fore: gunBox(b.m.fore, px), spin, round: sub(b.round), mag: sub(b.mag), rounds: b.rounds?.map(sub), charges, pulse: b.pulse?.map(sub), holo: b.m.holo && b.m.holo.map(n => n * px), core, flips };
 }
 // the gun's outer pixels, for keeping arms out of it
 const gunCellCache = {};
@@ -1222,7 +1270,7 @@ function gunCells(i) {
 }
 const holdOf = w => w.hold;
 // knife swing for characters: raise, chop down, come back
-const KNIFE_SWING = .36; // seconds
+const KNIFE_SWING = .36, swingT = w => w.swingT || KNIFE_SWING; // seconds (a balisong's is quicker)
 const swingAt = t => { const e = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   t = Math.min(1, Math.max(0, t)); return t < .3 ? -.55 * e(t / .3) : t < .55 ? -.55 + 1.3 * e((t - .3) / .25) : .75 * (1 - e((t - .55) / .45)); };
 
@@ -1294,6 +1342,7 @@ function fpHeld(a, w, ads) {
   heldGun(gunG.quaternion, gunG.position, Q_ID, V_0, a, gunHandP, 1, w.wand && !w.melee ? WAND_UP * (1 - a.level) * (1 - ads) : 0); // a wand rests tipped up in your hand
   gunG.updateMatrix();
   if (gunMag) gunMag.position.copy(gunMag.userData.rest).add(_fv.set(a.mx, a.my, a.mz));
+  flipShow(gunFlips, a);
   if (gunArmR) armFollow(gunArmR, gunArmR.userData.fp.c);
   if (gunArmL) { _fm.copy(gunArmL.userData.fp.c); _fm.z += a.az; if (a.left > 0 && gunMag) _fm.lerp(_fd.copy(partMid(gunMag)).add(gunMag.position), a.left); armFollow(gunArmL, _fm); }
   if (gunHand) { // a free left hand comes up to the mag
@@ -1322,9 +1371,10 @@ function buildGun() {
   gunG = new THREE.Group(); gunG.matrixAutoUpdate = false; vm.add(gunG); // the gun, moving in your hand
   gunSwing = holdOf(BASE[cur]) === 'lantern' ? new THREE.Group() : null; gunBody = null;
   if (gunSwing) { gunBody = new THREE.Group(); gunSwing.add(gunBody); gunG.add(gunSwing); } // gunSwing swings from your fist, gunBody is the lantern hung from it
-  const body = gunBody || gunG, { muzzle: [my, mz], grip, fore, spin, round, mag, rounds, charges, pulse, holo } = makeGun(cur, body, lvl[cur]);
+  gunCore?.dispose();
+  const body = gunBody || gunG, { muzzle: [my, mz], grip, fore, spin, round, mag, rounds, charges, pulse, holo, core, flips } = makeGun(cur, body, lvl[cur]);
   if (chargeT) chargeEnd(); // put away mid-charge
-  gunSpin = spin; gunRound = round; gunRounds = rounds; gunCharges = charges; chargeShow(charges, 0); gunPulse = pulse; gunHolo = holo; gunMag = mag; gunShown = cur; drawCross(BASE[cur]);
+  gunSpin = spin; gunRound = round; gunRounds = rounds; gunCharges = charges; chargeShow(charges, 0); gunPulse = pulse; gunCore = core; gunHolo = holo; gunMag = mag; gunFlips = flips; gunShown = cur; drawCross(BASE[cur]);
   const pose = !gunSwing && typeof holdFor === 'function' ? holdFor(cur) : null; // none yet while the game loads
   gunArmL = gunArmR = null; fpTurn = pose ? pose.turn : 0; gunHandP.set(...grip.c);
   if (gunSwing) { // your fist on the right end of its handle: it swings from there
@@ -1353,7 +1403,7 @@ function selectSlot(s) {
 }
 function equip(i) {
   if (i === cur || !WEAPONS[i] || !owned[i]) return;
-  cur = i; slotGun[slotOf(i)] = i; cancelReload(); swapLen = drawT(WEAPONS[i]); swapDown = true;
+  cur = i; slotGun[slotOf(i)] = i; cancelReload(); inspT = -1; swapLen = drawT(WEAPONS[i]); swapDown = true;
   cd = Math.max(cd, swapLen * (SWAP_DOWN * (1 - swapOff) + 1 - SWAP_DOWN)); renderHotbar(); sfx('equip');
 }
 function swapTick(dt) {
@@ -1370,6 +1420,9 @@ function reload() {
   reloading = reloadFull = rlOf(w, youFx()); reloadSnd = sfx('r_' + w.id, { rate: BASE[cur].reload / reloading }); myBurst.bn = 0;
 }
 function cancelReload() { reloading = 0; stopSfx(reloadSnd); reloadSnd = null; myBurst.bn = 0; }
+// melee can't aim: the aim key plays with it instead (held.js inspectPose)
+let inspT = -1;
+function inspect() { if (WEAPONS[cur].melee && inspT < 0 && kick <= 0 && swapOff <= 0 && respawnT <= 0 && gunShown === cur) inspT = 0; }
 buildGun();
 // build gun models and pictures in idle time so nothing stalls later
 {

@@ -188,11 +188,11 @@ function heroGun(i) {
   holdG.clear();
   heroFireStop(); stopSfx(hf.chgSnd);
   if (i < 0) { pose = null; hf.i = -1; return; }
-  const g = new THREE.Group();
+  const g = new THREE.Group(); hf.core?.dispose();
   const parts = makeGun(i, g, Math.max(0, gunUse(i) - 1));
   g.scale.setScalar(GUN_S);
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
-  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), spin: parts.spin, spinV: 0, round: parts.round, rounds: parts.rounds, bn: 0, rs: { rk: -1 }, charges: parts.charges, chg: 0, pulse: parts.pulse });
+  Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), flips: parts.flips, insp: -1, spin: parts.spin, spinV: 0, round: parts.round, rounds: parts.rounds, bn: 0, rs: { rk: -1 }, charges: parts.charges, chg: 0, pulse: parts.pulse, core: parts.core });
   chargeShow(parts.charges, 0);
   hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
@@ -222,8 +222,10 @@ function heroTrigger(down) {
   hf.held = true; hf.pend = true;
   if (heroCan()) { hf.pend = false; if (!autoFire(hf.st) && !hf.st.charge) heroShot(); } // the Aurora Rail fires when it's let go (heroTick)
 }
+function heroInspect() { const w = hf.st; if (heroCan() && w?.melee && hf.insp < 0 && hf.kick <= 0) { heroFireStop(); hf.insp = 0; } } // a blade gets played with
 function heroReload() {
-  const w = hf.st; if (!heroCan() || !w || w.melee || w.pool || hf.rl > 0) return;
+  const w = hf.st; if (w?.melee) return heroInspect();
+  if (!heroCan() || !w || w.pool || hf.rl > 0) return;
   heroFireStop(); hf.rl = w.reload; hf.bn = 0;
   sfx('r_' + w.id, { v: .7 * hv(), rate: BASE[hf.i].reload / w.reload });
 }
@@ -233,7 +235,7 @@ function heroShot(k = 1) {
   if (hf.rl > 0 || hf.cd > 0) return;
   if (!w.inf && hf.ammo <= 0) { hf.bn = 0; if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
   hf.cd = burstCd(w, hf); if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
-  hf.kick = kickOf(w);
+  hf.kick = kickOf(w); coreFire(hf.core);
   if (w.melee) {
     sfx(w.swing || 'swing', { v: .7 * hv() });
     if (w.wand) { hf.flashM.getWorldPosition(_hm); hf.g.getWorldQuaternion(_hq); _hd.set(0, 0, -1).applyQuaternion(_hq); stunZap(_hm.clone(), _hm.clone().addScaledVector(_hd, w.range), lobbyScene, .7); }
@@ -284,6 +286,7 @@ function heroTick(dt) {
   const can = heroCan();
   if (!heroLive()) { heroFireStop(); hf.bn = 0; }
   hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * kickFall(w)); hf.flash -= dt;
+  if (hf.insp >= 0) { const t0 = hf.insp; hf.insp += dt; if (hf.kick > 0 || !heroLive() || hf.insp >= inspLen(w)) hf.insp = -1; else inspSnd(w, t0, hf.insp, null, .6 * hv()); }
   if (w.charge) { // the Aurora Rail charges while it's held and fires when it's let go
     if (hf.held && can && hf.cd <= 0 && hf.rl <= 0 && hf.ammo > 0) {
       if (!hf.chg) hf.chgSnd = sfx('chargeUp', { v: .6 * hv() });
@@ -329,13 +332,13 @@ function lobbyGuns(t) {
   }
   if (lob.taps.length && t >= lob.taps[0]) { lob.taps.shift(); hf.held = hf.pend = true; lob.rel = t + .06; }
   if (lob.rel && t >= lob.rel) { lob.rel = 0; heroFireStop(); }
-  const busy = hf.held || hf.rl > 0 || lob.taps.length;
+  const busy = hf.held || hf.rl > 0 || hf.insp >= 0 || lob.taps.length;
   if (t >= lob.until && !busy) { lob.on = false; heroFireStop(); lob.next = t + 3.5 + Math.random() * 3.5; return; }
   if (fid?.k === 'relax') lob.act = Math.max(lob.act, fid.t0 + FID_T.relax); // lets him finish relaxing first
   if (t < lob.act || busy || holdK < .9) return;
   lob.act = t + 3 + Math.random() * 3;
   const w = hf.st, r = Math.random();
-  if (r < .3 && !w.melee && !w.pool && !w.inf) heroReload();
+  if (r < .3 && !w.pool && (w.melee || !w.inf)) heroReload(); // a blade gets played with instead
   else if (r < .65 && !lobbyHush()) { // a few shots, or a short burst
     if (autoFire(w)) { hf.held = hf.pend = true; lob.rel = t + .4 + Math.random() * .6; }
     else if (w.charge) { hf.held = true; lob.rel = t + (Math.random() < .6 ? w.charge + .3 : .3 + Math.random() * .4); } // a full charge, or a quick one
@@ -552,7 +555,9 @@ function updateLobby(dt) {
     const q0 = _q.copy(_wq).multiply(tq).multiply(hQ);
     // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
     const w = hf.i >= 0 && hf.st, rk = w && hf.rl > 0 ? 1 - hf.rl / w.reload : -1;
-    const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL }) : null;
+    const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL, insp: hf.insp ?? -1 }) : null;
+    flipShow(hf.flips, m);
+    if (w) bladeTrail(hf.g, w, w.melee && hf.kick > 0 ? 1 - hf.kick : -1, lobbyScene);
     let leftK = hLK;
     reloadSwap(hf.rs, w ? w.id : '', rk, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(m ? m.mx : 0, m ? m.my : 0, m ? m.mz : 0));

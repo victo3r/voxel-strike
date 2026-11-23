@@ -383,6 +383,7 @@ const SHOP = [
   { gun: 'daybreak', price: 150, desc: 'six heavy shots from a sunrise revolver' },
   { gun: 'highnoon', price: 300, desc: 'a lever rifle that drops them one by one' },
   { gun: 'cutlass', price: 160, desc: 'a quick blade from a wreck' },
+  { gun: 'balisong', price: 150, desc: 'a butterfly knife that cuts quick' },
   { gun: 'harpoon', price: 380, desc: 'spears one and reels it in' },
   { gun: 'conch', price: 480, desc: 'a jet of water that shoves them back' },
   { gun: 'tipistol', price: 520, desc: 'a hand cannon that hits like a rifle' },

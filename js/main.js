@@ -147,6 +147,7 @@ function update(dt) {
   aiming = opts.toggleAim || TOUCH ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
   kick = Math.max(0, kick - dt * kickFall(w)); // gun settles after a shot
+  if (inspT >= 0) { const t0 = inspT; inspT += dt; if (!w.melee || kick > 0 || swapOff > 0 || respawnT > 0 || gunShown !== cur || inspT >= inspLen(w)) inspT = -1; else inspSnd(w, t0, inspT); }
   wandOn -= dt; wandK = Math.max(0, Math.min(1, wandK + dt * (wandOn > 0 && gunShown === cur ? 14 : -4)));
   tickCross(dt, BASE[cur]);
   if (gunSpin) { spinTurn(gunSpin, gunSpinV + spinIdle(gunShown), dt); gunSpinV = Math.max(0, gunSpinV - dt * 25); } // barrels wind down
@@ -200,7 +201,8 @@ function update(dt) {
   }
   // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
   const rk = reloading > 0 && gunShown === cur ? 1 - reloading / reloadFull : -1;
-  fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, rl: rk, level: wandK, two: !!gunArmL, ads: adsT }), vw, adsT);
+  fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, rl: rk, level: wandK, two: !!gunArmL, ads: adsT, insp: vw === w ? inspT : -1 }), vw, adsT);
+  bladeTrail(gunG, vw, vw.melee && kick > 0 ? 1 - kick : -1, camera); // a swing's trail stays in your view
   reloadSwap(vmRl, w.id, rk, gunMag, scene); // mag swap
   if (rk >= 0 && w.id === 'eradicator' && reloading / reloadFull < .12) gunSpinV = Math.max(gunSpinV, 16);
   // weapon swap
@@ -476,7 +478,7 @@ function autoGfx(raw, playing) {
   drownTick(dt); musicTick();
   dropTick(dt); // dropped mags
   starTick(dt); boltTick(dt); secretTick(dt); SHINE_T.value = performance.now() / 1000;
-  if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
+  if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); trailTick(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
   bootDone();
   // zombie waves pause in the menu, matches and co-op don't
   const isLive = () => !dead && !matchOver && (net.coop || !shopOpen && (pvp() || locked));
@@ -492,6 +494,7 @@ function autoGfx(raw, playing) {
   // smooth ledge climbing
   const lagged = zombies.filter(z => z.g.position.lag), realY = lagged.map(z => z.g.position.y);
   for (const z of lagged) z.g.position.y -= z.g.position.lag;
+  trailTick(dt); // where the blades are drawn
   renderer.render(scene, camera);
   outlineRender(camera); // red enemy outline
   lagged.forEach((z, k) => z.g.position.y = realY[k]);

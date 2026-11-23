@@ -6,7 +6,7 @@ const EVENTS = [
   { id: 'sniper', name: 'SNIPER WEEK', icon: 'aim', col: '#7fd8ff', line: '+5 points for every sniper kill', cat: 'sniper', per: 5, skin: 'ghillie' },
   { id: 'champ', name: 'CHAMPIONS WEEK', icon: 'trophy', col: '#ffd75e', line: '+20 points for every win', win: 20, skin: 'laurel' },
 ];
-const EV_TRACK = [{ p: 30, b: 1 }, { p: 100, k: 1 }, { p: 200, b: 2 }, { p: 350, box: 'iron' }, { p: 550, b: 3 }, { p: 800, box: 'gold' }, { p: 1000, skin: 1 }];
+const EV_TRACK = [{ p: 50, b: 1 }, { p: 150, k: 1 }, { p: 400, b: 2 }, { p: 800, box: 'iron' }, { p: 1500, b: 3 }, { p: 2500, box: 'gold' }, { p: 4000, skin: 1 }];
 const EV_START = Date.UTC(2026, 10, 9), EV_WEEK = 7 * 864e5; // a Monday: Zombie Week, then down the list
 const evWeek = () => Math.floor((Date.now() - EV_START) / EV_WEEK);
 let evPick = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) && new URLSearchParams(location.search).get('ev') || null; // ?ev=blade to try one here
@@ -54,7 +54,7 @@ function eventTiles() {
 }
 // the lobby panel and the prize card
 function renderEvent() {
-  const E = eventNow(), S = prof.event, next = S.got < EV_TRACK.length ? evPrize(EV_TRACK[S.got]) : null, from = S.got ? EV_TRACK[S.got - 1].p : 0;
+  const E = eventNow(), S = prof.event, next = S.got < EV_TRACK.length ? evPrize(EV_TRACK[S.got]) : null, from = Math.min(S.pts, S.got ? EV_TRACK[S.got - 1].p : 0); // min: a prize won on the old, shorter track
   document.documentElement.style.setProperty('--ev', E.col);
   if (!inLobby) return; // chest pictures only build in the lobby
   setHTML($('event'), `<div class="eh"><b>${ico(E.icon)} ${E.name}</b><small>${evLeft()} LEFT</small></div><div class="el">${E.line}</div>` +

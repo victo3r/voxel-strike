@@ -385,7 +385,7 @@ barrel(-5.4, -15.6, 0); barrel(3.6, -15.8, 0); barrel(-6.4, -12.2, 0);
   net.position.set(NX, 1.15, NZ); add(net);
 }
 // driftwood and stones
-for (const [x, z, l, r] of [[-15, 8, 2.2, .4], [3, 8.4, 1.6, -.7], [17.5, 2, 2, 1.2], [-2, -9, 1.4, .2]]) deco(l, .22, .26, barkMat, x, .11, z).rotation.y = r;
+for (const [x, z, l, r] of [[-14, 7.6, 2.2, .4], [3, 8.4, 1.6, -.7], [17.5, 2, 2, 1.2], [-2, -9, 1.4, .2]]) deco(l, .22, .26, barkMat, x, .11, z).rotation.y = r;
 for (const [x, z, s] of [[-18.5, 6, 1], [19, -14, 1.1], [-19.5, -14.5, .9]]) onGround(x, z, s, s * .9, s * .8, boulder).rotation.y = rnd();
 // --- the cave ---
 for (const [x, z] of [[-4, -24], [2.5, -27], [-1.5, -29.2], [-1, -20.5]]) { const c = cellAt(x, z); if (c >= 0 && cave[c]) lantern(x, CC[c] - .5, z, .3); }

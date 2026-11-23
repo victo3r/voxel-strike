@@ -39,7 +39,7 @@ let dailyTag = null;
 function renderDaily() {
   const s = dailyNow(), next = s.claimed && dailyNext(s), name = next && dailyName(next), today = s.list[s.day - 1];
   $('dailyBtn').classList.toggle('ready', !s.claimed && !s.wait);
-  const tag = s.wait ? `<span>${dailyGift(today)}</span> PLAY A GAME` : name ? `<span>${dailyGift(next)}</span> TOMORROW` : next?.k ? `${ico('key')} TOMORROW` : ''; // something good waiting
+  const tag = s.wait ? `PLAY A GAME <span>${dailyGift(today)}</span>` : name ? `TOMORROW <span>${dailyGift(next)}</span>` : next?.k ? `TOMORROW ${ico('key')}` : ''; // something good waiting
   if (tag !== dailyTag) { $('dailyTmw').innerHTML = dailyTag = tag; $('dailyBtn').title = name ? `Daily reward: ${name} tomorrow` : tag ? 'Daily reward: a free chest tomorrow' : 'Daily reward'; }
   if ($('daily').style.display !== 'flex') return;
   const left = Math.max(0, Math.ceil((new Date().setHours(24, 0, 0, 0) - Date.now()) / 1000)), hms = `${left / 3600 | 0}:${String((left / 60 | 0) % 60).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;

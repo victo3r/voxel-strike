@@ -14,13 +14,16 @@ builds from `main` too and shows the move popup (`js/moved.js`) until it is take
   `http.server`/`wrangler`/`workerd` processes by command line.
 - `?all=1` on 127.0.0.1/localhost uses a separate dev profile with everything owned (max level, coins, keys, every gun, armor,
   boots and hat, topped up each load); it never signs in or syncs. The tests don't use it.
+- `?walk=<map>` on 127.0.0.1/localhost: PLAY drops you on that map alone (no bots, no clock) to look around; the only way to see a
+  duel map without a rival.
 - `?dev=1` (or a localhost page) points online play at `ws://127.0.0.1:8787`; `?srv=http://host:port` points saves, friends and
   play at another server (the tests use `?srv=http://127.0.0.1:9` to force offline).
 - All tests live in `../voxel-strike-server/test/` and drive this game through headless Playwright (`playwright-core`, Chromium
-  under `%LOCALAPPDATA%/ms-playwright`). Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
-  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `keyboards.mjs`, `arsenal.mjs`, `skins.mjs`, `sides.mjs`, `mythics.mjs`, `crystal.mjs`, `titanium.mjs`, `welcome.mjs`, `treasure.mjs`, `achievements.mjs`, `levelup.mjs`, `views.mjs` (first and third person show the same moves), `hits.mjs` (what flies off a hit, by gun), `flying.mjs` (the server's flying check against the real movement on every map), `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
-  keeps your score, `node test/band.mjs` checks the level bands for matchmaking and `node test/audit.mjs` checks the save check's rules (all three run the server's code directly, no servers or browser); `node test/measure-bots.mjs ladder` measures bot hit rates per
-  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards, `test/zboard.mjs` for the zombie board, `test/prizes.mjs` for the weekly prizes, `test/coop.mjs` for co-op zombie waves, `test/coopback.mjs` for coming back to a co-op run after a reload, `test/saves.mjs` for the save check, `test/hostback.mjs` for a host coming back to its bots) also need the local dev server described in the server README; run
+  under `%LOCALAPPDATA%/ms-playwright`), drawing on the graphics card (`test/gl.mjs`; `GL=soft` draws in software). They share the
+  user's PC: run one at a time, at below-normal priority. Offline checks need only the 8010 server: `node test/zombies.mjs`, `recoil.mjs`,
+  `maps.mjs`, `gear.mjs`, `sets.mjs`, `bots.mjs`, `picker.mjs`, `anim.mjs`, `armory.mjs`, `lowfps.mjs`, `daily.mjs`, `chests.mjs`, `sky.mjs`, `roofs.mjs`, `cove.mjs`, `graveyard.mjs`, `farm.mjs`, `mobile.mjs`, `clicks.mjs`, `lance.mjs`, `wands.mjs`, `knockoff.mjs`, `outlines.mjs`, `first.mjs`, `missions.mjs`, `wildsets.mjs`, `secrets.mjs`, `events.mjs`, `keyboards.mjs`, `mouse.mjs` (every bit the mouse moves turns you; only lone glitch jumps are dropped), `arsenal.mjs`, `skins.mjs`, `sides.mjs`, `mythics.mjs`, `crystal.mjs`, `titanium.mjs`, `welcome.mjs`, `treasure.mjs`, `achievements.mjs`, `levelup.mjs`, `views.mjs` (first and third person show the same moves), `hits.mjs` (what flies off a hit, by gun), `weaponfx.mjs` (swing trails and lit cores), `flying.mjs` (the server's flying check against the real movement on every map), `crazy.mjs` and `boost.mjs` (both use the CrazyGames SDK in its local mode, so they need the internet); `node test/rejoin.mjs` checks that coming back to an online match
+  keeps your score, `node test/band.mjs` checks the level bands for matchmaking and `node test/audit.mjs` checks the save check's rules and `node test/duelrules.mjs` a duel's rules and pay (all four run the server's code directly, no servers or browser); `node test/measure-bots.mjs ladder` measures bot hit rates per
+  skill level. Online checks (`test/sim.mjs`, `test/e2e.mjs`, `test/cgauth.mjs` for CrazyGames sign-in and rooms, `test/stats.mjs` for the stats rows, `test/boards.mjs` for the boards and player cards, `test/zboard.mjs` for the zombie board, `test/prizes.mjs` for the weekly prizes, `test/coop.mjs` for co-op zombie waves, `test/coopback.mjs` for coming back to a co-op run after a reload, `test/duel.mjs` for duels, `test/saves.mjs` for the save check, `test/hostback.mjs` for a host coming back to its bots) also need the local dev server described in the server README; run
   them one after the other (they share rooms). Zombie waves pauses without pointer lock, so headless tests set `locked = true`.
 - `node ../voxel-strike-server/scripts/check-tables.mjs` must pass after changing any number the server also uses (weapon stats,
   match rules, rewards, armor, gear, jumps and launches, map sizes/pads, zombie wave sizes and timing): the server keeps its own copy in `tables.js`.
@@ -53,6 +56,11 @@ builds from `main` too and shows the move popup (`js/moved.js`) until it is take
 - **Co-op zombie waves** (`js/coop.js`, spec-coop.md): `mode` stays `'zombies'`; `net.coop` / `net.pvp` say which kind of room you're
   in (`net.on` is just "in a room"). The host's client runs the zombies, everyone else draws mirrors (`z.mirror`) and sends hits to it;
   zombies chase `ZT` (the nearest player who's up), never `P.pos` directly.
+- **Duels** (`js/duel.js`, spec-duel.md): `mode` `'duel'`, always online, two real people on the duel maps (`DUEL_MAPS`, the ghost town
+  first). The server runs the standoff (`wait`, `count`, `play`), the win (10 kills two ahead, or the most at 4 minutes, and a tie plays
+  on to the next kill) and the pay; the client draws the standoff (`standoff`, both of them on the map's marks, the camera over your shoulder)
+  and then plays an ordinary match. A duel never falls back to bots. The mode's own words and look stay plain (FIGHT!, crossed swords);
+  a map brings its theme (`MAP.duel.go` start sound, `puff` colour), as the ghost town does with its bell and dust.
 - **Stats** are counted by the server only (room.js `saveStats`): signed-in players in public online rooms, into D1 `stats`,
   `stats_week` and `stats_guns`; `GET /stats/<id>` (a player card) and `GET /boards`
   (weekly / all-time top 50 by XP, wins or kills) read them; `js/boards.js` shows them (TOP in the lobby, clickable names). The daily reward (`js/daily.js`; a new player's first seven are the welcome week, each after a game that day), daily missions (`js/missions.js`), weekly events (`js/events.js`) and achievements (`js/achievements.js`: one-time goals claimed in the lobby for XP and more) are client-side, in `prof.daily`, `prof.missions`, `prof.event` and `prof.ach`.
@@ -71,12 +79,14 @@ builds from `main` too and shows the move popup (`js/moved.js`) until it is take
 - **Guns that grow.** A gun with `grow` (the Crystal Companion, from golden chests only) takes its numbers (`statsAt(i, stars, lv)`) and its model's
   crystals (`growStage`, the fourth argument of `makeGun`) from its owner's level: yours by default, a bot's or another player's from their
   record (`rec.lv`, sent in the gear online). The server does the same sums in `tables.js`.
-- **One set of moves for every view.** Kicks, melee swings, wand flicks and reloads come from `heldAnim` in `js/held.js`, which first person,
+- **One set of moves for every view.** Kicks, melee swings, blade inspects (the aim key on a melee weapon), wand flicks and reloads come from `heldAnim` in `js/held.js`, which first person,
   bots/other players and the lobby character all apply; a new animation goes there, never into one view (`test/views.mjs` checks).
 - **Baked hold poses (gotcha).** How bots and the armory character hold each gun is solved once and baked into `HOLD_BAKED` in
   `js/hold.js`, keyed by each `GUN_MODELS` entry's source length. Editing a gun model invalidates its pose and every player's
   browser re-solves it (seconds of stutter). Re-bake with `node ../voxel-strike-server/scripts/bake-holds.mjs` (8010 server
   running); `test/anim.mjs` fails while any pose is stale.
+- **Weapon effects** (`js/weaponfx.js`): every melee weapon has a swing trail in `TRAILS` (medium and high graphics only; each view
+  calls `bladeTrail`, `trailTick` draws them once a frame), and glowing parts listed in `CORE_FX` (weapons.js) light up when a gun fires.
 
 - **CrazyGames** (`js/crazy.js`, loaded before everything else): their SDK loads only on their domains or with `?cg=1`, and every
   `cg*` call is a no-op elsewhere. It reports loading and gameplay start/stop, follows their mute and chat settings, asks for a

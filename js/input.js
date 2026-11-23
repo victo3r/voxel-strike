@@ -233,7 +233,7 @@ function press(code) {
   if (isBind('chat', code)) { openChat(); if (chatting) return; }
   if (isBind('shoot', code)) shoot();
   if (isBind('reload', code)) reload();
-  if (isBind('aim', code) && (opts.toggleAim || code === 'T:aim')) aimOn = !aimOn;
+  if (isBind('aim', code)) { if (WEAPONS[cur].melee) { aimOn = false; inspect(); } else if (opts.toggleAim || code === 'T:aim') aimOn = !aimOn; } // a blade can't aim: it gets played with
   const sw = opts.wheel || !code.startsWith('Wheel');
   const before = cur;
   if (sw && isBind('next', code)) cycle(1);
@@ -300,12 +300,15 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && TOU
 let gestureAt = -1e9, relockT = 0;
 const RELOCK_FOR = 3000, RELOCK_EVERY = 150;
 const canRelock = () => !locked && !shopOpen && !inLobby && !matchOver && !armOpen && $('binds').style.display !== 'flex' && $('away').style.display !== 'flex';
-let lastMove = 0;
+let lastMove = 0, lastMoveT = 0, moveHeld = null;
 addEventListener('mousemove', e => {
   if (!locked || TOUCH) return;
-  const dx = e.movementX, dy = e.movementY, m = Math.hypot(dx, dy);
-  // ignore one-off huge mouse jumps (a browser glitch)
-  if (m > 250 && m > lastMove * 8 + 60) { lastMove = m; return; }
+  let dx = e.movementX, dy = e.movementY;
+  const m = Math.hypot(dx, dy), since = e.timeStamp - lastMoveT;
+  lastMoveT = e.timeStamp;
+  // a lone huge jump is a browser glitch: hold it one move and keep it if the mouse is still going fast
+  if (moveHeld) { if (since < 100 && m * 8 + 60 > moveHeld[2]) { dx += moveHeld[0]; dy += moveHeld[1]; } moveHeld = null; }
+  else if (m > 250 && m > lastMove * 8 + 60 && since < 40) { moveHeld = [dx, dy, m]; lastMove = m; return; }
   lastMove = m;
   const s = .0022 * sens.mouse * camera.fov / fovBase;
   const gap = e.timeStamp - aaLastT; aaLastT = e.timeStamp;
@@ -330,7 +333,7 @@ const TAP = TOUCH ? 'Tap' : 'Click';
 if (TOUCH) $('awayBar').firstChild.textContent = 'TAP TO PLAY';
 let blurAt = -1e9, unlockAt = -1e9;
 const AWAY_MS = 300;
-const runsBehindMenu = () => (pvp() || net.coop) && !dead && !shopOpen && !inLobby && !matchOver;
+const runsBehindMenu = () => (pvp() || net.coop) && !dead && !shopOpen && !inLobby && !matchOver && !standoff; // a duel's standoff keeps its own buttons
 function showAway(on) { $('away').style.display = on ? 'flex' : 'none'; if (on) $('menu').style.display = 'none'; }
 addEventListener('blur', () => {
   blurAt = performance.now();
@@ -346,7 +349,7 @@ document.addEventListener('pointerlockchange', () => {
   if (!locked) unlockAt = performance.now();
   const away = !locked && runsBehindMenu() && (!document.hasFocus() || unlockAt - blurAt < AWAY_MS);
   showAway(away);
-  $('menu').style.display = locked || away || shopOpen || inLobby || matchOver ? 'none' : 'flex';
+  $('menu').style.display = locked || away || shopOpen || inLobby || matchOver || standoff ? 'none' : 'flex';
   $('menuTip').innerHTML = cg.on && binds.menu[0] ? `Tip: press ${nice(binds.menu[0])} for this menu to stay in fullscreen` : '';
   showShop(shopOpen && !locked);
   if (locked) closeArmory();
@@ -366,6 +369,7 @@ document.addEventListener('pointerlockchange', () => {
 document.addEventListener('pointerlockerror', () => {
   if (shopOpen || inLobby || matchOver) return;
   if (performance.now() - gestureAt < RELOCK_FOR) { if (!relockT) relockT = setTimeout(() => { relockT = 0; if (canRelock()) lockMouse(); }, RELOCK_EVERY); return; }
+  if (standoff) return; // the standoff has its own READY
   showAway(false); $('menuTitle').textContent = 'MENU'; $('msg').textContent = TAP + ' to continue'; $('menu').style.display = 'flex';
 });
 
@@ -380,8 +384,11 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave();
 
 // the play button brings up mode select, then map select
 const ALL_MAPS = ['roofs', 'forest', 'cove', 'resort', 'sky'];
-const V_MAPS = 12; // bump when the map pictures change
+const V_MAPS = 13; // bump when the map pictures change
 const Z_MAPS = ['yard', 'graveyard', 'farm']; // zombie-only maps (tables.js COOP_MAPS too)
+const DUEL_MAPS = ['ghosttown']; // tables.js DUEL_MAPS too
+// ?walk=ghosttown on this PC: PLAY puts you on that map alone, no bots or clock, to look around (duel maps have no offline game)
+const walkMap = (w => /^(127\.0\.0\.1|localhost)$/.test(location.hostname) && MAPS[w] ? w : null)(new URLSearchParams(location.search).get('walk'));
 const MODES = [
   { id: 'zombiesMenu', name: 'ZOMBIE WAVES', short: 'ZOMBIES', desc: 'Hold off endless zombie waves, on your own or with friends', sub: [
     { id: 'zombies', name: 'SOLO', title: 'ZOMBIE WAVES · SOLO', desc: 'Test your loadout and strategy against endless zombie waves', maps: Z_MAPS },
@@ -393,6 +400,7 @@ const MODES = [
     { id: 'blitz', name: 'FREE FOR ALL', title: 'BLITZ · FREE FOR ALL', desc: 'Everyone for themselves, most kills wins', maps: ALL_MAPS },
     { id: 'blitzTeam', name: 'TEAM', title: 'BLITZ · TEAM', desc: 'Blue vs red, most kills wins', maps: ALL_MAPS },
   ] },
+  { id: 'duel', name: 'DUEL', desc: 'Just you and one rival, most kills wins', maps: DUEL_MAPS },
   { id: 'private', name: 'PRIVATE MATCH', desc: 'Make a room for friends or join one with a code', priv: true },
 ];
 const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : m.priv ? [] : [m]);
@@ -425,9 +433,9 @@ function renderPick() {
   const back = m ? (up ? up.short || up.name : pickPriv ? 'PRIVATE' : 'MODES') : group ? (pickPriv ? 'PRIVATE' : 'MODES') : priv ? 'MODES' : join || create ? 'PRIVATE' : 'BACK';
   $('pickBack').innerHTML = ico('left') + ' ' + back;
   $('pickList').className = m ? 'maps' : join ? 'code' : 'modes';
-  const pill = !!m && m.id !== 'zombies' && m.id !== 'coop' && !pickPriv; // co-op is always online
+  const pill = !!m && m.id !== 'zombies' && m.id !== 'coop' && m.id !== 'duel' && !pickPriv; // co-op and duels are always online
   $('pickPill').style.display = pill ? '' : 'none'; if (pill) renderPill();
-  const card = o => `<div class="mc" data-id="${o.id}"><button data-mode="${o.id}"><img class="mi" src="${MODE_ICONS[o.id]}"><b>${o.name}</b></button><button class="go" data-go="${o.id}" tabindex="-1">${o.priv || o.id.startsWith('priv') ? 'OPEN' : 'PLAY'}</button></div>`;
+  const card = o => `<div class="mc" data-id="${o.id}"><button data-mode="${o.id}"><span class="mi"><img src="${MODE_ICONS[o.id].src}" data-w="${MODE_ICONS[o.id].w}" data-h="${MODE_ICONS[o.id].h}"></span><b>${o.name}</b></button><button class="go" data-go="${o.id}" tabindex="-1">${o.priv || o.id.startsWith('priv') ? 'OPEN' : 'PLAY'}</button></div>`;
   pickSel = null; $('pickDesc').classList.remove('in'); $('pickDesc').textContent = m ? m.desc : '';
   if (join) {
     $('pickList').innerHTML = `<div class="codeBox"><p>Ask a friend for their room code</p><input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" autocapitalize="characters"><button id="codeGo">JOIN</button><p id="codeErr"></p></div>`;
@@ -438,7 +446,19 @@ function renderPick() {
     ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
         return `<button data-map="${id}" style="background-image:linear-gradient(transparent 45%,rgba(0,0,0,.72)),url('img/maps/${id}.jpg?v=${V_MAPS}')"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : m.id === 'coop' ? ` · ${COOP_CAP} players` : ''}</small></button>`; }).join('')
     : (priv ? PRIV_CARDS : group ? group.sub : create ? [...MODES.filter(x => x.id !== 'zombiesMenu' && !x.priv), { ...PLAY_MODES.find(x => x.id === 'coop'), name: 'CO-OP ZOMBIES' }] : MODES).map(card).join('');
+  fitModeIcons();
 }
+// mode icons at a whole number of screen pixels per art pixel, so every line is as thick as the rest (and stays so when a card lights up)
+function fitModeIcons() {
+  if (!pickOpen()) return;
+  const dpr = devicePixelRatio || 1;
+  for (const im of document.querySelectorAll('#pickList .mi img')) {
+    const r = zRect(im.parentNode), aw = +im.dataset.w, ah = +im.dataset.h, k = Math.max(1, Math.round(Math.min(r.width * dpr / aw, r.height * dpr / ah)));
+    let z = 1; for (let a = im; a; a = a.parentElement) z *= parseFloat(getComputedStyle(a).zoom) || 1; // a zoomed menu
+    im.style.width = aw * k / dpr / z + 'px'; im.style.height = ah * k / dpr / z + 'px';
+  }
+}
+addEventListener('resize', () => { if (pickOpen()) fitModeIcons(); });
 // first click selects a mode card, second click opens it
 let pickSel = null;
 const PICK_CARDS = [...MODES, ...MODES.flatMap(m => m.sub || []), ...PRIV_CARDS];
@@ -454,7 +474,13 @@ function showPick(on) {
   $('lobbyUI').style.display = on ? 'none' : '';
   if (on) { pickMode = null; pickPriv = false; renderPick(); }
 }
-$('playBtn').addEventListener('click', () => { sfx('ui'); if (TOUCH) touchFull(true); if (needStarter()) return startStarter(); showPick(true); net.probe?.(); }); // your first game skips the picker
+$('playBtn').addEventListener('click', () => { sfx('ui'); if (TOUCH) touchFull(true); if (walkMap) return startWalk(); if (needStarter()) return startStarter(); showPick(true); net.probe?.(); }); // your first game skips the picker
+// ?walk: alone on the map, a duel map from one end looking down it
+function startWalk() {
+  mode = 'dm'; mapId = walkMap; restart(); showLobby(false);
+  const e = MAP.duel?.ends?.[0]; if (e) respawnYou(e[0], e[1]);
+  lockMouse();
+}
 $('pickBack').addEventListener('click', () => {
   const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
   if (pickMode === 'private') pickMode = null;
@@ -488,7 +514,7 @@ $('pickList').addEventListener('click', e => {
   mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId);
   // online: net.js finds a room
   if (pickMode === 'coop') { net.start({ mode: 'coop', map: mapId, create: pickPriv }); return; }
-  if (mode !== 'zombies' && (pickPriv || onlinePref())) { net.start({ mode, map: mapId, create: pickPriv }); return; }
+  if (mode !== 'zombies' && (pickPriv || onlinePref() || mode === 'duel')) { net.start({ mode, map: mapId, create: pickPriv }); return; }
   showPick(false); restart(); showLobby(false); lockMouse();
 });
 $('pickList').addEventListener('keydown', e => { if (e.target.id === 'codeIn' && (e.code === 'Enter' || e.code === 'NumpadEnter')) { e.preventDefault(); joinWithCode(); } });
@@ -503,35 +529,7 @@ $('nameDice').addEventListener('click', () => { $('nameIn').value = setMyName(ne
 document.addEventListener('pointerlockchange', () => { if (document.activeElement === $('nameIn')) $('nameIn').blur(); });
 $('lobbySet').addEventListener('click', () => { openSettings(); sfx('ui'); });
 
-// pixel icons for the lobby buttons
-function pixIcon(rows, col, scale = 4) {
-  const h = rows.length, w = rows[0].length, c = document.createElement('canvas');
-  c.width = (w + 2) * scale; c.height = (h + 2) * scale;
-  const g = c.getContext('2d'), on = (x, y) => rows[y]?.[x] === 'X';
-  for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
-    const fill = on(x, y), edge = !fill && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => on(x + a, y + b));
-    if (!fill && !edge) continue;
-    g.fillStyle = fill ? (y < h / 2 ? col[0] : col[1]) : '#000';
-    g.fillRect((x + 1) * scale, (y + 1) * scale, scale, scale);
-  }
-  return c.toDataURL();
-}
-$('setIcon').src = pixIcon([
-  '.....XXXX.....',
-  '..XX.XXXX.XX..',
-  '.XXXXXXXXXXXX.',
-  '.XXXXXXXXXXXX.',
-  '..XXXXXXXXXX..',
-  'XXXXXX..XXXXXX',
-  'XXXXX....XXXXX',
-  'XXXXX....XXXXX',
-  'XXXXXX..XXXXXX',
-  '..XXXXXXXXXX..',
-  '.XXXXXXXXXXXX.',
-  '.XXXXXXXXXXXX.',
-  '..XX.XXXX.XX..',
-  '.....XXXX.....',
-], ['#d8dde4', '#9aa3ae']);
+$('setIcon').src = pixPic(ICON_PIX.gear, 8).toDataURL();
 // play button triangle
 $('playIcon').src = (() => {
   const N = 22, S = 10, SS = 6, c = document.createElement('canvas'); c.width = c.height = N * S;
@@ -559,7 +557,7 @@ function artIcon(rows, pal, scale = 8) {
     g.fillStyle = col; g.fillRect(x * scale, y * scale, scale, scale);
     if (col !== '#000' && y >= h / 2) { g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x * scale, y * scale, scale, scale); }
   }
-  return c.toDataURL();
+  return { src: c.toDataURL(), w, h };
 }
 const BOLT_ICON = [
   '....KKKKKK.', '...KyyyyyK.', '...KyyyyK..', '..KyyyyK...', '..KyyyKKKKK', '.KyyyyyyyyK',
@@ -604,6 +602,11 @@ const MODE_ICONS = {
   private: artIcon(LOCK_ICON, { K: '#000', y: '#e0b84a', b: '#aab2bc' }),
   privCreate: artIcon(LOCK_ICON, { K: '#000', y: '#e0b84a', b: '#aab2bc' }),
   privJoin: artIcon(KEY_ICON, { K: '#000', y: '#e0b84a' }),
+  duel: artIcon([ // two swords crossed
+    '.K.................K.', 'KwKK.............KKwK', '.KwsK...........KswK.', '..KwsK.........KswK..', '...KwsK.......KswK...', '....KwsK.....KswK....', '.....KwsK...KswK.....',
+    '......KwsK.KswK......', '.......KwsKswK.......', '........KwsKK........', '........KKwsK........', '.......KswKwsK.......', '....KKKswK.KwsKKK....', '...KyyswK...KwsyyK...',
+    '....KyyK.....KyyK....', '...KhhyyK...KyyhhK...', '..KhhKKK.....KKKhhK..', '.KyyK...........KyyK.', '..KK.............KK..',
+  ], { K: '#000', w: '#f2f5f8', s: '#b9c0c9', y: '#e0b84a', h: '#7a4f2a' }),
 };
 showLobby(true);
 
