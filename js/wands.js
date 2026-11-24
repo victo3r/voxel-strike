@@ -12,8 +12,9 @@ const TI_MATS = [0xeaf4ff, 0x8fc4ff, 0xffffff].map(c => bitMat(c, SHARD_TEX)), C
 // bits off a wand: [mats, count, speed, spread, life, size, gravity]
 const PLASMA_MATS = puffMats([0x8aff3a, 0xc8ff8a, 0xf2ffe0]); // the Quasar's
 const CONFETTI_MATS = [0xff3a5a, 0x3aff7a, 0x4aa8ff, 0xffd23a, 0xc86aff].map(c => bitMat(c, SHARD_TEX)); // the Grand Finale's
+const MOON_MATS = [0xd8ecff, 0xffffff, 0xfff4c8, 0xa8d4ff].map(c => bitMat(c, STAR_MATS[0].map)); // the Moonbeam's little stars
 const WAND_BITS = { plasma: [PLASMA_MATS, 7, 3.2, 2.4, .3, .085, 0], confetti: [CONFETTI_MATS, 10, 4, 3, .5, .08, 6], ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0],
-  crystal: [CRYSTAL_MATS, 3, 4, 2.6, .4, .08, 5], ti: [TI_MATS, 5, 4, 3, .25, .07, 4], wisp: [WISP_MATS, 6, 1.6, 1.4, .5, .08, -2], void: [VOID_MATS, 8, 2.2, 2, .4, .1, 0], aurora: [AURORA_MATS, 8, 3, 2.2, .45, .1, -1] };
+  crystal: [CRYSTAL_MATS, 3, 4, 2.6, .4, .08, 5], ti: [TI_MATS, 5, 4, 3, .25, .07, 4], wisp: [WISP_MATS, 6, 1.6, 1.4, .5, .08, -2], void: [VOID_MATS, 8, 2.2, 2, .4, .1, 0], aurora: [AURORA_MATS, 8, 3, 2.2, .45, .1, -1], moon: [MOON_MATS, 7, 2.4, 2, .5, .09, -1] };
 // what flies off a bot or player when hit, by what hit them: lasers break off pixels in their own colour, guns throw sparks
 const PIXEL_TEX = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 4; const g = c.getContext('2d');
@@ -53,6 +54,7 @@ function hitBits(w, at, head) {
   for (let i = fxN(n); i > 0; i--)
     fxBit(mats[Math.random() * mats.length | 0], scene, at, sz * (.7 + Math.random() * .6), new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread), life * (.8 + Math.random() * .4), g);
 }
+const moonGlint = (at, sc) => wandBits('moon', at, sc, 6, 2.2); // where a Moonbeam bounces
 function wandBits(k, at, sc, n, spread, size = 1) {
   const [mats, , , , life, sz, g] = WAND_BITS[k];
   for (let i = fxN(n); i > 0; i--)

@@ -8,7 +8,7 @@ function duelStand(info) {
   clearTimeout(duelHideT);
   standoff = { t: 0, slot: -1, bodies: new Map(), self: null, stand: info.stand || 0, count: info.count || 0, text: '', mid: '', push: 0 };
   document.body.classList.add('standoff');
-  duelEl.className = ''; duelEl.style.display = 'flex';
+  duelEl.className = ''; duelEl.style.display = 'flex'; $('duelMid').textContent = ''; // not the last duel's FIGHT! or SUDDEN DEATH
   if (locked) unlockMouse(); // the buttons need the mouse
   duelRoster();
 }
@@ -55,7 +55,7 @@ function duelRdy(who) { if (who !== net.pid) sfx('ui'); duelPanel(); }
 function duelGo() {
   if (!standoff) return;
   duelExit(true);
-  sfx(MAP.duel?.go || 'waveStart'); // the map's own start sound, the ghost town's bell
+  sfx(MAP.duel?.go || 'waveStart'); MAP.duel?.onGo?.(); // the map's own start: the ghost town's bell, the temple's gong
   if (!locked) showAway(true); // a click to grab the mouse
 }
 function duelExit(fight = false) {

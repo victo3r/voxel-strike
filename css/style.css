@@ -480,6 +480,16 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #event .ep span{font-size:.9em;color:var(--silver);white-space:nowrap}
 #event .en{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.9em;color:#ffd75e}#event .en img{height:1.9em;margin:-.3em 0}
 @media (max-height:420px){#event{padding:4px 8px 5px}#event .el{margin:2px 0 5px}#event .en{margin-top:4px}}
+/* weapon of the week: a card above the ARMORY button */
+#trial{--S:clamp(100px,17vmin,230px);position:absolute;left:calc(32px + var(--S));bottom:20px;height:var(--S);width:min(calc(var(--S) * 1.6),calc(100% - 2 * var(--S) - 64px));box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px 8px;background:var(--glass);border:clamp(3px,.45vmin,5px) solid var(--rc,var(--line-dim));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);color:#fff;text-shadow:2px 2px 0 #000;font:bold clamp(10px,1.75vmin,16px) monospace;cursor:pointer} /* a tile beside ARMORY, as tall */
+#trial:hover{background:var(--hov)}#trial:empty{display:none}
+#trial .th{align-self:stretch;display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+#trial .th b{color:#ffd75e;letter-spacing:1px;white-space:nowrap}#trial .th small{font-size:.8em;color:var(--silver);white-space:nowrap}
+#trial img{flex:1;min-height:0;width:100%;object-fit:contain}
+#trial .tn{max-width:100%;color:var(--rc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#trial button{flex:none;padding:3px 12px;font:inherit;letter-spacing:1px;color:#fff;text-shadow:2px 2px 0 #000;background:rgba(36,170,98,.85);border:3px solid var(--acc-lt);box-shadow:3px 3px 0 rgba(0,0,0,.4);cursor:pointer}#trial button:hover{background:var(--acc)}
+#trial .ton{flex:none;display:flex;align-items:center;gap:4px;padding:3px 0;font-size:.9em;color:var(--acc-lt);white-space:nowrap}#trial .ton .ic{height:1em;width:calc(1em * var(--ar,1))}
+#armList .card.trial .tag{color:#ffd75e}
 #evBox{display:flex;flex-direction:column;gap:12px;width:min(640px,94vw);padding:20px;background:var(--glass);border:4px solid var(--ev,var(--line));color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #evBox h1{display:flex;align-items:center;gap:10px;margin:0;font-size:26px;color:var(--ev);text-shadow:3px 3px 0 #000}#evBox p{margin:0;color:var(--muted);font-size:15px;line-height:1.4}
 #evBox .tiers{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -696,6 +706,7 @@ body.standoff #tc{display:none}
 @media (max-height:620px){.dpl b{font-size:18px}.dpl{padding:3px 8px 6px;width:clamp(130px,24vw,210px)}#duelVs{font-size:28px}#duelMsg{font-size:14px}#duel #duelGo{font-size:18px;padding:6px 30px}#duel button{font-size:14px;padding:5px 12px}}
 #netToast{position:fixed;left:50%;top:14%;transform:translateX(-50%);width:max-content;max-width:90vw;box-sizing:border-box;text-align:center;white-space:pre-line;padding:10px 18px;background:rgba(20,26,30,.92);color:#fff;border:3px solid var(--line-dim);font:bold 16px monospace;text-shadow:2px 2px 0 #000;opacity:0;pointer-events:none;transition:opacity .25s;z-index:30}
 #netToast.show{opacity:1}
+body.standoff #netToast{top:max(19%,100px)} /* under the duel's name plates */
 @media (max-height:620px){#findingMsg{font-size:24px}#joinBtn{bottom:10vmin}}
 
 /* friends */
@@ -920,6 +931,7 @@ body.touchOnly #pickList .mc{padding-bottom:50px}
   body.touchOnly #coinRow{top:12px;right:68px;gap:8px}
   body.touchOnly #lobbyCoins{position:absolute;top:calc(100% + 8px);right:-56px;height:auto;min-height:44px;max-width:130px;flex-wrap:wrap;justify-content:flex-end;padding:4px 12px}body.touchOnly #lobbyCoins .tbr{margin-left:0}
   body.touchOnly #lobbyUI>#side{left:12px;right:12px;top:150px;width:auto;max-width:480px;margin-left:auto}body.touchOnly #misDraw{margin-left:28px}
+  body.touchOnly #trial{left:calc(22px + var(--S));bottom:12px;width:min(calc(var(--S) * 1.6),calc(100% - 2 * var(--S) - 44px))}
   body.touchOnly #lobbyArm{left:12px;bottom:12px}body.touchOnly #playBtn{right:12px;bottom:12px}body.touchOnly #boostBtn{right:12px;bottom:calc(24px + clamp(100px,17vmin,230px))}
   body.touchOnly #pickList{flex-wrap:wrap}body.touchOnly #pickList :is([data-mode],[data-map]){width:calc((var(--uw2) * 100 - 64px) / 3)}
   body.touchOnly #setMain{flex-direction:column}body.touchOnly #setTabs{flex-direction:row;flex-wrap:wrap;width:auto;border-right:0;border-bottom:3px solid var(--line-dim);padding:8px}body.touchOnly #binds #setTabs button{flex:1 0 28%;text-align:center;padding:6px 2px;font-size:12px}body.touchOnly #setBody{padding:4px 12px 12px}

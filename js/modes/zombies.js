@@ -292,17 +292,19 @@ function explode(z) {
   blast(z.g.position.clone().setY(z.g.position.y + 1), BLAST, (120 + wave * 25) * ZHP, z.dmg, z);
 }
 // explosion effect
-function blastFx(p, R, gust = false, cl = false) {
+function blastFx(p, R, gust = false, cl = false, g = '') {
   if (gust) { burst(p, 0xffffff, 24); burst(p, 0x9fdcff, 16); burst(p, 0xffd45a, 6); sfx('gust', { at: p, far: 120 }); } // a burst of wind instead of fire
   else if (cl) { burst(p, 0xffd23a, 22); burst(p, 0xffffff, 10); burst(p, 0xff8800, 10); sfx('finaleBoom', { at: p, far: 120 }); } // a firework's gold burst (the bomblets bring the colours)
+  else if (g === 'bombard') { burst(p, 0xff8800, 34); burst(p, 0x2a2a2a, 18); burst(p, 0x8a7a66, 14); sfx('bombardBoom', { at: p, far: 130 }); } // a cannon's: more fire, more earth thrown up
+  else if (g === 'peregrine') { burst(p, 0xffc23a, 22); burst(p, 0xe9dfc8, 10); burst(p, 0x5c6b7a, 10); sfx('peregrineBoom', { at: p, far: 120 }); } // gold, with a puff of feathers
   else { burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 }); }
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : cl ? 0xffe08a : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : cl ? 0xffe08a : g === 'peregrine' ? 0xffd88a : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
 }
 // el: the Ancient Wand's spell (0 fire, 1 ice, 2 wind), which never hurts whoever cast it
 function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -1, lk0 = 0) { // lk0: a cluster bomblet's own push (it draws its own pop)
   const gun = rocket ? (rocket === true ? 'rocket' : rocket) : 'flare', W = BASE[gi(gun)], lk = lk0 || (W?.launch ?? 1), spell = !!W?.spell, vortex = !!W?.vortex, noSelf = spell || vortex; // a spell or a void never touches whoever made it
-  if (spell) spellFx(p, el); else if (!vortex && !lk0) blastFx(p, R, !!W?.gust, !!W?.cluster); // a void has its own (voidPop)
+  if (spell) spellFx(p, el); else if (!vortex && !lk0) blastFx(p, R, !!W?.gust, !!W?.cluster, W?.id); // a void has its own (voidPop)
   const k = spell ? longOf(by ? by.rec?.fx : youFx(), W) : 1, push = self => !self && spell && el === 2 ? SPELL_GUST : 1;
   const hex = o => { if (el === 0) applyBurn(o, W.burnT * k, W.burn, by, W.id, true, pj); else if (el === 1 && !net.pvp) shockHit(o, FROST, k); }; // online the server sends the ice
   const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
@@ -377,6 +379,9 @@ const SHOP = [
   { gun: 'hornet', price: 130, desc: 'stings in bursts of three' },
   { gun: 'salvo', price: 520, desc: 'four rockets before a reload' },
   { gun: 'finale', price: 560, desc: 'one big bang, then six little ones' },
+  { gun: 'moonbeam', price: 440, desc: 'a moonlit beam that bounces off walls' },
+  { gun: 'bombard', price: 540, desc: 'lobs a cannonball into the crowd' },
+  { gun: 'peregrine', price: 600, desc: 'rockets that dive for the nearest one' },
   { gun: 'apex', price: 440, desc: `${BASE[gi('apex')].dmg} dmg, top of the food chain` },
   { gun: 'tracker', price: 200, desc: 'darts that show them through walls' },
   { gun: 'tempest', price: 460, desc: 'lightning that jumps from one to the next' },

@@ -149,7 +149,7 @@ function update(dt) {
   kick = Math.max(0, kick - dt * kickFall(w)); // gun settles after a shot
   if (inspT >= 0) { const t0 = inspT; inspT += dt; if (!w.melee || kick > 0 || swapOff > 0 || respawnT > 0 || gunShown !== cur || inspT >= inspLen(w)) inspT = -1; else inspSnd(w, t0, inspT); }
   wandOn -= dt; wandK = Math.max(0, Math.min(1, wandK + dt * (wandOn > 0 && gunShown === cur ? 14 : -4)));
-  tickCross(dt, BASE[cur]);
+  tickCross(dt, BASE[cur]); lobAim(w);
   if (gunSpin) { spinTurn(gunSpin, gunSpinV + spinIdle(gunShown), dt); gunSpinV = Math.max(0, gunSpinV - dt * 25); } // barrels wind down
   if ((flashT -= dt) <= 0) { flashMesh.visible = false; flashLight.intensity = 0; }
   if (gunPulse) pulseShow(gunPulse, flashT > 0);
@@ -187,6 +187,9 @@ function update(dt) {
     vm.rotation.set(.04, 0, 0);
   } else if (vhold === 'shoulder') { // on the shoulder
     vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob, -.62);
+    vm.rotation.set(0, 0, 0);
+  } else if (vhold === 'orb') { // held out low on the right; aimed, it comes in toward the middle under the crosshair
+    vm.position.set(ORB_VM[0] - adsT * .13, ORB_VM[1] + adsT * .05 + bob, ORB_VM[2]); // up a little, so your hands stay in the narrower view
     vm.rotation.set(0, 0, 0);
   } else if (vhold === 'lantern') { // carried by its handle on the right of your view; it swings back when it's thrust out to fire, and with your steps
     lanV.x += ((-kick * .45 - lanA.x) * 90 - lanV.x * 7) * dt; lanA.x += lanV.x * dt;
@@ -386,7 +389,8 @@ function update(dt) {
 
   // rockets
   for (let i = rockets.length - 1; i >= 0; i--) {
-    const r = rockets[i], step = ROCKET_SPD * dt; r.life -= dt;
+    const r = rockets[i]; r.life -= dt; rocketFly(r, dt);
+    const step = r.spd * dt;
     ray2.set(r.m.position, r.dir); ray2.far = step;
     const hit = ray2.intersectObjects(targetsFor(r.by, ray2), false)[0];
     const onYou = !r.ghost && r.by && rayHitsYou(ray2.ray, step) < (hit ? hit.distance : Infinity);
@@ -397,13 +401,14 @@ function update(dt) {
       const fn = r.cluster && (hit?.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : r.dir.clone().negate()).toArray().map(v => Math.round(v * 100) / 100), seed = Math.random() * 65536 | 0; // a cluster shell's bomblets fly out from what it hit
       net.boom(r.id, at, r.by, fn && { s: seed, n: fn });
       // rocket self damage
-      blast(at, ROCKET_R, r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, r.g, r.id);
+      blast(at, boomR(r), r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, r.g, r.id);
       if (fn) clusterBurst(at, new THREE.Vector3(...fn).normalize(), seed, r.by, false, r.id, r.g, r.dmg);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);
     if (r.gust) r.m.rotateZ(dt * 18);
-    if ((r.smoke -= dt) <= 0) { r.smoke = .03; if (r.cluster) fxBit(CLUSTER_BITS[Math.random() * CLUSTER_N | 0], scene, r.m.position, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5), .4, 3); else burst(r.m.position, r.gust ? 0xe8f7ff : 0x888888, 1); } // a firework sparkles
+    if (r.lob) r.m.rotateX(dt * 6); else if (r.seek) r.m.lookAt(tmp.copy(r.m.position).add(r.dir));
+    if ((r.smoke -= dt) <= 0) { r.smoke = .03; if (r.cluster) fxBit(CLUSTER_BITS[Math.random() * CLUSTER_N | 0], scene, r.m.position, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5), .4, 3); else burst(r.m.position, r.gust ? 0xe8f7ff : r.lob ? 0x6a6a6a : r.seek ? 0xd8dde4 : 0x888888, 1); } // a firework sparkles
   }
 
   updateFlares(dt); updateGrenades(dt); mythTick(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt); patchTick(dt); bombletTick(dt);

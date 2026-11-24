@@ -3,22 +3,22 @@ const keyCount = () => prof.keys | 0;
 // chests you've won (weekly prizes) open free: prof.box[id] = how many
 const boxN = c => prof.box?.[c.id] | 0, boxAll = () => CHESTS.reduce((s, c) => s + boxN(c), 0);
 // loot: k = kind, n = amount or [min, max], w = weight, r = rarity. Things you can only have one of drop out once you own them, and wear waits for its level
-const GUN_DROP = { rare: 3, epic: 2.5, legend: 1.5, mythic: .5 }; // the guns a golden chest can hold are its own (chest: true), never the armory's
+const GUN_DROP = { rare: 4.5, epic: 3.75, legend: 2.25, mythic: .75 }; // the guns a golden chest can hold are its own (chest: true), never the armory's
 const CHESTS = [
   { id: 'wood', name: 'WOODEN CHEST', cost: 1, pal: { m: '#9a6634', w: '#c48a4e', b: '#5d5d66', g: '#d8d8e0' }, loot: [
     { k: 'coins', n: [10, 16], w: 40 }, { k: 'boosts', n: 1, w: 30 }, { k: 'xp', n: [100, 160], w: 20 },
     { k: 'coins', n: 30, w: 8, r: 'rare' }, { k: 'boosts', n: 3, w: 2, r: 'rare' },
   ] },
   { id: 'iron', name: 'IRON CHEST', cost: 3, pal: { m: '#7f8a99', w: '#b5bfcc', b: '#3c4450', g: '#4fa3ff' }, loot: [
-    { k: 'coins', n: [30, 45], w: 34 }, { k: 'boosts', n: 3, w: 24 }, { k: 'xp', n: [300, 450], w: 18 },
-    { k: 'star', n: 1, w: 5, r: 'rare' }, { k: 'coins', n: 100, w: 6, r: 'rare' },
-    ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 1.5, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 1.5, r: rarOf(h) })), // crafted pieces stay out of chests
+    { k: 'coins', n: [30, 45], w: 28 }, { k: 'boosts', n: 3, w: 20 }, { k: 'xp', n: [300, 450], w: 18 },
+    { k: 'star', n: 1, w: 7, r: 'rare' }, { k: 'coins', n: 100, w: 6, r: 'rare' },
+    ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 2.25, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 2.25, r: rarOf(h) })), // crafted pieces stay out of chests
     { k: 'boosts', n: 6, w: 2, r: 'epic' },
   ] },
   { id: 'gold', name: 'GOLDEN CHEST', cost: 10, pal: { m: '#e0b234', w: '#ffe07a', b: '#8a5a12', g: '#d23cff' }, loot: [
-    { k: 'coins', n: [120, 180], w: 24 }, { k: 'boosts', n: 12, w: 16 }, { k: 'star', n: 2, w: 14, r: 'rare' },
-    ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 3, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 3, r: rarOf(h) })),
-    { k: 'coins', n: 300, w: 12, r: 'epic' },
+    { k: 'coins', n: [120, 180], w: 16 }, { k: 'boosts', n: 12, w: 10 }, { k: 'star', n: 2, w: 15, r: 'rare' },
+    ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 3.5, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 3.5, r: rarOf(h) })),
+    { k: 'coins', n: 300, w: 9, r: 'epic' },
     ...BASE.filter(w => w.chest).map(w => ({ k: 'gun', id: w.id, w: w.drop ?? GUN_DROP[rarOf(w)], r: rarOf(w) })), // drop: a gun's own odds (the Crystal Companion is rarer still)
     { k: 'coins', n: 500, w: 3, r: 'legend' },
   ] },

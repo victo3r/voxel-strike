@@ -94,6 +94,7 @@ const BOT_KEEP = {
   rubypierce: [10, 24], quasar: [10, 26], paragon: [18, 36], windwand: [6, 16], stunwand: [1.5, 3.5], flamewand: [6, 16], soulwand: [16, 32], ancientwand: [7, 18],
   wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
   daybreak: [6, 18], highnoon: [12, 28], cutlass: [1, 1.9], harpoon: [14, 30], conch: [5, 14], tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
+  moonbeam: [9, 22], bombard: [11, 24], peregrine: [10, 22],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -131,6 +132,9 @@ const GUN_FIT = {
   semisniper: d => d > 18 ? 1.05 : d > 12 ? .7 : d > 7 ? .35 : .15,
   rocket: d => d < 5 ? 0 : d < 22 ? .72 : .4,
   finale: d => d < 5 ? 0 : d < 22 ? .8 : .42,
+  bombard: d => d < 6 ? 0 : d < 28 ? .78 : .4,
+  peregrine: d => d < 6 ? 0 : d < 30 ? .82 : .45,
+  moonbeam: d => d < 3 ? .5 : d < 26 ? .9 : .6,
   grenade: d => d < 5 ? 0 : d < 18 ? .75 : .2,
   aerial: d => d < 5 ? 0 : d < 22 ? .8 : .45,
   crossbow: d => d > 14 ? .95 : d > 8 ? .55 : .2,
@@ -735,12 +739,11 @@ function botFire(b, W, dist) {
 function botLance(b, W) {
   const k = W.charge ? b.chargeK : 1, full = k >= 1; // the Aurora Rail: as charged as the bot let it get
   if (W.charge) { W = { ...W, pierce: full, wallBreak: full }; b.chargeK = 0; chargeShow(b.charges, 0); if (full) b.fullFlag = true; b.chargeWant = null; }
-  let you = null;
-  if (respawnT <= 0 && !friendly(b, YOU_T)) {
+  const you = respawnT <= 0 && !friendly(b, YOU_T) ? (o, d, far) => { // you, along each leg of it (a Moonbeam's bounces too)
     pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25);
-    losRay.set(eye, dirV);
-    if (losRay.ray.intersectBox(pBox, hitV)) you = { you: true, distance: eye.distanceTo(hitV), point: hitV.clone() };
-  }
+    losRay.set(o, d);
+    return losRay.ray.intersectBox(pBox, hitV) && o.distanceTo(hitV) <= far ? { you: true, distance: o.distanceTo(hitV), point: hitV.clone() } : null;
+  } : null;
   const parts = [ground, ...coverAlong(eye, dirV, LANCE_FAR)]; for (const z of zombies) if (z !== b && !z.dead && !friendly(b, z)) parts.push(...z.parts);
   const L = lanceLine(eye, dirV, W, parts, you);
   shotCharge = k;
@@ -817,7 +820,7 @@ function updateBot(b, dt) {
     if (b.seeT <= dt) { b.lpx = tp.x; b.lpz = tp.z; }
     if (dt > 0) { b.pvx += ((tp.x - b.lpx) / dt - b.pvx) * Math.min(1, dt * 8); b.pvz += ((tp.z - b.lpz) / dt - b.pvz) * Math.min(1, dt * 8); }
     b.lpx = tp.x; b.lpz = tp.z;
-    const fly = W.rocket ? dist / ROCKET_SPD : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : W.spell ? dist / WAND_BOLT.spell0.spd : W.vortex ? dist / VOID_SPD : W.saw ? dist / SAW_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : 0;
+    const fly = W.rocket ? dist / rocketSpd(W) : W.flare ? dist / FLARE_SPD : W.grenade ? dist / GREN_SPD : W.spell ? dist / WAND_BOLT.spell0.spd : W.vortex ? dist / VOID_SPD : W.saw ? dist / SAW_SPD : 0, lag = 1 / S.turn, drop = W.flare ? FLARE_DROP : W.grenade ? GREN_GRAV : W.lob ? LOB_G : 0;
     const tx = dx + (fly ? b.pvx * fly * b.leadGuess : (b.pvx * S.lead - b.vx * S.self) * lag), tz = dz + (fly ? b.pvz * fly * b.leadGuess : (b.pvz * S.lead - b.vz * S.self) * lag), th = Math.hypot(tx, tz);
     wantYaw = Math.atan2(tx, tz);
     wantPitch = Math.atan2(tp.y + (W.rocket || W.grenade || W.spell || W.vortex ? .3 : 1.1) - pos.y - 1.6 - (fly ? 0 : b.vy * S.self * lag), th) + (drop ? Math.atan2(drop * fly * fly / 2, th) : 0);
@@ -952,7 +955,7 @@ function updateBot(b, dt) {
 
 // while you're dead: count down, then respawn
 function dmDown(dt) {
-  if (standoff) { duelCam(dt); return true; }
+  if (standoff) { duelCam(dt); net.duelElse?.(); return true; }
   if (respawnT <= 0) return false;
   respawnT -= dt;
   if (net.on) respawnT = Math.max(respawnT, .01); // online the server respawns you
@@ -1081,6 +1084,7 @@ function setupMode() {
     if (net.on) { net.roster(); joins = []; } else makeRecs(); // online the roster is the room's players
     matchT = MATCH_T; wearArmor();
     BASE.forEach((w, g) => { if (hasGun(g)) giveGun(g); });
+    if (trialOn()) giveGun(trialNow());
     CATS.forEach(([c], s) => slotGun[s] = loadoutGun(c));
     cur = slotGun[0]; buildGun(); renderHotbar();
   } else { // zombie waves: bring your loadout and armor

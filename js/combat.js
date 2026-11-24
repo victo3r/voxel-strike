@@ -101,33 +101,59 @@ function shoot(k) { // k: how charged the Aurora Rail was
   if (ammo[cur] === 0 && reserve[cur]) reload();
 }
 // lance guns: one beam through bodies and walls that hangs in the air for a moment
-const LANCE_FAR = 120, LANCE_T = .5, PIERCE_FALL = .75, WALL_MUL = .5;
+const LANCE_FAR = 120, LANCE_T = .5, PIERCE_FALL = .75, WALL_MUL = .5, RICO_MUL = .8; // RICO_MUL: what a bounced beam still hits for
 const lanceRay = new THREE.Raycaster(), lances = [], lanceGeo = new THREE.BoxGeometry(1, 1, 1), _lf = new THREE.Vector3(), _lc = new THREE.Color();
-// everything a lance passes, in order, and how hard it still hits each body
+const _rn = new THREE.Vector3(), _rm = new THREE.Matrix4(), _rm2 = new THREE.Matrix4(), _rn3 = new THREE.Matrix3();
+function hitNormal(h, d) { // the face a ray hit, in the world, turned to face the ray
+  if (!h.face) return null;
+  _rm.copy(h.object.matrixWorld);
+  if (h.object.isInstancedMesh && h.instanceId != null) { h.object.getMatrixAt(h.instanceId, _rm2); _rm.multiply(_rm2); }
+  _rn.copy(h.face.normal).applyNormalMatrix(_rn3.getNormalMatrix(_rm));
+  return _rn.dot(d) > 0 ? _rn.negate() : _rn;
+}
+// everything a lance passes, in order, and how hard it still hits each body; you: a hit on you, or a function finding one along each leg
 function lanceLine(eye, dir, w, parts, you = null, skip = null) {
-  lanceRay.set(eye, dir); lanceRay.far = LANCE_FAR;
-  const hs = lanceRay.intersectObjects(parts, false), hits = [], walls = [], seen = new Set();
-  if (you) { let k = 0; while (k < hs.length && hs[k].distance < you.distance) k++; hs.splice(k, 0, you); }
-  let wall = false, n = 0, end = null;
-  for (const h of hs) {
-    const zz = h.you ? YOU_T : h.object.userData.zombie;
-    if (zz) {
-      if (zz.dead || seen.has(zz) || skip?.(zz)) continue;
-      seen.add(zz);
-      hits.push({ zz, head: h.you ? h.point.y > P.pos.y + 1.45 : !!h.object.userData.head, point: h.point, mul: PIERCE_FALL ** n * (wall ? WALL_MUL : 1), thru: n * 2 + (wall ? 1 : 0) });
-      n++;
-      if (!w.pierce) { end = h.point; break; }
-      continue;
+  const hits = [], walls = [], bounces = [], seen = new Set(), o = eye.clone(), d = dir.clone();
+  let wall = false, n = 0, end = null, left = LANCE_FAR;
+  for (let leg = 0; ; leg++) {
+    lanceRay.set(o, d); lanceRay.far = left;
+    const hs = lanceRay.intersectObjects(leg ? [ground, ...coverAlong(o, d, left), ...parts.filter(m => m.userData.zombie)] : parts, false), yh = typeof you === 'function' ? you(o, d, left) : leg ? null : you; // a bounced leg finds the walls along its own way
+    if (yh) { let k = 0; while (k < hs.length && hs[k].distance < yh.distance) k++; hs.splice(k, 0, yh); }
+    let bounce = null;
+    for (const h of hs) {
+      if (leg && h.distance < .02) continue; // the face it just left
+      const zz = h.you ? YOU_T : h.object.userData.zombie;
+      if (zz) {
+        if (zz.dead || seen.has(zz) || skip?.(zz)) continue;
+        seen.add(zz);
+        hits.push({ zz, head: h.you ? h.point.y > P.pos.y + 1.45 : !!h.object.userData.head, point: h.point, mul: PIERCE_FALL ** n * (wall ? WALL_MUL : leg ? RICO_MUL : 1), thru: n * 2 + (wall || leg ? 1 : 0) });
+        n++;
+        if (!w.pierce) { end = h.point; break; }
+        continue;
+      }
+      if (w.ricochet && leg < w.ricochet && (bounce = hitNormal(h, d))) { bounce = { at: h.point.clone(), n: bounce.clone(), dist: h.distance }; break; }
+      if (h.object === ground || !w.wallBreak) { end = h.point; break; }
+      if (walls.length < 4) walls.push(h.point);
+      wall = true;
     }
-    if (h.object === ground || !w.wallBreak) { end = h.point; break; }
-    if (walls.length < 4) walls.push(h.point);
-    wall = true;
+    if (!bounce || end) break;
+    bounces.push(bounce.at); left -= bounce.dist; // off it goes, mirrored in the face it hit
+    d.addScaledVector(bounce.n, -2 * d.dot(bounce.n)).normalize(); o.copy(bounce.at).addScaledVector(bounce.n, .01);
+    if (left < 1) { end = bounce.at; break; }
   }
-  return { hits, walls, end: end ? end.clone() : eye.clone().addScaledVector(dir, LANCE_FAR), stop: !!end };
+  return { hits, walls, bounces, end: end ? end.clone() : o.clone().addScaledVector(d, left), stop: !!end };
 }
 // the beam: a glow and a hot core, k = thickness
 function showLance(from, L, col, k = 1, sc = scene, tip = null, held = null) { // tip: the muzzle it keeps coming out of while the gun kicks, until held() says the gun was put away
   for (const p of L.walls) burst(p, col, 3); // punched through here
+  if (L.bounces?.length) { // a leg for each bounce, the first from the muzzle
+    const pts = [...L.bounces, L.end];
+    for (let i = 0; i < pts.length; i++) {
+      if (i < L.bounces.length) { burst(pts[i], col, 3); moonGlint(pts[i], sc); sfx('ricochet', { at: pts[i], far: 40 }); }
+      showLance(i ? pts[i - 1] : from, { walls: [], end: pts[i], stop: i === pts.length - 1 && L.stop }, col, k, sc, i ? null : tip, i ? null : held);
+    }
+    return;
+  }
   if (L.stop) burst(L.end, col, 4);
   const len = from.distanceTo(L.end); if (len < .3) return;
   const g = new THREE.Group(), mats = [
@@ -531,6 +557,9 @@ function rayHitsYou(r, far) { // distance to your body along the ray, or Infinit
 }
 const targetsFor = (by, rc) => by ? shotTargets(rc).filter(o => o.userData.zombie !== by) : shotTargets(rc);
 const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 12; // speed, blast radius, max self damage
+const LOB_SPD = 30, LOB_G = 18, LOB_TILT = .3, LOB_R = 5; // the Bombard's ball: speed, gravity, how far up it's thrown over your aim, its blast
+const SEEK_SPD = 28, SEEK_TURN = 1.5, SEEK_CONE = .82, SEEK_RANGE = 36, SEEK_ARM = .25, SEEK_R = 3.2; // the Peregrine's rockets: slow, turning gently toward whoever is ahead of them
+const boomR = w => w?.lob ? LOB_R : w?.seek ? SEEK_R : ROCKET_R, rocketSpd = w => w.lob ? LOB_SPD : w.seek ? SEEK_SPD : ROCKET_SPD;
 const rockets = [];
 // rocket jumping: blasts push everyone away
 const LAUNCH = 13, LAUNCH_OTHER = .45, LAUNCH_JUMP = 1.25, LAUNCH_UP = .35, LAUNCH_MAX = 17;
@@ -604,13 +633,61 @@ function dashMove(o, pos, r, dt) {
 }
 // ghost = someone else's rocket online, the server says what it hit
 function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
-  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; if (w.lob) dir = lobDir(fwd); }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
   const m = new THREE.Group();
   if (w.gust) { m.add(box(.18, .18, .18, GUST_MATS[0])); for (const r of [0, Math.PI / 2]) { const b = box(.42, .06, .06, GUST_MATS[1]); b.rotation.z = r; m.add(b); } } // a ball of wind
-  else { const [bc, tc] = ROCKET_COLS[w.id] ?? ROCKET_COLS.rocket, body = box(.1, .1, .4, lam({ color: bc })), tip = box(.12, .12, .12, lam({ color: tc })); tip.position.z = .24; m.add(body, tip); }
+  else if (w.lob) { m.add(box(.26, .2, .2, BALL_MAT), box(.2, .26, .2, BALL_MAT), box(.2, .2, .26, BALL_MAT)); } // an iron ball, its corners off
+  else {
+    const [bc, tc] = ROCKET_COLS[w.id] ?? ROCKET_COLS.rocket, body = box(.1, .1, .4, lam({ color: bc })), tip = box(.12, .12, .12, lam({ color: tc })); tip.position.z = .24; m.add(body, tip);
+    if (w.seek) { const wing = box(.42, .03, .14, lam({ color: 0x5c6b7a })); wing.position.z = .02; m.add(wing); } // swept wings, like a diving falcon
+  }
   m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
-  rockets.push({ m, dir: dir.clone(), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust, cluster: !!w.cluster });
+  rockets.push({ m, dir: dir.clone(), spd: rocketSpd(w), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust, cluster: !!w.cluster, lob: !!w.lob, seek: !!w.seek, age: 0, look: 0, lock: null });
+}
+const BALL_MAT = new THREE.MeshLambertMaterial({ color: 0x26282c });
+const lobDir = d => d.clone().setY(d.y + LOB_TILT).normalize(); // thrown up a little over your aim
+function rocketFly(r, dt) { // the Bombard's ball falls, the Peregrine's rockets turn toward their prey
+  if (r.lob) { r.v ??= r.dir.clone().multiplyScalar(r.spd); _rv.copy(r.v); r.v.y -= LOB_G * dt; _rv.add(r.v).multiplyScalar(.5); r.spd = _rv.length(); r.dir.copy(_rv).divideScalar(r.spd); } // this step goes the average way, so it falls the same at any frame rate
+  if (!r.seek || (r.age += dt) < SEEK_ARM) return;
+  if (r.lock && !seekSees(r, r.lock)) r.lock = null;
+  if (!r.lock && (r.look -= dt) <= 0) {
+    r.look = .1; let bs = SEEK_CONE;
+    for (const t of foesOf(r.by)) if (seekSees(r, t) && _rv.dot(r.dir) > bs) { bs = _rv.dot(r.dir); r.lock = t; }
+    if (r.lock) { if (r.lock === YOU_T) { toast('INCOMING', '#ffc23a'); sfx('peregrineCry'); } else sfx('peregrineCry', { at: r.m.position, far: 35 }); }
+  }
+  if (!r.lock) return;
+  chestOf(r.lock, _rv).sub(r.m.position).normalize();
+  const a = r.dir.angleTo(_rv); if (a > 1e-3) r.dir.lerp(_rv, Math.min(1, SEEK_TURN * dt / a)).normalize();
+}
+function seekSees(r, t) { // still ahead of it, near enough and in plain view (leaves _rv pointing at it)
+  if (t === YOU_T ? respawnT > 0 || dead : t.dead || !zombies.includes(t)) return false;
+  const d = chestOf(t, _rv).distanceTo(r.m.position); if (d > SEEK_RANGE || d < .3) return false;
+  const c = clearLine(r.m.position, _rv); _rv.sub(r.m.position).divideScalar(d);
+  return c && _rv.dot(r.dir) > SEEK_CONE;
+}
+const _rv = new THREE.Vector3();
+// the Bombard shows where its ball will come down: a ring as wide as the blast
+const lobRing = (() => {
+  const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: .7, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  for (const [a, b] of [[LOB_R - .4, LOB_R], [.3, .6]]) g.add(new THREE.Mesh(new THREE.RingGeometry(a, b, a < 1 ? 16 : 48), mat));
+  g.visible = false; scene.add(g); g.userData.mat = mat; return g;
+})(), _lo = new THREE.Vector3(), _ld = new THREE.Vector3(), _lv = new THREE.Vector3(), _lz = new THREE.Vector3(0, 0, 1);
+function lobAim(w) {
+  lobRing.visible = false;
+  if (!w.lob || inLobby || matchOver || dead || respawnT > 0 || gunShown !== cur) return;
+  _lv.copy(lobDir(camera.getWorldDirection(_ld))).multiplyScalar(LOB_SPD); _lo.copy(camera.position).addScaledVector(_lv, .6 / LOB_SPD);
+  for (let t = 0; t < 3; t += .06) { // its flight, a bit at a time, until it hits something
+    _ld.copy(_lv).multiplyScalar(.06); _ld.y -= LOB_G * .0018; const len = _ld.length(); _ld.divideScalar(len);
+    lanceRay.set(_lo, _ld); lanceRay.far = len;
+    const h = lanceRay.intersectObjects([ground, ...coverAlong(_lo, _ld, len)], false)[0];
+    if (h) {
+      const n = hitNormal(h, _ld) || _rv.set(0, 1, 0);
+      lobRing.position.copy(h.point).addScaledVector(n, .06); lobRing.quaternion.setFromUnitVectors(_lz, n); lobRing.visible = true;
+      lobRing.userData.mat.opacity = .6 + .15 * Math.sin(performance.now() * .008); return;
+    }
+    _lo.addScaledVector(_ld, len); _lv.y -= LOB_G * .06;
+  }
 }
 const GUST_MATS = [new THREE.MeshBasicMaterial({ color: 0xc8f0ff }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
 const ROCKET_COLS = { rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c], tirocket: [0xaab5c2, 0x4f8fe0], finale: [0x2a46b0, 0xf2c230] }; // body, tip

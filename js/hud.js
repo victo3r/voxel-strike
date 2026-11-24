@@ -25,6 +25,12 @@ function xArcs(r, at, span, t = 2) {
   return o;
 }
 const DIAG = [45, 135, 225, 315];
+// two crescents facing the middle, ( and ): outside radius r, each bite's radius ri, o off to the side
+function xMoons(r, ri, o, t = 2) {
+  const out = [], n = Math.ceil(r / t);
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) { const x = i * t, y = j * t; if (Math.hypot(x, y) <= r && Math.max(Math.hypot(x - o, y), Math.hypot(x + o, y)) >= ri) out.push([x - t / 2, y - t / 2, t, t]); }
+  return out;
+}
 // square corners
 function xCorners(h, arm, t = 2) {
   const o = [];
@@ -91,6 +97,9 @@ const CROSSES = {
   quasar: () => [...xDot(), ...xLines(5, 5, 2, 'ud'), ...xArcs(9, [0, 180], 60), ...xLines(11, 4, 2, 'lr')], // its jets and disc
   paragon: () => [...xDot(), ...xLines(10, 6, 2, 'lrd')],
   crossbow: () => [...xDot(), ...xLines(7, 4, 2, 'lrd')],
+  moonbeam: () => [...xDot(), ...xMoons(11, 13.6, 5.6)], // two crescent moons
+  bombard: () => [...xDot(), ...xCorners(15, 5), ...xLines(5, 5, 2, 'd')], // a wide blast, and down it comes
+  peregrine: () => [...xDot(), ...xCorners(11, 4), ...xArcs(17, [0, 180], 44)], // spread wings
   // wands: rings for the spells
   flamewand: () => [...xDot(), ...xLines(4, 5), ...xArcs(11, DIAG, 34)],
   windwand: () => [...xDot(), ...xArcs(8, DIAG, 50)],

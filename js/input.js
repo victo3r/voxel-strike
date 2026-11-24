@@ -384,9 +384,9 @@ $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave();
 
 // the play button brings up mode select, then map select
 const ALL_MAPS = ['roofs', 'forest', 'cove', 'resort', 'sky'];
-const V_MAPS = 13; // bump when the map pictures change
+const V_MAPS = 14; // bump when the map pictures change
 const Z_MAPS = ['yard', 'graveyard', 'farm']; // zombie-only maps (tables.js COOP_MAPS too)
-const DUEL_MAPS = ['ghosttown']; // tables.js DUEL_MAPS too
+const DUEL_MAPS = ['ghosttown', 'temple']; // tables.js DUEL_MAPS too
 // ?walk=ghosttown on this PC: PLAY puts you on that map alone, no bots or clock, to look around (duel maps have no offline game)
 const walkMap = (w => /^(127\.0\.0\.1|localhost)$/.test(location.hostname) && MAPS[w] ? w : null)(new URLSearchParams(location.search).get('walk'));
 const MODES = [

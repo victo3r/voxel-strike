@@ -1008,6 +1008,58 @@ SOUNDS.finale = [.9, .8, s => { s.thud({ f: 62, d: .16, v: 1 }); s.hiss({ ft: 'l
 SOUNDS.finaleBoom = [1.3, 1, s => { s.thud({ f: 52, d: .4, v: 1 }); s.hiss({ ft: 'lowpass', f: 1400, f2: 250, a: .005, d: .5, v: .8 }); s.crunch({ t: .08, a: .03, d: 1, dens: .02, lo: 1500, hi: 7000, v: .5 }); }];
 SOUNDS.finalePop = [.8, .6, s => { s.clack({ f: 1200, d: .03, v: .9, body: .6 }); s.thud({ f: 120, d: .08, v: .55 }); s.crunch({ t: .03, a: .01, d: .6, dens: .015, lo: 2000, hi: 8000, v: .45 }); }];
 SOUNDS.r_finale = [2.4, .45, s => { s.scrape({ t: .3, d: .25, f: 900, v: .4 }); s.thunk(.8); s.latch(1.5); s.hiss({ ft: 'highpass', f: 4000, t: 1.75, a: .02, d: .4, v: .3 }); s.click({ t: 2.05, f: 2600, v: .4 }); }];
+// Alpha 16 (new sounds go at the end: each sound's noise is seeded by its place in this list)
+SOUNDS.templeGong = [3.6, .6, s => { // a temple gong: a soft mallet, a low hum, the shimmer swelling after
+  s.tone({ f: 72, f2: 52, d: .3, v: .8 }); s.hiss({ ft: 'lowpass', f: 500, d: .1, v: .35 });
+  s.ring({ f: 96, d: 3.4, v: .6, ratios: [1, 1.47, 1.98, 2.44, 2.93, 3.62, 4.31] }); s.tone({ f: 97.1, d: 3, v: .2 });
+  s.tone({ f: 510, t: .06, a: .5, d: 2.4, v: .07 }); s.tone({ f: 657, t: .1, a: .7, d: 2.2, v: .05 }); s.hiss({ ft: 'bandpass', f: 3400, q: 3, t: .05, a: .6, d: 2.2, v: .05 });
+}];
+// the Moonbeam: a breath of air, a glassy chime and a shimmer that hangs, nothing like the other lances' buzz
+SOUNDS.moonbeam = [1.4, .85, s => {
+  s.thud({ f: 95, d: .06, v: .5 }); s.tone({ f: 150, f2: 60, d: .2, v: .45 });
+  s.hiss({ ft: 'bandpass', f: 1200, f2: 5200, q: 1.6, a: .01, d: .35, v: .55, sweep: .2 });
+  s.ring({ f: 1568, t: .01, d: .95, v: .22, ratios: [1, 2.01, 3.02, 4.1] }); s.ring({ f: 2349, t: .03, d: .8, v: .14, ratios: [1, 2, 2.98] });
+  for (let i = 0; i < 6; i++) s.tone({ type: 'sine', t: .05 + i * .07, f: 2637 + i * 220, f2: 2700 + i * 260, a: .01, d: .18, v: .045 });
+  s.hiss({ ft: 'highpass', f: 6000, t: .05, a: .15, d: .7, v: .1 });
+}];
+SOUNDS.ricochet = [.5, .5, s => { s.ring({ f: 3136, d: .35, v: .25, ratios: [1, 2.4, 3.9] }); s.tone({ type: 'sine', f: 4200, f2: 2500, d: .16, v: .1 }); s.hiss({ ft: 'highpass', f: 5000, d: .07, v: .25 }); }]; // where a Moonbeam bounces
+SOUNDS.r_moonbeam = [1.9, .45, s => {
+  s.ring({ f: 1760, t: .5, d: .22, v: .09, ratios: [1, 2.01] }); s.hiss({ ft: 'bandpass', f: 2600, t: .48, d: .1, v: .12 }); // the little moon comes out
+  s.tone({ type: 'sine', t: .95, f: 300, f2: 1400, a: .35, d: .55, v: .13, glide: .5 }); s.ring({ f: 1568, t: 1.48, d: .32, v: .1, ratios: [1, 2.01, 3.02] }); s.ring({ f: 2093, t: 1.56, d: .3, v: .08, ratios: [1, 2.01] });
+}];
+// the Bombard: a cannon's crack and deep boom, a heavier one where the ball lands, and three balls rolled down the barrel
+SOUNDS.bombard = [1.4, 1, s => {
+  s.hiss({ ft: 'highpass', f: 1800, d: .03, v: .7 }); s.thud({ f: 58, d: .22, v: 1 }); s.tone({ f: 78, f2: 30, d: .6, v: 1 });
+  s.hiss({ ft: 'lowpass', f: 900, f2: 120, a: .004, d: 1.1, v: .8 }); s.tone({ type: 'square', f: 64, f2: 34, d: .3, v: .25, lp: 300 });
+  s.crunch({ t: .02, a: .01, d: .25, dens: .02, lo: 700, hi: 3000, v: .3 });
+}];
+SOUNDS.bombardBoom = [1.9, 1, s => {
+  s.hiss({ f: 1500, f2: 60, a: .004, d: 1.5, v: 1 }); s.tone({ f: 60, f2: 22, d: .9, v: 1 }); s.thud({ f: 48, d: .3, v: .9 });
+  s.tone({ type: 'square', f: 100, f2: 36, d: .45, v: .3, lp: 350 });
+  s.crunch({ t: .15, a: .05, d: 1.3, dens: .025, lo: 400, hi: 2500, v: .45 }); // earth falling back
+}];
+SOUNDS.r_bombard = [2.6, .45, s => {
+  for (const t of [.6, 1.07, 1.54]) { s.scrape({ t, d: .14, f: 420, v: .3 }); s.knock({ t: t + .12, f: 170, tau: .05, v: .8, grit: .25 }); }
+  s.thunk(2.17); s.latch(2.36);
+}];
+// the Peregrine: a rush of air as it leaves, a falcon's cry when it picks its prey, a sharp gold blast
+SOUNDS.peregrine = [1, .85, s => {
+  s.tone({ f: 110, f2: 45, d: .18, v: .9 }); s.thud({ f: 130, d: .05, v: .6 });
+  s.hiss({ ft: 'bandpass', f: 700, f2: 3600, q: 1.4, a: .02, d: .7, v: .8, sweep: .45 });
+  s.tone({ type: 'sine', t: .03, f: 1900, f2: 2600, a: .02, d: .3, v: .07, glide: .3 });
+}];
+SOUNDS.peregrineCry = [.9, .55, s => {
+  s.tone({ type: 'sawtooth', f: 2900, f2: 2050, a: .02, d: .5, v: .2, bp: 2800, q: 2.5, glide: .5 }); s.tone({ type: 'sine', f: 3100, f2: 2250, a: .02, d: .45, v: .1, glide: .45 });
+  s.hiss({ ft: 'bandpass', f: 3000, f2: 2300, q: 4, a: .02, d: .45, v: .2 });
+}];
+SOUNDS.peregrineBoom = [1.4, 1, s => {
+  s.hiss({ f: 2200, f2: 120, a: .003, d: 1, v: 1 }); s.tone({ f: 85, f2: 32, d: .55, v: 1 }); s.hiss({ ft: 'highpass', f: 3500, d: .05, v: .7 });
+  s.crunch({ t: .03, a: .01, d: .5, dens: .02, lo: 2000, hi: 7000, v: .35 });
+}];
+SOUNDS.r_peregrine = [2.6, .45, s => {
+  for (const t of [.6, 1.07, 1.54]) { s.scrape({ t, d: .16, f: 1100, v: .3 }); s.latch(t + .17); }
+  s.thunk(2.2); s.click({ t: 2.4, f: 2800, v: .4 });
+}];
 const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
 // close-up sounds get less echo
@@ -1031,7 +1083,7 @@ const soundNow = name => BUF[name] || void makeSound(name);
 // once the lobby is up: all the rest, a few at a time, what a first game needs first
 function soundsLater() {
   if (soundQ) return;
-  const mine = new Set(Object.values(prof.loadout || {}));
+  const mine = new Set([...Object.values(prof.loadout || {}), ...typeof trialOn === 'function' && trialOn() ? [BASE[trialNow()].id] : []]);
   const rank = n => n === 'ui' ? 0 : /^(step_|land_|hurt|die$|armorHit$|kill$|pick|equip$|dry$|swing$|slash$)/.test(n) || mine.has(n.replace(/^(r_|zin_|zout_)/, '')) ? 1 : 2;
   soundQ = Object.keys(SOUNDS).sort((a, b) => rank(a) - rank(b));
   const step = () => {

@@ -1,7 +1,7 @@
 // online play: the server runs rooms and checks hits, you own your movement
 const NET_V = 1;
 const GEN_MSG = "That room's on a different version of the game";
-const NET_GEN = 10; // content version: rooms hold one, bump it when new guns or maps ship
+const NET_GEN = 11; // content version: rooms hold one, bump it when new guns or maps ship
 const NET_DEV = /[?&]dev=1\b/.test(location.search) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const NET_HTTP = /[?&]srv=(https?:\/\/[\w.:-]+)/.exec(location.search)?.[1] || (NET_DEV ? 'http://127.0.0.1:8787' : CLOUD); // ?srv= points at another server
 const NET_WS = NET_HTTP.replace(/^http/, 'ws');
@@ -82,6 +82,7 @@ net = (() => {
   function myGear() { // every gun you own, since you can swap mid-match
     const load = CATS.map(([c]) => BASE[loadoutGun(c)].id), stars = {};
     BASE.forEach((w, i) => { if (hasGun(i)) stars[w.id] = Math.max(0, Math.min(2, gunUse(i) - 1)); });
+    if (trialOn()) stars[BASE[trialNow()].id] = 0;
     return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load, lv: prof.lv }; // lv: how grown a gun that grows is
   }
   function hello(rejoin = null) {
@@ -116,7 +117,7 @@ net = (() => {
     o.room ||= backRoom(o); // back to the match you dropped out of
     last = o; // kept for PLAY AGAIN
     const job = starting = { o, not: [], tries: 0, dead: false, timer: 0 };
-    showFinding(o.friend ? `JOINING ${o.friend.toUpperCase()}…` : o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…');
+    showFinding(o.move ? `OFF TO THE ${MAPS[o.map].name.toUpperCase()}…` : o.friend ? `JOINING ${o.friend.toUpperCase()}…` : o.code ? `JOINING ROOM ${o.code}…` : o.create ? 'MAKING YOUR ROOM…' : 'FINDING MATCH…');
     job.timer = setTimeout(() => fail(job, 'Took too long to reach the servers'), 8000);
     findRoom(job).catch(e => fail(job, errText(e) || 'Could not reach the servers'));
   }
@@ -213,6 +214,22 @@ net = (() => {
     endOnline();
   }
   function again() { if (!last) return; endOnline(); start(last.code ? { code: last.code } : { mode: last.mode, map: last.map, room: last.room }); }
+  // a duel nobody's joining: after a while alone, ask now and then whether someone waits on another duel map (worker.js duelElse)
+  const DUEL_ELSE_MS = 20e3; // worker.js too
+  let elseAt = 0, elseBusy = false;
+  function duelElse() {
+    if (!api.on || roomMode !== 'duel' || !room.startsWith('pub-duel-') || phase !== 'wait' || remotes.size || starting) { elseAt = 0; return; }
+    const t = localNow();
+    if (!elseAt) elseAt = t + DUEL_ELSE_MS;
+    if (t < elseAt || elseBusy) return;
+    elseAt = t + 5000; elseBusy = true;
+    const was = room;
+    fetchJson(`/play/duelelse?room=${was}&gen=${NET_GEN}&lv=${prof.lv}`).then(r => {
+      if (!r.room || !MAPS[r.map] || room !== was || !api.on || remotes.size || phase !== 'wait') return;
+      netToast(`Nobody's joining the ${MAPS[mapId].name}, but someone's waiting on the ${MAPS[r.map].name}`, 6000);
+      start({ mode: 'duel', map: r.map, room: r.room, move: true });
+    }).catch(() => {}).finally(() => { elseBusy = false; });
+  }
 
   // messages from the server
   function onMsg(m, job) {
@@ -582,7 +599,7 @@ net = (() => {
       if (k >= 0) { kind = list === flares ? 'flare' : 'rocket'; gust = !!list[k].gust; scene.remove(list[k].m); list.splice(k, 1); break; }
     }
     const cl = !!BASE[gi(m.g)]?.cluster; // a cluster shell: a gold burst, then its bomblets
-    if (kind === 'rocket') blastFx(p, ROCKET_R, gust, cl);
+    if (kind === 'rocket') blastFx(p, boomR(BASE[gi(m.g)]), gust, cl, m.g);
     else flareFx(p);
     if (cl && Number.isFinite(m.s) && Array.isArray(m.n) && m.n.length === 3 && m.n.every(Number.isFinite)) { // its bomblets, thrown just as the shooter's were
       const n = new THREE.Vector3(...m.n); clusterBurst(p, n.lengthSq() > .01 ? n.normalize() : n.set(0, 1, 0), m.s, bodyOf(m.pid), true, m.id, m.g, 0, m.pid);
@@ -913,7 +930,7 @@ net = (() => {
     selfRec: () => makeRemoteRec({ pid, name: myName, css: '#8ff0b6', look: prof.look.px ? { ...lookSent(), px: prof.look.px } : lookSent(), gear: myGear() }), rival: rivalRec, rdy: () => send({ t: 'rdy' }),
     coopTick, mates: () => mateList, recOf, zHit, zEvent: e => { if (zev.length < 60) zev.push(e); }, zHurt: h => { if (zhurts.length < 20) zhurts.push(h); }, zSend: send,
     now, start, again, leave, onLock, claim, burn, shot: (w, by) => { if (!api.on) return; shotN++; if (by) { const h = hostedOf(by); if (h) h.fired++; } else fired++; }, launch: launchP, boom, patch, ev: k => { if (api.on) evFlags |= k === 'djump' ? 64 : k === 'dash' ? 256 : k === 'full' ? 4096 : 32; },
-    matchTick, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
+    matchTick, duelElse, applyRemote, roster: () => { recs = roster.recs; youRec = roster.youRec; }, chat: text => send({ t: 'chat', text }), report: (pid, why) => send({ t: 'report', pid, why }), probe, pick,
   });
   Object.defineProperties(api, { // read live
     pvp: { get: () => api.on && roomMode !== 'coop' }, coop: { get: () => api.on && roomMode === 'coop' }, renderT: { get: () => renderT },

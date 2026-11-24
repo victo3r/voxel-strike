@@ -1,5 +1,5 @@
 // held weapons: one set of moves for every view (first person in weapons.js, bots and other players in deathmatch.js, the lobby)
-const KICK = { shoulder: [.2, .1], heavy: [.1, .06], all: [.25, .08] }; // muzzle climb, slide back
+const KICK = { shoulder: [.2, .1], heavy: [.1, .06], orb: [.1, .06], all: [.25, .08] }; // muzzle climb, slide back
 const SWING = { arm: .65, lift: .35, wrist: .45, sweep: .35, push: .1 }; // arm and hand share a swing; the wind-up barely lifts the arm, so it stays out of your view
 const kickFall = w => (w.melee ? 1 / swingT(w) : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1);
 const RL_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz'];

@@ -71,7 +71,8 @@ function gunAttrs(w) {
   if (w.charge) a.push('CHARGE SHOT');
   if (w.grow) a.push('GROWS WITH YOU');
   if (w.wisp) a.push('HOMING');
-  if (w.saw) a.push('RICOCHET');
+  if (w.saw || w.ricochet) a.push('RICOCHET');
+  if (w.seek) a.push('HOMING');
   if (w.vortex) a.push('PULLS IN', 'EXPLOSIVE', 'NO SELF DAMAGE');
   if (w.pierce) a.push('PIERCING');
   if (w.wallBreak) a.push('WALL BREAK');
@@ -85,6 +86,7 @@ function gunAttrs(w) {
   if (w.soul) a.push('HEALS ON KILL');
   if (w.rocket) a.push(...w.gust ? ['WIND BLAST', 'BIG LAUNCH'] : ['ROCKET', 'EXPLOSIVE']);
   if (w.cluster) a.push('CLUSTER BOMB');
+  if (w.lob) a.push('LOBBED');
   if (w.spell) a.push('FIRE ICE OR WIND', 'EXPLOSIVE', 'NO SELF DAMAGE');
   else if (w.flame || w.flare || w.burn) a.push('FIRE');
   if (w.jump) a.push('JUMP BOOST');
@@ -152,6 +154,9 @@ const DESC = {
   tisaw: 'Throws spinning saw blades that cut through a whole row and skip off walls',
   tisniper: 'A long titanium rifle for one clean shot',
   tirocket: 'Two tubes, two big rockets, all titanium',
+  moonbeam: 'A beam of moonlight that bounces off walls and finds whoever hides round the corner',
+  bombard: 'An old siege cannon that lobs its ball high and lands it with a crash',
+  peregrine: 'Its rockets dive for whoever is in front of them, but they turn slowly',
 };
 // the next level a growing gun gets stronger at (0: fully grown)
 function growNext(i) { const w = BASE[i], a = grown(w, prof.lv); for (let lv = prof.lv + 1; lv <= w.grow.top; lv++) { const b = grown(w, lv); if (Object.keys(w.grow).some(k => a[k] !== b[k])) return lv; } return 0; }
@@ -160,7 +165,7 @@ function gunSpecs(i) {
   const w = BASE[i], out = [], rl = +statsAt(i, Math.max(0, gunUse(i) - 1)).reload.toFixed(1);
   if (!w.melee && w.start) out.push(['RELOAD', rl + 's']);
   if (w.range) out.push(['RANGE', w.range + ' BLOCKS']);
-  if (w.rocket || w.grenade || w.spell) out.push(['BLAST RADIUS', ROCKET_R + ' BLOCKS']);
+  if (w.rocket || w.grenade || w.spell) out.push(['BLAST RADIUS', boomR(w) + ' BLOCKS']);
   if (w.cluster) out.push(['BOMBLETS', `${CLUSTER_N}, ${Math.round(CLUSTER_K * 100)}% DAMAGE EACH`]);
   if (w.grenade) out.push(['FUSE', GREN_FUSE + 's']);
   if (w.launch && !w.vortex) out.push(['ROCKET JUMP', `${Math.round((w.launch - 1) * 100)}% STRONGER`]);
@@ -170,6 +175,9 @@ function gunSpecs(i) {
   if (w.flare) out.push(['SPLASH RADIUS', FLARE_R + ' BLOCKS']);
   if (w.wisp) out.push(['SEEKS', WISP_SEEK + ' BLOCKS']);
   if (w.saw) out.push(['SKIPS OFF', SAW_BOUNCES + ' WALLS']);
+  if (w.ricochet) out.push(['BOUNCES', w.ricochet + ' TIMES'], ['AFTER A BOUNCE', Math.round(RICO_MUL * 100) + '% DAMAGE']);
+  if (w.lob) out.push(['LANDING', 'SHOWN BY A RING']);
+  if (w.seek) out.push(['SEEKS', SEEK_RANGE + ' BLOCKS']);
   if (w.vortex) out.push(['PULL RADIUS', VOID_PULL_R + ' BLOCKS'], ['BLAST RADIUS', VOID_R + ' BLOCKS']);
   if (w.charge) out.push(['FULL CHARGE', w.charge + 's'], ['QUICK SHOT', Math.round(CHARGE_MIN * 100) + '% DAMAGE'], ['FULLY CHARGED', 'THROUGH WALLS']);
   if (w.jump) out.push(['JUMP', `+${Math.round(w.jump[Math.max(0, gunUse(i) - 1)] * 100)}% HIGHER`]);
@@ -200,7 +208,7 @@ const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIV
 const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare', 'eradicator', 'rocket', 'hitman', 'heatray', 'thrasher', 'semisniper', 'herosword', 'shockbeam', 'tigerbite', 'executioner',
   'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
   'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
-  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong', 'monarch', 'quasar', 'wildfire', 'finale'];
+  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong', 'monarch', 'quasar', 'wildfire', 'finale', 'moonbeam', 'bombard', 'peregrine'];
 const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
 function renderIndex() {
   const list = indexList(), have = list.filter(hasGun).length;
@@ -236,8 +244,8 @@ function renderArmory() {
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
   else $('armList').innerHTML = (excl ? `<p class="wd">${EXCL_DESC}</p>` : '') + list.map(i => {
-    const w = BASE[i], tag = chestOnly(i) ? `${ico('lock')} ${w.gift ? 'WELCOME GIFT' : 'GOLDEN CHEST'}` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : on(i) ? 'EQUIPPED' : '';
-    return `<div class="card rr${isLocked(i) || chestOnly(i) ? ' locked' : ''}${i === armSel && armPick ? ' sel' : ''}${on(i) ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
+    const w = BASE[i], tri = i === trialNow() && trialOk(), tag = tri ? (on(i) ? `${ico('check')} TRYING` : 'FREE THIS WEEK') : chestOnly(i) ? `${ico('lock')} ${w.gift ? 'WELCOME GIFT' : 'GOLDEN CHEST'}` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : on(i) ? 'EQUIPPED' : '';
+    return `<div class="card rr${!tri && (isLocked(i) || chestOnly(i)) ? ' locked' : ''}${tri ? ' trial' : ''}${i === armSel && armPick ? ' sel' : ''}${on(i) ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${gunPic(i)}">` +
       `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
   }).join('');
@@ -253,6 +261,7 @@ function renderAct() {
   if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(w.cat);
   let btns;
+  const tr = i === trialNow() && trialOk() ? (i === eq ? `<button class="eq" disabled>${ico('check')} TRYING IT</button>` : '<button class="go" data-try="1">TRY IT FREE</button>') : '';
   if (chestOnly(i)) btns = `<button disabled>${ico('lock')} ${BASE[i].gift ? 'A WELCOME WEEK GIFT, OR IN GOLDEN CHESTS' : 'FOUND IN GOLDEN CHESTS'}</button>`;
   else if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
   else if (!hasGun(i)) btns = `<button data-buy="${i}" ${prof.coins < w.price ? 'disabled' : ''}>BUY ${COIN}${w.price}</button>`;
@@ -260,6 +269,7 @@ function renderAct() {
     btns = i === eq ? '<button class="eq" disabled>EQUIPPED</button>' : `<button data-eq="${i}">EQUIP</button>`;
     if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${upgPrice(i)}</button>`;
   }
+  if (tr) btns = tr + btns;
   const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   setAct(actCard(w.name + ' ' + gunTags(w), starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns));
   placeAct();
@@ -786,15 +796,17 @@ function armClick(e) {
   else if (b.id === 'detBack') { armDet = false; hskOpen = false; hskSel = null; sfx('ui'); }
   else if (b.dataset.buy) {
     const i = +b.dataset.buy, w = BASE[i]; if (w.chest || prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
-    prof.coins -= w.price; prof.guns[w.id] = 1; prof.loadout[w.cat] = w.id; saveProf(); showProf();
+    trialOff(w.cat); prof.coins -= w.price; prof.guns[w.id] = 1; prof.loadout[w.cat] = w.id; saveProf(); showProf();
     armSync(i, 'buy'); sfx('buy');
   } else if (b.dataset.up) {
     const i = +b.dataset.up, p = upgPrice(i); if (prof.coins < p || gunStars(i) >= 3) return;
     prof.coins -= p; prof.guns[BASE[i].id]++; delete prof.use[BASE[i].id]; saveProf(); showProf();
     armSync(i, 'up'); sfx('upgrade');
   } else if (b.dataset.eq) {
-    const i = +b.dataset.eq; prof.loadout[BASE[i].cat] = BASE[i].id; saveProf();
+    const i = +b.dataset.eq; trialOff(BASE[i].cat); prof.loadout[BASE[i].cat] = BASE[i].id; saveProf();
     armSync(i, 'eq'); sfx('equip');
+  } else if (b.dataset.try) {
+    trialSet(true); sfx('equip');
   } else if (b.id === 'armX') { closeArmory(); return; }
   renderArmory();
 }

@@ -56,6 +56,7 @@ function eventTiles() {
 function renderEvent() {
   const E = eventNow(), S = prof.event, next = S.got < EV_TRACK.length ? evPrize(EV_TRACK[S.got]) : null, from = Math.min(S.pts, S.got ? EV_TRACK[S.got - 1].p : 0); // min: a prize won on the old, shorter track
   document.documentElement.style.setProperty('--ev', E.col);
+  if (typeof renderTrial === 'function') renderTrial();
   if (!inLobby) return; // chest pictures only build in the lobby
   setHTML($('event'), `<div class="eh"><b>${ico(E.icon)} ${E.name}</b><small>${evLeft()} LEFT</small></div><div class="el">${E.line}</div>` +
     (next ? `<div class="ep"><u><i style="width:${(S.pts - from) / (next.p - from) * 100}%"></i></u><span>${S.pts}/${next.p}</span></div><div class="en">NEXT ${evPic(next)} ${evName(next)}</div>`
