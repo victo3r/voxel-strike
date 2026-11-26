@@ -85,7 +85,7 @@ const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t
 // team modes: winners get 1st place pay
 const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res === 0 ? t[1] : t[t.length - 1]; };
 // bot loadouts: one gun per category, rarer guns less often
-const botGun = c => pickRare(BASE.filter(w => w.cat === c && (w.unlock || 0) <= botTop())).id;
+const botGun = (c, top = botTop()) => pickRare(BASE.filter(w => w.cat === c && (w.unlock || 0) <= top)).id;
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], hornet: [8, 18], salvo: [9, 18], apex: [18, 36], tracker: [6, 16], tempest: [6, 16], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
@@ -95,6 +95,7 @@ const BOT_KEEP = {
   wisp: [6, 16], voidlantern: [8, 18], aurora: [18, 36], crystal: [8, 20],
   daybreak: [6, 18], highnoon: [12, 28], cutlass: [1, 1.9], harpoon: [14, 30], conch: [5, 14], tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
   moonbeam: [9, 22], bombard: [11, 24], peregrine: [10, 22],
+  firefly: [5, 14], longbow: [14, 30], rhino: [9, 22], boomerang: [6, 16], juggernaut: [6, 14], scythe: [1, 2.4], meteor: [12, 28],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -138,6 +139,13 @@ const GUN_FIT = {
   grenade: d => d < 5 ? 0 : d < 18 ? .75 : .2,
   aerial: d => d < 5 ? 0 : d < 22 ? .8 : .45,
   crossbow: d => d > 14 ? .95 : d > 8 ? .55 : .2,
+  firefly: d => d < 3 ? .6 : d < 14 ? .75 : .4,
+  longbow: d => d > 14 ? .95 : d > 8 ? .6 : .25,
+  rhino: d => d < 3 ? .6 : d < 26 ? .93 : .72,
+  boomerang: d => d < 3 ? .4 : d < 16 ? .85 : .2,
+  juggernaut: d => d < 16 ? 1 : .5,
+  scythe: d => d < 3.2 ? 1.33 : d < 4.8 ? .42 : 0,
+  meteor: d => d < 7 ? 0 : d < 30 ? .8 : .45,
   flare: d => d < 3 ? .1 : d < 20 ? .6 : .35,
   windwand: d => d < 3 ? .6 : d < 20 ? .78 : .5,
   stunwand: d => d < 4 ? 1.3 : d < 6 ? .4 : 0,
@@ -176,7 +184,7 @@ function botWear() {
     boots = { id: T.suit, st: 1 + (Math.random() * Math.max(1, bootStars(T.suit)) | 0) };
     hat = { id: T.suit, st: 1 + (Math.random() * Math.max(1, hatStars(T.suit)) | 0) };
   }
-  return { armor, boots, hat };
+  return { armor, boots, hat, kfx: botKfx() };
 }
 // online the host makes the room's bots
 function botGearNet() {
@@ -184,13 +192,13 @@ function botGearNet() {
   for (const id of load) { const top = Math.max(0, gunUse(gi(id)) - 1); stars[id] = Math.random() * (top + 1) | 0; }
   return { ...botWear(), stars, load, lv: Math.min(LV_MAX, botTop()) }; // lv: how grown a gun that grows is
 }
-function botLoadout(easy) {
-  const load = CATS.map(([c]) => gi(easy ? pickRare(BASE.filter(w => w.cat === c && rarOf(w) === 'common')).id : botGun(c))), taste = tasteFor(load);
+function botLoadout(easy, top = botTop()) {
+  const load = CATS.map(([c]) => gi(easy ? pickRare(BASE.filter(w => w.cat === c && rarOf(w) === 'common')).id : botGun(c, top))), taste = tasteFor(load);
   // stars: never more than you use on that gun
-  const stars = {}, W = {}, lv = Math.min(LV_MAX, botTop()); // lv: how grown a gun that grows is
+  const stars = {}, W = {}, lv = Math.min(LV_MAX, top); // lv: how grown a gun that grows is
   for (const g of load) { const top = easy ? 0 : Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g], lv); }
-  const { armor, boots, hat } = easy ? { armor: 0, boots: null, hat: null } : botWear();
-  return { load, taste, stars, W, lv, armor, boots, hat, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
+  const { armor, boots, hat, kfx } = easy ? { armor: 0, boots: null, hat: null, kfx: '' } : botWear();
+  return { load, taste, stars, W, lv, armor, boots, hat, kfx, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
 }
 
 const BOT_U = 1.85 / 33; // one skin pixel, so bots are as tall as you
@@ -261,6 +269,7 @@ function boardHTML() {
     + ranked().filter(r => r.team === t).map(row).join('')).join('');
 }
 function feed(html) {
+  if (sfxOff) return; // the lobby's backdrop
   const d = document.createElement('div'); d.className = 'kf'; d.innerHTML = html; $('feed').append(d);
   while ($('feed').children.length > 5) $('feed').firstChild.remove();
   setTimeout(() => d.remove(), 5000);
@@ -345,10 +354,10 @@ function heldTick(b, dt, left, total) {
   if (b.rounds) roundsShow(b.rounds, b.ammo, k);
   if (wand) b.wf = Math.max(0, Math.min(1, b.wf + dt * (b.fireOn > 0 || b.wandT > 0 ? 14 : -4)));
   if (lan) b.lanT = b.muzzle > 0 ? 0 : (b.lanT ?? 9) + dt;
-  b.kick = Math.max(0, (b.kick || 0) - dt * kickFall(W));
-  const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, sv: b.sv, rl: k, level: wand ? b.wf : 0, two: !!R.fL, insp: b.insp ?? -1 });
+  b.kick = Math.max(0, (b.kick || 0) - dt * kickFall(W)); b.ct = Math.max(0, (b.ct || 0) - dt / CATCH_T);
+  const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, sv: b.sv, rl: k, level: wand ? b.wf : 0, two: !!R.fL, insp: b.insp ?? -1, draw: b.chargeK || 0, ct: W.boomer ? b.ct : 0 });
   bladeTrail(g, W, W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, scene); flipShow(b.flips, a);
-  b.aim.rotation.x += a.sw; b.aim.position.z = a.push; // the arms swing at the shoulders
+  b.aim.rotation.x += a.sw; b.aim.position.z = a.push; b.aim.rotation.y = b.body.rotation.y = a.tw; // the arms swing at the shoulders, the chest turns with a sweep
   if (heldIdle(a) && !lan) {
     if (R.on) { R.on = false; g.position.copy(R.p); g.quaternion.copy(R.q); b.armR.quaternion.copy(R.qR); b.armL.quaternion.copy(R.qL); if (b.mag) b.mag.position.copy(R.magAt); }
     return;
@@ -361,7 +370,7 @@ function heldTick(b, dt, left, total) {
   if (b.mag) b.mag.position.copy(R.magAt).add(_rlV.set(a.mx, a.my, a.mz));
   g.updateMatrix();
   const aimAt = (arm, p) => arm.quaternion.setFromUnitVectors(ARM_DOWN, _rlV.copy(p).sub(arm.position).normalize());
-  aimAt(b.armR, cl ? _rlK : _rlF.copy(R.fR).applyMatrix4(g.matrix));
+  aimAt(b.armR, cl ? _rlK : _rlF.copy(R.fR).setZ(R.fR.z + a.dr).applyMatrix4(g.matrix));
   // left hand on the gun, then to the mag
   const to = a.left;
   if (!b.mag || (!R.fL && to <= 0)) { if (R.fL) aimAt(b.armL, _rlF.copy(R.fL).setZ(R.fL.z + a.az).applyMatrix4(g.matrix)); else b.armL.quaternion.copy(R.qL); }
@@ -407,7 +416,7 @@ function makeBot(rec, spot) {
   dressBoots(ch, hide & HIDE_BIT.boots ? null : rec.boots); dressHat(ch, hide & HIDE_BIT.hats ? null : rec.hat);
   g.rotation.order = 'YXZ'; g.position.set(x, groundAt(x, z, .35, floorY(x, z)), z);
   // arms forward holding the gun
-  const aim = new THREE.Group(); aim.position.y = 22 * u; g.add(aim);
+  const aim = new THREE.Group(); aim.position.y = 22 * u; aim.rotation.order = 'YXZ'; g.add(aim); // pitched to aim, turned (y) with the chest
   for (const a of [ch.armR, ch.armL]) { aim.add(a); a.position.y = 0; }
   ch.headPiv.rotation.order = 'YXZ';
   const tag = new THREE.Sprite(rec.tag); tag.scale.set(rec.tagW, .25, 1); tag.position.y = 2.25;
@@ -415,10 +424,11 @@ function makeBot(rec, spot) {
   const yaw = spot?.yaw ?? Math.atan2(-x, -z);
   g.rotation.y = yaw;
   const mags = {}; for (const i of rec.load) mags[i] = rec.W[i].mag; // full ammo on respawn
-  const b = { g, head: ch.head, headPiv: ch.headPiv, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, wings: ch.wings, zap: ch.zap, hatFx: ch.hat?.fx, rec, pid: rec.pid, remote: !!rec.remote,
+  const b = { g, head: ch.head, headPiv: ch.headPiv, body: ch.body, aim, armR: ch.armR, armL: ch.armL, holdTurn: 0, gunM: null, flashM: null, spin: null, spinV: 0, tag, pivL: ch.legL, pivR: ch.legR, parts: ch.parts, mats: ch.mats, wings: ch.wings, zap: ch.zap, hatFx: ch.hat?.fx, rec, pid: rec.pid, remote: !!rec.remote,
     type: 'bot', hp: BOT.hp, maxHp: BOT.hp, armor: arm ? arm.hp : 0, maxArmor: arm ? arm.hp : 0, dr: arm ? arm.dr : 0, scale: 1, r: .3, coins: 0, t: 0, flash: 0, dead: 0, burn: 0,
     gun: rec.load[0], mags, refill: {}, ammo: mags[rec.load[0]], reload: 0, swap: 0, pickT: 0, stab: 0, fireOn: 0, fireEnd: 'flameEnd', leadGuess: .6 + Math.random() * .6, cd: .3, burst: 5, muzzle: 0, seeT: 0, aimT: 0, aimYaw: yaw, aimPitch: 0,
     strafe: 1, strafeT: 0, detour: 0, detourDir: 1, tgt: null, scanT: 0, lostT: 0, engaged: false, hitBy: null, hitByT: 0, hitDmg: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, vy: 0, jumpT: 2 + Math.random() * 4 };
+  b.ch = ch; b.free = () => botFree(b);
   if (!friendly(rec, YOU_T)) addOutline(b); // enemies glow red
   b.gun = pickGun(b, HUNT_D); b.ammo = mags[b.gun];
   holdGun(b);
@@ -426,18 +436,24 @@ function makeBot(rec, spot) {
   zombies.push(b); rec.b = b;
   return b;
 }
-// bot death: cry, angel, and its effects off
-function botDownFx(b, nobody = false) {
+// a bot's models, freed when its body goes
+function botFree(b) {
+  b.gunM?.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); });
+  b.core?.dispose(); b.ch.dispose();
+}
+// bot death: cry, the killer's kill effect (angels), and its effects off
+function botDownFx(b, nobody = false, fx = '') {
   b.hp = Math.min(b.hp, 0); b.dead ||= .0001;
   b.tag.visible = false; b.flashM.visible = false;
   if (b.fireOn > 0) { b.fireOn = 0; sfx(b.fireEnd, { at: b.g.position, far: 50 }); }
   const bm = beams.get(b); if (bm) { scene.remove(bm.g); beams.delete(b); }
   if (!nobody) sfx('die', { at: b.g.position, far: 40 });
-  if (!b.drowned) angel(b); // drowned ones just sink
+  if (!b.drowned) killFx(b, nobody ? '' : fx); // drowned ones just sink
 }
 // a bot died (by = the bot that got it, null = you)
 function botDown(b, by, head, nobody = false) {
-  botDownFx(b, nobody);
+  if (b.dummy) { rangeDown(b); return; } // the range counts nothing
+  botDownFx(b, nobody, by ? by.rec?.kfx : wornKfx());
   b.rec.wait = MR.bot + DIE_T;
   scoreKill(nobody ? null : by ? by.rec : youRec, b.rec, head, b.helpers);
 }
@@ -638,6 +654,10 @@ function botStab(b, W, t, dist) {
   const facing = dist < .7 || Math.abs(Math.atan2(Math.sin(want - b.aimYaw), Math.cos(want - b.aimYaw))) <= .6;
   const miss = dist > W.range || Math.abs(p.y - pos.y) > 1.6 || !facing, at = new THREE.Vector3(p.x, p.y + 1.2, p.z);
   if (W.wand) { aimDir(b.aimYaw, b.aimPitch, dirV); stunZap(b.flashM.getWorldPosition(new THREE.Vector3()), miss ? zapEnd(W, pos.clone().setY(pos.y + 1.6), dirV, b) : at); } // a little stun blast
+  if (W.sweep) { // the scythe takes everyone in its arc, you included
+    for (const h of sweepFoes(b, pos.clone().setY(pos.y + 1.6), b.aimYaw, W)) { sfx(W.hit || 'slash', { at: h.at, far: 20 }); if (h.z === YOU_T) hurtPlayer(Math.round(W.dmg * BOT.dmgMul), false, b, false, 1); else hurtZombie(h.z, W.dmg * BOT.dmgMul, h.at, false, false, b, 1); }
+    return;
+  }
   if (miss) return;
   sfx(W.hit || 'slash', { at, far: 20 });
   if (W.knock && !net.on) launch(t.you ? P : t, t.you ? new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z) : t.g.position.clone().setY(t.g.position.y + 1), pos.clone().setY(pos.y + 1), W.knock, false);
@@ -676,22 +696,23 @@ function botFire(b, W, dist) {
   muzzleBits(W, b.flashM);
   // beams in long sweeps, everything else in short bursts
   if (W.burst) { b.cd = burstCd(W, b); if (!b.bn) b.cd += Math.random() * .3; } // whole bursts, a little apart
-  else if (autoFire(W)) { b.cd = W.rate; if (--b.burst <= 0) { b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
+  else if (autoFire(W)) { b.cd = W.windup ? windGap(W, b.wk || 0) : W.rate; if (W.windup) b.wk = Math.min(1, (b.wk || 0) + b.cd / W.windup); if (--b.burst <= 0) { b.wk = (b.wk || 0) * .5; b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
   else b.cd = W.rate + Math.random() * .12; // semi-auto: about as fast as a person clicks
   if (W.scope) b.aimT = 0;
   if (W.beam) { if (!(b.fireOn > 0)) sfx(beamSnd(W) + 'Start', { at: b.g.position, far: 50 }); b.fireOn = .2; b.fireEnd = beamSnd(W) + 'End'; }
   else if (!W.flame) sfx(W.id, { at: b.g.position, far: W.quiet ? 35 : 100 });
   if (b.ammo <= 0) {
-    b.reload = rlOf(W, b.rec.fx); if (!W.pool) sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
+    b.reload = rlOf(W, b.rec.fx); if (!W.pool && !W.boomer) sfx('r_' + W.id, { at: b.g.position, far: 25, v: .8 });
     b.pickT = Math.min(b.pickT, .15 + Math.random() * .25); // out of ammo: think about switching
   }
   if (W.flame) return botFlame(b, W);
   const S = skillOf(b), err = S.aimErr + S.moveErr * Math.min(1, Math.hypot(b.pvx, b.pvz) / 6) + W.spread * (W.scope ? .1 : .8);
-  if (W.rocket || W.flare || W.grenade || W.spell || W.wisp || W.vortex || W.saw) {
+  if (W.rocket || W.flare || W.grenade || W.spell || W.wisp || W.vortex || W.saw || W.boomer) {
     const wob = () => (Math.random() + Math.random() - 1) * err;
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
     if (W.spell) castSpell(W, eye.clone(), dirV.clone(), b, b.flashM);
-    else (W.rocket ? fireRocket : W.grenade ? fireGrenade : W.wisp ? fireWisp : W.vortex ? fireVoid : W.saw ? fireSaw : fireFlare)(W, eye.clone(), dirV, b);
+    else (W.rocket ? fireRocket : W.grenade ? fireGrenade : W.wisp ? fireWisp : W.vortex ? fireVoid : W.saw ? fireSaw : W.boomer ? fireBoomer : fireFlare)(W, eye.clone(), dirV, b);
+    if (W.boomer) b.reload = BOOMER_T + .05; // until it comes back
     b.leadGuess = .6 + Math.random() * .6;
     return;
   }
@@ -700,6 +721,8 @@ function botFire(b, W, dist) {
     aimDir(b.aimYaw + wob(), b.aimPitch + wob(), dirV);
     return botLance(b, W);
   }
+  const ck = chargeMul(W, b.chargeK || 0); // a bot's Longbow: as drawn as it let it get
+  if (W.charge) { shotCharge = Math.min(1, b.chargeK || 0); b.chargeK = 0; chargeShow(b.charges, 0); b.chargeWant = null; }
   const youUp = respawnT <= 0 && !friendly(b, YOU_T);
   pBox.min.set(P.pos.x - .25, P.pos.y, P.pos.z - .25); pBox.max.set(P.pos.x + .25, P.pos.y + 1.85, P.pos.z + .25); // as wide as a bot
   // shots hit any enemy in the way
@@ -718,7 +741,7 @@ function botFire(b, W, dist) {
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45, was = respawnT;
-      hurtPlayer(Math.max(1, Math.round(W.dmg * BOT.dmgMul * (head ? headMul(W) : 1))), false, b, head, W.beam ? 2 : 0);
+      hurtPlayer(Math.max(1, Math.round(W.dmg * ck * BOT.dmgMul * (head ? headMul(W) : 1))), false, b, head, W.beam ? 2 : 0);
       if (slows(W)) shockHit(P, W);
       if (W.track && !net.pvp) youTracked(W.track); // online the server's hit says so
       if (!net.on) { if (W.reel) reelIn(P, eye, W.reel); else if (W.beam && W.knock) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), eye, W.knock, false); } // online the server sends the pull or the push
@@ -727,7 +750,7 @@ function botFire(b, W, dist) {
     } else if (near === botD) {
       const zz = bot.object.userData.zombie, head = !!bot.object.userData.head;
       if (!zz.dead) {
-        hurtZombie(zz, W.dmg * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W);
+        hurtZombie(zz, W.dmg * ck * BOT.dmgMul * (head ? headMul(W) : 1), bot.point, head, false, b, W.beam ? 2 : 0); if (slows(W)) shockHit(zz, W);
         if (!net.on && !zz.dead) { if (W.reel) reelIn(zz, eye, W.reel); else if (W.beam && W.knock) launch(zz, zz.g.position.clone().setY(zz.g.position.y + 1), eye, W.knock, false); }
         if (W.chain) chainJumps(zz, W, b, b.rec.stars[b.gun] | 0);
         if (bolt) { wandHit(W, zz, eye, b); if (W.soul && !net.on && zz.dead) soulHeal(b, zz.g.position.clone().setY(zz.g.position.y + 1), W.soul); }
@@ -840,12 +863,12 @@ function updateBot(b, dt) {
   botLook(b, wantYaw, wantPitch, dt);
   b.g.rotation.y = b.aimYaw - b.holdTurn; b.headPiv.rotation.y = b.holdTurn; b.headPiv.rotation.x = b.aim.rotation.x = -b.aimPitch;
 
-  b.cd -= dt; b.muzzle -= dt; b.swap -= dt; b.wandT = (b.wandT || 0) - dt; b.flashM.visible = b.muzzle > 0; if (b.pulse) pulseShow(b.pulse, b.muzzle > 0);
+  b.cd -= dt; b.muzzle -= dt; b.swap -= dt; if (b.wk && b.cd < -.15) b.wk = Math.max(0, b.wk - dt * 1.4 / (BASE[b.gun].windup || 1)); // a Juggernaut left alone spins down b.wandT = (b.wandT || 0) - dt; b.flashM.visible = b.muzzle > 0; if (b.pulse) pulseShow(b.pulse, b.muzzle > 0);
   if (b.fireOn > 0 && (b.fireOn -= dt) <= 0) sfx(b.fireEnd, { at: pos, far: 50 });
   b.stab = Math.max(0, b.stab - dt);
   if (b.inspNext > 0 && (b.inspNext -= dt) <= 0 && W.melee && !t && b.stab <= 0) b.insp = 0; // the flourish
   if (b.insp >= 0) { const t0 = b.insp; b.insp += dt; if (sees || b.stab > 0 || b.insp >= inspLen(W)) b.insp = -1; else inspSnd(W, t0, b.insp, pos); }
-  if (b.spin) { if (b.muzzle > 0) b.spinV = spinKick(b.gun); spinTurn(b.spin, b.spinV + spinIdle(b.gun), dt); b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
+  if (b.spin) { if (b.muzzle > 0) b.spinV = shotSpin(W, b.gun, b.spinV, b.wk || 0); if (W.windup) b.spinV = Math.max(b.spinV, 30 * (b.wk || 0)); spinTurn(b.spin, b.spinV + spinIdle(b.gun), dt); b.spinV = Math.max(0, b.spinV - dt * 25); } // eradicator barrels spin
   if (b.reload > 0 && (b.reload -= dt) <= 0) b.ammo = W.mag;
   if (b.round) b.round.visible = b.ammo > 0;
   heldTick(b, dt, b.reload, rlOf(W, b.rec.fx)); // swings, kicks, wand flicks and reloads
@@ -900,7 +923,7 @@ function updateBot(b, dt) {
     mx = Math.sin(b.mvYaw) * m0; mz = Math.cos(b.mvYaw) * m0;
   } else if (Math.hypot(mx, mz) > .05) b.mvYaw = Math.atan2(mx, mz);
   if (b.leap) { if (!b.vy || (b.leap.t -= dt) <= 0) b.leap = null; else { mx = b.leap.x; mz = b.leap.z; } } // mid-jump over a gap
-  const ml = Math.hypot(mx, mz), spd = b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd) * slowMul(b) * (b.vy && swimAt(pos.x, pos.z, pos.y) ? SWIM_MUL : 1);
+  const ml = Math.hypot(mx, mz), spd = b.leap?.s ?? BOT.speed * (mobMul(W) + b.rec.fx.spd) * slowMul(b) * (1 - WIND_SLOW * (W.windup ? b.wk || 0 : 0)) * (b.vy && swimAt(pos.x, pos.z, pos.y) ? SWIM_MUL : 1);
   const tx = ml > .05 ? mx / ml * spd : 0, tz = ml > .05 ? mz / ml * spd : 0;
   if (b.leap) { b.mvx = tx; b.mvz = tz; } // a jump keeps its line
   else { const e = 1 - Math.exp(-MOVE_EASE * dt); b.mvx += (tx - b.mvx) * e; b.mvz += (tz - b.mvz) * e; } // eases into a new direction like a player
@@ -948,6 +971,9 @@ function updateBot(b, dt) {
     break;
   }
 
+  botGlow(b, dt);
+}
+function botGlow(b, dt) { // hit, burning, stunned or slowed
   b.flash -= dt;
   const e = b.flash > 0 ? 0x880000 : b.burn > 0 ? (Math.sin(performance.now() * .03) > 0 ? 0x993300 : 0x441100) : b.stunT > 0 ? (Math.sin(performance.now() * .04) > 0 ? 0x5a5000 : 0x1a1800) : b.slowT > 0 ? (Math.sin(performance.now() * .05) > 0 ? 0x1a4a66 : 0x0a1a2a) : 0;
   b.mats.forEach(m => m.emissive.setHex(e));
@@ -986,6 +1012,7 @@ function updateDM(dt) {
   if (net.on) { net.matchTick(dt); return; } // online the server runs the match
   while (joins.length && MATCH_T - matchT >= joins[0].at) joinBot(joins.shift());
   chatTick(dt); burnTick(dt); tipTick(dt);
+  if (mode === 'range') { rangeTick(dt); return; } // no clock, no bots, no end
   for (const r of recs) if (!r.you && (!r.b || r.b.dead) && (r.wait -= dt) <= 0) makeBot(r);
   if (walkMap) { if (!lastTop) $('top').innerHTML = lastTop = `<div class="place">${MAP.name.toUpperCase()}  ·  LOOKING AROUND</div>`; return; } // ?walk: no clock, no end
   matchT -= dt;
@@ -1049,7 +1076,7 @@ function endMatch(results) {
   const key = !!results && !results.priv && place === 1 && !D; // keys come from public online wins (not duels)
   if (key) prof.keys = (prof.keys | 0) + 1;
   const quick = !!D && !results.xp && !results.gold; // a duel over before 30 s of fighting pays nothing and doesn't count (room.js duelOver)
-  if (!quick) { missionEnd(won); achEnd(won, key || !!D && won && !results.priv); dailyPlayed(); }
+  if (!quick) { missionEnd(won); achEnd(won, key || !!D && won && !results.priv, !!D && !results.priv); dailyPlayed(); }
   funnelEnd();
   const [xp0, gold] = boostPay(...(results ? [results.xp, results.gold] : MR.team ? teamReward(lead) : rewardFor(place))), xp = xp0 + missionXpTake(), { ups, bonus, boostUp, bars, boxes } = grant(xp, gold); // doubled with a booster, plus the missions' XP
   if (!quick) eventEnd(xp0, won);
@@ -1076,7 +1103,7 @@ function giveGun(g) {
 function setupMode() {
   matchOver = false; respawnT = 0; lastTop = lastBoard = ''; killedBy = ''; youHelpers.clear(); killCam = null;
   MR = starterNext && !net.on ? STARTER : RULES[mode] || RULES.dm; MATCH_T = MR.t; YOU_RESPAWN = MR.you; JOIN_T = MR.join; starterNext = false;
-  BOT_COUNT = net.on || walkMap ? 0 : MR.players[MAP.size] - 1; // ?walk (input.js): nobody else
+  BOT_COUNT = net.on || walkMap || mode === 'range' ? 0 : MR.players[MAP.size] - 1; // ?walk (input.js) and the range: nobody else
   $('post').style.display = 'none'; document.body.classList.remove('results'); $('board').style.display = 'none'; $('banner').style.opacity = 0; hideKillerCard(); // clears "KILLED BY"
   $('feed').innerHTML = ''; $('top').innerHTML = ''; resetChat();
   $('chat').style.display = pvp() || net.coop ? '' : 'none';
@@ -1095,4 +1122,5 @@ function setupMode() {
   }
   musicMatch(mapId, pvp() ? 'dm' : mode); // bot matches use the deathmatch music
   tipStart(); missionMark(); achMark(); eventMark();
+  if (mode === 'range') rangeSetup();
 }

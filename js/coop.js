@@ -42,7 +42,7 @@ function coopCount(t) { // 3, 2, 1 before a wave
 function coopPhase(w, ph) {
   const was = zph, wasW = wave;
   wave = w; zph = ph;
-  if (ph === 1 && (was !== 1 || w !== wasW)) { countShown = 0; waveStartFx(); missionWave(wave); }
+  if (ph === 1 && (was !== 1 || w !== wasW)) { countShown = 0; waveStartFx(); missionWave(wave, true); }
   if (ph === 2 && was !== 2) coopCleared();
   if (ph === 0 && was === 2) coopShopShut();
   if (ph === 3 && was !== 3) { dead = true; deadT = 0; coopForget(); if (shopOpen) { shopOpen = false; showShop(false); } }

@@ -32,7 +32,7 @@ function claimDaily() {
   if (r.box) prof.box = { ...prof.box, [r.box]: (prof.box?.[r.box] | 0) + 1 };
   prof.coins += c; prof.earned = (prof.earned ?? 0) + c; prof.boosts = (prof.boosts | 0) + (r.b || 0); prof.keys = (prof.keys | 0) + (r.k || 0);
   if (s.list === WELCOME) { prof.welcome = s.day; prof.daily = { last: today, streak: 0, w: today }; if (s.day < 3) funnel('gift' + s.day); } else prof.daily = { last: today, streak: s.day };
-  saveProf(); showProf(); sfx(r.gun || r.boots ? 'levelUp' : 'buy');
+  achDaily(); saveProf(); showProf(); sfx(r.gun || r.boots ? 'levelUp' : 'buy');
   if (r.boots) dressHero();
 }
 let dailyTag = null;

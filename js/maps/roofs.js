@@ -51,10 +51,12 @@ function steps(x, z, ax, dir, y0, y1, n, side) { // foot at (x, z), climbing alo
   const [lx, lz] = P(.6 + run + .45); addSlab(lx, lz, 1.4, 1.4, y1 - .15, y1, metal); // landing
   const blen = (end - start) * Math.hypot(1, k), [bx, bz] = P(bm, -.76), r = box(ax === 'x' ? blen : .1, .28, ax === 'x' ? .1 : blen, metal); // the outer side board
   r.position.set(bx, top(bm) - half, bz); if (ax === 'x') r.rotation.z = dir * Math.atan2(y1 - y0, run); else r.rotation.x = -dir * Math.atan2(y1 - y0, run); add(r);
+  const along = (d, up) => { const [px, pz] = P(d, -.76); return [px, top(d) + up, pz]; };
+  tiltSolids(along(start, -half), along(end, -half), .1, .28, 'metal');
   const p0 = .6, p1 = end - .1, np = Math.max(1, Math.round((p1 - p0) / 1.5)), len = (p1 - p0) * Math.hypot(1, k) + .06, [mx, mz] = P((p0 + p1) / 2, -.76);
-  for (let j = 0; j <= np; j++) { const d = p0 + (p1 - p0) * j / np, [px, pz] = P(d, -.76), p = box(.06, .86, .06, dark); p.position.set(px, top(d) + .4, pz); add(p); } // posts from the board up to the rail
-  const rail = box(ax === 'x' ? len : .06, .06, ax === 'x' ? .06 : len, dark); rail.position.set(mx, top((p0 + p1) / 2) + .8, mz); rail.rotation.copy(r.rotation); add(rail); // from the first post to the last
-  if (y0 < .1) for (const f of [.45, .85]) { const d = Math.min(.6 + run * f, end - .1), [px, pz] = P(d, -.76), h = top(d) - 2 * half + .04, p = box(.12, h, .12, metal); p.position.set(px, h / 2, pz); add(p); } // legs up to the board
+  for (let j = 0; j <= np; j++) { const d = p0 + (p1 - p0) * j / np, [px, pz] = P(d, -.76), p = box(.06, .86, .06, dark); p.position.set(px, top(d) + .4, pz); add(p); solidBox(px, top(d) + .4, pz, .06, .86, .06, 'metal'); } // posts from the board up to the rail
+  const rail = box(ax === 'x' ? len : .06, .06, ax === 'x' ? .06 : len, dark); rail.position.set(mx, top((p0 + p1) / 2) + .8, mz); rail.rotation.copy(r.rotation); add(rail); tiltSolids(along(p0, .8), along(p1, .8), .06, .06, 'metal'); // from the first post to the last
+  if (y0 < .1) for (const f of [.45, .85]) { const d = Math.min(.6 + run * f, end - .1), [px, pz] = P(d, -.76), h = top(d) - 2 * half + .04, p = box(.12, h, .12, metal); p.position.set(px, h / 2, pz); add(p); solidBox(px, h / 2, pz, .12, h, .12, 'metal'); } // legs up to the board
   const [ex, ez] = P(.6 + run + .45, 1.5);
   GAPS.push([lx + side[0] * .9, lz + side[1] * .9]);
   return { foot: [...P(-.3), y0], land: [lx, lz, y1], entry: [ex, ez, y1] };
@@ -78,9 +80,9 @@ function bridge(x0, z0, y0, x1, z1, y1) {
     const w = deck ? 1.6 : .06, d = box(ax ? len : w, deck ? .12 : .06, ax ? w : len, deck ? plank : dark);
     d.position.set((x0 + x1) / 2 + (ax ? 0 : o), (y0 + y1) / 2 + (deck ? -.06 : .95), (z0 + z1) / 2 + (ax ? o : 0));
     if (ax) d.rotation.z = Math.atan2(y1 - y0, x1 - x0); else d.rotation.x = -Math.atan2(y1 - y0, z1 - z0);
-    add(d); if (deck) building.cover.push(d);
+    add(d); if (deck) building.cover.push(d); else tiltSolids([x0 + (ax ? 0 : o), y0 + .95, z0 + (ax ? o : 0)], [x1 + (ax ? 0 : o), y1 + .95, z1 + (ax ? o : 0)], .06, .06, 'metal');
   }
-  for (const [x, z, y] of [[x0, z0, y0], [x1, z1, y1]]) for (const o of [-.85, .85]) { const p = box(.08, 1, .08, dark); p.position.set(x + (ax ? 0 : o), y + .5, z + (ax ? o : 0)); add(p); }
+  for (const [x, z, y] of [[x0, z0, y0], [x1, z1, y1]]) for (const o of [-.85, .85]) { const p = box(.08, 1, .08, dark); p.position.set(x + (ax ? 0 : o), y + .5, z + (ax ? o : 0)); add(p); solidBox(x + (ax ? 0 : o), y + .5, z + (ax ? o : 0), .08, 1, .08, 'metal'); }
   GAPS.push([x0, z0], [x1, z1]);
 }
 bridge(-12, -4.5, 6, -12, 4.5, 4.5); CONNS.push([1, 4, [[-12, -6, 6], [-12, 6, 4.5]]]);
@@ -140,8 +142,8 @@ parapet(4.5, 4.5 + inset, 18, 4.5 + inset, 9); parapet(4.5, 19 - inset, 18, 19 -
   instanced(unit, dark, frames.map(f => [...f, 0xffffff]));
   instanced(unit, new THREE.MeshBasicMaterial({}), lit);
   instanced(unit, lam({}), curt);
-  instanced(unit, lam({ color: 0xc8c0b4 }), sills);
-  instanced(unit, acMat0, units);
+  instanced(unit, lam({ color: 0xc8c0b4 }), sills); boxSolids(sills, 'stone');
+  instanced(unit, acMat0, units); boxSolids(units, 'metal');
   instanced(unit, lam({ color: 0x4a3426 }), doors.map(d => [...d, 0xffffff]));
   const stripes = new Map(); // striped awnings, sloping down over the sidewalk
   for (const [ax, c, out, u, len, color] of awn) {
@@ -149,6 +151,8 @@ parapet(4.5, 4.5 + inset, 18, 4.5 + inset, 9); parapet(4.5, 19 - inset, 18, 19 -
     const m = tbox(ax === 'x' ? len : 1.2, .08, ax === 'x' ? 1.2 : len, stripes.get(color), 2); m.position.set(ax === 'x' ? u : c + out * .58, 2.75, ax === 'x' ? c + out * .58 : u);
     if (ax === 'x') m.rotation.x = out * .35; else m.rotation.z = -out * .35;
     add(m);
+    const hc = .6 * Math.cos(.35), hy = .6 * Math.sin(.35), at = (o, y) => ax === 'x' ? [u, y, c + out * o] : [c + out * o, y, u]; // its slope, from the wall down
+    tiltSolids(at(.58 - hc, 2.75 + hy), at(.58 + hc, 2.75 - hy), len, .08, 'grass', .12);
   }
 }
 // sidewalks along the streets
@@ -186,14 +190,14 @@ car(1.6, 9, 0, 0xc0392b); car(-1.6, -13, Math.PI, 0x2f6fb0); car(13, 1.6, Math.P
 const green = surf(lam({ color: 0x2f6a46 }), 'metal'), concrete = surf(plaster([176, 172, 166]), 'stone');
 for (const [x, z, ry] of [[-22, -17, 0], [21.8, -9.5, 0], [-6, 21.5, Math.PI / 2]]) {
   const r = Math.abs(ry) > .1; addBlock(x, z, r ? 1.9 : 1.2, r ? 1.2 : 1.9, 1.25, green);
-  const lid = box(r ? 2 : 1.3, .08, r ? 1.3 : 2, dark); lid.position.set(x, 1.29, z); lid.rotation.z = r ? 0 : .08; add(lid);
+  const lid = box(r ? 2 : 1.3, .08, r ? 1.3 : 2, dark); lid.position.set(x, 1.29, z); lid.rotation.z = r ? 0 : .08; add(lid); solidBox(x, 1.29, z, r ? 2 : 1.3, r ? .08 : .19, r ? 1.3 : 2, 'metal');
 }
 for (const [x, z, ax] of [[-1.2, -21, 1], [9.5, -1.5, 0], [-10, 1.8, 0], [1.4, 20.5, 1]]) addBlock(x, z, ax ? 2.4 : .7, ax ? .7 : 2.4, .85, concrete);
 const lampMat = new THREE.MeshBasicMaterial({ color: 0xffe2a0 });
 for (const [x, z, dx, dz] of [[-3.8, -3.8, 1, 0], [3.8, 3.8, -1, 0], [-3.8, 20, 1, 0], [21, -3.8, 0, 1]]) { // on the sidewalk, leaning over the road
   addSlab(x, z, .16, .16, 0, 4.4, dark, false);
-  const arm = box(dx ? .9 : .08, .08, dz ? .9 : .08, dark); arm.position.set(x + dx * .45, 4.35, z + dz * .45); add(arm);
-  const head = box(dx ? .4 : .3, .18, dz ? .4 : .3, lampMat); head.position.set(x + dx * .85, 4.25, z + dz * .85); add(head);
+  const arm = box(dx ? .9 : .08, .08, dz ? .9 : .08, dark); arm.position.set(x + dx * .45, 4.35, z + dz * .45); add(arm); solidBox(x + dx * .45, 4.35, z + dz * .45, dx ? .9 : .08, .08, dz ? .9 : .08, 'metal');
+  const head = box(dx ? .4 : .3, .18, dz ? .4 : .3, lampMat); head.position.set(x + dx * .85, 4.25, z + dz * .85); add(head); solidBox(x + dx * .85, 4.25, z + dz * .85, dx ? .4 : .3, .18, dz ? .4 : .3, 'metal');
 }
 addCrates(M.crates);
 
@@ -201,17 +205,17 @@ addCrates(M.crates);
 const acMat = acMat0;
 for (const [x, z, y, w, d, h] of [[-15, -16, 6, 1.6, 1.1, 1], [-8.5, -9, 6, 1.1, 1.6, 1], [17, -16.5, 3, 1.6, 1.1, 1], [-16, 13, 4.5, 1.6, 1.1, 1], [-8, 8.5, 4.5, 1.1, 1.6, 1], [8.5, 15.5, 9, 1.6, 1.2, 1.1], [14.5, -8.5, 7.5, 1.4, 1, .9]]) {
   addSlab(x, z, w, d, y, y + h, acMat);
-  const fan = box(Math.min(w, d) * .7, .04, Math.min(w, d) * .7, dark); fan.position.set(x, y + h + .02, z); add(fan);
+  const fan = box(Math.min(w, d) * .7, .04, Math.min(w, d) * .7, dark); fan.position.set(x, y + h + .02, z); add(fan); solidBox(x, y + h + .02, z, Math.min(w, d) * .7, .04, Math.min(w, d) * .7, 'metal');
 }
 // stair houses: a door box you can hide behind
 for (const [x, z, y, m] of [[-11, -16.5, 6, BLD[0].m], [11, 9, 9, BLD[5].m]]) {
   addSlab(x, z, 2.6, 2.2, y, y + 2.4, m, true, 2);
   addSlab(x, z, 2.9, 2.5, y + 2.4, y + 2.6, capMat);
-  const door = box(.9, 1.8, .06, lam({ color: 0x4a3426 })); door.position.set(x, y + .9, z + 1.13); add(door);
+  const door = box(.9, 1.8, .06, lam({ color: 0x4a3426 })); door.position.set(x, y + .9, z + 1.13); add(door); solidBox(x, y + .9, z + 1.13, .9, 1.8, .06, 'wood');
 }
 // skylights on the low south-west roof
 const glassTop = lam({ color: 0x9ec4d8, emissive: 0x1a2a34 });
-for (const [x, z] of [[-13, 8], [-10, 12.5]]) { addSlab(x, z, 2, 1.4, 4.5, 5.05, capMat); const g2 = box(1.7, .06, 1.1, glassTop); g2.position.set(x, 5.08, z); add(g2); }
+for (const [x, z] of [[-13, 8], [-10, 12.5]]) { addSlab(x, z, 2, 1.4, 4.5, 5.05, capMat); const g2 = box(1.7, .06, 1.1, glassTop); g2.position.set(x, 5.08, z); add(g2); } // the glass lies flat on its frame
 // the water tower on the tallest roof
 {
   const X = 13.5, Z = 14.5, Y = 9, LH = 2.8;
@@ -221,6 +225,7 @@ for (const [x, z] of [[-13, 8], [-10, 12.5]]) { addSlab(x, z, 2, 1.4, 4.5, 5.05,
   const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 2.4, 12), tankMat); tank.position.set(X, Y + LH + 1.4, Z); add(tank); building.cover.push(tank);
   building.solids.push({ mesh: null, minX: X - 1.35, maxX: X + 1.35, minZ: Z - 1.35, maxZ: Z + 1.35, bot: Y + LH + .2, top: Y + LH + 2.6, round: 1.35, surf: 'wood' });
   const lidM = new THREE.Mesh(new THREE.ConeGeometry(1.5, .8, 12), lam({ color: 0x5a3e2a })); lidM.position.set(X, Y + LH + 3, Z); add(lidM);
+  building.solids.push({ mesh: null, minX: X - 1.5, maxX: X + 1.5, minZ: Z - 1.5, maxZ: Z + 1.5, bot: Y + LH + 2.6, top: Y + LH + 3.4, round: 1.5, peak: { x: X, z: Z, rx: 1.5, rz: 1.5, edge: Y + LH + 2.6 }, surf: 'wood' }); // its pointed lid
 }
 // a billboard on the north-west roof, facing the crossroads
 {
@@ -232,11 +237,12 @@ for (const [x, z] of [[-13, 8], [-10, 12.5]]) { addSlab(x, z, 2, 1.4, 4.5, 5.05,
     g.fillStyle = '#2a1a14'; g.fillRect(12, 4, 2, 7); g.fillRect(12.5, 2, 1, 2); g.fillStyle = '#7ad0ff'; g.fillRect(12, 6, 2, 2);
   });
   art.wrapS = art.wrapT = THREE.ClampToEdgeWrapping;
-  const board = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.2, .15), [steel, steel, steel, steel, lam({ map: art }), steel]); board.position.set(X, Y + 2.9, Z - .3); add(board); building.cover.push(board);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.2, .15), [steel, steel, steel, steel, lam({ map: art }), steel]); board.position.set(X, Y + 2.9, Z - .3); add(board); building.cover.push(board); solidBox(X, Y + 2.9, Z - .3, 5.2, 2.2, .15, 'metal');
 }
 // antennas and a dish on the tower
-for (const [x, z, h] of [[18, -10.5, 3], [17.2, -10.8, 2]]) { const a = box(.08, h, .08, dark); a.position.set(x, 7.5 + h / 2, z); add(a); }
-{ const pole = box(.12, .7, .12, dark); pole.position.set(13.5, 7.85, -11); add(pole); const base = box(.5, .1, .5, dark); base.position.set(13.5, 7.55, -11); add(base); const dish = new THREE.Mesh(new THREE.CylinderGeometry(.6, .1, .25, 10), steel); dish.position.set(13.5, 8.3, -11.1); dish.rotation.x = -.9; add(dish); }
+for (const [x, z, h] of [[18.95, -5.15, 3], [18.35, -5.35, 2]]) { const a = box(.08, h, .08, dark); a.position.set(x, 7.5 + h / 2, z); add(a); solidBox(x, 7.5 + h / 2, z, .08, h, .08, 'metal'); } // in the corner, clear of the way up
+{ const pole = box(.12, .7, .12, dark); pole.position.set(13.5, 7.85, -11); add(pole); const base = box(.5, .1, .5, dark); base.position.set(13.5, 7.55, -11); add(base); const dish = new THREE.Mesh(new THREE.CylinderGeometry(.6, .1, .25, 10), steel); dish.position.set(13.5, 8.3, -11.1); dish.rotation.x = -.9; add(dish);
+  solidBox(13.5, 7.85, -11, .12, .7, .12, 'metal'); solidBox(13.5, 7.55, -11, .5, .1, .5, 'metal'); tiltSolids([13.5, 7.83, -11.47], [13.5, 8.77, -10.73], 1, .25, 'metal', .15); } // the dish leans back: a plate from its low edge to its high one
 
 // --- round the edge: a fence, a ring road, then city blocks ---
 {
@@ -318,11 +324,24 @@ const dome = (() => {
   m.renderOrder = -1; m.frustumCulled = false; m.onBeforeRender = (r, sc, cam) => m.matrixWorld.setPosition(cam.position); add(m); return m;
 })();
 const SUN_D = new THREE.Vector3(-1, .3, .12).normalize(); // low, down the west road
-const sunSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, color: 0xffd0a0, fog: false, depthWrite: false, depthTest: false, transparent: false, alphaTest: .5 }));
+{ // far off: the rest of the city, towers going hazy into the sunset, a few windows lit, lower toward the sun so it sets between them
+  const fr = seeded(271), F = M.env.fog, sunA = Math.atan2(SUN_D.z, SUN_D.x), lit = [];
+  for (const [R, k, lo, hi] of [[130, .72, 20, 50], [116, .5, 12, 38]]) {
+    const n = Math.round(R * 6.28 / 7);
+    skyline(R, n, (i, a) => {
+      if (fr() < .16) return [0, 0];
+      const d = Math.abs(Math.atan2(Math.sin(a - sunA), Math.cos(a - sunA))), t = (lo + (hi - lo) * fr() ** 1.6) * (d < .45 ? .5 : 1), w = .55 + fr() * .4, cols = Math.max(1, Math.floor(R * 6.28 / n * w / 1.9 - .3));
+      if (R < 120) for (let y = 3; y < t - 2; y += 3.2) for (let j = 0; j < cols; j++) { const x = (j - (cols - 1) / 2) * 1.9; if (fr() < .13) lit.push([.8, 1.1, .3, Math.cos(a) * (R - 6.1) - Math.sin(a) * x, y, Math.sin(a) * (R - 6.1) + Math.cos(a) * x, -a - Math.PI / 2]); }
+      return [-1, t, w];
+    }, farMat(0x4a3a58, F, k));
+  }
+  farOff(boxesMesh(lit, farMat(0xffd890, F, .3)));
+}
+const sunSpr = skyCube(sunFaces([255, 175, 58], [255, 192, 93], [255, 202, 134]), SUN_D.clone().negate().add(new THREE.Vector3(-.4, .5, 0)), { amb: .6, order: -.5 }); // a block
 const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, color: 0xffb080, fog: false, depthWrite: false, depthTest: false, transparent: false, blending: THREE.AdditiveBlending }));
-[[sunSpr, 6, -.5], [sunGlow, 26, -.6]].forEach(([o, k, ro]) => {
-  o.scale.setScalar(k); o.renderOrder = ro; o.frustumCulled = false; add(o);
-  o.onBeforeRender = (r, sc, cam) => { o.position.copy(cam.position).addScaledVector(SUN_D, 52); o.updateMatrixWorld(); };
+[[sunSpr, 4, -.5], [sunGlow, 26, -.6]].forEach(([o, k, ro]) => {
+  const own = o.onBeforeRender; o.scale.setScalar(k); o.renderOrder = ro; o.frustumCulled = false; add(o);
+  o.onBeforeRender = (r, sc, cam, ...a) => { o.position.copy(cam.position).addScaledVector(SUN_D, 52); o.updateMatrixWorld(); own.call(o, r, sc, cam, ...a); };
 });
 
 // --- bots: which roof you're on, and the way between them ---

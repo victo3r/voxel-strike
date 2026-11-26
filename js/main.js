@@ -1,7 +1,7 @@
 let stepT = 0, stepAlt = false; // footsteps
 let jumpWas = false; // double jump needs a fresh press
 const RL_C = 2 * Math.PI * 34; // reload ring length
-const runMul = w => (mobMul(w) + youFx().spd + perk.spd * .1) * slowMul(P); // run speed: gun, boots and perks, slowed by shocks
+const runMul = w => (mobMul(w) + youFx().spd + perk.spd * .1) * slowMul(P) * (1 - WIND_SLOW * windK); // run speed: gun, boots and perks, slowed by shocks and a spinning Juggernaut
 
 // scope and holo sight overlay
 const RPX = () => Math.max(2, Math.round(scr.h / 240));
@@ -139,6 +139,7 @@ function update(dt) {
 
   // keep the real fire rate at any frame rate
   cd -= dt; autoTick(dt, w);
+  if (w.windup) { windK = held('shoot') && reloading <= 0 && gunShown === cur && !dead && respawnT <= 0 ? Math.min(1, windK + dt / w.windup) : Math.max(0, windK - dt * 1.4 / w.windup); if (gunSpin) gunSpinV = Math.max(gunSpinV, 30 * windK); } else windK = 0;
   if (w.charge) chargeTick(dt, w); // the Aurora Rail fires when you let go
   else if (myBurst.bn > 0 || (autoFire(w) || keys['T:shoot'] || autoShot) && held('shoot')) for (let n = 0; n < 3 && cd <= 0; n++) { // a held fire button keeps shooting any gun, and a burst finishes
     const c0 = cd; shoot(); if (cd === c0) break;
@@ -146,7 +147,7 @@ function update(dt) {
   }
   aiming = opts.toggleAim || TOUCH ? aimOn : held('aim');
   if (reloading > 0) { reloading -= dt; if (reloading <= 0) { const take = Math.min(w.mag - ammo[cur], reserve[cur]); ammo[cur] += take; reserve[cur] -= take; reloadSnd = null; } }
-  kick = Math.max(0, kick - dt * kickFall(w)); // gun settles after a shot
+  kick = Math.max(0, kick - dt * kickFall(w)); boomCatchK = Math.max(0, boomCatchK - dt / CATCH_T); // gun settles after a shot
   if (inspT >= 0) { const t0 = inspT; inspT += dt; if (!w.melee || kick > 0 || swapOff > 0 || respawnT > 0 || gunShown !== cur || inspT >= inspLen(w)) inspT = -1; else inspSnd(w, t0, inspT); }
   wandOn -= dt; wandK = Math.max(0, Math.min(1, wandK + dt * (wandOn > 0 && gunShown === cur ? 14 : -4)));
   tickCross(dt, BASE[cur]); lobAim(w);
@@ -154,10 +155,11 @@ function update(dt) {
   if ((flashT -= dt) <= 0) { flashMesh.visible = false; flashLight.intensity = 0; }
   if (gunPulse) pulseShow(gunPulse, flashT > 0);
   if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / reloadFull < .6); // flare leaves the muzzle when fired
+  if (gunG && WEAPONS[gunShown]?.boomer) gunG.visible = !boomerOut(null); // your Boomerang is out
   if (gunRound) { // rocket leaves the tube when fired
     const k = reloading > 0 ? reloading / reloadFull : 0;
     gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
-    gunRound.position.z = reloading > 0 ? k / .4 * 10 * GPX : 0;
+    if (reloading > 0 || !gunCharges?.bow) gunRound.position.z = reloading > 0 ? k / .4 * 10 * GPX : 0; // the Longbow's arrow: its string says
   }
   if (gunRounds && gunShown === cur) roundsShow(gunRounds, ammo[cur], reloading > 0 ? 1 - reloading / reloadFull : -1);
   const hold = holdOf(w);
@@ -179,7 +181,9 @@ function update(dt) {
   const bob = (mx || mz) && P.onGround ? Math.sin(performance.now() * .012) * .015 * (1 - adsT * .8) : 0;
   const sw = swapTick(dt); // first, so a gun built this frame gets its own pose
   const vw = WEAPONS[gunShown] ?? w, vhold = holdOf(vw); // pose the gun on screen: the old one while it lowers
-  if (vw.melee) { // swords stand up, lower in the hand and out to the right
+  vm.scale.setScalar(1); // only the bow's shrinks
+  if (vhold === 'pole') { vm.rotation.set(0, 0, 0); vm.position.set(POLE_FP.vm[0], POLE_FP.vm[1] + bob, POLE_FP.vm[2]); } // the scythe: its own turn is in its hand (POLE_FP)
+  else if (vw.melee) { // swords stand up, lower in the hand and out to the right
     const up = meleeUp(vw), lo = vw.tilt ? .12 : 0, out = vw.tilt ? .23 : 0;
     vm.rotation.set(up, 0, 0); vm.position.set(.3 + lo * .3 + out, -.22 - lo + bob, -.5 - lo);
   } else if (vhold === 'heavy') { // low at the hip
@@ -187,6 +191,10 @@ function update(dt) {
     vm.rotation.set(.04, 0, 0);
   } else if (vhold === 'shoulder') { // on the shoulder
     vm.position.set(.42 - adsT * .12, -.17 + adsT * .04 + bob, -.62);
+    vm.rotation.set(0, 0, 0);
+  } else if (vhold === 'bow') { // upright right of the middle; aimed, it comes in a little and the zoom leaves it its size
+    const k = Math.tan(THREE.MathUtils.degToRad(fovBase / 2)) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    vm.position.set((BOW_VM[0] - adsT * .04) / k, (BOW_VM[1] + adsT * .03 + bob) / k, BOW_VM[2]); vm.scale.set(1 / k, 1 / k, 1); bowFpQ.setFromAxisAngle(UP_V, BOW_YAW[0] + (BOW_YAW[1] - BOW_YAW[0]) * adsT);
     vm.rotation.set(0, 0, 0);
   } else if (vhold === 'orb') { // held out low on the right; aimed, it comes in toward the middle under the crosshair
     vm.position.set(ORB_VM[0] - adsT * .13, ORB_VM[1] + adsT * .05 + bob, ORB_VM[2]); // up a little, so your hands stay in the narrower view
@@ -204,12 +212,12 @@ function update(dt) {
   }
   // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
   const rk = reloading > 0 && gunShown === cur ? 1 - reloading / reloadFull : -1;
-  fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, sv: swingV, rl: rk, level: wandK, two: !!gunArmL, ads: adsT, insp: vw === w ? inspT : -1 }), vw, adsT);
+  fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, sv: swingV, rl: rk, level: wandK, two: !!gunArmL, ads: adsT, insp: vw === w ? inspT : -1, draw: vw === w && w.charge ? chargeT / w.charge : 0, ct: vw.boomer ? boomCatchK : 0 }), vw, adsT);
   bladeTrail(gunG, vw, vw.melee && kick > 0 ? 1 - kick : -1, camera); // a swing's trail stays in your view
   reloadSwap(vmRl, w.id, rk, gunMag, scene); // mag swap
   if (rk >= 0 && w.id === 'eradicator' && reloading / reloadFull < .12) gunSpinV = Math.max(gunSpinV, 16);
   // weapon swap
-  if (sw > 0) { const e = sw * sw * (3 - 2 * sw); vm.position.y -= e * .5; vm.rotation.x -= e * .9; }
+  if (sw > 0) { const e = sw * sw * (3 - 2 * sw); if (vhold === 'pole') poleDown(e); else { vm.position.y -= e * .5; vm.rotation.x -= e * .9; } }
   // reload ring
   const rl = $('rl');
   const chg = w.charge && chargeT > 0 ? chargeT / w.charge : 0; // the Aurora Rail's charge fills the same ring
@@ -235,6 +243,20 @@ function update(dt) {
     }
   }
 
+  worldTick(dt, down);
+  const boss = zombies.find(z => z.boss && !z.dead);
+  $('bossbar').style.display = boss ? 'block' : 'none';
+  if (boss) $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
+
+  vitBar('hp', P.hp, P.max, 'heart'); vitBar('arm', P.armor, P.maxArmor, 'shield');
+  $('arm').classList.toggle('grow', (P.growA = (P.growA || 0) - dt) > 0); $('hp').classList.toggle('grow', (P.growH = (P.growH || 0) - dt) > 0);
+  const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
+  setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : w.pool ? ammo[cur] : ammo[cur] + ' / ' + spare}`);
+  if (!pvp()) setHTML($('top'), net.coop && coopTop() || zTop());
+}
+
+// everything in the world but you: zombies, bots and other players, the map, pickups, shots and effects (down: you can't pick things up)
+function worldTick(dt, down) {
   zTs = zTargets();
   for (let i = zombies.length - 1; i >= 0; i--) {
     const z = zombies[i];
@@ -242,10 +264,11 @@ function update(dt) {
     if (z.dead) {
       z.dead += dt;
       if (z.angel) angelTick(z, z.dead); // bots float up
+      else if (z.kfx) kfxTick(z, z.dead); // or the kill effect they got
       else z.g.rotation.x = -Math.min(z.dead * 4, Math.PI / 2); // zombies fall over
       if (z.drowned) { const p = z.g.position; p.y = Math.max(MAP.floor?.(p.x, p.z) ?? 0, p.y - (MAP.sink ?? 1.8) * dt); }
       if (z.leap || z.rock) { const p = z.g.position; p.y = Math.max(groundAt(p.x, p.z, z.r, p.y), p.y - 12 * dt); if (z.rock) { scene.remove(z.rock); z.rock = null; } } // shot down mid-jump
-      if (z.dead > 1.5) { if (z.angel) angelGone(z); scene.remove(z.g); zombies.splice(i, 1); }
+      if (z.dead > 1.5) { if (z.angel) angelGone(z); if (z.kfx) kfxGone(z); scene.remove(z.g); z.free?.(); zombies.splice(i, 1); }
       continue;
     }
     if (z.remote) { net.applyRemote(z, dt); continue; } // online players move from server updates
@@ -261,6 +284,7 @@ function update(dt) {
       if ((z.burnT = (z.burnT ?? 0) - dt) <= 0) { z.burnT = .25; zFrom = z.burnPid | 0; hurtZombie(z, z.burnDmg, z.g.position.clone().setY(z.g.position.y + z.scale * 1.2), false, true, z.burnBy ?? null); zFrom = 0; } // co-op: a teammate's fire pays them
       if (z.dead) continue;
     }
+    if (z.dummy) continue; // the range runs its dummies
     if (z.type === 'bot') { updateBot(z, dt); continue; }
     ZT = net.coop && zTarget(z) || YOU_Z; // co-op: the nearest of you
     if (z.rise > 0) { riseTick(z, dt); continue; } // still climbing out of a grave
@@ -398,6 +422,7 @@ function update(dt) {
       scene.remove(r.m); rockets.splice(i, 1);
       if (r.ghost) continue; // the server places other players' blasts
       const at = onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone();
+      if (r.meteor) { net.boom(r.id, at, r.by); callMeteor(at, r.by, r.dmg, r.g, r.id, false, r.dir); continue; } // the beacon: the meteor comes later
       const fn = r.cluster && (hit?.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : r.dir.clone().negate()).toArray().map(v => Math.round(v * 100) / 100), seed = Math.random() * 65536 | 0; // a cluster shell's bomblets fly out from what it hit
       net.boom(r.id, at, r.by, fn && { s: seed, n: fn });
       // rocket self damage
@@ -408,10 +433,10 @@ function update(dt) {
     r.m.position.addScaledVector(r.dir, step);
     if (r.gust) r.m.rotateZ(dt * 18);
     if (r.lob) r.m.rotateX(dt * 6); else if (r.seek) r.m.lookAt(tmp.copy(r.m.position).add(r.dir));
-    if ((r.smoke -= dt) <= 0) { r.smoke = .03; if (r.cluster) fxBit(CLUSTER_BITS[Math.random() * CLUSTER_N | 0], scene, r.m.position, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5), .4, 3); else burst(r.m.position, r.gust ? 0xe8f7ff : r.lob ? 0x6a6a6a : r.seek ? 0xd8dde4 : 0x888888, 1); } // a firework sparkles
+    if ((r.smoke -= dt) <= 0) { r.smoke = .03; if (r.cluster) fxBit(CLUSTER_BITS[Math.random() * CLUSTER_N | 0], scene, r.m.position, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5), .4, 3); else burst(r.m.position, r.gust ? 0xe8f7ff : r.lob ? 0x6a6a6a : r.seek ? 0xd8dde4 : r.meteor ? 0xff8a3a : 0x888888, 1); } // a firework sparkles
   }
 
-  updateFlares(dt); updateGrenades(dt); mythTick(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt); patchTick(dt); bombletTick(dt);
+  updateFlares(dt); updateGrenades(dt); mythTick(dt); updateBoomers(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt); patchTick(dt); bombletTick(dt); meteorTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;
@@ -420,21 +445,11 @@ function update(dt) {
     if (f.life <= 0) { scene.remove(f.m); flames.splice(i, 1); }
   }
 
-  const boss = zombies.find(z => z.boss && !z.dead);
-  $('bossbar').style.display = boss ? 'block' : 'none';
-  if (boss) $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
-
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.life -= dt; p.v.y -= 15 * dt; p.p.addScaledVector(p.v, dt);
     if (p.life <= 0 || p.p.y < 0) { parts[i] = parts[parts.length - 1]; parts.pop(); }
   }
   partsDraw();
-
-  vitBar('hp', P.hp, P.max, 'heart'); vitBar('arm', P.armor, P.maxArmor, 'shield');
-  $('arm').classList.toggle('grow', (P.growA = (P.growA || 0) - dt) > 0); $('hp').classList.toggle('grow', (P.growH = (P.growH || 0) - dt) > 0);
-  const spare = reserve[cur] === Infinity ? ico('inf') : reserve[cur];
-  setHTML($('ammo'), `${w.name} <span class="st">${stars(cur)}</span><br>${w.melee ? 'MELEE' : reloading > 0 ? 'RELOADING' : !ammo[cur] && !reserve[cur] ? 'NO AMMO' : w.pool ? ammo[cur] : ammo[cur] + ' / ' + spare}`);
-  if (!pvp()) setHTML($('top'), net.coop && coopTop() || zTop());
 }
 
 const lanA = { x: 0, z: 0 }, lanV = { x: 0, z: 0 }; // the Void Lantern's swing
@@ -484,8 +499,8 @@ function autoGfx(raw, playing) {
   fpsTick(raw);
   drownTick(dt); musicTick();
   dropTick(dt); // dropped mags
-  starTick(dt); boltTick(dt); secretTick(dt); SHINE_T.value = performance.now() / 1000;
-  if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); trailTick(dt); renderer.render(lobbyScene, lobbyCam); bootDone(); return; }
+  starTick(dt); boltTick(dt); kfxFrame(dt); secretTick(dt); SHINE_T.value = performance.now() / 1000;
+  if (inLobby) { $('rl').style.display = 'none'; cgPlay(false); soundTick(dt, false); updateLobby(dt); trailTick(dt); lobbyDraw(dt); bootDone(); return; }
   bootDone();
   // zombie waves pause in the menu, matches and co-op don't
   const isLive = () => !dead && !matchOver && (net.coop || !shopOpen && (pvp() || locked));
@@ -502,7 +517,7 @@ function autoGfx(raw, playing) {
   const lagged = zombies.filter(z => z.g.position.lag), realY = lagged.map(z => z.g.position.y);
   for (const z of lagged) z.g.position.y -= z.g.position.lag;
   trailTick(dt); // where the blades are drawn
-  renderer.render(scene, camera);
+  shadowTick(dt, camera); renderer.render(scene, camera);
   outlineRender(camera); // red enemy outline
   lagged.forEach((z, k) => z.g.position.y = realY[k]);
 })();

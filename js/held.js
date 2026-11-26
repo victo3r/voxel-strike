@@ -1,21 +1,26 @@
 // held weapons: one set of moves for every view (first person in weapons.js, bots and other players in deathmatch.js, the lobby)
-const KICK = { shoulder: [.2, .1], heavy: [.1, .06], orb: [.1, .06], all: [.25, .08] }; // muzzle climb, slide back
+const KICK = { shoulder: [.2, .1], heavy: [.1, .06], orb: [.1, .06], bow: [.06, .03], all: [.25, .08] }; // muzzle climb, slide back
 const SWING = { arm: .65, lift: .35, wrist: .45, sweep: .35, push: .1 }; // arm and hand share a swing; the wind-up barely lifts the arm, so it stays out of your view
-const kickFall = w => (w.melee ? 1 / swingT(w) : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1);
+const THROW_T = .4, CATCH_T = .3; // the Boomerang's throw and catch
+const kickFall = w => (w.melee ? 1 / swingT(w) : w.boomer ? 1 / THROW_T : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1);
 const RL_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz'];
 const kickOf = w => w.beam ? 0 : w.flame ? .3 : 1; // a beam can't kick: its far end would jump
-const heldIdle = a => !(a.sw || a.push || a.wx || a.wy || a.wz || a.left || a.az || a.level || a.fb || a.fh || a.toss || a.tossR || RL_KEYS.some(c => a[c]));
+const heldIdle = a => !(a.sw || a.push || a.tw || a.wx || a.wy || a.wz || a.left || a.az || a.level || a.fb || a.fh || a.toss || a.tossR || a.dr || RL_KEYS.some(c => a[c]));
 // the middle of a palm on the gun, in the gun's own frame
 function palmAt(h, left) {
+  if (!left && h.hand) return new THREE.Vector3().fromArray(h.hand).multiplyScalar(BOT_U); // a bow's drawing hand
   const S = left ? SH_L : SH_R, d = new THREE.Vector3().fromArray(left ? h.dL : h.dR), [n] = armAxes(d, left);
   return new THREE.Vector3(...S).addScaledVector(d, PALM_A).addScaledVector(n, ARM_HW + FIST_GAP + 1).sub(new THREE.Vector3(...h.T)).applyQuaternion(new THREE.Quaternion().fromArray(h.q).invert()).multiplyScalar(BOT_U);
 }
 // a weapon's moves at this moment: the arms swing at the shoulders, it turns in the hand, a reload moves it and the left hand
 function heldAnim(w, st) {
-  const o = { sw: 0, push: 0, wx: 0, wy: 0, wz: 0, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, mx: 0, my: 0, mz: 0, left: 0, az: 0, level: st.level || 0, fb: 0, fh: 0, toss: 0, tossR: 0 };
+  const o = { sw: 0, push: 0, tw: 0, wx: 0, wy: 0, wz: 0, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, mx: 0, my: 0, mz: 0, left: 0, az: 0, level: st.level || 0, fb: 0, fh: 0, toss: 0, tossR: 0, dr: w.bow && w.charge ? Math.min(1, st.draw || 0) * BOW_PULL * GPX * (GUN_SCALE[w.id] || 1) : 0 }; // dr: how far a drawing hand has come back
   if (w.melee) {
-    if (st.swing >= 0) swingPose(st.swing, w.swings ? st.sv | 0 : 0, o);
+    if (st.swing >= 0) w.sweep ? sweepPose(st.swing, st.sv | 0, o) : swingPose(st.swing, w.swings ? st.sv | 0 : 0, o);
     else if (st.insp >= 0) inspectPose(w, st.insp, o);
+  } else if (w.boomer) {
+    if (st.kick > 0) throwPose(1 - st.kick, o);
+    if (st.ct > 0) catchPose(st.ct, o);
   } else if (st.kick > 0) {
     const [up, back] = KICK[w.hold] || KICK.all, k = st.kick * (heavyKick(w) ? HEAVY.lift : 1);
     o.wx = k * up * (1 - (st.ads || 0) * .85); o.z = k * back; // less muzzle climb while aiming
@@ -33,6 +38,16 @@ function swingPose(t, v, o) {
   else if (v === 3) { o.sw = SWING.arm * (s > 0 ? .9 * s : .7 * s); o.wx = -SWING.wrist * 1.5 * s; o.wy = -.1 * s; o.wz = Math.PI * 2 * inspK(t, .04, .3) + .45 * c; o.push = SWING.push * c; }
   else { o.sw = SWING.arm * lift; o.wx = -SWING.wrist * s; o.wy = SWING.sweep * s; o.push = SWING.push * c; }
 }
+// the scythe's sweep in both hands (t 0 to 1), its chest turning (tw) with it: cocked back to the right, one wide sweep across to the left with its edge leading, then back;
+// v 0 comes down from high, v 1 rises from low to level, so no two running are alike
+function sweepPose(t, v, o) {
+  const a = inspK(t, 0, .25), b = inspK(t, .25, .6), k = 1 - inspK(t, .62, 1), [from, mid, to] = v ? [.45, .1, .1] : [-.3, .25, .35]; // v 1 from low up to level: higher, your arms came up over your view
+  o.tw = (-.75 * a + 1.6 * b) * k; o.sw = (from * a * (1 - b) + mid * Math.sin(Math.PI * b) + to * b) * k;
+  o.wy = (.12 * a - .3 * b) * k; o.push = .08 * Math.sin(Math.PI * b) * k;
+}
+// the Boomerang's throw (t 0 to 1): let go at once, high and out in front, the arm follows through down, then comes back; its catch (c 1 to 0): the hand gives with it
+function throwPose(t, o) { const a = inspK(t, 0, .3), k = 1 - inspK(t, .3, 1), sw = (.55 * a - .2) * k; o.sw = sw; o.push = (.22 - .1 * a) * k; o.wx = -.9 * sw; o.wy = .1 * k; }
+function catchPose(c, o) { const u = 1 - c, e = u < .25 ? inspK(u, 0, .25) : 1 - inspK(u, .25, 1); o.z += .1 * e; o.wx += .4 * e; }
 const nextSwing = (v, n) => n > 1 ? ((v | 0) + 1 + Math.random() * (n - 1) | 0) % n : 0; // never the same twice running
 const swingRate = (w, v) => w.swings ? [1, 1.07, .93, .97][v | 0] : 1; // each swing sounds a little different
 // melee inspect (the aim key): turned to look at, then played with; a balisong flips shut and open (fb: the blade on its pin, fh: the bite handle on the tang)
@@ -40,6 +55,7 @@ const inspLen = w => w.tricks ? 3.8 : w.flip ? 2.4 : 1.9;
 const inspK = (t, a, b) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); }; // 0 to 1 between a and b
 function inspectPose(w, t, o) {
   const L = inspLen(w), up = inspK(t, 0, .3) * (1 - inspK(t, L - .35, L)), TAU = Math.PI * 2;
+  if (w.hold === 'pole') { o.sw -= .3 * up; o.push += .06 * up; o.tw += (.45 * inspK(t, 0, .3) - .8 * inspK(t, .8, 1.2)) * (1 - inspK(t, L - .35, L)); return; } // both hands on it: up to show its blade, then turned across the other way
   o.wy += 1.2 * up; o.wx -= .15 * up; o.x -= .1 * up; o.y += .07 * up; o.z -= .04 * up; // up and across in front of you, its flat your way
   if (w.tricks) { // the balisong's flips, shut again and tossed end over end, caught, thrown open, then twirled twice
     o.fb = Math.PI * (inspK(t, .3, .68) - inspK(t, 1.12, 1.5) + inspK(t, 1.55, 1.8) - inspK(t, 2.78, 2.98));
@@ -52,9 +68,9 @@ function inspectPose(w, t, o) {
     o.wz += TAU * inspK(t, 1.6, 1.95); // and a twirl
   } else o.wz += .9 * inspK(t, .3, .7) - 1.8 * inspK(t, .8, 1.2) + (.9 + TAU) * inspK(t, 1.3, 1.6); // one side, the other, a twirl
 }
-const INSPECT_SND = { flip: [[.3, 'flipSwish'], [.7, 'flipShut'], [.87, 'flipSwish'], [1.12, 'flipSwish'], [1.47, 'flipShut'], [1.6, 'flipSwish']], any: [[1.3, 'flipSwish']],
+const INSPECT_SND = { pole: [[.85, 'flipSwish']], flip: [[.3, 'flipSwish'], [.7, 'flipShut'], [.87, 'flipSwish'], [1.12, 'flipSwish'], [1.47, 'flipShut'], [1.6, 'flipSwish']], any: [[1.3, 'flipSwish']],
   tricks: [[.3, 'flipSwish'], [.7, 'flipShut'], [.87, 'flipSwish'], [1.12, 'flipSwish'], [1.47, 'flipShut'], [1.55, 'flipSwish'], [1.82, 'flipShut'], [1.95, 'flipToss'], [2.63, 'flipCatch'], [2.72, 'flipSwish'], [2.96, 'flipShut'], [3.04, 'flipSwish'], [3.24, 'flipSwish']] };
-function inspSnd(w, t0, t1, at, v = .6) { for (const [t, n] of INSPECT_SND[w.tricks ? 'tricks' : w.flip ? 'flip' : 'any']) if (t > t0 && t <= t1) sfx(n, at ? { at, far: 16, v: .8 } : { v }); } // the cues it passed this frame
+function inspSnd(w, t0, t1, at, v = .6) { for (const [t, n] of INSPECT_SND[w.tricks ? 'tricks' : w.flip ? 'flip' : w.hold === 'pole' ? 'pole' : 'any']) if (t > t0 && t <= t1) sfx(n, at ? { at, far: 16, v: .8 } : { v }); } // the cues it passed this frame
 const flipShow = (f, a) => { if (f) { f[0].rotation.x = a ? a.fb : 0; if (f[1]) f[1].rotation.x = a ? a.fh : 0; } };
 // a tossed blade leaves the hand: up, end over end about its middle (`toss`: where that is, model pixels [y, z]); each view calls this after placing the hands so they stay put
 const TOSS_UP = .2, _tsQ = new THREE.Quaternion(), _tsC = new THREE.Vector3(), _tsV = new THREE.Vector3(), _tsX = new THREE.Vector3(1, 0, 0);
@@ -71,7 +87,7 @@ const CLR_DT = .05, CLR_GAP = .35, CLR_FAR = 6, CLR_FRONT = .8, CLR_DIRS = [[0, 
 const clrCache = {}, _clQ = new THREE.Quaternion(), _clP = new THREE.Vector3(), _clV = new THREE.Vector3(), _clR = new THREE.Quaternion(), _clH = new THREE.Quaternion(), _clX = new THREE.Vector3(1, 0, 0);
 function bladeClear(i) {
   if (i in clrCache) return clrCache[i];
-  const w = BASE[i]; if (!w.melee) return clrCache[i] = null;
+  const w = BASE[i]; if (!w.melee || w.hold === 'pole') return clrCache[i] = null; // a blade in both hands stays in them
   const h = holdFor(i), u = BOT_U, q = new THREE.Quaternion().fromArray(h.q), T = new THREE.Vector3().fromArray(h.T), S = new THREE.Vector3(...SH_R), d0 = new THREE.Vector3().fromArray(h.dR);
   const hP = palmAt(h, false), px = gunPx(i), { m: mdl, main, subs } = gunPieces(i, 0), fl = mdl.flips || [];
   const cellsOf = (list, at) => { // a part's outer pixels, in the blade's frame

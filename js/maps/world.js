@@ -59,6 +59,106 @@ function addSlab(x, z, w, d, bot, top, m, cover = true, k = 1) {
 const addSolid = (x, z, w, d, top, surf) => { const s = { mesh: null, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top, surf }; building.solids.push(s); return s; };
 // invisible wall, bullets go through
 const addWall = (x, z, w, d) => addSolid(x, z, w, d, 99);
+// a hitbox exactly round a box drawn at (x, y, z)
+function solidBox(x, y, z, w, h, d, surf) { const s = addSolid(x, z, w, d, y + h / 2, surf); s.bot = y - h / 2; return s; }
+// hitboxes for boxes as instanced() takes them; only right-angle turns, or the box would poke out of its hitbox
+function boxSolids(list, surf) {
+  for (const [x, y, z, sx, sy, sz, ry = 0] of list) {
+    const q = Math.round(ry / (Math.PI / 2)); if (Math.abs(ry - q * Math.PI / 2) > 1e-3) console.warn(`a box at ${x.toFixed(1)}, ${z.toFixed(1)} is turned off the grid`);
+    solidBox(x, y, z, q % 2 ? sz : sx, sy, q % 2 ? sx : sz, surf);
+  }
+}
+// a sloping board or rope from a to b ([x, y, z], running along x or z), w across and h thick: short boxes stepping along it
+function tiltSolids(a, b, w, h, surf, step = .25) {
+  const dx = b[0] - a[0], dz = b[2] - a[2], dy = b[1] - a[1], L = Math.hypot(dx, dz), n = Math.max(1, Math.ceil(L / step)), hv = h * Math.hypot(L, dy) / L, alongX = Math.abs(dx) > Math.abs(dz);
+  for (let i = 0; i < n; i++) {
+    const y0 = a[1] + dy * i / n, y1 = a[1] + dy * (i + 1) / n, s = addSolid(a[0] + dx * (i + .5) / n, a[2] + dz * (i + .5) / n, alongX ? L / n : w, alongX ? w : L / n, Math.max(y0, y1) + hv / 2, surf);
+    s.bot = Math.min(y0, y1) - hv / 2;
+  }
+}
+// a sloping roof th thick, its top from y0 at a up to y1 at b (along ax, across c0..c1): strips with flat bottoms, none hanging below it
+function slopeSolids(ax, a, b, y0, y1, c0, c1, th, surf) {
+  const n = Math.max(1, Math.ceil(2 * Math.abs(y1 - y0) / th)), k = (y1 - y0) / (b - a), out = [];
+  for (let i = 0; i < n; i++) {
+    const p = a + (b - a) * i / n, q = a + (b - a) * (i + 1) / n, up = y0 + (y1 - y0) * (i + 1) / n >= y0 + (y1 - y0) * i / n, hp = up ? q : p, top = y0 + k * (hp - a);
+    const [l, r] = p < q ? [p, q] : [q, p], s = { mesh: null, minX: ax === 'x' ? l : c0, maxX: ax === 'x' ? r : c1, minZ: ax === 'x' ? c0 : l, maxZ: ax === 'x' ? c1 : r, bot: top - th, top, ramp: k ? { ax, a: hp - th / k, b: hp } : undefined, surf };
+    building.solids.push(s); out.push(s);
+  }
+  return out;
+}
+// a mesh's hitboxes: one exact box when it's square to the world, else slices along it
+const _hbV = new THREE.Vector3();
+function meshSolids(o, surf = [o.material].flat()[0]?.userData?.surf, step = .25) {
+  const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox();
+  o.updateWorldMatrix(true, false);
+  const M = o.matrixWorld, e = M.elements, lo = g.boundingBox.min.toArray(), hi = g.boundingBox.max.toArray(), out = [];
+  const scl = i => Math.hypot(e[i * 4], e[i * 4 + 1], e[i * 4 + 2]), len = [0, 1, 2].map(i => (hi[i] - lo[i]) * scl(i));
+  const slant = [0, 1, 2].map(i => 1 - Math.max(...[0, 1, 2].map(j => Math.abs(e[i * 4 + j]))) / scl(i)), score = len.map((l, i) => slant[i] > 1e-3 ? l : 0); // cut along the longest side that runs at a slant
+  const k = score.indexOf(Math.max(...score)), n = score[k] ? Math.min(60, Math.max(1, Math.ceil(len[k] / step))) : 1;
+  for (let i = 0; i < n; i++) {
+    const a = [Infinity, Infinity, Infinity], b = [-Infinity, -Infinity, -Infinity];
+    for (let c = 0; c < 8; c++) {
+      const p = [0, 1, 2].map(j => c >> j & 1 ? hi[j] : lo[j]);
+      p[k] = lo[k] + (hi[k] - lo[k]) * (i + (c >> k & 1)) / n;
+      _hbV.fromArray(p).applyMatrix4(M).toArray(p);
+      for (let j = 0; j < 3; j++) { a[j] = Math.min(a[j], p[j]); b[j] = Math.max(b[j], p[j]); }
+    }
+    const s = addSolid((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, b[0] - a[0], b[2] - a[2], b[1], surf); s.bot = a[1]; out.push(s);
+  }
+  return out;
+}
+// hitboxes for the meshes in a list, or added since `from` (building.root's child count then), that have none yet; thin ropes stay open
+function propSolids(from, skip = () => false) {
+  const had = new Set(building.solids.map(s => s.mesh)), still = m => { for (let q = m; q; q = q.parent) if (q.userData.live || detailObjs.includes(q)) return false; return true; }; // moving bits and what low graphics hides stay open
+  const bb = new THREE.Box3(), inside = m => { m.updateWorldMatrix(true, false); const { min: a, max: b } = bb.setFromObject(m); return building.solids.some(s => !s.ramp && !s.peak && !s.round && s.minX <= a.x + .03 && s.maxX >= b.x - .03 && s.minZ <= a.z + .03 && s.maxZ >= b.z - .03 && (s.bot || 0) <= a.y + .03 && s.top >= b.y - .03); }; // already inside a hitbox of its own
+  for (const o of Array.isArray(from) ? from : building.root.children.slice(from)) o.traverse(m => {
+    const p = m.geometry?.parameters, rope = m.geometry?.type === 'BoxGeometry' && [p.width, p.height, p.depth].sort((a, b) => a - b)[1] < .045;
+    if (m.isMesh && !m.isInstancedMesh && !had.has(m) && !rope && !skip(m) && still(m) && !inside(m)) meshSolids(m);
+  });
+}
+// boxes [w, h, d, x, y, z, rotY] as one mesh: far scenery in one draw call (k: a tiled texture's size, laid at bake time)
+function boxesMesh(list, m, k) {
+  const pos = [], nor = [], uv = [], idx = [], o = new THREE.Object3D();
+  for (const [w, h, d, x, y, z, ry] of list) {
+    const g = new THREE.BoxGeometry(w, h, d); o.position.set(x, y, z); o.rotation.set(0, ry, 0); o.updateMatrix(); g.applyMatrix4(o.matrix);
+    const v = pos.length / 3; pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array); for (const i of g.index.array) idx.push(v + i);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setIndex(idx);
+  if (k) { g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); }
+  const mesh = new THREE.Mesh(g, m); if (k) mesh.userData.uvk = k; add(mesh); return mesh;
+}
+// far off round the map: n boxes in a ring at R, each from y0 up to h(i, a) (or h's [bottom, top, width]), facing in, in one mesh
+function skyline(R, n, h, mat, { deep = 12, y0 = -1, wide = 1.12 } = {}) {
+  const list = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i + .5) / n * Math.PI * 2, v = h(i, a), [b, t, w = wide] = Array.isArray(v) ? v : [y0, v];
+    if (t > b) list.push([R * Math.PI * 2 / n * w, t - b, deep, Math.cos(a) * R, (b + t) / 2, Math.sin(a) * R, -a - Math.PI / 2]);
+  }
+  return farOff(boxesMesh(list, mat));
+}
+// far scenery stays put like the rest of the map, drawn after the sky and before the map, never casting shadows
+const FAR_VS = sh => { sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n\tgl_Position.z = min(gl_Position.z, gl_Position.w * .999999);'); }; // past the view's end (low graphics) it's drawn on it, not cut off
+function farOff(m) {
+  live(m); m.userData.far = true; m.frustumCulled = false; m.material.onBeforeCompile = FAR_VS;
+  const p = m.geometry.attributes.position; let r = 0; for (let i = 0; i < p.count; i++) r += Math.hypot(p.getX(i), p.getZ(i));
+  m.renderOrder = -.45 - r / p.count / 1e4; // farther ones first, so nearer ones win where both lie past the view's end
+  return m;
+}
+// rolling tops round a ring, 0 to 1, each phase its own
+const rollAt = (a, ph) => (Math.sin(a * 3 + ph) * .5 + Math.sin(a * 7 + ph * 1.7) * .3 + Math.sin(a * 13 + ph * 2.3) * .2 + 1) / 2;
+// far mountains round the map: tops rolling from lo to hi, a few sharp peaks up to peak higher, snow on what's above snowAt, none where where(a) is 0
+function farRange(R, rnd, { lo, hi, peaks = 0, peak = 0, mat, snow = null, snowAt = 1e9, where = () => 1, n = Math.round(R * 1.5) }) {
+  const ph = [rnd() * 6, rnd() * 6], tops = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i + .5) / n * Math.PI * 2, u = rollAt(a, ph[0]), w = where(a), p = peaks ? Math.max(0, Math.sin(a * peaks + ph[1])) ** 6 : 0;
+    tops.push(w > 0 ? (lo + (hi - lo) * u * u + peak * p + rnd() * 1.2) * w : 0);
+  }
+  skyline(R, n, i => tops[i] > 0 ? tops[i] : [0, 0], mat);
+  if (snow) skyline(R - .3, n, i => tops[i] > snowAt ? [Math.max(snowAt - 2, tops[i] - (tops[i] - snowAt) * .8 - 1.5), tops[i] + .06, 1.14] : [0, 0], snow);
+  return tops;
+}
+// a flat colour for far scenery: c mixed toward the haze by k, no fog so it reads the same on every setting (fogged: for what stands just past the fog)
+const farMat = (c, haze, k, fogged = false) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(haze), k), fog: fogged });
 function addGround(G, mat) {
   const g = new THREE.Mesh(new THREE.PlaneGeometry(G * 2, G * 2), mat);
   g.rotation.x = -Math.PI / 2; add(g); building.ground = g;
@@ -103,13 +203,7 @@ const addCrates = list => { for (const [x, z, tall] of list) addBlock(x, z, 1.2,
 // seeded random, same layout every game
 const seeded = s => () => (s = s * 16807 % 2147483647) / 2147483647;
 
-// daytime sky: pixel sun and blocky clouds
-const sunTex = tex(g => {
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const e = Math.min(x, y, 15 - x, 15 - y), v = e < 1 ? 0 : e < 2 ? 1 : 2;
-    if (v) { g.fillStyle = v === 1 ? '#ffd65c' : e < 4 ? '#ffeb94' : '#fff8d6'; g.fillRect(x, y, 1, 1); }
-  }
-});
+// daytime sky: the sun a block, blocky clouds
 const sunGlowTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32); gr.addColorStop(0, 'rgba(255,248,215,.75)'); gr.addColorStop(1, 'rgba(255,248,215,0)');
@@ -117,11 +211,10 @@ const sunGlowTex = (() => {
 })();
 const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9aa8b8, fog: false });
 function addSky(rnd, skyDir, n, r0, r1, y0, y1) {
-  const d = new THREE.Vector3(...skyDir).normalize().multiplyScalar(150);
-  const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false }));
-  sun.scale.setScalar(14); sun.position.copy(d); add(sun);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, fog: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-  glow.scale.setScalar(46); glow.position.copy(d).multiplyScalar(1.01); add(glow);
+  const d = new THREE.Vector3(...skyDir).normalize();
+  const sun = skyCube(sunFaces([255, 214, 92], [255, 235, 148], [255, 248, 214]), d.clone().negate().add(new THREE.Vector3(-.4, .5, 0)), { amb: .6 }); sun.scale.setScalar(7.2); add(sun); // a block
+  const glow = skyBack(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, fog: false, blending: THREE.AdditiveBlending }))); glow.scale.setScalar(37); add(glow);
+  for (const [o, k] of [[sun, 120], [glow, 121]]) { const own = o.onBeforeRender; o.position.copy(d).multiplyScalar(k); o.onBeforeRender = (r, sc, cam, ...a) => { o.position.copy(cam.position).addScaledVector(d, k); o.updateMatrixWorld(); own.call(o, r, sc, cam, ...a); }; } // round whoever looks, inside the low setting's view
   for (let i = 0; i < n; i++) {
     const a = rnd() * 6.28, r = r0 + rnd() * (r1 - r0), x = Math.cos(a) * r, z = Math.sin(a) * r, y = y0 + rnd() * (y1 - y0);
     const w = 12 + rnd() * 18, dd = 7 + rnd() * 10;
@@ -163,7 +256,7 @@ function bakeMap(m) {
     if (!o.isMesh || !seen(o)) return;
     const mt = o.material, g = o.geometry, mts = Array.isArray(mt) ? mt : [mt];
     if (o.isInstancedMesh) { if (!live(o) && mts.every(solid) && !detailObjs.includes(o)) o.layers.enable(OCC_LAYER); return; } // trees still hide enemies
-    if (live(o)) { if (!g.boundingSphere) g.computeBoundingSphere(); if (mts.every(solid) && g.boundingSphere.radius > .4) o.layers.enable(OCC_LAYER); return; } // moving parts bigger than a chicken
+    if (live(o)) { if (o.userData.far) return; if (!g.boundingSphere) g.computeBoundingSphere(); if (mts.every(solid) && g.boundingSphere.radius > .4) o.layers.enable(OCC_LAYER); return; } // moving parts bigger than a chicken
     if (Array.isArray(mt)) { // cliffs and islands: each material's triangles
       const n = (g.index ? g.index.count : g.attributes.position.count) / 3 | 0, f = new Uint8Array(n);
       for (const gr of g.groups) { const x = mt[gr.materialIndex]; if (x && solid(x)) f.fill(side(x), gr.start / 3, Math.min(n, (gr.start + gr.count) / 3)); }
@@ -374,8 +467,45 @@ function applyView() {
   scene.fog.near = e.fogNear * k; scene.fog.far = e.fogFar * k;
   camera.far = Math.max(60, 200 * k); camera.updateProjectionMatrix();
 }
+// shadows on high: the map's sun casts them from one still box round the whole map, so their edges never crawl
+renderer.shadowMap.autoUpdate = false; // drawn once a frame, before the view (main.js, the showcase), not again for the glow passes
+sun.castShadow = renderer.shadowMap.enabled = !!gfxQ().shadow; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -.0002; sun.shadow.normalBias = .03;
+const _shB = new THREE.Box3(), _shV = new THREE.Vector3();
+function shadowFlags(root, cast = true) { // solid things cast them and lit things take them; never the sky, glass, water, glows or grass
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    const ms = [o.material].flat();
+    o.receiveShadow = ms.some(m => m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial);
+    o.castShadow = cast && o.renderOrder >= 0 && ms.every(m => !m.transparent && m.blending === THREE.NormalBlending && m.depthTest && m.depthWrite && m.fog !== false) && !(o.isInstancedMesh && detailObjs.includes(o));
+  });
+}
+function fitShadow(m) { // the box: the map's ground and whatever stands on it, as the sun sees them
+  const c = sun.shadow.camera, h = m.half + 8;
+  sun.position.set(...(m.env.sunDir || [10, 20, 5])).normalize().multiplyScalar(120); sun.target.position.set(0, 0, 0);
+  let y0 = -2, y1 = 4;
+  m.root.traverse(o => {
+    if (!o.castShadow) return;
+    const b = o.isInstancedMesh ? (o.boundingBox || (o.computeBoundingBox(), o.boundingBox)) : (o.geometry.boundingBox || (o.geometry.computeBoundingBox(), o.geometry.boundingBox));
+    _shB.copy(b).applyMatrix4(o.matrixWorld);
+    if (_shB.max.x > -h && _shB.min.x < h && _shB.max.z > -h && _shB.min.z < h) { y0 = Math.min(y0, Math.max(_shB.min.y, -12)); y1 = Math.max(y1, Math.min(_shB.max.y, 60)); }
+  });
+  c.position.copy(sun.position); c.lookAt(0, 0, 0); c.updateMatrixWorld();
+  let l = Infinity, r = -Infinity, bo = Infinity, t = -Infinity, n = Infinity, f = -Infinity;
+  for (const x of [-h, h]) for (const y of [y0, y1]) for (const z of [-h, h]) {
+    _shV.set(x, y, z).applyMatrix4(c.matrixWorldInverse);
+    l = Math.min(l, _shV.x); r = Math.max(r, _shV.x); bo = Math.min(bo, _shV.y); t = Math.max(t, _shV.y); n = Math.min(n, -_shV.z); f = Math.max(f, -_shV.z);
+  }
+  Object.assign(c, { left: l, right: r, bottom: bo, top: t, near: n - 20, far: f + 5 }); c.updateProjectionMatrix();
+}
+let shadowT = 0;
+function shadowTick(dt, cam) { // before a view of the map: fighters near enough to see cast, new gear too, then the shadows are drawn
+  if (!renderer.shadowMap.enabled) return;
+  if ((shadowT -= dt) < 0) { shadowT = .3; for (const z of zombies) shadowFlags(z.g, z.g.position.distanceToSquared(cam.position) < 1600); }
+  renderer.shadowMap.needsUpdate = true;
+}
 // apply graphics settings
 function applyGfx() {
+  const sh = !!gfxQ().shadow; if (sun.castShadow !== sh) sun.castShadow = lKey.castShadow = renderer.shadowMap.enabled = sh; // every lit material changes with it
   renderer.setPixelRatio(pixelRatio()); renderer.setSize(scr.w, scr.h, false);
   const an = Math.min(gfxQ().aniso, renderer.capabilities.getMaxAnisotropy());
   for (const t of allTex) if (t.anisotropy !== an) { t.anisotropy = an; t.needsUpdate = true; }
@@ -394,8 +524,9 @@ function useMap(id) {
   const e = m.env;
   scene.background.setHex(e.sky); scene.fog.color.setHex(e.fog); applyView();
   hemi.color.setHex(e.hemiSky); hemi.groundColor.setHex(e.hemiGround); hemi.intensity = e.hemi;
-  sun.color.setHex(e.sunColor); sun.intensity = e.sun; sun.position.set(...(e.sunDir || [10, 20, 5]));
-  if (m.pads.length !== PAD_COUNT[m.size]) console.warn(`${id} has ${m.pads.length} pads, ${m.size} maps should have ${PAD_COUNT[m.size]}`);
+  sun.color.setHex(e.sunColor); sun.intensity = e.sun;
+  if (!m.shadowed) { m.shadowed = true; m.root.updateMatrixWorld(true); shadowFlags(m.root); } fitShadow(m);
+  if (m.pads.length !== (m.range ? 0 : PAD_COUNT[m.size])) console.warn(`${id} has ${m.pads.length} pads, ${m.size} maps should have ${PAD_COUNT[m.size]}`);
 }
 // rays only test what they pass: the map's cover in a 4 m grid, and big meshes get a grid of their own (testing all of it was the bots' biggest cost)
 const CG = 4, _cgOut = [], _cgBox = new THREE.Box3();

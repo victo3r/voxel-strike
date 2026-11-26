@@ -93,6 +93,7 @@ const SONGS = {
   },
 };
 const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky', 'cove', 'graveyard', 'farm', 'ghosttown', 'temple'];
+let muLobbyAt = () => 0; // which of them the lobby music starts on (lobbies.js: the map behind you)
 
 // what should be playing
 let muWant = { kind: 'lobby', id: 0, seed: 1 },muNow = null, muId = 0, muOld = [];
@@ -211,6 +212,7 @@ function muStart(w) {
   const now = ac.currentTime, S = { ...w, bar: 0, I: 0, nodes: [], fresh: true };
   const lobby = w.kind === 'lobby';
   S.bpm = lobby ? 84 : SONGS[w.song].bpm; S.st = 60 / S.bpm / 4; S.barDur = S.st * 16; S.nextT = now + .1;
+  if (lobby) S.bar = S.bar0 = (muLobbyAt() | 0) * 8;
   S.out = ac.createGain(); S.out.gain.value = 0; S.out.connect(MU.master);
   S.wet = ac.createGain(); S.wet.gain.value = 0; S.wet.connect(MU.verbIn);
   // melody echo
@@ -453,6 +455,14 @@ function muLobbyBar(S, t) {
     const steps = [[0, 6, 10], [4, 10], [0, 3, 8]][pr() * 3 | 0], idx = steps.map(() => pr() * 4 | 0);
     steps.forEach((s, i) => pluck(S, t + s * st, ch[1][idx[i]] + 12, .05));
   }
+}
+
+// the lobby song playing now: its place in LOBBY_SONGS, how far into its 8 bars and how long they last (null while there's no music clock)
+function musicLobbyPos() {
+  const S = muNow;
+  if (!S || S.kind !== 'lobby' || !ac || ac.state !== 'running') return null;
+  const now = ac.currentTime, b = Math.max(S.bar0, S.bar - Math.max(1, Math.ceil((S.nextT - now) / S.barDur)));
+  return { i: (b >> 3) % LOBBY_SONGS.length, t: (b & 7) * S.barDur + Math.max(0, now - S.nextT + (S.bar - b) * S.barDur), len: 8 * S.barDur };
 }
 
 // every frame

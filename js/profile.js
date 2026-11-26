@@ -13,8 +13,8 @@ const lvBoosts = lv => 1 + Math.floor(lv / 10);
 const DEV_ALL = /[?&]all=1\b/.test(location.search) && /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
 const PROF_KEY = DEV_ALL ? 'voxelstrike-profile-dev' : 'voxelstrike-profile';
 // saved profile (v = save format version)
-let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, suits: {}, suitUse: {}, armorOn: '', boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '', skins: {}, hatSkin: {} };
-try { const s = JSON.parse(localStorage.getItem(PROF_KEY)); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, suits: { ...s.suits }, suitUse: { ...s.suitUse }, boots: { ...s.boots }, bootUse: { ...s.bootUse }, hats: { ...s.hats }, hatUse: { ...s.hatUse }, skins: { ...s.skins }, hatSkin: { ...s.hatSkin } }; } catch {}
+let prof = { v: 1, lv: 1, xp: 0, coins: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, suits: {}, suitUse: {}, armorOn: '', boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '', skins: {}, hatSkin: {}, kfx: {}, kfxOn: '', lobbies: {} };
+try { const s = JSON.parse(localStorage.getItem(PROF_KEY)); if (s) prof = { ...prof, ...s, guns: { ...s.guns }, loadout: { ...s.loadout }, use: { ...s.use }, suits: { ...s.suits }, suitUse: { ...s.suitUse }, boots: { ...s.boots }, bootUse: { ...s.bootUse }, hats: { ...s.hats }, hatUse: { ...s.hatUse }, skins: { ...s.skins }, hatSkin: { ...s.hatSkin }, kfx: { ...s.kfx }, lobbies: { ...s.lobbies } }; } catch {}
 let onSave = () => {}; // cloud.js uploads changes when signed in
 const saveProf = () => { try { localStorage.setItem(PROF_KEY, JSON.stringify(prof)); } catch {} onSave(); };
 // tops the dev profile up, so anything new shows up owned
@@ -27,6 +27,8 @@ function devAll() {
   for (const b of BOOTS) prof.boots[b.id] ||= 1;
   for (const h of HATS) prof.hats[h.id] ||= 1;
   for (const S of HAT_SKINS) prof.skins[S.id] ||= 1;
+  for (const K of KILL_FX) prof.kfx[K.id] ||= 1;
+  for (const L of LOBBIES) if (L.price) prof.lobbies[L.id] ||= 1;
   prof.secrets = Object.keys(SECRETS);
   saveProf(); showProf(); renderChests();
 }
@@ -59,9 +61,10 @@ const xpTile = n => [ico('xp'), 'XP', `+${n}`, 'tx'], coinTile = n => [COIN, 'CO
 const barChest = () => CHESTS.findIndex(c => c.id === BAR_CHEST), boxTile = n => n ? [`<img src="${chestPic(barChest())}">`, CHESTS[barChest()].name, `+${n}`, 'tbr'] : null;
 const barWord = () => barNext() ? 'BAR' : 'CHESTS';
 const xpText = () => prof.lv >= LV_MAX ? `NEXT ${barNext() ? 'BAR' : BAR_CHESTS + ' CHESTS'} ${prof.barXp | 0} / ${BAR_XP} XP` : `${prof.xp} / ${xpNeed(prof.lv)} XP`;
-// what the armory opens at a level: [picture, name] for its guns (not ones you have), armor, boots and hats
+// what the armory opens at a level: [picture, name] for its guns (not ones you have), armor, boots, hats and kill effects
 const unlocksAt = lv => [...BASE.map((w, i) => w.price && !w.chest && w.unlock === lv && !prof.guns[w.id] && [gunPic(i), w.name]), ...SUITS.map(S => S.unlock[0] === lv && [armorPic(suitN(S.id, 1) - 1), S.name]),
-  ...BOOTS.map(b => b.unlock === lv && [bootPic(b.id, 1), b.name]), ...HATS.map(h => h.unlock === lv && [hatPic(h.id, 1), h.name])].filter(Boolean);
+  ...BOOTS.map(b => b.unlock === lv && [bootPic(b.id, 1), b.name]), ...HATS.map(h => h.unlock === lv && [hatPic(h.id, 1), h.name]),
+  ...KILL_FX.map(K => !K.chest && K.unlock === lv && !prof.kfx?.[K.id] && [kfxPic(K.id), K.name])].filter(Boolean);
 const unlockPics = list => list.slice(0, 4).map(([pic, name]) => `<span><img src="${pic}">${name.replace(/"/g, '').toUpperCase()}</span>`).join('');
 // results screen: what the levels you just reached opened, or what the next one will
 function unlockRow(ups = 0) {

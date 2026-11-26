@@ -51,7 +51,7 @@ function missionKill(head, streak) {
   if (head) missionStep(m => m.k === 'head', n => n + 1);
   if (streak) missionStep(m => m.k === 'streak', n => Math.max(n, streak));
 }
-function missionWave(w) { achWave(w); missionStep(m => m.k === 'wave', n => Math.max(n, w)); }
+function missionWave(w, coop) { achWave(w, coop); missionStep(m => m.k === 'wave', n => Math.max(n, w)); }
 function missionEnd(won) {
   missionStep(m => m.k === 'play', n => n + 1);
   if (won) missionStep(m => m.k === 'win', n => n + 1);
@@ -84,11 +84,13 @@ function renderMissions() {
     `<div class="mb${M.all ? ' ok' : ''}">${M.all ? ico('check') + ' ' : ''}ALL 3: <img src="${chestPic(0)}"> WOODEN CHEST</div>`;
 }
 $('missions').addEventListener('click', e => { const b = e.target.closest('.rr'); if (b) { e.stopPropagation(); missionReroll(+b.dataset.i); } });
-// the arrow tab pushes the card off the side and pulls it back
-function missionsIn(shut) { $('misDraw').classList.toggle('in', shut); $('misTab').innerHTML = ico('left'); $('misTab').title = shut ? 'Show daily missions' : 'Hide daily missions'; }
-let misIn = false; try { misIn = localStorage.getItem('voxelstrike-missions-in') === '1'; } catch {}
-missionsIn(misIn);
-$('misTab').addEventListener('click', e => { e.stopPropagation(); missionsIn(misIn = !misIn); try { localStorage.setItem('voxelstrike-missions-in', misIn ? '1' : '0'); } catch {} sfx('ui'); });
+// an arrow tab pushes its card off the side and pulls it back (the weekly event's too)
+function sideDrawer(draw, tab, key, what) {
+  let shut = false; try { shut = localStorage.getItem(key) === '1'; } catch {}
+  const set = () => { $(draw).classList.toggle('in', shut); $(tab).innerHTML = ico('left'); $(tab).title = (shut ? 'Show ' : 'Hide ') + what; };
+  set(); $(tab).addEventListener('click', e => { e.stopPropagation(); shut = !shut; set(); try { localStorage.setItem(key, shut ? '1' : '0'); } catch {} sfx('ui'); });
+}
+sideDrawer('misDraw', 'misTab', 'voxelstrike-missions-in', 'daily missions');
 setInterval(() => { if (inLobby) renderMissions(); }, 30000);
 addEventListener('pagehide', () => saveProf()); // kills so far this game
 renderMissions();

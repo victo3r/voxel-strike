@@ -36,7 +36,8 @@ const rutMat = decal({ color: 0x9a7048 }, -4), water = decal({ color: 0x4a6a6a, 
 const barMat = len => seeThru(tex(g => { g.fillStyle = '#26241f'; for (const x of [1, 5, 9, 13]) g.fillRect(x, 0, 1, 16); g.fillRect(0, 1, 16, 1); g.fillRect(0, 14, 16, 1); }, len / 1.2, 1));
 
 // helpers
-const piece = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); return b; };
+const pieces = [], piece = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); pieces.push(b); return b; }; // each gets a hitbox once it's placed and turned
+const onWall = b => { pieces.splice(pieces.lastIndexOf(b), 1); return b; }; // trim flat on a wall needs none
 const slab = (x0, x1, z0, z1, bot, top, m, cover = true) => addSlab((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, bot, top, m, cover);
 const solid = (x0, x1, z0, z1, bot, top, s = 'wood') => { const o = { mesh: null, minX: x0, maxX: x1, minZ: z0, maxZ: z1, bot, top, surf: s }; building.solids.push(o); return o; };
 const flat = (x0, x1, z0, z1, m, y = .012, k = 2) => {
@@ -109,14 +110,17 @@ function gable(ax, x0, x1, z0, z1, h, y1, m, o = .3, th = .2) {
     if (AX) { r.position.set(cl, cy, cc); r.rotation.x = e * a; } else { r.position.set(cc, cy, cl); r.rotation.z = -e * a; }
     add(r); building.cover.push(r);
   }
-  const rc = AX ? box(len, .14, .28, beam) : box(.28, .14, len, beam); rc.position.set(AX ? cl : mid, y1 + .03, AX ? mid : cl); add(rc); // the ridge
+  const rc = AX ? box(len, .14, .28, beam) : box(.28, .14, len, beam); rc.position.set(AX ? cl : mid, y1 + .03, AX ? mid : cl); add(rc); meshSolids(rc, 'wood'); // the ridge
   const d = th / 2 / Math.cos(a), sh = new THREE.Shape([[c0, h], [c1, h], [c1, yw - d], [mid, y1 - d], [c0, yw - d]].map(([p, q]) => new THREE.Vector2(p, q))); // the ends stop inside the roof: level with its face they flickered through it
   for (const at of [l0, l1 - T]) {
     const g = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }), m); g.userData.uvk = 1;
     if (AX) { g.rotation.y = -Math.PI / 2; g.position.x = at + T; } else g.position.z = at;
     add(g); building.cover.push(g);
   }
-  building.solids.push({ mesh: null, minX: AX ? x0 - o : mid - H, maxX: AX ? x1 + o : mid + H, minZ: AX ? mid - H : z0 - o, maxZ: AX ? mid + H : z1 + o, bot: h, top: y1, peak: { x: AX ? 0 : mid, z: AX ? mid : 0, rx: AX ? 1e6 : H, rz: AX ? H : 1e6, edge: ye }, surf: 'wood' });
+  for (const e of [-1, 1]) for (const s of slopeSolids(AX ? 'z' : 'x', mid + e * H, mid, ye, y1, l0 - o, l1 + o, th / Math.cos(a), 'wood')) { // each side, the ends filled up to it
+    const [u0, u1] = AX ? [Math.max(s.minZ, c0), Math.min(s.maxZ, c1)] : [Math.max(s.minX, c0), Math.min(s.maxX, c1)];
+    if (s.bot > h && u1 > u0) for (const at of [l0, l1 - T]) building.solids.push({ mesh: null, minX: AX ? at : u0, maxX: AX ? at + T : u1, minZ: AX ? u0 : at, maxZ: AX ? u1 : at + T, bot: h, top: s.bot, surf: 'wood' });
+  }
 }
 // stairs: a ramp you walk from a (y0) to b (y1) along ax, across c0..c1, and the steps you see
 function stairs(ax, a, b, c0, c1, y0, y1, m = deck) {
@@ -143,7 +147,7 @@ function stairRail(ax, a, b, c, y0, y1, hh = .95) {
   for (const [ry, th] of [[hh - .05, .1], [hh * .45, .07]]) {
     const r = ax === 'x' ? box(L, th, .08, beam) : box(.08, th, L, beam); r.position.set(mx, (y0 + y1) / 2 + ry, mz);
     if (ax === 'x') r.rotation.z = Math.sign(b - a) * ang; else r.rotation.x = -Math.sign(b - a) * ang;
-    add(r);
+    add(r); if (th < .1) meshSolids(r, 'wood', .5);
   }
   const [x0, z0] = P(Math.min(a, b), c - .07), [x1, z1] = P(Math.max(a, b), c + .07);
   building.solids.push({ mesh: null, minX: x0, maxX: x1, minZ: z0, maxZ: z1, bot: y0 + hh, top: y1 + hh, ramp: { ax, a, b }, surf: 'wood' });
@@ -172,7 +176,7 @@ function signTex(text, fg, bg) {
 // a painted board w wide facing ry (0: toward +z), painted on both sides when two (as a decal: a hair off the board it flickered from far off)
 function sign(text, w, x, y, z, ry, fg = '#f2e4c2', bg = '#4a2c1a', two = false, parent = null) {
   const h = w * 9 / (text.length * 4 + 3), g = new THREE.Group(), mat = decal({ map: signTex(text, fg, bg) }); g.position.set(x, y, z); g.rotation.y = ry; (parent || building.root).add(g);
-  g.add(box(w + .12, h + .12, .06, beam));
+  const bd = box(w + .12, h + .12, .06, beam); g.add(bd); if (!parent) meshSolids(bd, 'wood'); // a sign on a swinging bracket stays open
   for (const e of two ? [1, -1] : [1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); p.position.z = e * .035; p.rotation.y = e > 0 ? 0 : Math.PI; g.add(p); }
   return g;
 }
@@ -261,7 +265,7 @@ sign('BARBER', 3, -6.9, 4.45, -18.5, FACE(-1), '#30343c', '#e8e2d6');
 { const p = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, 1.3, 8), lam({ map: tex(g => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = ((x + y) >> 2) % 2 ? '#e8e8e8' : '#c42a2a'; g.fillRect(x, y, 1, 1); } }, 1, 2) }));
   p.position.set(-6.82, 1.75, -20.4); add(p); building.cover.push(p); piece(.3, .12, .3, iron, -6.82, 2.46, -20.4); piece(.3, .12, .3, iron, -6.82, 1.04, -20.4); solid(-6.98, -6.66, -20.56, -20.24, FL, 2.52, 'metal'); }
 slab(-12.2, -11.2, -18.2, -17.2, FL, .9, cloth); slab(-12.2, -11.9, -18.2, -17.2, .9, 1.7, cloth); // the chair
-piece(.04, 1.1, 1.6, lam({ color: 0xb8c8cc, emissive: 0x2a3438 }), -14.73, 1.9, -17.7); // the mirror
+onWall(piece(.04, 1.1, 1.6, lam({ color: 0xb8c8cc, emissive: 0x2a3438 }), -14.73, 1.9, -17.7)); // the mirror
 // the bank: brick, its flat roof up the stairs out back, a parapet round it
 house(-1, -13, -4, 4.8, brick, { front: [[-8.5, 1.8, 0, 2.6], [-11.4, 1.2, 1.3, 2.5], [-5.6, 1.2, 1.3, 2.5]], north: [[4, 1.2, 1.3, 2.5]], south: [[4, 1.2, 1.3, 2.5]] });
 sl(-1, 0, DEEP, -13, -4, 4.8, 5, stone);
@@ -274,7 +278,7 @@ for (const [z0, z1] of [[-12.6, -9.4], [-7.6, -4.4]]) {
   slab(-11.6, -11, z0, z1, FL, 1.2, beam); // the tellers' counter, barred
   const b = new THREE.Mesh(new THREE.PlaneGeometry(z1 - z0, 1.1), barMat(z1 - z0)); b.position.set(-11.3, 1.76, (z0 + z1) / 2); b.rotation.y = Math.PI / 2; add(b); solid(-11.35, -11.25, z0, z1, 1.2, 2.31, 'metal');
 }
-{ const v = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, .18, 16), iron); v.rotation.z = Math.PI / 2; v.position.set(-14.66, 1.6, -8.5); add(v); building.cover.push(v); piece(.1, .5, .5, rust, -14.53, 1.6, -8.5); } // the vault
+{ const v = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, .18, 16), iron); v.rotation.z = Math.PI / 2; v.position.set(-14.66, 1.6, -8.5); add(v); building.cover.push(v); meshSolids(v, 'metal'); piece(.1, .5, .5, rust, -14.53, 1.6, -8.5); } // the vault
 addBlock(-14.2, -12.2, .9, .9, FL + 1, iron); // the safe
 stairs('z', -4.6, -10.9, -16.4, -15, 0, 5);
 slab(-16.47, -15, -12.75, -10.9, 4.8, 5, deck);
@@ -308,7 +312,7 @@ sign('SHERIFF', 3.6, -6.9, 4.85, 17, FACE(-1), '#f0dca0', '#3a2414');
     solid(Math.min(x0, x1) - .04, Math.max(x0, x1) + .04, Math.min(z0, z1) - .04, Math.max(z0, z1) + .04, FL, FL + 2.3, 'metal');
   };
   bars(BX, 13.25, BX, 14.6); bars(BX, 15.6, BX, 18.4); bars(BX, 19.4, BX, 20.75); bars(BX, 17, X(-1, DEEP - T), 17);
-  for (const z of [14.6, 18.4]) { const d = new THREE.Mesh(new THREE.PlaneGeometry(1, 2.2), barMat(1)); d.position.set(BX + .32, FL + 1.1, z - .38); d.rotation.y = .7; add(d); }
+  for (const z of [14.6, 18.4]) { const d = new THREE.Mesh(new THREE.PlaneGeometry(1, 2.2), barMat(1)); d.position.set(BX + .32, FL + 1.1, z - .38); d.rotation.y = .7; add(d); meshSolids(d, 'metal'); }
   for (const z of [14.1, 19.9]) slab(-14.75, -13.3, z - .4, z + .4, FL, .7, cloth); // cots
   for (const z of [15.2, 18.8]) { const b = new THREE.Mesh(new THREE.PlaneGeometry(1, .8), barMat(1)); b.position.set(-15.02, 1.8, z); b.rotation.y = Math.PI / 2; add(b); }
 }
@@ -331,7 +335,8 @@ for (const [x, z, ry] of [[-6.98, 15.8, Math.PI / 2], [-6.98, 18.2, Math.PI / 2]
   for (const dx of [-.95, .95]) for (const dz of [.05, 1.95]) piece(.2, 1.4, .2, beam, dx, 7.9, z0 + dz);
   for (const [w, y] of [[.42, 8.35], [.62, 8.1], [.8, 7.85]]) piece(w, .25, w, lam({ color: 0x9a7a3a, emissive: 0x1a1206 }), 0, y, z0 + 1);
   piece(2.4, .2, 2.4, beam, 0, 8.7, z0 + 1);
-  { const c = new THREE.Mesh(new THREE.ConeGeometry(1.75, 1.7, 4), shingle); c.rotation.y = Math.PI / 4; c.position.set(0, 9.65, z0 + 1); add(c); building.cover.push(c); }
+  { const c = new THREE.Mesh(new THREE.ConeGeometry(1.75, 1.7, 4), shingle); c.rotation.y = Math.PI / 4; c.position.set(0, 9.65, z0 + 1); add(c); building.cover.push(c);
+    const r = 1.75 / Math.SQRT2; building.solids.push({ mesh: null, minX: -r, maxX: r, minZ: z0 + 1 - r, maxZ: z0 + 1 + r, bot: 8.8, top: 10.5, peak: { x: 0, z: z0 + 1, rx: r, rz: r, edge: 8.8 }, surf: 'wood' }); } // up to its point
   piece(.1, 1, .1, beam, 0, 11, z0 + 1); piece(.55, .1, .1, beam, 0, 11.15, z0 + 1); // a cross on top
   for (const z of [23.6, 25]) for (const e of [-1, 1]) slab(e * 2 - .9, e * 2 + .9, z - .25, z + .25, FL, .75, beam); // pews
   slab(-.8, .8, 25.4, 25.95, FL, 1.2, beam); for (const dx of [-.5, .5]) { piece(.07, .25, .07, white, dx, 1.32, 25.67); piece(.05, .07, .05, glowMat, dx, 1.48, 25.67); }
@@ -350,7 +355,7 @@ sign('POP. 0', 1.1, 5.6, 2.2, -24.77, Math.PI, '#2a1a10', '#d8c8a0');
   const hole = new THREE.Mesh(new THREE.CircleGeometry(.75, 12), decal({ color: 0x1a1410 })); hole.rotation.x = -Math.PI / 2; hole.position.set(2.6, .905, 0); add(hole);
   for (const e of [-1, 1]) slab(2.6 + e * .85 - .07, 2.6 + e * .85 + .07, -.07, .07, .9, 2.4, beam);
   piece(1.9, .12, .12, beam, 2.6, 2.34, 0);
-  for (const e of [-1, 1]) { const r = tbox(2.3, .1, 1.3, shingle); r.position.set(2.6, 2.62, e * .5); r.rotation.x = e * .6; add(r); }
+  for (const e of [-1, 1]) { const r = tbox(2.3, .1, 1.3, shingle); r.position.set(2.6, 2.62, e * .5); r.rotation.x = e * .6; add(r); meshSolids(r, 'wood'); }
   piece(.03, .7, .03, lam({ color: 0xb8a070 }), 2.6, 1.93, 0); piece(.28, .3, .28, beam, 2.6, 1.45, 0);
 }
 const trough = (x, z, along) => { const [w, d] = along === 'z' ? [.7, 2.2] : [2.2, .7]; addBlock(x, z, w, d, .7, beam); flat(x - w / 2 + .08, x + w / 2 - .08, z - d / 2 + .08, z + d / 2 - .08, water, .64, 1); };
@@ -359,12 +364,11 @@ for (const [x, z] of [[-3.8, -15.6], [-3.3, -16.3], [-4.1, -16.6], [3.8, 15.6], 
 addBlock(3.9, 5.5, 1.2, 1.2, 1.2, crate1); addBlock(4.1, 6.8, 1, 1, 1, crate1);
 addBlock(-3.9, -5.6, 1.3, .9, .9, hay); addBlock(-3.9, -6.5, 1.3, .9, .9, hay); slab(-4.55, -3.25, -6.5, -5.6, .9, 1.8, hay);
 { // a wagon with a broken wheel, down on one corner
-  const g = new THREE.Group(); g.position.set(-3.2, 0, 10.6); g.rotation.set(0, .12, .08); add(g);
-  const bed = box(1.7, .5, 3.4, beam); bed.position.y = .85; g.add(bed); building.cover.push(bed);
-  for (const e of [-1, 1]) { const sd = box(.08, .45, 3.4, deck); sd.position.set(e * .81, 1.32, 0); g.add(sd); building.cover.push(sd); }
-  const wheel = (x, y, z, rz = 0) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, .1, 12), beam); w.rotation.set(0, 0, Math.PI / 2 + rz); w.position.set(x, y, z); g.add(w); };
+  const g = new THREE.Group(); g.position.set(-3.2, 0, 10.6); g.rotation.set(0, 0, .08); add(g); // square to the street, so its hitboxes fit
+  const bed = box(1.7, .5, 3.4, beam); bed.position.y = .85; g.add(bed); building.cover.push(bed); meshSolids(bed, 'wood');
+  for (const e of [-1, 1]) { const sd = box(.08, .45, 3.4, deck); sd.position.set(e * .81, 1.32, 0); g.add(sd); building.cover.push(sd); meshSolids(sd, 'wood'); }
+  const wheel = (x, y, z, rz = 0) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, .1, 12), beam); w.rotation.set(0, 0, Math.PI / 2 + rz); w.position.set(x, y, z); g.add(w); meshSolids(w, 'wood'); };
   wheel(.95, .55, 1.1); wheel(.95, .55, -1.1); wheel(-.95, .55, 1.1); wheel(-1.5, .06, -1.7, 1.5);
-  solid(-4.1, -2.3, 8.9, 12.3, 0, 1.5);
 }
 for (const [x, z0, z1] of [[4.5, -8, -5.6], [4.5, -3.2, -.8], [-4.5, .8, 3.2], [-4.5, 5.8, 8.2]]) railing(x, z0, x, z1, 0, [true, true], 1); // hitching rails
 
@@ -372,8 +376,8 @@ for (const [x, z0, z1] of [[4.5, -8, -5.6], [4.5, -3.2, -.8], [-4.5, .8, 3.2], [
 const tower = (cx, cz, dir) => { // a platform on legs, stairs up to it from dir's side (1: from the north)
   const P = 4.2, H = 2.1;
   for (const dx of [-1.6, 1.6]) for (const dz of [-1.6, 1.6]) slab(cx + dx - .15, cx + dx + .15, cz + dz - .15, cz + dz + .15, 0, P - .2, beam);
-  const ang = Math.atan2(3.2, 3.4), L = Math.hypot(3.2, 3.4); // braces from leg to leg
-  for (const e of [-1, 1]) for (const f of [-1, 1]) { const b = detail(box(.1, L, .1, beam)); b.position.set(cx + e * 1.6, 2.1, cz); b.rotation.x = f * ang; add(b); const c = detail(box(.1, L, .1, beam)); c.position.set(cx, 2.1, cz + e * 1.6); c.rotation.z = f * ang; add(c); }
+  const ang = Math.atan2(3.2, 3.4), L = Math.hypot(3.2, 3.4); // braces from leg to leg, on every setting since they're solid
+  for (const e of [-1, 1]) for (const f of [-1, 1]) { const b = box(.1, L, .1, beam); b.position.set(cx + e * 1.6, 2.1, cz); b.rotation.x = f * ang; add(b); const c = box(.1, L, .1, beam); c.position.set(cx, 2.1, cz + e * 1.6); c.rotation.z = f * ang; add(c); meshSolids(b, 'wood', .5); meshSolids(c, 'wood', .5); }
   slab(cx - H, cx + H, cz - H, cz + H, P - .2, P, deck);
   const zs = cz + dir * H, sx0 = cx - .5, sx1 = cx + .7, zr = zs - dir * .06;
   stairs('z', zs + dir * 5.5, zs, sx0, sx1, 0, P);
@@ -389,6 +393,7 @@ const tower = (cx, cz, dir) => { // a platform on legs, stairs up to it from dir
   building.solids.push({ mesh: null, minX: cx - 1.35, maxX: cx + 1.35, minZ: cz - 1.35, maxZ: cz + 1.35, bot: P, top: P + 3, round: 1.35, surf: 'wood' });
   for (const y of [.5, 1.5, 2.5]) { const ring = detail(new THREE.Mesh(new THREE.CylinderGeometry(1.39, 1.39, .07, 16, 1, true), iron)); ring.position.set(cx, P + y, cz); add(ring); }
   const top = new THREE.Mesh(new THREE.ConeGeometry(1.55, 1, 16), shingle); top.position.set(cx, P + 3.5, cz); add(top); building.cover.push(top);
+  building.solids.push({ mesh: null, minX: cx - 1.55, maxX: cx + 1.55, minZ: cz - 1.55, maxZ: cz + 1.55, bot: P + 3, top: P + 4, round: 1.55, peak: { x: cx, z: cz, rx: 1.55, rz: 1.55, edge: P + 3 }, surf: 'wood' }); // the lid, up to its point
   piece(.16, 1.4, .16, iron, cx + 1, P + .8, cz + 1); // the spout
 }
 const blades = live(new THREE.Group());
@@ -410,20 +415,18 @@ const blades = live(new THREE.Group());
   addBlock(24.4, 14.8, 1.1, .8, .8, hay); addBlock(24.4, 11.2, 1.1, .8, .8, hay);
 }
 { // a stagecoach that didn't make it
-  const g = new THREE.Group(); g.position.set(-22.5, 0, -13); g.rotation.set(0, .4, -.06); add(g);
-  const body = box(1.7, 1.6, 2.8, W_RED); body.position.y = 1.5; g.add(body); building.cover.push(body);
-  const roof = box(1.9, .12, 3, beam); roof.position.y = 2.36; g.add(roof);
+  const g = new THREE.Group(); g.position.set(-22.5, 0, -13); g.rotation.set(0, 0, -.06); add(g); // square, so its hitboxes fit
+  const body = box(1.7, 1.6, 2.8, W_RED); body.position.y = 1.5; g.add(body); building.cover.push(body); meshSolids(body, 'wood');
+  const roof = box(1.9, .12, 3, beam); roof.position.y = 2.36; g.add(roof); meshSolids(roof, 'wood');
   for (const e of [-1, 1]) { const win = box(.02, .6, .7, black); win.position.set(e * .86, 1.75, 0); g.add(win); }
-  const wheel = (x, z, r) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, .1, 12), beam); w.rotation.z = Math.PI / 2; w.position.set(x, r, z); g.add(w); };
+  const wheel = (x, z, r) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, .1, 12), beam); w.rotation.z = Math.PI / 2; w.position.set(x, r, z); g.add(w); meshSolids(w, 'wood'); };
   wheel(.95, 1.1, .6); wheel(-.95, 1.1, .6); wheel(.95, -1.1, .75);
-  solid(-23.9, -21.1, -14.9, -11.1, 0, 2.4);
-  const lost = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, .1, 12), beam); lost.position.set(-20.2, .05, -11.4); add(lost); // its wheel
+  const lost = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, .1, 12), beam); lost.position.set(-20.2, .05, -11.4); add(lost); building.solids.push({ mesh: null, minX: -20.95, maxX: -19.45, minZ: -12.15, maxZ: -10.65, top: .1, round: .75, surf: 'wood' }); // its wheel
 }
 { // boot hill
   for (const [x, z] of [[11, 24.6], [13.2, 25.3], [15.4, 24.4], [17.6, 25.4], [19.8, 24.7], [22, 25.2], [12.2, 22.9], [20.8, 23]]) {
     const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.set(0, (rnd() - .5) * .3, rnd() * .3 - .15); add(g);
-    const p = box(.12, 1.3, .12, beam); p.position.y = .65; g.add(p); const c = box(.6, .1, .1, beam); c.position.y = .95; g.add(c); building.cover.push(p);
-    solid(x - .15, x + .15, z - .15, z + .15, 0, 1.2);
+    const p = box(.12, 1.3, .12, beam); p.position.y = .65; g.add(p); const c = box(.6, .1, .1, beam); c.position.y = .95; g.add(c); building.cover.push(p); meshSolids(p, 'wood'); meshSolids(c, 'wood');
     piece(.8, .22, 1.6, lam({ map: tex(g => noise(g, [168, 124, 84], 18)) }), x, .11, z - 1); solid(x - .4, x + .4, z - 1.8, z - .2, 0, .22, 'sand');
   }
 }
@@ -453,7 +456,9 @@ const saguaro = (x, z, h, arms) => {
 saguaro(24.6, -1.8, 3.2, [[1, 1.6, 1.1], [-1, 2.1, .8]]); saguaro(-24.6, 1.8, 3, [[-1, 1.5, 1.1]]); saguaro(24, 19.5, 2.6, [[-1, 1.3, .9]]); saguaro(-24, -19.5, 3.3, [[1, 1.8, 1], [-1, 1.4, .9]]);
 saguaro(13.5, -24.8, 2.8, [[1, 1.4, 1]]); saguaro(-12.6, 23.4, 2.4, [[-1, 1.2, .8]]);
 for (const [x, z, w, h] of [[19.6, -24.6, 2.2, 1.1], [22.8, -23.6, 1.6, .8], [-19.8, 22.4, 1.8, .9], [24.2, 6.5, 1.4, .7], [-24.2, -6.5, 1.4, .7]]) addBlock(x, z, w, w * .8, h, rock);
-{ const sk = new THREE.Group(); sk.position.set(16.6, 0, -23.6); sk.rotation.y = .6; add(sk); for (const [w, h, d, x, y, z] of [[.4, .2, .5, 0, .1, 0], [.5, .08, .1, .3, .2, -.2], [.5, .08, .1, -.3, .2, -.2]]) { const b = box(w, h, d, bone); b.position.set(x, y, z); sk.add(b); } } // a cow's skull
+{ const sk = new THREE.Group(); sk.position.set(16.6, 0, -23.6); sk.rotation.y = .6; add(sk); for (const [w, h, d, x, y, z] of [[.4, .2, .5, 0, .1, 0], [.5, .08, .1, .3, .2, -.2], [.5, .08, .1, -.3, .2, -.2]]) { const b = box(w, h, d, bone); b.position.set(x, y, z); sk.add(b); meshSolids(b, 'stone'); } } // a cow's skull
+
+propSolids(pieces.filter(b => Math.max(Math.abs(b.position.x), Math.abs(b.position.z)) < 27.6), m => m.material === glowMat); // every piece in town, now they're all placed (flames aside)
 
 // --- red cliffs all round, a rockslide over the road out, mesas off in the haze ---
 {
@@ -485,10 +490,10 @@ const skyMat = new THREE.MeshBasicMaterial({ map: (() => {
 })(), side: THREE.BackSide, fog: false, depthWrite: false });
 const dome = live(new THREE.Mesh(new THREE.SphereGeometry(58, 24, 16), skyMat)); dome.renderOrder = -2; add(dome);
 const SUN = new THREE.Vector3(...M.env.sunDir).normalize();
-const sunS = live(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, color: 0xfff4dc, fog: false, depthWrite: false })));
-const sunG = live(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, color: 0xffe0b0, fog: false, transparent: true, opacity: .85, depthWrite: false, blending: THREE.AdditiveBlending })));
-sunS.scale.setScalar(5); sunG.scale.setScalar(24); sunS.renderOrder = sunG.renderOrder = -1; add(sunG); add(sunS);
-for (const [o, d] of [[dome, 0], [sunG, 52], [sunS, 53]]) { o.frustumCulled = false; o.onBeforeRender = (rr, sc, cam) => { o.position.copy(cam.position).addScaledVector(SUN, d); o.updateMatrixWorld(); }; } // round whatever camera looks
+const sunS = skyCube(sunFaces([255, 206, 80], [255, 226, 130], [255, 238, 186]), SUN.clone().negate().add(new THREE.Vector3(-.4, .5, 0)), { amb: .6 }); // a block
+const sunG = skyBack(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, color: 0xffe0b0, fog: false, opacity: .85, blending: THREE.AdditiveBlending })));
+sunS.scale.setScalar(3.3); sunG.scale.setScalar(24); add(sunG); add(sunS);
+for (const [o, d] of [[dome, 0], [sunG, 52], [sunS, 53]]) { const own = o.onBeforeRender; o.frustumCulled = false; o.onBeforeRender = (rr, sc, cam, ...a) => { o.position.copy(cam.position).addScaledVector(SUN, d); o.updateMatrixWorld(); own.call(o, rr, sc, cam, ...a); }; } // round whatever camera looks
 const buzzards = [0, 1, 2].map(i => {
   const g = live(new THREE.Group()), body = box(.4, .22, .9, black); g.add(body);
   for (const e of [-1, 1]) { const w = box(1.7, .05, .5, black); w.position.x = e * .95; w.rotation.z = e * .14; g.add(w); }

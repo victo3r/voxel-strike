@@ -6,13 +6,13 @@
 <!-- added to a phone's home screen it opens fullscreen, like an app -->
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blockslingers"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#14241a">
-<link id="css" rel="stylesheet" href="css/style.css?v=alpha-16">
+<link id="css" rel="stylesheet" href="css/style.css?v=alpha-17">
 <script>
 // the update's name: change it (and the css ?v=) on every update to skip old caches
-const GAME_V = 'alpha-16';
+const GAME_V = 'alpha-17';
 // the game files in the order they run, once three.js is in (the module at the end)
-const GAME_FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/maps/ghosttown.js', 'js/maps/temple.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js', 'js/held.js',
-  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/mythics.js', 'js/weaponfx.js', 'js/modes/deathmatch.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/trial.js', 'js/achievements.js', 'js/levelup.js', 'js/funnel.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/coop.js', 'js/duel.js', 'js/friends.js', 'js/boards.js', 'js/touch.js', 'js/moved.js'];
+const GAME_FILES = ['js/core.js', 'js/icons.js', 'js/sound.js', 'js/music.js','js/profile.js', 'js/character.js', 'js/names.js', 'js/maps/world.js', 'js/maps/yard.js', 'js/maps/forest.js', 'js/maps/resort.js', 'js/maps/sky.js', 'js/maps/roofs.js', 'js/maps/cove.js', 'js/maps/graveyard.js', 'js/maps/farm.js', 'js/maps/ghosttown.js', 'js/maps/temple.js', 'js/maps/range.js', 'js/player.js', 'js/armor.js', 'js/boots.js', 'js/hats.js', 'js/hud.js', 'js/weapons.js', 'js/held.js',
+  'js/modes/zombies.js', 'js/combat.js', 'js/wands.js', 'js/mythics.js', 'js/weaponfx.js', 'js/modes/deathmatch.js', 'js/killfx.js', 'js/range.js', 'js/hold.js', 'js/chat.js', 'js/colpick.js', 'js/lobby.js', 'js/lobbies.js', 'js/lobbyscenes.js', 'js/armory.js', 'js/draw.js', 'js/boost.js', 'js/daily.js', 'js/input.js', 'js/chests.js', 'js/missions.js', 'js/events.js', 'js/trial.js', 'js/achievements.js', 'js/levelup.js', 'js/funnel.js', 'js/main.js', 'js/cloud.js', 'js/net.js', 'js/coop.js', 'js/duel.js', 'js/friends.js', 'js/boards.js', 'js/touch.js', 'js/moved.js'];
 // fetch them all now, alongside three.js, instead of after it
 for (const f of ['js/crazy.js', ...GAME_FILES]) { const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = f + '?v=' + GAME_V; document.head.append(l); }
 </script>
@@ -44,14 +44,15 @@ for (const f of ['js/crazy.js', ...GAME_FILES]) { const l = document.createEleme
     <div id="drawBtns"><button id="drawCancel">CANCEL</button><button id="drawSave">SAVE</button></div>
   </div>
   <div id="stage"></div>
+  <div id="lobPick"><div id="lobBox"></div></div>
   <div id="lobbyUI">
     <div id="lobbyTop">
       <div id="nameRow"><input id="nameIn" maxlength="16" autocomplete="off" spellcheck="false"><button id="nameDice" title="Random name"></button></div>
       <div id="prof"></div>
-      <div id="lobbyBtns"><button id="cloudBtn" title="Cloud save"></button><button id="friendsBtn" title="Friends">FRIENDS<i id="frBadge"></i></button><button id="topBtn" title="Top players"></button><button id="achBtn" title="Achievements"></button></div>
+      <div id="lobbyBtns"><button id="cloudBtn" title="Cloud save"></button><button id="friendsBtn" title="Friends">FRIENDS<i id="frBadge"></i></button><button id="topBtn" title="Top players"></button><button id="achBtn" title="Achievements"></button><button id="lobBtn" title="Lobby"></button></div>
     </div>
     <div id="coinRow"><button id="dailyBtn" title="Daily reward"></button><button id="keyBtn" title="Chests"></button><div id="lobbyCoins" class="pc"></div></div>
-    <div id="side"><div id="event"></div><div id="misDraw"><button id="misTab"></button><div id="missions"></div></div></div>
+    <div id="side"><div id="evDraw"><button id="evTab"></button><div id="event"></div></div><div id="misDraw"><button id="misTab"></button><div id="missions"></div></div></div>
     <button id="lobbySet" class="sq small" title="Settings"><img id="setIcon"></button>
     <button id="boostBtn" title="2× Booster"></button>
     <div id="trial"></div>
@@ -62,14 +63,21 @@ for (const f of ['js/crazy.js', ...GAME_FILES]) { const l = document.createEleme
   <div id="pick">
     <button id="pickBack"></button>
     <h1 id="pickTitle"></h1>
-    <p id="pickDesc"></p>
-    <div id="pickPill" class="seg" style="display:none"><button data-on="1">ONLINE</button><button data-on="0">VS BOTS</button><small id="pillNote"></small></div>
-    <div id="pickList"></div>
+    <div id="pickBody">
+      <div id="pickTabs"></div>
+      <div id="pickMain">
+        <p id="pickDesc"></p>
+        <div id="pickSegs"><div id="pickSub" class="seg"></div><div id="pickPill" class="seg" style="display:none"><button data-on="1">ONLINE</button><button data-on="0">VS BOTS</button></div><small id="pillNote"></small></div>
+        <div id="pickList"></div>
+      </div>
+    </div>
+    <div id="pickFoot"><button id="privBtn"></button><button id="codeBtn"></button></div>
   </div>
 </div>
 <div id="menu">
   <h1 id="menuTitle">MENU</h1>
   <p id="msg"></p>
+  <div id="rack" style="display:none"></div>
   <div id="roomRow" style="display:none"><span id="roomCode"></span><button id="inviteBtn">INVITE</button></div>
   <div id="menuBtns"><button id="menuPlay">BACK TO GAME</button><button id="armBtn">ARMORY</button><button id="menuFriends">FRIENDS</button><button id="menuPlayers">PLAYERS</button><button id="ctrlBtn">SETTINGS</button><button id="lobbyBtn">EXIT GAME</button></div>
   <p id="menuTip"></p>

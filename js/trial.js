@@ -1,5 +1,5 @@
 // weapon of the week: one armory gun anyone can try in every match that week, never yours, so nothing that counts guns sees it
-const TRIAL_GUNS = ['finale', 'wildfire', 'quasar', 'monarch', 'starsmasher', 'voidlantern', 'tempest', 'aurora', 'blazesaber', 'apex', 'wisp', 'windsaber', 'moonbeam', 'bombard', 'peregrine'];
+const TRIAL_GUNS = ['finale', 'wildfire', 'quasar', 'monarch', 'starsmasher', 'voidlantern', 'tempest', 'aurora', 'blazesaber', 'apex', 'wisp', 'windsaber', 'moonbeam', 'bombard', 'peregrine', 'boomerang', 'juggernaut', 'scythe', 'meteor'];
 const TRIAL_FROM = 2; // the evWeek() of the first, the week of 2026-11-23
 const trialPick = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) && new URLSearchParams(location.search).get('try') || null; // ?try=quasar to see one here
 const trialWk = () => new Date(EV_START + evWeek() * EV_WEEK).toISOString().slice(0, 10);

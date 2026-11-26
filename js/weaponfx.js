@@ -11,6 +11,7 @@ const TRAILS = {
   windsaber: { a: [1, -8], b: [1, -44], band: [.06, 1.04], op: .32, life: .11, inner: .45, cols: [0xeefaff, 0xb8e4ff, 0x8fd0ff], edges: [[1, .85], [.75, .45, .025], [.5, .3, .02], [.25, .2, .02]] },
   tisword: { a: [2, -8], b: [5, -44], band: [.5, 1.03], op: .4, life: .09, inner: 0, cols: [0xdcecff, 0x8fc0ff, 0x4f9dff], edges: [[1, 1, .035]], bits: 'glint' },
   stunwand: { a: [0, -20], b: [0, -33], band: [.3, 1.12], op: .55, life: .1, inner: .15, cols: [0xfff6a0, 0xffd23a, 0xffa020], edge: 0xfffbe0, edges: [[1, 1, .08], [.6, .6, .06]], zap: true, bits: 'sparks' },
+  scythe: { win: [.24, .3, .58, .66], a: [0, -24], b: [0, -42, 32], band: [0, 1], op: .5, life: .15, inner: .3, cols: [0xeee8ff, 0xc4b4ff, 0x8a6ee0, 0x4a3290], edge: 0xf6f2ff, edges: [[1, .7], [.55, .25, .03]] },
   monarch: { a: [.5, -2], b: [.5, -16.5], band: [.4, 1.06], op: .5, life: .09, inner: .15, cols: [0xffd88a, 0xf9a23c, 0xf28c1e, 0xb8500a], edge: 0xfff4dc, edges: [[1, .6], [.62, .22, .03]], bits: 'fly' },
 };
 for (const T of Object.values(TRAILS)) { T.cols = (T.cols || [0xffffff]).map(c => new THREE.Color(c)); T.edge = new THREE.Color(T.edge ?? 0xffffff); }
@@ -37,7 +38,8 @@ function trLayer(sp, add) { // the sweep is laid over what's behind it (so it ke
 }
 const trails = new Map(); // a weapon's group: its trail
 const trSmooth = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };
-const trailE = s => s < 0 ? 0 : trSmooth(.31, .36, s) * (1 - trSmooth(.48, .56, s)); // only the slash itself, not the wind-up or the way back
+const TRAIL_WIN = [.31, .36, .48, .56]; // a slash's trail fades in and out between these (the scythe's sweep has its own)
+const trailE = (s, w = TRAIL_WIN) => s < 0 ? 0 : trSmooth(w[0], w[1], s) * (1 - trSmooth(w[2], w[3], s)); // only the slash itself, not the wind-up or the way back
 // each frame a weapon is held: s is how far through its swing (-1 when it isn't), sp what the trail is drawn in (the camera for yours)
 function bladeTrail(g, w, s, sp) {
   const T = TRAILS[w.id]; if (!T || gfx.q === 'low') return;
@@ -51,9 +53,9 @@ function trailSample(t, g) {
   const T = t.T, v = t.v, px = t.px, P = t.pts;
   g.updateWorldMatrix(true, false);
   _tm.copy(t.sp.matrixWorld).invert().multiply(g.matrixWorld); // the weapon's frame, in the trail's
-  _ta.set(0, T.a[0] * px, T.a[1] * px).applyMatrix4(_tm); _tb.set(0, T.b[0] * px, T.b[1] * px).applyMatrix4(_tm);
+  _ta.set((T.a[2] || 0) * px, T.a[0] * px, T.a[1] * px).applyMatrix4(_tm); _tb.set((T.b[2] || 0) * px, T.b[0] * px, T.b[1] * px).applyMatrix4(_tm);
   const last = P[P.length - 1], before = P[P.length - 2], p = before && last.t - before.t < 1 / 120 ? last : trFree.pop() || { i: new THREE.Vector3(), o: new THREE.Vector3() }; // the newest follows the blade, the rest no more than 120 a second
-  p.i.lerpVectors(_ta, _tb, T.band[0] + v.b0); p.o.lerpVectors(_ta, _tb, T.band[1]); p.t = fxClock; p.e = trailE(t.s);
+  p.i.lerpVectors(_ta, _tb, T.band[0] + v.b0); p.o.lerpVectors(_ta, _tb, T.band[1]); p.t = fxClock; p.e = trailE(t.s, T.win);
   if (p !== last) P.push(p);
   if (T.bits && p.e > .3) trailShed(t, p, P[P.length - 2]);
 }

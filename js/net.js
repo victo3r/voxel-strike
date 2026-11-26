@@ -83,7 +83,7 @@ net = (() => {
     const load = CATS.map(([c]) => BASE[loadoutGun(c)].id), stars = {};
     BASE.forEach((w, i) => { if (hasGun(i)) stars[w.id] = Math.max(0, Math.min(2, gunUse(i) - 1)); });
     if (trialOn()) stars[BASE[trialNow()].id] = 0;
-    return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), stars, load, lv: prof.lv }; // lv: how grown a gun that grows is
+    return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), kfx: wornKfx(), stars, load, lv: prof.lv }; // lv: how grown a gun that grows is
   }
   function hello(rejoin = null) {
     const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookSent(), gear: myGear(), lv: prof.lv, boost: boostSet() > 0 }; // a drawn skin follows in its own message
@@ -334,7 +334,7 @@ net = (() => {
     const boots = gear.boots && bootOf(gear.boots.id) ? { id: gear.boots.id, st: Math.max(1, Math.min(3, gear.boots.st | 0)) } : null;
     const hat = gear.hat && hatOf(gear.hat.id) ? { id: gear.hat.id, st: Math.max(1, Math.min(3, gear.hat.st | 0)), ...(hatSkinOf(gear.hat.skin) ? { skin: gear.hat.skin } : {}) } : null;
     const armor = Math.max(0, Math.min(ARMOR_ALL, gear.armor | 0));
-    return { stars, load, W, lv, boots, hat, armor, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
+    return { stars, load, W, lv, boots, hat, armor, kfx: kfxOf(gear.kfx) ? gear.kfx : '', fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
   }
   function gearMsg(m) { // someone changed gear mid-match
     if (m.pid === undefined) { if (roomMode !== 'coop') { P.maxArmor = m.maxArmor; P.armor = m.armor; } return; } // the server's answer to your own change (co-op: your armor's yours, shop plates and all)
@@ -487,7 +487,7 @@ net = (() => {
     r.respawnAt = m.respawnAt || now() + 3000; r.readyAt = 0;
     const b = r.body; if (!b) { r.rec.alive = false; return; }
     b.hp = 0; b.dead = .0001; b.drowned = !!m.drowned;
-    botDownFx(b, !!m.drowned);
+    botDownFx(b, !!m.drowned, killer === youRec ? wornKfx() : killer?.kfx);
     r.body = null; r.rec.b = null; r.rec.alive = false;
   }
   function score(rows) {
@@ -585,7 +585,7 @@ net = (() => {
       const b = wandBolt('spell' + el, tip, from.clone().addScaledVector(dir, SPELL_FAR)); b.ghost = id; b.el = el;
       return;
     }
-    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : w.wisp ? fireWisp : w.vortex ? fireVoid : w.saw ? fireSaw : null)?.(w, from, dir, by, { ghost: true, id });
+    (w.rocket ? fireRocket : w.flare ? fireFlare : w.grenade ? fireGrenade : w.wisp ? fireWisp : w.vortex ? fireVoid : w.saw ? fireSaw : w.boomer ? fireBoomer : null)?.(w, from, dir, by, { ghost: true, id });
   }
   function remoteBoom(m) {
     if (m.of !== undefined) return remoteBomblet(m);
@@ -593,6 +593,7 @@ net = (() => {
     const sb = bolts.findIndex(b => b.ghost === id);
     if (sb >= 0) { const b = bolts[sb]; b.ms.forEach(x => b.sc.remove(x)); bolts.splice(sb, 1); spellFx(p, b.el); return; }
     if (mythBoom(id, p, m.g, bodyOf(m.pid))) return; // a wisp, or a void opening
+    if (BASE[gi(m.g)]?.meteor) { const k = rockets.findIndex(x => x.ghost && x.id === id), r = rockets[k]; if (r) { scene.remove(r.m); rockets.splice(k, 1); } callMeteor(p, bodyOf(m.pid), 0, m.g, id, true, r?.dir); return; } // a beacon: the meteor's on its way
     let kind = 'rocket', gust = false;
     for (const list of [rockets, flares, grenades]) {
       const k = list.findIndex(x => x.ghost && x.id === id);
@@ -678,11 +679,11 @@ net = (() => {
     wingTick(z, !!(cur.flags & 16), dt); // Skyrunner wings while they glide
     if (W.charge) { // their coils light up while they charge
       z.chargeK = r.charging ? Math.min(1, (z.chargeK || 0) + dt / W.charge) : 0; chargeShow(z.charges, z.chargeK);
-      if (z.chargeK >= 1 && !z.chargeFull) sfx('chargeReady', { at: pos, far: 30, v: .6 }); z.chargeFull = z.chargeK >= 1;
+      if (z.chargeK >= 1 && !z.chargeFull) sfx(W.bow ? 'bowFull' : 'chargeReady', { at: pos, far: 30, v: .6 }); z.chargeFull = z.chargeK >= 1;
     }
     const full = !!(r.q & 4096); r.q = 0;
     if (r.fired) {
-      const n = Math.min(r.fired, 3); r.fired = 0; z.ammo = Math.max(0, z.ammo - n); // just for the rockets in a Salvo's tubes
+      const n = Math.min(r.fired, 3); r.fired = 0; z.ammo = Math.max(0, z.ammo - n); z.fireT = 0; // just for the rockets in a Salvo's tubes
       if (!W.melee) coreFire(z.core);
       if (W.melee) {
         z.sv = r.sv | 0; sfx(W.swing || 'swing', { at: pos, far: 20, rate: swingRate(W, z.sv) }); z.stab = swingT(W); z.insp = -1;
@@ -707,7 +708,8 @@ net = (() => {
     if (!ins) z.inspOn = false; else if (!z.inspOn) { z.inspOn = true; z.insp = z.stab > 0 ? -1 : 0; }
     if (z.insp >= 0) { const t0 = z.insp; z.insp += dt; if (!ins || z.stab > 0 || z.insp >= inspLen(W)) z.insp = -1; else inspSnd(W, t0, z.insp, pos); }
     z.stab = Math.max(0, z.stab - dt); heldTick(z, dt, z.rlLeft, rlT); // swings, kicks, wand flicks and reloads
-    if (z.spin) { if (z.muzzle > 0) z.spinV = spinKick(z.gun); spinTurn(z.spin, z.spinV + spinIdle(z.gun), dt); z.spinV = Math.max(0, z.spinV - dt * 25); }
+    if (W.windup) { z.fireT = (z.fireT ?? 9) + dt; z.wk = z.fireT < .25 ? Math.min(1, (z.wk || 0) + dt / W.windup) : Math.max(0, (z.wk || 0) - dt * 1.4 / W.windup); } // their Juggernaut winds up as they keep firing
+    if (z.spin) { if (z.muzzle > 0) z.spinV = shotSpin(W, z.gun, z.spinV, z.wk || 0); if (W.windup) z.spinV = Math.max(z.spinV, 30 * (z.wk || 0)); spinTurn(z.spin, z.spinV + spinIdle(z.gun), dt); z.spinV = Math.max(0, z.spinV - dt * 25); }
     if (z.round) z.round.visible = true;
     // flame and heat ray stay on while they hold fire
     const firing = !!(cur.flags & 4) && (W.flame || W.beam);

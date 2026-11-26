@@ -20,18 +20,20 @@ const CHESTS = [
     ...BOOTS.filter(b => !b.bars).map(b => ({ k: 'boots', id: b.id, w: 3.5, r: rarOf(b) })), ...HATS.filter(h => !h.bars).map(h => ({ k: 'hats', id: h.id, w: 3.5, r: rarOf(h) })),
     { k: 'coins', n: 300, w: 9, r: 'epic' },
     ...BASE.filter(w => w.chest).map(w => ({ k: 'gun', id: w.id, w: w.drop ?? GUN_DROP[rarOf(w)], r: rarOf(w) })), // drop: a gun's own odds (the Crystal Companion is rarer still)
+    ...KILL_FX.filter(K => K.chest).map(K => ({ k: 'kfx', id: K.id, w: GUN_DROP[K.rar] * .6, r: K.rar })), // the kill effects only chests hold
+    ...LOBBIES.filter(L => L.chest).map(L => ({ k: 'lobby', id: L.id, w: GUN_DROP[L.rar] * .6, r: L.rar })), // and the lobbies
     { k: 'coins', n: 500, w: 3, r: 'legend' },
   ] },
 ];
 const starGuns = () => BASE.map((w, i) => i).filter(i => BASE[i].price && gunStars(i) >= 1 && gunStars(i) < 3);
-const lootOk = l => l.k === 'star' ? starGuns().length > 0 : l.k === 'gun' ? !gunStars(gi(l.id)) : l.k === 'boots' ? !prof.boots[l.id] && prof.lv >= gearOf(l).unlock : l.k === 'hats' ? !prof.hats[l.id] && prof.lv >= gearOf(l).unlock : true;
+const lootOk = l => l.k === 'star' ? starGuns().length > 0 : l.k === 'gun' ? !gunStars(gi(l.id)) : l.k === 'boots' ? !prof.boots[l.id] && prof.lv >= gearOf(l).unlock : l.k === 'hats' ? !prof.hats[l.id] && prof.lv >= gearOf(l).unlock : l.k === 'kfx' ? !prof.kfx?.[l.id] : l.k === 'lobby' ? !prof.lobbies?.[l.id] : true;
 // what a chest can give you right now, with odds that add up to 100
 function lootNow(c) {
   const ok = c.loot.filter(lootOk), sum = ok.reduce((s, l) => s + l.w, 0);
   return ok.map(l => ({ ...l, p: l.w / sum }));
 }
 // the "can have" row: common to mythic, then by kind and amount
-const LOOT_KIND = ['coins', 'boosts', 'xp', 'star', 'boots', 'hats', 'gun'], lootLow = n => Array.isArray(n) ? n[0] : n | 0;
+const LOOT_KIND = ['coins', 'boosts', 'xp', 'star', 'boots', 'hats', 'kfx', 'lobby', 'gun'], lootLow = n => Array.isArray(n) ? n[0] : n | 0;
 function lootShown(c) {
   const rk = Object.keys(RARITY), r = l => rk.indexOf(l.r || 'common');
   return lootNow(c).sort((a, b) => r(a) - r(b) || LOOT_KIND.indexOf(a.k) - LOOT_KIND.indexOf(b.k) || lootLow(a.n) - lootLow(b.n));
@@ -48,8 +50,10 @@ function lootCard(l, n = l.n) {
   else if (l.k === 'xp') { pic = `<span class="lc lx">XP</span>`; name = `${nText(n)} XP`; }
   else if (l.k === 'star') { pic = `<span class="lc ls">${ico('star').repeat(n)}</span>`; name = l.gave ? l.gave.map(([i, k]) => `${BASE[i].name.toUpperCase()} +${k} ${ico('star')}`).join('<br>') || '50 COINS A STAR' : n > 1 ? `+${n} STARS ON YOUR GUNS` : '+1 STAR ON A GUN'; }
   else if (l.k === 'gun') { pic = `<img class="ai" src="${gunPic(gi(l.id))}">`; name = BASE[gi(l.id)].name.toUpperCase(); }
+  else if (l.k === 'kfx') { pic = `<img class="ai" src="${kfxPic(l.id)}">`; name = kfxOf(l.id).name.toUpperCase(); }
+  else if (l.k === 'lobby') { pic = `<span class="lc">${ico(lobbyById(l.id).ic)}</span>`; name = lobbyById(l.id).name; }
   else { pic = `<img class="ai" src="${l.k === 'boots' ? bootPic(l.id, 1) : hatPic(l.id, 1)}">`; name = gearOf(l).name.toUpperCase(); }
-  return `<div class="loot" style="--rc:${rc}"><div class="pic">${pic}</div><b>${name}</b><small>${rn}${l.k === 'gun' ? ' ' + CATS[CAT_I[BASE[gi(l.id)].cat]][1] : ''}</small>${l.p !== undefined ? `<i>${(l.p * 100).toFixed(l.p < .1 ? 1 : 0)}%</i>` : ''}</div>`;
+  return `<div class="loot" style="--rc:${rc}"><div class="pic">${pic}</div><b>${name}</b><small>${rn}${l.k === 'gun' ? ' ' + CATS[CAT_I[BASE[gi(l.id)].cat]][1] : l.k === 'kfx' ? ' KILL FX' : l.k === 'lobby' ? ' LOBBY' : ''}</small>${l.p !== undefined ? `<i>${(l.p * 100).toFixed(l.p < .1 ? 1 : 0)}%</i>` : ''}</div>`;
 }
 // open one: a won chest or the keys, roll, hand it over
 function openChest(c) {
@@ -74,6 +78,8 @@ function openChest(c) {
   else if (got.k === 'gun') prof.guns[got.id] = 1;
   else if (got.k === 'boots') prof.boots[got.id] = 1;
   else if (got.k === 'hats') prof.hats[got.id] = 1;
+  else if (got.k === 'kfx') prof.kfx = { ...prof.kfx, [got.id]: 1 };
+  else if (got.k === 'lobby') prof.lobbies = { ...prof.lobbies, [got.id]: 1 };
   if (got.k === 'xp') grant(got.n, 0); else { saveProf(); showProf(); }
   return got;
 }

@@ -137,6 +137,7 @@ function hitFx(zz, point, head, quiet, w) { // w: what hit it
 // kind and pj say what hit it, for online play
 function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj = 0, thru = 0) {
   if (!Number.isFinite(dmg)) return; // a bad number would make it unkillable
+  if (zz.show && !by) by = zz; // the lobby's backdrop: nothing there is ever yours
   if (zz.type === 'bot' && friendly(by, zz)) return; // no friendly fire
   const hw = by ? BASE[by.gun] : BASE[cur];
   if (net.pvp && (zz.remote || zz.pid)) { // online the server owns its health
@@ -159,6 +160,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
     const t = kind === 1 && zz.rec.fx.thorns; // the Thornwood Crown stings back
     if (t && by !== zz) { if (by) { if (!by.dead) { stingFx(by.g.position); hurtZombie(by, dmg * t, by.g.position.clone().setY(by.g.position.y + 1), false, true, zz, 8); } } else { stingFx(P.pos); hurtPlayer(dmg * t, false, zz, false, 8); } }
   } else zz.hp -= dmg;
+  if (zz.dummy) rangeHit(zz, dmg, head, quiet, point);
   const dies = zz.hp <= 0 && !zz.dead;
   if (dies) { zz.dead = .0001; zz.killBy = by ? 0 : zFrom || net.pid; zz.killHead = head; } // mark dead first so a broken effect can't make it unkillable
   if (zz.type === 'bot' && by !== zz) { // recent damage, for kill credit
@@ -194,7 +196,7 @@ function youHitFx(head, armorOnly, silver = armorOnly) {
 // pierce skips armor, by = the bot that shot you
 function hurtPlayer(d, pierce = false, by = null, head = false, kind = 0, pj = 0, thru = 0) {
   if (by?.type === 'bot' && grace()) return; // stray shots in your first game's first moments
-  if (respawnT > 0 || matchOver || !pvp() && dead || P.downed || P.waiting || by && friendly(by, YOU_T)) return; // your own rocket still hurts
+  if (mode === 'range' || respawnT > 0 || matchOver || !pvp() && dead || P.downed || P.waiting || by && friendly(by, YOU_T)) return; // your own rocket still hurts
   if (net.pvp) { // online the server decides the damage
     net.claim(P, { kind, head, point: new THREE.Vector3(P.pos.x, P.pos.y + (head ? 1.6 : 1), P.pos.z), gun: by ? BASE[by.gun]?.id : BASE[cur].id, pj, by, thru });
     return;
@@ -296,9 +298,10 @@ function blastFx(p, R, gust = false, cl = false, g = '') {
   if (gust) { burst(p, 0xffffff, 24); burst(p, 0x9fdcff, 16); burst(p, 0xffd45a, 6); sfx('gust', { at: p, far: 120 }); } // a burst of wind instead of fire
   else if (cl) { burst(p, 0xffd23a, 22); burst(p, 0xffffff, 10); burst(p, 0xff8800, 10); sfx('finaleBoom', { at: p, far: 120 }); } // a firework's gold burst (the bomblets bring the colours)
   else if (g === 'bombard') { burst(p, 0xff8800, 34); burst(p, 0x2a2a2a, 18); burst(p, 0x8a7a66, 14); sfx('bombardBoom', { at: p, far: 130 }); } // a cannon's: more fire, more earth thrown up
+  else if (g === 'meteor') { burst(p, 0xff6a2a, 40); burst(p, 0x3a2c26, 22); burst(p, 0xffd890, 14); sfx('meteorBoom', { at: p, far: 160 }); } // fire, and the ground thrown up
   else if (g === 'peregrine') { burst(p, 0xffc23a, 22); burst(p, 0xe9dfc8, 10); burst(p, 0x5c6b7a, 10); sfx('peregrineBoom', { at: p, far: 120 }); } // gold, with a puff of feathers
   else { burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 }); }
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : cl ? 0xffe08a : g === 'peregrine' ? 0xffd88a : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : cl ? 0xffe08a : g === 'peregrine' ? 0xffd88a : g === 'meteor' ? 0xff7a2a : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
 }
 // el: the Ancient Wand's spell (0 fire, 1 ice, 2 wind), which never hurts whoever cast it
@@ -382,6 +385,13 @@ const SHOP = [
   { gun: 'moonbeam', price: 440, desc: 'a moonlit beam that bounces off walls' },
   { gun: 'bombard', price: 540, desc: 'lobs a cannonball into the crowd' },
   { gun: 'peregrine', price: 600, desc: 'rockets that dive for the nearest one' },
+  { gun: 'firefly', price: 140, desc: 'a little machine pistol that buzzes' },
+  { gun: 'longbow', price: 220, desc: 'draw it all the way back for a big hit' },
+  { gun: 'rhino', price: 300, desc: 'big slow rounds that hit like a charge' },
+  { gun: 'boomerang', price: 420, desc: 'hits on the way out and on the way back' },
+  { gun: 'juggernaut', price: 460, desc: 'spins up into a storm of lead' },
+  { gun: 'scythe', price: 450, desc: 'one wide sweep takes the whole row' },
+  { gun: 'meteor', price: 640, desc: 'calls a meteor down on them' },
   { gun: 'apex', price: 440, desc: `${BASE[gi('apex')].dmg} dmg, top of the food chain` },
   { gun: 'tracker', price: 200, desc: 'darts that show them through walls' },
   { gun: 'tempest', price: 460, desc: 'lightning that jumps from one to the next' },

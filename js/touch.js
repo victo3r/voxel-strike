@@ -98,7 +98,7 @@ if (TOUCH) {
   document.addEventListener('pointerlockchange', () => {
     tc.classList.toggle('on', locked); document.body.classList.toggle('tcOn', locked); // the HUD hides behind menus
     own.clear(); homeStick(); tc.querySelectorAll('.tb').forEach(b => b.classList.remove('down', 'on'));
-    $('tBoard').style.display = pvp() ? '' : 'none';
+    $('tBoard').style.display = pvp() && mode !== 'range' ? '' : 'none';
     $('tChat').style.display = net.on && chatOn() ? '' : 'none';
     clearInterval(aimSync); if (locked) aimSync = setInterval(() => $('tAim').classList.toggle('on', aimOn), 100);
   });

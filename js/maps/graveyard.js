@@ -68,12 +68,12 @@ const fenceRun = (x1, z1, x2, z2) => {
   for (let i = 0; i <= n; i++) {
     const x = x1 + (x2 - x1) * i / n, z = z1 + (z2 - z1) * i / n, k = x.toFixed(1) + ',' + z.toFixed(1);
     if (posts.has(k)) continue; posts.add(k);
-    building.cover.push(piece(.5, FH + .3, .5, stone, x, (FH + .3) / 2, z)); piece(.64, .16, .64, darkStone, x, FH + .38, z);
+    const post = piece(.5, FH + .3, .5, stone, x, (FH + .3) / 2, z); building.cover.push(post); meshSolids(post); meshSolids(piece(.64, .16, .64, darkStone, x, FH + .38, z));
   }
 };
 fenceRun(-GA, -GA, GA, -GA); fenceRun(-GA, -GA, -GA, GA); fenceRun(GA, -GA, GA, GA);
 fenceRun(-GA, GA, -2.4, GA); fenceRun(2.4, GA, GA, GA);
-for (const s of [-1, 1]) { building.cover.push(piece(.8, 3.2, .8, stone, s * 2.4, 1.6, GA)); piece(.95, .2, .95, darkStone, s * 2.4, 3.3, GA); addSolid(s * 2.4, GA, .8, .8, 3.4); }
+for (const s of [-1, 1]) { building.cover.push(piece(.8, 3.2, .8, stone, s * 2.4, 1.6, GA)); meshSolids(piece(.95, .2, .95, darkStone, s * 2.4, 3.3, GA)); addSolid(s * 2.4, GA, .8, .8, 3.2); }
 { const gate = new THREE.Mesh(new THREE.PlaneGeometry(4, FH + .2), barMat(4 / 1.2)); gate.position.set(0, (FH + .2) / 2, GA); add(gate); piece(4, .12, .08, iron, 0, FH * .55, GA); }
 
 // --- the chapel ---
@@ -85,7 +85,7 @@ const glass = [0x8a50d8, 0xd89a3a, 0x3a8ad8].map(c => new THREE.MeshBasicMateria
 for (const [z, k] of [[-18.2, 0], [-13.8, 1]]) for (const s of [-1, 1]) {
   const x = s * (cx1 + .025);
   for (let i = 0; i < 4; i++) piece(.04, .55, 1 - Math.abs(i - 1.5) * .25, glass[(k + i) % 3], x, 1.4 + i * .55, z);
-  piece(.1, .1, 1.2, darkStone, s * (cx1 + .05), 1.1, z); piece(.1, .1, .5, darkStone, s * (cx1 + .05), 3.65, z);
+  meshSolids(piece(.1, .1, 1.2, darkStone, s * (cx1 + .05), 1.1, z)); meshSolids(piece(.1, .1, .5, darkStone, s * (cx1 + .05), 3.65, z));
 }
 { for (const [dx, dy, c] of [[0, 0, 1], [-.45, 0, 0], [.45, 0, 0], [0, .45, 2], [0, -.45, 2]]) piece(.42, .42, .04, glass[c], dx, 5.6 + dy, cz0 - .03); } // rose window
 // stepped gables and the slate roof, which you can walk on (up the steps in the belfry and over its north wall)
@@ -104,14 +104,15 @@ const DOOR = .7, DOOR_H = 2.5;
 tw(-TO, TO, -TO, -TI, 0, DECK + PAR); // north wall
 tw(-TO, -TI, -TI, TI, 0, DECK + PAR); tw(TI, TO, -TI, TI, 0, DECK + PAR); // west and east walls
 tw(-TO, -DOOR, TI, TO, 0, DECK + PAR); tw(DOOR, TO, TI, TO, 0, DECK + PAR); tw(-DOOR, DOOR, TI, TO, DOOR_H, DECK + PAR); // south wall and door
-for (const s of [-1, 1]) piece(.16, .2, .16, darkStone, TX + s * (DOOR + .08), DOOR_H - .1, TZ + TO + .08);
-piece(DOOR * 2 + .5, .3, .22, darkStone, TX, DOOR_H + .15, TZ + TO + .11);
+for (const s of [-1, 1]) meshSolids(piece(.16, .2, .16, darkStone, TX + s * (DOOR + .08), DOOR_H - .1, TZ + TO + .08));
+meshSolids(piece(DOOR * 2 + .5, .3, .22, darkStone, TX, DOOR_H + .15, TZ + TO + .11));
 for (const [u, v] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) tw(u * TO - (u > 0 ? .55 : 0), u * TO + (u < 0 ? .55 : 0), v * TO - (v > 0 ? .55 : 0), v * TO + (v < 0 ? .55 : 0), DECK + PAR, DECK + 3); // belfry pillars
-for (const s of [-1, 1]) { piece(TO * 2, .3, .55, darkStone, TX, DECK + 3.15, TZ + s * (TO - .275)); piece(.55, .3, TO * 2 - 1.1, darkStone, TX + s * (TO - .275), DECK + 3.15, TZ); }
-{ const roof = new THREE.Mesh(new THREE.ConeGeometry(TO * 1.45, 3.2, 4), slate); roof.rotation.y = Math.PI / 4; roof.position.set(TX, DECK + 4.9, TZ); add(roof); building.cover.push(roof); }
-piece(.12, 1.5, .12, iron, TX, DECK + 6.95, TZ); piece(.7, .1, .1, iron, TX, DECK + 7.2, TZ); // a cross out of the spire's tip
+for (const s of [-1, 1]) { meshSolids(piece(TO * 2, .3, .55, darkStone, TX, DECK + 3.15, TZ + s * (TO - .275))); meshSolids(piece(.55, .3, TO * 2 - 1.1, darkStone, TX + s * (TO - .275), DECK + 3.15, TZ)); }
+{ const roof = new THREE.Mesh(new THREE.ConeGeometry(TO * 1.45, 3.2, 4), slate); roof.rotation.y = Math.PI / 4; roof.position.set(TX, DECK + 4.9, TZ); add(roof); building.cover.push(roof);
+  const r = TO * 1.45 / Math.SQRT2; building.solids.push({ mesh: null, minX: TX - r, maxX: TX + r, minZ: TZ - r, maxZ: TZ + r, bot: DECK + 3.3, top: DECK + 6.5, peak: { x: TX, z: TZ, rx: r, rz: r, edge: DECK + 3.3 }, surf: 'stone' }); } // the spire, up to its point
+meshSolids(piece(.12, 1.5, .12, iron, TX, DECK + 6.95, TZ)); meshSolids(piece(.7, .1, .1, iron, TX, DECK + 7.2, TZ)); // a cross out of the spire's tip
 // the bell
-piece(.2, .2, TO * 2 - .5, wood, TX, DECK + 3.15, TZ); // the yoke rests in the belfry's beams
+meshSolids(piece(.2, .2, TO * 2 - .5, wood, TX, DECK + 3.15, TZ)); // the yoke rests in the belfry's beams
 for (const [w, y] of [[.5, 2.9], [.8, 2.7], [.95, 2.45], [1.1, 2.25]]) { const b = piece(w, .25, w, bronze, TX, DECK + y, TZ); building.cover.push(b); }
 building.solids.push({ mesh: null, minX: TX - .55, maxX: TX + .55, minZ: TZ - .55, maxZ: TZ + .55, bot: DECK + 2.15, top: DECK + 3.1 }); // high enough to hop under
 // stair runs: E (0 to RISE), N, W, then S over the door to the deck; a landing in each corner on the way
@@ -135,7 +136,7 @@ RUNS.forEach(({ r: [u0, u1, v0, v1], ax, a, b, fill }, j) => {
   if (!fill && j) { // a beam under the run
     const len = Math.hypot(Math.abs(b - a), RISE), m = ax === 'z' ? box(u1 - u0 - .3, .2, len, wood) : box(len, .2, v1 - v0 - .3, wood);
     m.position.set(TX + (ax === 'z' ? (u0 + u1) / 2 : (a + b) / 2), bot + RISE / 2 - .25, TZ + (ax === 'z' ? (a + b) / 2 : (v0 + v1) / 2));
-    if (ax === 'z') m.rotation.x = -Math.atan(RISE / (b - a)); else m.rotation.z = Math.atan(RISE / (b - a)); add(m);
+    if (ax === 'z') m.rotation.x = -Math.atan(RISE / (b - a)); else m.rotation.z = Math.atan(RISE / (b - a)); add(m); meshSolids(m);
   }
   if (j < 3) { const [l0, l1, k0, k1] = LANDINGS[j]; tw(l0, l1, k0, k1, 0, bot + RISE, darkStone); }
 });
@@ -144,7 +145,7 @@ for (const [u0, u1, v0, v1] of [[-E0, TI, -TI, E0], [E0, TI, E0, TI], [-TI, -E0,
 for (let k = 0; k < 3; k++) tw(-.7, .7, -TI + (2 - k) * .37, -TI + (3 - k) * .37, DECK, DECK + PAR * (k + 1) / 3, wood); // steps up onto the north wall, then the chapel roof
 // a lantern in the stairwell
 const lanternMat = lam({ color: 0xffd08a, emissive: 0xffa040, emissiveIntensity: 1.2 });
-piece(.04, .9, .04, iron, TX, DECK - .75, TZ); piece(.3, .4, .3, lanternMat, TX, DECK - 1.4, TZ); piece(.38, .07, .38, iron, TX, DECK - 1.17, TZ);
+piece(.04, .9, .04, iron, TX, DECK - .75, TZ); meshSolids(piece(.3, .4, .3, lanternMat, TX, DECK - 1.4, TZ), 'metal'); meshSolids(piece(.38, .07, .38, iron, TX, DECK - 1.17, TZ));
 { const pl = new THREE.PointLight(0xffb35a, 6, 8, 1.6); pl.position.set(TX, DECK - 1.8, TZ); add(pl); }
 
 // --- the crypt: a room under the ground with a stairway at each end ---
@@ -182,7 +183,7 @@ const coffin = (x, z, along) => {
 coffin(13.2, -7.6, 'x'); coffin(18.8, -7.6, 'x'); coffin(19.6, -3.6, 'z');
 const candleMat = lam({ color: 0xf2e6c8, emissive: 0x3a3020 }), flameMat = new THREE.MeshBasicMaterial({ color: 0xffc860 });
 const flameAt = [];
-const candles = (x, y, z) => { for (const [dx, dz, h] of [[0, 0, .3], [.14, .08, .2], [-.12, .1, .24]]) { piece(.07, h, .07, candleMat, x + dx, y + h / 2, z + dz); flameAt.push([x + dx, y + h + .05, z + dz]); } };
+const candles = (x, y, z) => { for (const [dx, dz, h] of [[0, 0, .3], [.14, .08, .2], [-.12, .1, .24]]) { meshSolids(piece(.07, h, .07, candleMat, x + dx, y + h / 2, z + dz), 'stone'); flameAt.push([x + dx, y + h + .05, z + dz]); } };
 candles(13.2, CF + .89, -7.6); candles(18.8, CF + .89, -7.6); candles(19.6, CF + .89, -3.6); candles(12, CF, -1.6); candles(20.4, CF, -8.4);
 const flames = new THREE.InstancedMesh(new THREE.BoxGeometry(.05, .09, .05), flameMat, flameAt.length), flameM = new THREE.Matrix4(); add(flames); // one draw for every flame
 for (const [x, z] of [[13.5, -6.2], [18.6, -4]]) { const pl = new THREE.PointLight(0xffa24a, 5, 9, 1.6); pl.position.set(x, CF + 1.4, z); add(pl); }
@@ -220,7 +221,7 @@ for (const [x, z] of graves) {
   else if (kind < .75) { h = 1.25; pc(.7, 1.1, .24, m, x, .55, hz); pc(.5, .15, .24, m, x, 1.18, hz); pc(.9, .12, .36, m, x, .06, hz); }
   else if (kind < .9) { h = 1.7; pc(.36, 1.4, .36, m, x, .7, hz); pc(.24, .3, .24, m, x, 1.55, hz); pc(.6, .2, .6, m, x, .1, hz); }
   else { h = 1.25; pc(.2, 1.25, .2, m, x, .62, hz); pc(.7, .2, .24, m, x, .9, hz); }
-  building.solids.push({ mesh: null, minX: x - .42, maxX: x + .42, minZ: hz - .16, maxZ: hz + .16, top: h, surf: 'stone' });
+  for (const b of parts) meshSolids(b, 'stone'); // each part its own, so an obelisk or a cross isn't a slab
   building.cover.push(...parts);
   if (isOpen) { // dug up: a dark hole and the dirt beside it
     flat(.9, 1.8, holeMat, x, .014, z + .05); open.push([x, z + .05]);
@@ -235,8 +236,8 @@ const LAMP_C = 0xffb35a;
 const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: LAMP_C, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false });
 const haloMat = new THREE.SpriteMaterial({ map: glowTex, color: LAMP_C, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false });
 LAMPS.forEach(([x, z], i) => {
-  piece(.2, 2.9, .2, iron, x, 1.45, z); addSolid(x, z, .3, .3, 3.4);
-  piece(.34, .44, .34, lanternMat, x, 3.1, z); piece(.44, .08, .44, iron, x, 3.36, z);
+  piece(.2, 2.9, .2, iron, x, 1.45, z); addSolid(x, z, .2, .2, 2.9);
+  meshSolids(piece(.34, .44, .34, lanternMat, x, 3.1, z), 'metal'); meshSolids(piece(.44, .08, .44, iron, x, 3.36, z));
   const halo = new THREE.Sprite(haloMat); halo.scale.setScalar(1.8); halo.position.set(x, 3.1, z); add(halo);
   const pool = new THREE.Mesh(new THREE.CircleGeometry(3.6, 20), poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(x, .03, z); add(pool);
   if (i % 2 === 0) { const pl = new THREE.PointLight(LAMP_C, 8, 12, 1.4); pl.position.set(x, 2.9, z); add(pl); }
@@ -244,13 +245,13 @@ LAMPS.forEach(([x, z], i) => {
 const deadBark = surf(lam({ map: tex(g => { noise(g, [58, 50, 44], 14); g.fillStyle = 'rgba(0,0,0,.3)'; for (const x of [3, 9, 13]) g.fillRect(x, 0, 1, 16); }) }), 'wood');
 const deadTree = (x, z, s, solid) => {
   const h = 3.4 * s, ry = rnd() * Math.PI;
-  const t = piece(.45 * s, h, .45 * s, deadBark, x, h / 2, z); t.rotation.y = ry;
+  const t = piece(.45 * s, h, .45 * s, deadBark, x, h / 2, z); if (!solid) t.rotation.y = ry; // ones you can reach stand square, to fit their hitboxes
   for (let k = 0; k < 4; k++) {
     const a = ry + k * 1.7 + rnd() * .6, y = h * (.5 + k * .13), l = (1.2 + rnd() * .8) * s;
     const b = box(.16 * s, l, .16 * s, deadBark); b.position.set(x + Math.cos(a) * l * .35, y + l * .3, z + Math.sin(a) * l * .35);
-    b.rotation.set(Math.sin(a) * .9, 0, -Math.cos(a) * .9); add(b);
+    b.rotation.set(Math.sin(a) * .9, 0, -Math.cos(a) * .9); add(b); if (solid) meshSolids(b, 'wood');
   }
-  if (solid) { addSolid(x, z, .5 * s, .5 * s, h); building.cover.push(t); }
+  if (solid) { addSolid(x, z, .45 * s, .45 * s, h, 'wood'); building.cover.push(t); }
 };
 const onGrave = (x, z, m) => graves.some(([gx, gz]) => Math.abs(gx - x) < .5 + m && Math.abs(gz - z) < 1.1 + m);
 for (const [x, z] of [[-21, -2], [21.5, -20], [-9, 22.5], [10, -14]]) if (clearOf(x, z, .2) && !onGrave(x, z, .4)) deadTree(x, z, 1 + rnd() * .3, true);
@@ -274,15 +275,40 @@ const mists = Array.from({ length: 14 }, () => {
   m.position.set(o.x, o.y, o.z); add(m); return o;
 });
 const MOON = new THREE.Vector3(...M.env.sunDir).normalize();
-const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(g => {
-  g.clearRect(0, 0, 16, 16);
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7.5); if (d > 7.2) continue; g.fillStyle = d > 6.2 ? '#c9d2df' : '#eef2f8'; g.fillRect(x, y, 1, 1); }
-  g.fillStyle = '#c3ccd9'; for (const [x, y, w, h] of [[4, 4, 3, 2], [9, 3, 2, 2], [10, 8, 3, 3], [5, 10, 2, 2]]) g.fillRect(x, y, w, h);
-}), fog: false, transparent: true }));
-moon.material.map.wrapS = moon.material.map.wrapT = THREE.ClampToEdgeWrapping; moon.scale.setScalar(7);
-const moonGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xcfdcff, fog: false, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false }));
+const moon = skyCube(moonFaces([238, 242, 248], [195, 204, 217]), MOON.clone().negate().add(new THREE.Vector3(-.5, .6, 0)), { amb: .3 }); moon.scale.setScalar(4.5); moon.position.copy(MOON).multiplyScalar(100); // full, a block, up in the sky from the start
+const moonGlow = skyBack(new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xcfdcff, fog: false, opacity: .3, blending: THREE.AdditiveBlending })));
 moonGlow.scale.setScalar(30); add(moonGlow); add(moon);
-for (const o of [moon, moonGlow]) { o.frustumCulled = false; o.onBeforeRender = (r, sc, cam) => { o.position.copy(cam.position).addScaledVector(MOON, 100); o.updateMatrixWorld(); }; } // far off from whatever camera looks, inside the low setting's view
+for (const o of [moon, moonGlow]) { const own = o.onBeforeRender; o.frustumCulled = false; o.onBeforeRender = (r, sc, cam, ...a) => { o.position.copy(cam.position).addScaledVector(MOON, 100); o.updateMatrixWorld(); own.call(o, r, sc, cam, ...a); }; } // far off from whatever camera looks, inside the low setting's view
+
+// the night: a faint glow over the hills, darker overhead, a few stars
+add(skyDome(90, [[-1, 0x1a2030], [0, 0x1a2030], [.05, 0x2e3852], [.15, 0x262f47], [.3, 0x182036], [.55, 0x0f1424], [.8, 0x0a0e1a], [1, 0x070a12]]));
+{
+  const pos = [], s = [], c = [], C = new THREE.Color();
+  for (let i = 0; i < 1500; i++) {
+    const a = Math.random() * Math.PI * 2, y = .06 + Math.random() * .94, r = Math.sqrt(1 - y * y);
+    pos.push(r * Math.cos(a) * 85, y * 85, r * Math.sin(a) * 85); s.push(Math.random() > .985 ? .34 : .17, .3 + Math.random() * .45, .2 + Math.random() * .4, Math.random());
+    C.set([0xffffff, 0xdce6ff, 0xc8d4ff][Math.random() * 3 | 0]); c.push(C.r, C.g, C.b);
+  }
+  add(camStars(pos, s, c, 16));
+}
+{ // far off, just past the fog: dark hills, bare trees, and the old church on its hill with one window lit
+  const fr = seeded(1313), mat = farMat(0x06080e, M.env.fog, 0, true), R = 74, n = 120, ph = fr() * 6, CH = 4.2, list = [], S = 1.5; // S: all of it moved out past the dead trees, the same seen from the middle
+  const tops = [...Array(n)].map((_, i) => 2.5 + 6 * rollAt((i + .5) / n * 6.28, ph) ** 1.5 + fr() * .6), near = a => Math.abs(Math.atan2(Math.sin(a - CH), Math.cos(a - CH)));
+  const cy = Math.min(5, tops[Math.floor(CH / 6.28 * n)]); tops.forEach((t, i) => { if (near((i + .5) / n * 6.28) < .1) tops[i] = cy; }); // the church's hill is flat on top
+  skyline(R * S, n, i => tops[i] * S, mat);
+  const put = (a, r, w, h, d, y, x = 0) => list.push([w, h, d, Math.cos(a) * r - Math.sin(a) * x, y, Math.sin(a) * r + Math.cos(a) * x, -a - Math.PI / 2]); // x along the hills, r out from the middle
+  for (let i = 0; i < n; i++) { // bare trees: a trunk and branches stepping up and out
+    const a = (i + .5) / n * 6.28, r = R - 5 - fr() * 2, h = 3 + fr() * 3.5, y = tops[i] - .3;
+    if (fr() > .3 || near(a) < .14) continue;
+    put(a, r, .45, h, .45, y + h / 2);
+    for (const sd of [-1, 1]) { const by = y + h * (.45 + fr() * .3); for (let k = 1; k <= 3; k++) put(a, r, .35, .35, .35, by + k * .4, sd * k * .38); }
+  }
+  const T = (x, w, h, y, d = 3.6) => put(CH, R - 6, w, h, d, cy + y, x); // the church, side on: nave, stepped roof, tower, spire and cross
+  T(0, 7, 4, 2); T(0, 7.4, .8, 4.4, 4); T(0, 7.2, .8, 5.2, 2.6); T(0, 7, .8, 6, 1.2); T(4.4, 2.4, 9, 4.5, 2.4); T(4.4, 1.6, 1.6, 9.8, 1.6); T(4.4, .9, 1.6, 11.4, .9); T(4.4, .4, 1.6, 13, .4); T(4.4, .14, 1.4, 14.5, .14); T(4.4, .8, .14, 14.7, .14);
+  const out = l => l.map(([w, h, d, x, y, z, ry]) => [w * S, h * S, d * S, x * S, y * S, z * S, ry]);
+  farOff(boxesMesh(out(list), mat));
+  farOff(boxesMesh(out([[.5, .8, .3, Math.cos(CH) * (R - 7.9) - Math.sin(CH) * -1.2, cy + 2.4, Math.sin(CH) * (R - 7.9) + Math.cos(CH) * -1.2, -CH - Math.PI / 2]]), farMat(0xffc870, M.env.fog, .5)));
+}
 
 // --- zombies climb out of the open graves, and follow you up the tower and down into the crypt ---
 const NV = makeNav(M, [0, 0, 12]);

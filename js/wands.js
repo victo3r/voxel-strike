@@ -75,7 +75,16 @@ const WAND_BOLT = {
   wisp: { spd: 26, glow: 0x5fe8d8, core: 0xeafffb, size: .34, bits: 'wisp', gap: .35 }, // the armory's wisps and void orbs (the real ones are in mythics.js)
   voidorb: { spd: 20, glow: 0x9a5aff, core: 0xe8d2ff, size: .45, bits: 'void', gap: .3 },
   saw: { spd: 60, glow: 0x8fc4ff, core: 0xffffff, size: .3, bits: 'ti', gap: 0 },
+  arrow: { spd: 150, glow: 0xf4ead8, core: 0xffffff, size: .1, bits: 'wind', gap: 0, mesh: (d, size) => arrowMesh(d, size) }, // the Longbow's own arrow
 };
+let arrowGeos = null;
+function arrowMesh(d, size) {
+  arrowGeos ??= gunGeos(gi('longbow'), 0, 0).round.geos;
+  const g = new THREE.Group();
+  for (const [geo, mat] of [[arrowGeos.lit, gunLit], [arrowGeos.glow, gunGlow], [arrowGeos.shine, gunShine]]) if (geo) g.add(new THREE.Mesh(geo, mat));
+  g.scale.setScalar(2 * size); g.lookAt(-d.x, -d.y, -d.z); // its head down its -z
+  return g;
+}
 for (const K of Object.values(WAND_BOLT)) { K.mg = bitMat(K.glow, PUFF_TEX); K.mc = bitMat(K.core, PUFF_TEX); }
 const bolts = [], _bp = new THREE.Vector3(), _bt = new THREE.Vector3();
 function wandBolt(kind, from, to, sc = scene, onArrive = null, size = 1) {

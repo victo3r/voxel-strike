@@ -100,6 +100,13 @@ const CROSSES = {
   moonbeam: () => [...xDot(), ...xMoons(11, 13.6, 5.6)], // two crescent moons
   bombard: () => [...xDot(), ...xCorners(15, 5), ...xLines(5, 5, 2, 'd')], // a wide blast, and down it comes
   peregrine: () => [...xDot(), ...xCorners(11, 4), ...xArcs(17, [0, 180], 44)], // spread wings
+  firefly: () => [...xDot(), ...xLines(6, 5), ...xTicks(9, 10)],
+  rhino: () => [...xDot(), ...xLines(5, 9), ...xTicks(11, 12)],
+  juggernaut: () => [...xDot(), ...xLines(10, 6), ...xTicks(11, 14), ...xArcs(18, DIAG, 30)],
+  longbow: () => [...xDot(), ...xLines(8, 5, 2, 'd'), ...xArcs(10, [0, 180], 50)], // a drawn bow either side
+  boomerang: () => [...xDot(), ...xArcs(9, [0, 180], 70)],
+  scythe: () => [...xDot(), ...xArcs(12, [90], 120)], // one wide sweep
+  meteor: () => [...xDot(), ...xCorners(15, 5), ...xLines(5, 6, 2, 'u')], // a big blast, coming down from above
   // wands: rings for the spells
   flamewand: () => [...xDot(), ...xLines(4, 5), ...xArcs(11, DIAG, 34)],
   windwand: () => [...xDot(), ...xArcs(8, DIAG, 50)],

@@ -92,9 +92,9 @@ body.results #tip{display:none}
 /* shared menu pieces */
 #menu,#shop,#post,#binds,#pick{background:rgba(22,28,32,var(--ov));backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
 #menuTitle,#shop h1,#setHead h1,#armory h1,#pickTitle,#postPlace,#menu #msg{color:#fff;text-shadow:4px 4px 0 var(--acc-dk)}
-#menu button,#shop button,#binds button,#post button,#armory button,#custBtns button,#drawBtns button,#pickBack,#nameDice,#cloudBtn,#friendsBtn,#topBtn,#achBtn,.cv button{
+#menu button,#shop button,#binds button,#post button,#armory button,#custBtns button,#drawBtns button,#pickBack,#nameDice,#cloudBtn,#friendsBtn,#topBtn,#achBtn,#lobBtn,.cv button{
   background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
-#menu button:hover,#shop button:hover:not(:disabled),#binds button:hover,#post button:hover,#armory button:hover:not(:disabled),#custBtns button:hover,#drawBtns button:hover,#pickBack:hover,#nameDice:hover,#cloudBtn:hover,#friendsBtn:hover,#topBtn:hover,#achBtn:hover,.cv button:hover:not(:disabled){background:var(--hov)}
+#menu button:hover,#shop button:hover:not(:disabled),#binds button:hover,#post button:hover,#armory button:hover:not(:disabled),#custBtns button:hover,#drawBtns button:hover,#pickBack:hover,#nameDice:hover,#cloudBtn:hover,#friendsBtn:hover,#topBtn:hover,#achBtn:hover,#lobBtn:hover,.cv button:hover:not(:disabled){background:var(--hov)}
 
 #menu{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;cursor:pointer;text-shadow:2px 2px 0 #000}
 #menu p{font-size:18px;margin:6px}
@@ -179,6 +179,19 @@ body.results #tip{display:none}
 #menu #msg:empty{display:none}
 #menuTitle{font-size:56px;margin:0 0 6px}
 #menuBtns{display:flex;flex-direction:column;gap:10px;margin-top:12px;width:220px}
+/* the range's rack in its menu: every gun, by slot */
+#rack{width:min(880px,94vw);margin:4px 0}
+#rack .rkTabs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+#rack button{font-family:monospace;font-weight:bold}#menu #rack .rkTabs button{margin:0;padding:6px 12px;font-size:14px}#menu #rack .rkTabs button.on{background:var(--sel);border-color:var(--line)}
+#rack .rkList{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;max-height:min(calc(100vh - 250px),560px);overflow-y:auto;padding:4px 6px 4px 4px}
+#menu #rack .rk{margin:0;padding:6px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;border-color:var(--rc)}
+#menu #rack .rk.on{background:var(--sel)}
+#rack .rk img{width:100%;aspect-ratio:2;object-fit:contain}
+#rack .rk b{font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rack .rk small{font-size:11px;color:var(--silver);letter-spacing:1px}
+#menu.rk #menuBtns{flex-direction:row;flex-wrap:wrap;justify-content:center;width:auto;margin-top:8px}#menu.rk #menuBtns button{width:auto;min-width:170px}
+body.touchOnly #menu.rk #menuTitle{font-size:28px;margin:0 0 2px}body.touchOnly #rack .rkTabs{margin-bottom:6px}
+body.touchOnly #rack .rkList{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));max-height:calc(var(--uh2) * 100 - 190px)}
 /* paused bar (window lost focus) */
 #away{position:fixed;inset:0;display:none;align-items:flex-end;justify-content:center;padding-bottom:92px;box-sizing:border-box;cursor:pointer}
 #awayBar{display:flex;align-items:center;gap:14px;padding:8px 10px 8px 18px;background:rgba(20,26,30,.88);border:3px solid var(--line-dim);color:#fff;font:bold 18px monospace;letter-spacing:2px;text-shadow:2px 2px 0 #000}
@@ -392,9 +405,14 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 /* the right column: the weekly event, then the daily missions on a drawer */
 #lobbyUI>#side{position:absolute;right:20px;top:calc(38px + clamp(48px,7vmin,64px));width:clamp(250px,42vmin,340px);display:flex;flex-direction:column;gap:8px;pointer-events:none}
 #side>*{pointer-events:auto}
-#misDraw{position:relative}#missions{transition:transform .25s}#misDraw.in #missions{transform:translateX(calc(100% + 28px))}
-#misTab{position:absolute;right:100%;top:0;bottom:0;width:clamp(26px,4vmin,32px);transition:right .25s;box-sizing:border-box;padding:0;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);border-right:0}
-#misDraw.in #misTab{right:0%;border-right:3px solid var(--line-dim)}#misTab:hover{background:var(--hov)}#misTab .ic{height:1em;width:calc(1em * var(--ar,1));transform:scaleX(-1)}#misDraw.in #misTab .ic{transform:none}
+#misDraw,#evDraw{position:relative;pointer-events:none}:is(#misDraw,#evDraw)>*{pointer-events:auto}#evDraw:has(#event:empty){display:none}
+#missions,#event{transition:transform .25s}#misDraw.in #missions,#evDraw.in #event{transform:translateX(calc(100% + 28px))}
+:is(#misTab,#evTab){position:absolute;right:100%;top:0;bottom:0;width:clamp(26px,4vmin,32px);transition:right .25s,left .25s;box-sizing:border-box;padding:0;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;background:var(--glass);border:3px solid var(--line-dim);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:4px 4px 0 rgba(0,0,0,.4);border-right:0}
+#misDraw.in #misTab,#evDraw.in #evTab{right:0%;border-right:3px solid var(--line-dim)}:is(#misTab,#evTab):hover{background:var(--hov)}:is(#misTab,#evTab) .ic{height:1em;width:calc(1em * var(--ar,1));transform:scaleX(-1)}:is(#misDraw,#evDraw).in .ic{transform:none}
+/* on the left (a phone held sideways) the event's drawer opens the other way */
+#lobbyTop>#evDraw #evTab{right:auto;left:100%;border-right:3px solid var(--line-dim);border-left:0}#lobbyTop>#evDraw.in #evTab{left:0%;border-left:3px solid var(--line-dim)}#lobbyTop>#evDraw.in #event{transform:translateX(calc(-100% - 40px))}
+#lobbyTop>#evDraw #evTab .ic{transform:none}#lobbyTop>#evDraw.in #evTab .ic{transform:scaleX(-1)}
+#evDraw #evTab,#evDraw.in #evTab,#lobbyTop>#evDraw #evTab,#lobbyTop>#evDraw.in #evTab{border-color:var(--ev,var(--line-dim));color:var(--ev,#fff)} /* the event's own colour, like its card */
 @media (max-height:500px){#missions{padding:4px 8px 5px}#missions .mh{margin:0}#missions .mr{padding:2px 0 5px}#missions .rr{width:1.5em;height:1.5em}#missions .mb{margin-top:0}#lobbyUI>#side{gap:6px}}
 .msr{margin-top:10px}.msr>small{display:block;text-align:center;font-size:12px;letter-spacing:2px;color:var(--acc-lt);margin-bottom:4px}
 .msr>div{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
@@ -419,16 +437,16 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .coin{display:inline-block;width:1.15em;height:1.15em;margin:0 .18em 0 .08em;vertical-align:-.2em;background:var(--coin) center/contain no-repeat;filter:drop-shadow(0 1px 0 rgba(0,0,0,.35))}
 .tbar{display:inline-block;width:1.4em;height:1.4em;margin:0 .14em 0 .04em;vertical-align:-.36em;background:var(--bar) center/contain no-repeat;filter:drop-shadow(0 1px 0 rgba(0,0,0,.35))}
 #lobbyCoins .tbr{margin-left:12px;color:#dfe7ef}.rt.tbr b{color:#dfe7ef}
-.sq{position:absolute;width:clamp(86px,13vmin,128px);aspect-ratio:1;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:0;font:bold clamp(13px,2vmin,17px) monospace;color:#fff;text-shadow:2px 2px 0 #000;cursor:pointer;background:var(--glass);border:4px solid var(--line);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),5px 5px 0 rgba(0,0,0,.45)}
+.sq{position:absolute;width:clamp(86px,13vmin,128px);aspect-ratio:1;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:0;font:bold clamp(13px,2vmin,17px) monospace;color:#fff;text-shadow:2px 2px 0 #000;cursor:pointer;background:var(--glass);border:4px solid var(--line);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:5px 5px 0 rgba(0,0,0,.45)}
 .sq:hover{background:var(--hov)}
-.sq:active{transform:translate(3px,3px);box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),2px 2px 0 rgba(0,0,0,.45)}
+.sq:active{transform:translate(3px,3px);box-shadow:2px 2px 0 rgba(0,0,0,.45)}
 .sq img{image-rendering:pixelated;pointer-events:none}
 #lobbyArm,#playBtn{width:clamp(100px,17vmin,230px);font-size:clamp(14px,2.5vmin,28px);border-width:clamp(4px,.5vmin,6px)}
 #lobbyArm{left:20px;bottom:20px}
 #lobbyArm img{width:78%;height:auto}
-#playBtn{right:20px;bottom:20px;background:rgba(36,170,98,.82);box-shadow:inset 0 -6px 0 var(--acc-dk),inset 0 4px 0 rgba(143,240,182,.6),5px 5px 0 rgba(0,0,0,.45)}
+#playBtn{right:20px;bottom:20px;background:rgba(36,170,98,.82);box-shadow:5px 5px 0 rgba(0,0,0,.45)}
 #playBtn:hover{background:rgba(52,200,118,.9)}
-#playBtn:active{box-shadow:inset 0 -6px 0 var(--acc-dk),inset 0 4px 0 rgba(143,240,182,.6),2px 2px 0 rgba(0,0,0,.45)}
+#playBtn:active{box-shadow:2px 2px 0 rgba(0,0,0,.45)}
 #playBtn img{width:56%;image-rendering:auto}
 #playBtn b{font-size:clamp(19px,3.6vmin,40px)}
 #lobbySet{right:20px;top:18px;width:clamp(48px,7vmin,64px)}
@@ -516,35 +534,56 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #lobbySet img{width:62%;image-rendering:auto}
 
 /* mode and map picker */
-#pick{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:16px;box-sizing:border-box;overflow-y:auto}
+#pick{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:16px;box-sizing:border-box;overflow-y:auto;--mw:clamp(110px,min(25vmin,calc((96vw - 64px) / 5)),200px);--sg:14px;--sh:62px}
 #pick>*{flex-shrink:0}
 #pickTitle{margin:0;font-size:44px}
 #pickBack{position:absolute;left:20px;top:18px;font:bold 16px monospace;padding:8px 14px}
+/* the first page and the code page show only the list */
+#pick:not([data-page=grp]) :is(#pickTabs,#pickDesc,#pickSegs,#pickFoot){display:none!important}
+#pickBody,#pickMain{display:flex;flex-direction:column;align-items:center;gap:var(--sg);max-width:96vw}
+#pick.bare #pickFoot{margin-bottom:calc(var(--sh) + var(--sg))} /* DUEL has no switches: its maps come up, their room goes under the buttons so the modes stay put */
 #pickList{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;max-width:96vw}
-#pickList button{width:clamp(160px,24vmin,240px);aspect-ratio:1;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:14px;text-align:left;font:bold clamp(16px,2.6vmin,22px) monospace;color:#fff;text-shadow:2px 2px 0 #000;cursor:pointer;background:var(--glass);border:4px solid var(--line);box-shadow:inset 0 -6px 0 rgba(0,0,0,.25),5px 5px 0 rgba(0,0,0,.45)}
+#pickList button{width:clamp(160px,24vmin,240px);aspect-ratio:1;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:14px;text-align:left;font:bold clamp(16px,2.6vmin,22px) monospace;color:#fff;text-shadow:2px 2px 0 #000;cursor:pointer;background:var(--glass);border:4px solid var(--line);box-shadow:5px 5px 0 rgba(0,0,0,.45)}
 #pickList button:hover{filter:brightness(1.18)}
-#pickList :is([data-mode=zombies],[data-mode=zombiesMenu]){background:linear-gradient(160deg,rgba(70,120,40,.85),rgba(18,40,20,.88))}
-#pickList [data-mode=coop]{background:linear-gradient(160deg,rgba(50,140,105,.85),rgba(12,42,34,.88))}
-#pickList [data-mode=dm]{background:linear-gradient(160deg,rgba(150,45,40,.85),rgba(40,14,14,.88))}
-#pickList [data-mode=team]{background:linear-gradient(135deg,rgba(40,90,190,.85) 0%,rgba(20,30,70,.88) 49%,rgba(70,16,16,.88) 51%,rgba(170,45,40,.85) 100%)}
-#pickList [data-mode=blitzMenu]{background:linear-gradient(160deg,rgba(235,160,30,.86),rgba(90,30,10,.88))}
-#pickList [data-mode=blitz]{background:linear-gradient(160deg,rgba(235,160,30,.86),rgba(110,30,20,.88))}
-#pickList [data-mode=blitzTeam]{background:linear-gradient(135deg,rgba(235,160,30,.86) 0%,rgba(40,80,170,.88) 55%,rgba(170,45,40,.85) 100%)}
-#pickList [data-mode=duel]{background:linear-gradient(160deg,rgba(124,72,196,.86),rgba(34,16,62,.9))}
-#pickList .mi{flex:1;min-height:0;width:58%;align-self:center;display:flex;align-items:center;justify-content:center}#pickList .mi img{flex:none;image-rendering:pixelated;filter:drop-shadow(4px 4px 0 rgba(0,0,0,.35))}
+#pick :is([data-mode=zombies],[data-grp=zombies]){background:linear-gradient(160deg,rgba(70,120,40,.85),rgba(18,40,20,.88))}
+#pick [data-mode=coop]{background:linear-gradient(160deg,rgba(50,140,105,.85),rgba(12,42,34,.88))}
+#pick [data-mode=dm]{background:linear-gradient(160deg,rgba(150,45,40,.85),rgba(40,14,14,.88))}
+#pick [data-grp=main]{background:linear-gradient(160deg,rgba(210,90,40,.86),rgba(60,16,14,.9))}
+#pick [data-mode=team]{background:linear-gradient(135deg,rgba(40,90,190,.85) 0%,rgba(20,30,70,.88) 49%,rgba(70,16,16,.88) 51%,rgba(170,45,40,.85) 100%)}
+#pick [data-mode=blitzMenu]{background:linear-gradient(160deg,rgba(235,160,30,.86),rgba(90,30,10,.88))}
+#pick [data-mode=duel]{background:linear-gradient(160deg,rgba(124,72,196,.86),rgba(34,16,62,.9))}
+#pick [data-go=range]{background:linear-gradient(160deg,rgba(40,120,160,.86),rgba(10,30,46,.9))}
+#pick .mi{display:flex;align-items:center;justify-content:center}#pick .mi img{flex:none;image-rendering:pixelated;filter:drop-shadow(4px 4px 0 rgba(0,0,0,.35))}
 #pickList [data-map]{background-color:#334;background-position:center;background-size:cover}
-/* mode cards */
-#pickList{align-items:flex-start}
-#pickList .mc{position:relative;padding-bottom:54px}
-#pickList button[data-mode]{align-items:center;text-align:center;white-space:nowrap;gap:10px;padding:14px 8px}
-#pickList .mc.sel button[data-mode]{border-color:var(--acc-lt);box-shadow:inset 0 -6px 0 rgba(0,0,0,.25),0 0 0 3px var(--acc),5px 5px 0 rgba(0,0,0,.45)}
-#pickList .go{position:absolute;left:0;right:0;bottom:4px;width:auto;aspect-ratio:auto;height:42px;padding:0;flex-direction:row;justify-content:center;align-items:center;font-size:18px;letter-spacing:2px;background:var(--sel);border-width:3px;opacity:0;transform:translateY(-26px) scaleY(.3);pointer-events:none;transition:opacity .16s,transform .18s}
-#pickList .mc.sel .go{opacity:1;transform:none;pointer-events:auto}
-#pickList .go:hover{background:var(--acc);filter:none}
-#pickDesc{margin:-8px 0 0;min-height:24px;max-width:90vw;font-size:18px;color:var(--silver);text-align:center;text-shadow:2px 2px 0 #000}
+#pickList small{font-size:clamp(11px,1.6vmin,14px);font-weight:normal;color:var(--silver)}
+/* the first page: MAIN and ZOMBIES, the target range under them */
+#pickList.top{gap:22px}
+#pickList [data-grp]{width:clamp(190px,min(34vmin,calc(100vh - 300px)),300px);aspect-ratio:1/1.04;align-items:center;text-align:center;gap:6px;padding:14px 12px 16px}
+#pickList [data-grp] .mi{flex:1;min-height:0;width:62%}
+#pickList [data-grp] b{font-size:clamp(22px,3.4vmin,30px);letter-spacing:2px}
+#pickList [data-grp] small{min-height:2.6em;line-height:1.3;text-wrap:balance}
+#pickList .rngRow{flex-basis:100%;display:flex;justify-content:center}
+#pickList [data-go=range]{width:auto;aspect-ratio:auto;flex-direction:row;align-items:center;gap:10px;padding:7px 18px 7px 10px;font-size:16px;border-width:3px;box-shadow:4px 4px 0 rgba(0,0,0,.45)}
+#pickList [data-go=range] .mi{width:30px;height:30px}
+/* a group's page: its modes in a row, the picked one's maps under them, everything on the screen's centre line */
+#pickTabs{display:flex;justify-content:center;gap:12px}
+#pickTabs button{display:flex;align-items:center;justify-content:center;gap:10px;width:210px;height:60px;padding:0 10px;box-sizing:border-box;font:bold 18px monospace;color:#fff;text-shadow:2px 2px 0 #000;white-space:nowrap;cursor:pointer;border:4px solid var(--line-dim);box-shadow:4px 4px 0 rgba(0,0,0,.45);filter:brightness(.72) saturate(.75);transition:filter .12s}
+#pickTabs button:hover{filter:brightness(.92)}
+#pickTabs button.sel{filter:none;border-color:var(--line);box-shadow:0 0 0 3px var(--acc),4px 4px 0 rgba(0,0,0,.45)}
+#pickTabs .mi{flex:none;width:40px;height:40px}#pickTabs .mi img{filter:drop-shadow(3px 3px 0 rgba(0,0,0,.35))}
+#pickList.maps{max-width:calc(5 * var(--mw) + 64px)}#pickList.maps button{width:var(--mw)}
+#pickList.maps.in{animation:mapsIn .2s ease-out}
+@keyframes mapsIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#pickSegs{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;gap:6px 18px;min-height:var(--sh)}
+#pickSub{display:flex;gap:8px}#pickSegs button{white-space:nowrap}
+#pickFoot{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+#pickFoot button{display:flex;align-items:center;gap:10px;font:bold 16px monospace;padding:8px 18px 8px 12px;color:#fff;background:var(--glass);border:3px solid var(--line-dim);box-shadow:3px 3px 0 rgba(0,0,0,.45);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7)}
+#pickFoot button:hover{background:var(--hov)}
+#pickFoot button.sel{background:var(--sel);border-color:var(--line)}
+#pickFoot img{height:24px;image-rendering:pixelated}
+#pickDesc{margin:0;min-height:24px;max-width:90vw;font-size:18px;color:var(--silver);text-align:center;text-shadow:2px 2px 0 #000}
 #pickDesc.in{animation:descIn .22s ease-out}
 @keyframes descIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
-#pickList small{font-size:clamp(11px,1.6vmin,14px);font-weight:normal;color:var(--silver)}
 
 /* xp and rewards */
 .xpbar{height:10px;margin-top:6px;background:rgba(0,0,0,.45);border:2px solid var(--line-dim)}
@@ -638,6 +677,7 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 .boot>*:not(canvas):not(#noTouch){opacity:0!important;pointer-events:none!important}
 .booting>*:not(canvas){transition:opacity .45s ease-out}
 #cloudBtn{font:bold 15px monospace;width:40px;height:32px;padding:0;line-height:0;display:flex;align-items:center;justify-content:center}
+#lobBtn{width:40px;height:32px;padding:0;display:flex;align-items:center;justify-content:center}#lobBtn .ic{height:18px;width:calc(18px * var(--ar,1))}
 #cloudBtn .ic{vertical-align:0;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.7))}
 #nameDice,#custRand{display:flex;align-items:center;justify-content:center;line-height:0}
 #nameDice .ic,#custRand .ic{height:16px;width:calc(16px * var(--ar,1));vertical-align:0;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.6))}
@@ -649,11 +689,11 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 @keyframes cloudpulse{50%{opacity:.4}}
 
 /* online play */
-#pickPill{align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;max-width:96vw}
-#pickPill button{font:bold 15px monospace;padding:7px 16px;background:var(--glass);color:var(--silver);border:3px solid var(--line-dim);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7)}
-#pickPill button.sel{background:var(--sel);color:#fff;border-color:var(--line)}
-#pickPill button:disabled{opacity:.45;cursor:default}
-#pickPill small{width:100%;text-align:center;color:var(--silver);font-size:13px;text-shadow:2px 2px 0 #000}
+#pickPill{align-items:center;gap:8px;justify-content:center}
+#pickSegs button{font:bold 15px monospace;padding:7px 16px;background:var(--glass);color:var(--silver);border:3px solid var(--line-dim);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7)}
+#pickSegs button.sel{background:var(--sel);color:#fff;border-color:var(--line)}
+#pickSegs button:disabled{opacity:.45;cursor:default}
+#pillNote{flex-basis:100%;text-align:center;color:var(--silver);font-size:13px;text-shadow:2px 2px 0 #000}
 .codeBox{display:flex;flex-direction:column;align-items:center;gap:12px;color:#fff;text-shadow:2px 2px 0 #000;font-size:18px}
 .codeBox p{margin:0}
 #codeIn{width:260px;box-sizing:border-box;font:bold 26px monospace;letter-spacing:6px;text-align:center;text-transform:uppercase;padding:8px 10px;background:var(--glass);color:#fff;border:3px solid var(--line-dim);outline:none}
@@ -661,8 +701,6 @@ img.ai{image-rendering:auto!important;object-fit:contain}
 #pickList #codeGo{width:auto;aspect-ratio:auto;display:block;text-align:center;gap:0;font:bold 22px monospace;padding:10px 34px;background:var(--glass);color:#fff;border:3px solid var(--line);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
 #pickList #codeGo:hover{background:var(--hov);filter:none}
 #codeErr{color:#ff6a6a;font-size:15px;min-height:18px}
-#pickList [data-mode=private],#pickList [data-mode=privCreate]{background:linear-gradient(160deg,rgba(90,100,120,.85),rgba(25,28,40,.9))}
-#pickList [data-mode=privJoin]{background:linear-gradient(160deg,rgba(60,120,140,.85),rgba(18,36,48,.9))}
 #joinBtn{left:50%;bottom:16vmin;transform:translateX(-50%);width:auto;aspect-ratio:auto;padding:14px 26px;gap:2px}
 #joinBtn:active{transform:translate(calc(-50% + 3px),3px)}
 #joinBtn small{font-size:22px;letter-spacing:4px;color:#ffd23f}
@@ -769,6 +807,21 @@ body.cgIn #nameIn{cursor:default;color:var(--muted)}
 #card{z-index:21;background:rgba(0,0,0,.6)}#card #cardBox{background:rgba(24,34,30,.95)}#lbBox>*,#cardBox>*,#achBox>*{flex-shrink:0}#lbBox>.lbList,#achBox>.acList{flex-shrink:1}
 #lbBox,#cardBox,#achBox{display:flex;flex-direction:column;gap:10px;width:min(560px,94vw);max-height:92vh;box-sizing:border-box;padding:18px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
 #cardBox{width:min(460px,94vw)}
+/* the lobby picker: beside you, so you see each one as you pick it */
+#lobPick{position:absolute;inset:0;display:none;align-items:center;justify-content:flex-start;padding-left:24px;pointer-events:none;z-index:6;zoom:var(--z2,1)}
+#lobBox{pointer-events:auto;display:flex;flex-direction:column;gap:10px;width:min(290px,calc(100% - 48px));max-height:92%;overflow:hidden;box-sizing:border-box;padding:16px;background:var(--glass);border:4px solid var(--line);color:#fff;text-shadow:2px 2px 0 #000;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:6px 6px 0 rgba(0,0,0,.45)}
+#lobBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000;display:flex;align-items:center;gap:10px}#lobBox h1 .ic{height:22px;width:calc(22px * var(--ar,1))}
+#lobBox button{font:bold 14px monospace;padding:7px 12px;color:#fff;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}#lobBox button:hover{background:var(--hov)}
+#lobBox .lobC{display:flex;align-items:center;gap:12px;padding:10px 12px;text-align:left}#lobBox .lobC.on{border-color:#ffd75e;background:var(--sel)}
+.lobL{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;margin:0 -8px -4px 0;padding:0 8px 4px 0} /* the cards scroll; the coins, BUY and DONE stay put */
+.lobI{width:44px;display:flex;justify-content:center}.lobI .ic{height:30px;width:calc(30px * var(--ar,1))}.lobC.on .lobI .ic{color:#ffd75e}
+.lobT{flex:1}.lobT b{font-size:16px;letter-spacing:1px;white-space:nowrap}.lobT b.sm{font-size:14px;letter-spacing:0}
+.lobS{min-width:18px;display:flex;align-items:center;justify-content:flex-end;gap:4px;font-size:13px;color:#ffd75e}.lobS .ic{height:16px;width:calc(16px * var(--ar,1));color:#ffd75e}.lobS .coin{width:15px;height:15px}
+#lobBox .lobC.lk{opacity:.6}#lobBox .lobC.lk .lobS,#lobBox .lobC.lk .lobS .ic{color:#c9ced6}
+.lobCo{font-size:15px;color:#ffd75e;display:flex;align-items:center;gap:4px}.lobCo .coin{width:16px;height:16px}
+#lobBox .lbFoot button{display:flex;align-items:center;gap:6px}#lobBox .lbFoot .coin{width:14px;height:14px}#lobBox .lbFoot button:disabled{opacity:.55;cursor:default}#lobBox #lobBuy:not(:disabled){border-color:#ffd75e;color:#ffd75e}
+@media (max-width:620px){#lobPick{justify-content:center;padding:0}}
+@media (max-height:500px){#lobBox{padding:10px 12px;gap:6px}#lobBox h1{font-size:20px}#lobBox h1 .ic{height:18px;width:calc(18px * var(--ar,1))}.lobL{gap:6px}#lobBox .lobC{padding:5px 10px}.lobI .ic{height:24px;width:calc(24px * var(--ar,1))}#lobBox .lbFoot button{padding:5px 10px}}
 #lbBox h1,#cardBox h1,#achBox h1{margin:0;font-size:26px;color:#ffd75e;text-shadow:3px 3px 0 #000}
 @media (max-height:480px){#lbBox{padding:10px 14px;gap:6px}#lbBox h1{font-size:20px}#lbBox .lbBy button{padding:5px 4px;font-size:13px}#lbBox .lbFoot button{padding:5px 10px}.lbSub{font-size:11px}.lbList{max-height:none}.lr{padding:2px 8px}}
 #lbBox button,#cardBox button,#achBox button{font:bold 14px monospace;padding:7px 12px;color:#fff;background:var(--glass);border:3px solid var(--line-dim);cursor:pointer;text-shadow:2px 2px 0 rgba(0,0,0,.7);box-shadow:3px 3px 0 rgba(0,0,0,.45)}
@@ -918,9 +971,14 @@ body.touchOnly #drawSheet{width:min(440px,100%,calc(var(--uh) * 56))!important}
 /* phones: a tighter lobby and picker */
 body.touchOnly #lobbyTop{flex-direction:column;align-items:flex-start;gap:8px;max-width:none}body.touchOnly #lobbyBtns{flex-basis:auto}
 @media (max-width:1000px){#lobbyTop{flex-direction:column;align-items:flex-start;gap:8px;max-width:none}#lobbyBtns{flex-basis:auto}} /* a narrow window: the level goes under the name, clear of the coins */
-body.touchOnly #pickList{gap:10px;flex-wrap:nowrap}
-body.touchOnly #pickList :is([data-mode],[data-map]){width:clamp(96px,calc((var(--uw2) * 100 - 90px) / 5),200px);font-size:14px;padding:10px 6px}
-body.touchOnly #pickList .mc{padding-bottom:50px}
+body.touchOnly #pick{gap:8px;padding:10px;--mw:clamp(88px,min(calc(var(--uh2) * 100 - 272px),calc((var(--uw2) * 96 - 40px) / 5)),150px);--sg:8px;--sh:48px}
+body.touchOnly #pickTitle{font-size:26px}
+body.touchOnly :is(#pickBody,#pickMain){max-width:calc(var(--uw2) * 96)}
+body.touchOnly #pickList{gap:10px}body.touchOnly #pickList.maps{max-width:calc(5 * var(--mw) + 40px)}body.touchOnly #pickList.maps button{font-size:14px;padding:10px 8px}
+body.touchOnly #pickTabs{gap:8px}body.touchOnly #pickTabs button{width:168px;height:44px;font-size:15px;gap:8px}body.touchOnly #pickTabs .mi{width:30px;height:30px}
+body.touchOnly #pickDesc{font-size:15px;min-height:20px}body.touchOnly #pickSegs{gap:4px 14px}body.touchOnly #pickSegs button{font-size:13px;padding:5px 12px;min-width:84px}body.touchOnly #pillNote{font-size:12px}
+body.touchOnly #pickFoot button{font-size:14px;padding:7px 14px 7px 10px}body.touchOnly #pickFoot img{height:20px}
+body.touchOnly #pickList [data-grp]{width:clamp(150px,min(calc((var(--uw2) * 100 - 80px) / 2),calc(var(--uh2) * 100 - 150px)),260px)}
 /* phones held upright: the lobby stacks, the character between the menus above and below */
 @media (orientation:portrait){
   body.touchOnly #lobbyTop{left:12px;top:12px;gap:8px}body.touchOnly #nameRow{width:180px}body.touchOnly #prof .lv .xp{width:120px}
@@ -930,12 +988,20 @@ body.touchOnly #pickList .mc{padding-bottom:50px}
   body.touchOnly #lobbySet{right:12px;top:12px;width:48px}
   body.touchOnly #coinRow{top:12px;right:68px;gap:8px}
   body.touchOnly #lobbyCoins{position:absolute;top:calc(100% + 8px);right:-56px;height:auto;min-height:44px;max-width:130px;flex-wrap:wrap;justify-content:flex-end;padding:4px 12px}body.touchOnly #lobbyCoins .tbr{margin-left:0}
-  body.touchOnly #lobbyUI>#side{left:12px;right:12px;top:150px;width:auto;max-width:480px;margin-left:auto}body.touchOnly #misDraw{margin-left:28px}
+  body.touchOnly #lobbyUI>#side{left:12px;right:12px;top:150px;width:auto;max-width:480px;margin-left:auto}body.touchOnly :is(#misDraw,#evDraw){margin-left:28px}
   body.touchOnly #trial{left:calc(22px + var(--S));bottom:12px;width:min(calc(var(--S) * 1.6),calc(100% - 2 * var(--S) - 44px))}
   body.touchOnly #lobbyArm{left:12px;bottom:12px}body.touchOnly #playBtn{right:12px;bottom:12px}body.touchOnly #boostBtn{right:12px;bottom:calc(24px + clamp(100px,17vmin,230px))}
-  body.touchOnly #pickList{flex-wrap:wrap}body.touchOnly #pickList :is([data-mode],[data-map]){width:calc((var(--uw2) * 100 - 64px) / 3)}
+  body.touchOnly #pick{padding:64px 16px;gap:14px;--mw:calc((var(--uw2) * 100 - 52px) / 3);--sg:12px}body.touchOnly #pickTitle{font-size:34px}
+  body.touchOnly #pickList.maps{max-width:calc(3 * var(--mw) + 20px)}
+  body.touchOnly #pickTabs button{flex-direction:column;width:calc((var(--uw2) * 100 - 56px) / 4);height:78px;padding:6px 2px;gap:6px;font-size:12px}
+  body.touchOnly #pickDesc{display:flex;align-items:center;justify-content:center;min-height:2.6em;line-height:1.3}body.touchOnly #pickSegs button{padding:5px 9px;min-width:70px}
+  body.touchOnly #pick.many:not(.bare) #pickList.maps{min-height:calc(2 * var(--mw) + 10px);align-content:flex-start} /* room for two rows of maps, so nothing moves between modes */
+  body.touchOnly #pick.many.bare #pickFoot{margin-bottom:calc(var(--sh) + var(--sg) + var(--mw) + 10px)}
+  body.touchOnly #pickList [data-grp]{width:calc((var(--uw2) * 100 - 54px) / 2)}
   body.touchOnly #setMain{flex-direction:column}body.touchOnly #setTabs{flex-direction:row;flex-wrap:wrap;width:auto;border-right:0;border-bottom:3px solid var(--line-dim);padding:8px}body.touchOnly #binds #setTabs button{flex:1 0 28%;text-align:center;padding:6px 2px;font-size:12px}body.touchOnly #setBody{padding:4px 12px 12px}
   body.touchOnly :is(#lbBox,#cardBox,#achBox){width:calc(var(--uw2) * 96)}
+  body.touchOnly #lobPick{align-items:flex-end;justify-content:center;padding:0 0 12px} /* under you, as the armory is */
+  body.touchOnly #lobBox{max-height:50%} /* the cards scroll, you stay in view */
   body.touchOnly #armory{top:calc(var(--uh) * 34);width:calc(var(--uw) * 100);-webkit-mask-image:none;mask-image:none;padding:12px 14px 300px;border-top:3px solid var(--line-dim);border-right:0}
   body.touchOnly #armBody{flex-direction:column}body.touchOnly #armPages{flex-direction:row;width:auto;align-self:stretch;position:static}body.touchOnly #armory #armPages button{flex:1}body.touchOnly #armMain{width:100%}
   body.touchOnly #armAct{right:12px;bottom:12px;width:calc(var(--uw) * 100 - 24px)}
@@ -947,7 +1013,7 @@ body.touchOnly #pickList .mc{padding-bottom:50px}
   body.touchOnly #armory{width:min(720px,calc(var(--uw) * 50));padding-right:8px;border-right-width:22px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent)}
   body.touchOnly #armList{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
   body.touchOnly #heroAct{flex-direction:row;transform:none}
-  body.touchOnly #lobbyTop>#event{width:clamp(250px,42vmin,340px)}
+  body.touchOnly #lobbyTop>#evDraw{width:clamp(250px,42vmin,340px)}
   body.touchOnly #heroHide,body.touchOnly #heroHide button{width:42px}body.touchOnly #heroHide button{height:42px}body.touchOnly #heroHide img{width:34px;height:34px}
   body.touchOnly{--vbw:16vw} /* smaller health bars, so the top line fits between them and the buttons */
 }

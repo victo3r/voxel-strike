@@ -218,6 +218,86 @@ function updateSaws(dt) {
     o.m.position.addScaledVector(o.v, dt);
   }
 }
+// ---- the Boomerang: straight out along your aim and back to whoever threw it, through everyone in its way, once each way. A wall knocks it down, and it's back in the hand a moment later
+const BOOMER_T = 1.15, BOOMER_R = 20, BOOMER_W = .25, BOOMER_LOST = .6, BOOMER_SPIN = 24, BOOMER_HIT = .4; // a trip's time, how far out it goes and how far it bows aside coming back, how long a knocked-down one takes, its spin, how far from its middle it still hits
+const boomers = [], _bm = new THREE.Vector3(), _bm2 = new THREE.Vector3(), _bmD = new THREE.Vector3(), _bmU = new THREE.Vector3(), _bmW = new THREE.Vector3(), _bmE = new THREE.Vector3(), _bmO = new THREE.Vector3(), _bmY = new THREE.Vector3(0, 1, 0);
+let boomerParts = null, boomCatchK = 0; // boomCatchK: your catch, 1 to 0
+function boomerMesh(size) { // the gun's own model, spinning about its middle with its face toward whoever threw it
+  if (!boomerParts) {
+    const geos = gunGeos(gi('boomerang'), 0, 0).main, g = new THREE.Group();
+    for (const [geo, mat] of [[geos.lit, gunLit], [geos.glow, gunGlow], [geos.shine, gunShine]]) if (geo) g.add(new THREE.Mesh(geo, mat));
+    boomerParts = { g, c: new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()) };
+  }
+  const m = new THREE.Group(), spin = new THREE.Group(), turn = new THREE.Group(), flat = boomerParts.g.clone();
+  flat.position.copy(boomerParts.c).negate(); turn.rotation.y = Math.PI / 2; turn.add(flat); spin.add(turn); m.add(spin); // the model stands in y and z: turned to face along the flight's axis
+  m.scale.setScalar(2 * size); m.userData.spin = spin;
+  return m;
+}
+function fireBoomer(w, from = null, dir = null, by = null, opts = {}) {
+  if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
+  const id = opts.ghost ? opts.id : opts.show ? 0 : net.launch(w.id, from, dir, by), k = opts.size || 1, sc = opts.sc || scene;
+  const m = boomerMesh(k), off = !by && !opts.ghost && !opts.show && gunG?.visible && WEAPONS[gunShown]?.boomer ? gunG.localToWorld(boomerParts.c.clone()).sub(from) : null; m.position.copy(from); sc.add(m); // yours leaves your hand
+  if (off) { m.position.add(off); m.scale.multiplyScalar(.5); }
+  const side = _bm.set(dir.z, 0, -dir.x); if (side.lengthSq() < 1e-4) side.set(1, 0, 0); side.normalize();
+  boomers.push({ m, sc, o: from.clone(), d: dir.clone().normalize(), side: side.clone(), k, t: 0, dmg: w.dmg, by, ghost: !!opts.ghost, show: !!opts.show, home: opts.home, hide: opts.hide ?? by?.gunM, caught: opts.caught, id, g: w.id, cut: [new Set(), new Set()], at: from.clone(), lost: 0, off, grow: off ? .5 : 1 });
+  sfx('boomerang', { at: from, far: 40, v: opts.show ? .5 : 1 });
+}
+const boomerOut = (by, show = false) => boomers.some(o => o.by === by && o.show === show && !o.ghost);
+function boomerHome(o, out) { // whoever threw it, where they are now
+  if (o.home) return o.home(out);
+  if (o.by) return o.by.g ? out.copy(o.by.g.position).setY(o.by.g.position.y + 1.3) : out.copy(o.o);
+  return out.copy(camera.position).setY(camera.position.y - .3);
+}
+function boomerPos(o, s, out) { // s of the way: straight out along the throw, slowing to a stop, then back to its thrower, bowed a little aside
+  const f = Math.sin(Math.PI * s), b = Math.min(1, Math.max(0, (s - .5) * 2));
+  boomerHome(o, out); out.lerpVectors(o.o, out, b * b * (3 - 2 * b));
+  return out.addScaledVector(o.d, BOOMER_R * o.k * f).addScaledVector(o.side, BOOMER_W * o.k * Math.sin(Math.PI * b));
+}
+function boomerCatch(o, lost) {
+  if (o.hide) o.hide.visible = true;
+  if (o.show) { o.caught?.(); sfx('boomCatch', { v: .4 }); return; }
+  if (o.by || o.ghost) { if (o.by) o.by.ct = 1; if (!lost) sfx('boomCatch', { at: o.m.position, far: 30 }); return; }
+  sfx('boomCatch'); boomCatchK = 1; const i = gi(o.g); if (i !== undefined) ammo[i] = WEAPONS[i].mag; // back in your hand
+}
+function boomerRay(o, from, dir, far, cut, pass, edge = false) { // what it cuts along one line: every body in the way, up to the first wall (which it returns); its edges never take a head
+  ray2.set(from, dir); ray2.far = far;
+  let wall = null;
+  for (const h of ray2.intersectObjects(targetsFor(o.by, ray2), false)) {
+    const z = h.object.userData.zombie;
+    if (!z) { wall = h; break; }
+    if (z.dead || z === o.by || cut.has(z) || friendly(o.by, z)) continue;
+    cut.add(z); sfx('boomHit', { at: h.point, far: 30 });
+    if (!o.ghost) { const head = !edge && !!h.object.userData.head; hurtZombie(z, o.dmg * (head ? HEAD_MUL : 1), h.point.clone(), head, false, o.by, 5, o.id, pass); } // the server says what someone else's did
+  }
+  if (o.by && !o.ghost && !cut.has(YOU_T) && !friendly(o.by, YOU_T) && respawnT <= 0 && !dead && rayHitsYou(ray2.ray, far) < (wall ? wall.distance : Infinity)) {
+    cut.add(YOU_T); const p = youHitP.clone(), head = !edge && p.y > P.pos.y + 1.45; sfx('boomHit', { at: p, far: 30 });
+    hurtPlayer(Math.round(o.dmg * (head ? HEAD_MUL : 1)), false, o.by, head, 5, o.id, pass);
+  }
+  return wall;
+}
+function updateBoomers(dt) {
+  for (let i = boomers.length - 1; i >= 0; i--) {
+    const o = boomers[i];
+    if (o.lost) { if ((o.lost -= dt) <= 0) { boomers.splice(i, 1); boomerCatch(o, true); } continue; }
+    if (o.hide) o.hide.visible = false;
+    const s = Math.min(1, (o.t += dt) / BOOMER_T); boomerPos(o, s, _bm); o.m.userData.spin.rotation.z += dt * BOOMER_SPIN;
+    const seg = _bm2.copy(_bm).sub(o.at), len = seg.length();
+    if (len > 1e-4 && !o.show) {
+      const pass = s < .5 ? 0 : 1, cut = o.cut[pass], dir = _bmD.copy(seg).divideScalar(len), wall = boomerRay(o, o.at, dir, len + .05, cut, pass);
+      _bmU.crossVectors(dir, _bmY); if (_bmU.lengthSq() < 1e-4) _bmU.set(1, 0, 0); _bmU.normalize(); _bmW.crossVectors(dir, _bmU);
+      for (let r = 0; r < 4; r++) { // it's wide: beside it, above and below it too, unless a wall's that close
+        const e = _bmE.copy(r < 2 ? _bmU : _bmW).multiplyScalar(r % 2 ? -1 : 1);
+        if (!boomerRay(o, o.at, e, BOOMER_HIT, cut, pass, true)) boomerRay(o, _bmO.copy(o.at).addScaledVector(e, BOOMER_HIT), dir, (wall ? wall.distance : len) + .05, cut, pass, true);
+      }
+      if (wall && o.t > .05) { o.sc.remove(o.m); o.lost = BOOMER_LOST; wandBits('wind', wall.point, scene, 8, 3, .8); sfx('boomDrop', { at: wall.point, far: 40 }); continue; } // knocked down
+    }
+    o.m.position.copy(_bm); o.at.copy(_bm);
+    if (o.off) { const f = Math.exp(-14 * dt); o.m.position.add(o.off.multiplyScalar(f)); o.grow += (1 - o.grow) * (1 - f); o.m.scale.setScalar(2 * o.k * o.grow); } // from your hand onto its path
+    o.m.lookAt(boomerHome(o, _bm2)); o.m.rotateX(.45); // tipped back a little
+    if (s >= 1 || s > .75 && boomerHome(o, _bm2).distanceTo(_bm) < 1.2 * o.k) { o.sc.remove(o.m); boomers.splice(i, 1); boomerCatch(o, false); } // caught
+  }
+}
+function clearBoomers(sc) { for (let i = boomers.length - 1; i >= 0; i--) { const o = boomers[i]; if (sc && o.sc !== sc) continue; o.sc.remove(o.m); if (o.hide) o.hide.visible = true; boomers.splice(i, 1); } }
 // someone else's wisp or orb, where the server says it went (g: its gun)
 function mythBoom(id, p, g, by) {
   const wi = wisps.findIndex(o => o.ghost && o.id === id), oi = orbs.findIndex(o => o.ghost && o.id === id), si = saws.findIndex(o => o.ghost && o.id === id);
@@ -234,7 +314,7 @@ function clearMyths() {
   for (const o of orbs) scene.remove(o.m);
   for (const v of voids) { scene.remove(v.fx); stopSfx(v.snd); }
   for (const o of saws) scene.remove(o.m);
-  wisps.length = orbs.length = voids.length = saws.length = 0; chargeEnd();
+  wisps.length = orbs.length = voids.length = saws.length = 0; chargeEnd(); clearBoomers(scene);
 }
 function mythTick(dt) { updateWisps(dt); updateOrbs(dt); updateVoids(dt); updateSaws(dt); }
 
@@ -246,9 +326,9 @@ function chargeEnd() { chargeT = 0; chargeFull = false; stopSfx(chargeSnd); char
 function chargeTick(dt, w) {
   const can = cd <= 0 && reloading <= 0 && respawnT <= 0 && !dead && !P.downed && ammo[cur] > 0 && gunShown === cur;
   if (can && held('shoot')) {
-    if (!chargeT) chargeSnd = sfx('chargeUp');
+    if (!chargeT) chargeSnd = sfx(w.bow ? 'bowDraw' : 'chargeUp');
     chargeT = Math.min(w.charge, chargeT + dt);
-    if (chargeT >= w.charge && !chargeFull) { chargeFull = true; sfx('chargeReady'); }
+    if (chargeT >= w.charge && !chargeFull) { chargeFull = true; sfx(w.bow ? 'bowFull' : 'chargeReady'); }
   } else if (chargeT > 0) {
     const k = chargeT / w.charge; chargeEnd();
     if (can) shoot(k);

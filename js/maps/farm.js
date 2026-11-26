@@ -30,7 +30,8 @@ const furrowMat = decal({ map: tex(g => { noise(g, [112, 86, 56], 18); g.fillSty
 const waterMat = decal({ color: 0x3a6a8a, emissive: 0x0a1a24 });
 
 // helpers
-const piece = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); return b; };
+const pieces = [], piece = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); pieces.push(b); return b; }; // each gets a hitbox once it's placed and turned
+const onWall = b => { pieces.splice(pieces.lastIndexOf(b), 1); return b; }; // trim flat on a wall needs none
 const slab = (x0, x1, z0, z1, bot, top, m, cover = true) => addSlab((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, bot, top, m, cover);
 const solid = (x0, x1, z0, z1, bot, top, s) => { const o = { mesh: null, minX: x0, maxX: x1, minZ: z0, maxZ: z1, bot, top, surf: s }; building.solids.push(o); return o; };
 const flat = (x0, x1, z0, z1, m, y = .012) => {
@@ -62,19 +63,18 @@ const treads = (x0, x1, z0, z1, ax, a, b, y0, y1, n, m = wood) => {
     const L = Math.hypot(len, y1 - y0), sg = ax === 'x' ? box(L, .26, .12, oldWood) : box(.12, .26, L, oldWood);
     sg.position.set(ax === 'x' ? (a + b) / 2 : x0 + e, (y0 + y1) / 2 - .2, ax === 'z' ? (a + b) / 2 : z0 + e);
     if (ax === 'x') sg.rotation.z = Math.sign(b - a) * ang; else sg.rotation.x = -Math.sign(b - a) * ang;
-    add(sg);
+    add(sg); meshSolids(sg, 'wood');
   }
 };
 const postAt = [], newPost = (x, y, z) => !postAt.some(([a, b, c]) => Math.hypot(a - x, c - z) < .25 && Math.abs(b - y) < .3) && postAt.push([x, y, z]);
-// a rail along an edge from height y0 to y1: posts and two bars, a wall from .9 to 1 m over the walk so it stops bodies but not people underneath
+// a rail along an edge from height y0 to y1: posts and two bars
 const rail = (x0, x1, z0, z1, y0, y1 = y0, m = wood) => {
   const ax = x1 - x0 > z1 - z0 ? 'x' : 'z', a = ax === 'x' ? x0 : z0, b = ax === 'x' ? x1 : z1, len = b - a, n = Math.max(1, Math.round(len / 1.4));
   if (y1 === y0) solid(x0, x1, z0, z1, y0, y0 + 1, 'wood');
-  else strips(x0, x1, z0, z1, ax, a, b, y0, y1, Math.ceil(len / .5), 'wood', 1, .1);
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, ang = Math.atan2(y1 - y0, len);
   for (let k = 0; k <= n; k++) { const p = a + len * k / n, y = y0 + (y1 - y0) * k / n, px = ax === 'x' ? p : cx, pz = ax === 'z' ? p : cz; if (newPost(px, y, pz)) building.cover.push(piece(.1, 1, .1, m, px, y + .5, pz)); }
   const L = Math.hypot(len, y1 - y0) - .04;
-  for (const h of [.95, .5]) { const bar = ax === 'x' ? box(L, .08, .07, m) : box(.07, .08, L, m); bar.position.set(cx, (y0 + y1) / 2 + h, cz); if (ax === 'x') bar.rotation.z = ang; else bar.rotation.x = -ang; add(bar); building.cover.push(bar); }
+  for (const h of [.95, .5]) { const bar = ax === 'x' ? box(L, .08, .07, m) : box(.07, .08, L, m); bar.position.set(cx, (y0 + y1) / 2 + h, cz); if (ax === 'x') bar.rotation.z = ang; else bar.rotation.x = -ang; add(bar); if (y1 !== y0) meshSolids(bar, 'wood'); building.cover.push(bar); }
 };
 const bale = (x, y, z, along) => {
   const [w, d] = along === 'x' ? [1.2, .6] : [.6, 1.2];
@@ -104,8 +104,8 @@ addWall(0, -GA, GA * 2 + .3, .3); addWall(0, GA, GA * 2 + .3, .3); addWall(-GA, 
   run(-GA, -GA, GA, -GA); run(-GA, -GA, -GA, GA); run(GA, -GA, GA, GA); run(-GA, GA, -2, GA); run(2, GA, GA, GA);
   building.cover.push(instanced(unit, oldWood, posts), instanced(unit, oldWood, rails));
   for (const s of [-1, 1]) building.cover.push(piece(.3, 1.8, .3, oldWood, s * 2, .9, GA));
-  for (const y of [.4, .8, 1.2]) building.cover.push(piece(3.7, .14, .06, wood, 0, y, GA));
-  const brace = piece(4, .14, .06, wood, 0, .8, GA - .06); brace.rotation.z = Math.atan2(.8, 3.7); building.cover.push(brace);
+  for (const y of [.4, .8, 1.2]) building.cover.push(onWall(piece(3.7, .14, .06, wood, 0, y, GA)));
+  const brace = onWall(piece(4, .14, .06, wood, 0, .8, GA - .06)); brace.rotation.z = Math.atan2(.8, 3.7); building.cover.push(brace);
 }
 
 // --- the barn: a hayloft over the east half, stairs up the north wall, a hay door out to the silo ---
@@ -124,16 +124,16 @@ const outer = [[BC - ED, EAVE], [BC - KD, KNEE], [BC, RIDGE], [BC + KD, KNEE], [
 prismX([...outer, ...[...outer].reverse().map(([z, y]) => [z, y - .3])], BX0 - OV, BX1 + OV, tin);
 const G0 = KD + (KNEE - WH - .15) / (KNEE - EAVE) * (ED - KD);
 for (const x of [BX0, BX1 - BT]) prismX([[BC - G0, WH], [BC + G0, WH], [BC + KD, KNEE - .15], [BC, RIDGE - .15], [BC - KD, KNEE - .15]], x, x + BT, barnRed);
-slope(BX0 - OV, BX1 + OV, 0, 0, 'z', BC - ED, BC - KD, EAVE, KNEE, 4, 'metal'); slope(BX0 - OV, BX1 + OV, 0, 0, 'z', BC + ES, BC + KD, HS, KNEE, 4, 'metal');
-building.solids.push({ mesh: null, minX: BX0 - OV, maxX: BX1 + OV, minZ: BC - KD, maxZ: BC + KD, bot: KNEE - .2, top: RIDGE, peak: { x: 0, z: BC, rx: 1e6, rz: KD, edge: KNEE }, surf: 'metal' });
+const barnRoof = [[BC - ED, BC - KD, EAVE, KNEE], [BC + ES, BC + KD, HS, KNEE], [BC - KD, BC, KNEE, RIDGE], [BC + KD, BC, KNEE, RIDGE]].flatMap(([a, b, y0, y1]) => slopeSolids('z', a, b, y0, y1, BX0 - OV, BX1 + OV, .3, 'metal'));
+for (const s of barnRoof) if (s.bot > WH) for (const x of [BX0, BX1 - BT]) solid(x, x + BT, Math.max(s.minZ, BZ0), Math.min(s.maxZ, BZ1), WH, s.bot, 'wood'); // the gables filled up to it
 slab(BX0 - OV - .02, BX1 + OV + .02, BC - .25, BC + .25, RIDGE - .2, RIDGE + .1, trim); // ridge cap
 // white trim: corners, sliding doors with an X, the hay hook
 for (const [x, z] of [[BX0, BZ0], [BX1, BZ0], [BX0, BZ1], [BX1, BZ1]]) piece(.24, WH - .05, .24, trim, x, (WH - .05) / 2, z);
 const leaf = (x, z, w, h, nx) => { // a plank door leaf against a wall facing x (nx) or z
   const p = (a, b, c, m, dx, dy, o) => piece(nx ? c : a, b, nx ? a : c, m, x + (nx ? nx * o : dx), dy, z + (nx ? dx : o));
   building.cover.push(p(w, h, .1, barnRed, 0, h / 2 + .02, .08));
-  for (const s of [-1, 1]) { const b = p(Math.hypot(w, h) - .3, .14, .04, trim, 0, h / 2, .165 + s * .005); if (nx) b.rotation.x = s * Math.atan2(h, w); else b.rotation.z = s * Math.atan2(h, w); }
-  p(w, .14, .04, trim, 0, h - .05, .15); p(w, .14, .04, trim, 0, .12, .15);
+  for (const s of [-1, 1]) { const b = onWall(p(Math.hypot(w, h) - .3, .14, .04, trim, 0, h / 2, .165 + s * .005)); if (nx) b.rotation.x = s * Math.atan2(h, w); else b.rotation.z = s * Math.atan2(h, w); }
+  onWall(p(w, .14, .04, trim, 0, h - .05, .15)); onWall(p(w, .14, .04, trim, 0, .12, .15));
 };
 leaf(-12.05, BZ1, 2, 3.6, 0); leaf(-5.95, BZ1, 2, 3.6, 0); leaf(-1.05, BZ1, 1.9, 2.4, 0); leaf(BX0, -17.05, 2, 3.6, -1);
 piece(9.2, .12, .12, iron, -9, 3.74, BZ1 + .08); piece(3.8, .12, .12, iron, -2.1, 2.54, BZ1 + .08); piece(.12, .12, 4.2, iron, BX0 - .08, 3.74, -16);
@@ -202,14 +202,14 @@ solid(HX0, HX1, HZ0, HZ1, 0, HW, 'wood');
   slab(-24.6, -23.6, 15, 16, HW, HR + .8, brick); piece(1.2, .2, 1.2, brick, -24.1, HR + .9, 15.5); // the chimney
 }
 const win = (x, z, dx, dz, w = 1, h = 1.2, y = 1.6) => { // a window with shutters on a wall facing (dx, dz)
-  const p = (u, v, o, sw, sh, sd, m) => piece(dx ? sd : sw, sh, dx ? sw : sd, m, x + (dx ? dx * o : u), y + v, z + (dz ? dz * o : u));
+  const p = (u, v, o, sw, sh, sd, m) => onWall(piece(dx ? sd : sw, sh, dx ? sw : sd, m, x + (dx ? dx * o : u), y + v, z + (dz ? dz * o : u)));
   p(0, 0, .02, w, h, .04, glass);
   p(0, h / 2 + .04, .04, w + .12, .12, .06, trim); p(0, -h / 2 - .04, .04, w + .12, .12, .06, trim); p(0, 0, .04, .08, h - .04, .06, trim);
   for (const s of [-1, 1]) p(s * (w / 2 + .25), 0, .03, .32, h + .1, .05, shutter);
 };
 for (const z of [11.6, 16.4]) win(HX1, z, 1, 0); for (const z of [11.6, 14, 16.4]) win(HX0, z, -1, 0);
 for (const x of [-24, -20]) { win(x, HZ0, 0, -1); win(x, HZ1, 0, 1); }
-piece(.05, 2.2, 1.1, paint(0x6a3a26), HX1 + .03, 1.5, 14); piece(.08, .1, .1, iron, HX1 + .08, 1.4, 14.35);
+onWall(piece(.05, 2.2, 1.1, paint(0x6a3a26), HX1 + .03, 1.5, 14)); piece(.08, .1, .1, iron, HX1 + .08, 1.4, 14.35);
 // porch, a balcony on its roof, stairs up the north end
 const PO = [HX1, -15.4, 10.6, 17.4], BAL = 2.9;
 slab(PO[0], PO[1], PO[2], PO[3], 0, .4, wood);
@@ -227,7 +227,7 @@ prismX([[CO[2], 0], [CO[3], 0], [CO[3], 1.8], [CO[2], 2.4]], CO[0], CO[1], barnR
 solid(CO[0], CO[1], CO[2], CO[3], 0, 1.8, 'wood');
 prismX([[CE, 1.9], [CO[2] - .2, 2.5], [CO[2] - .2, 2.32], [CE, 1.72]], CO[0] - .2, CO[1] + .2, tin);
 slope(CO[0] - .2, CO[1] + .2, 0, 0, 'z', CE, CO[2] - .2, 1.9, 2.5, 2, 'metal');
-piece(.44, .6, .04, dark, -24, .45, CO[3] + .02); { const r = piece(.5, .05, 1.3, oldWood, -24, .3, CO[3] + .6); r.rotation.x = .45; }
+onWall(piece(.44, .6, .04, dark, -24, .45, CO[3] + .02)); { const r = piece(.5, .05, 1.3, oldWood, -24, .3, CO[3] + .6); r.rotation.x = .45; }
 for (let k = 0; k < 3; k++) for (let j = 0; j <= 2 - k; j++) bale(-25.8, j * .5, CE + .3 + .6 * k, 'x');
 const wire = seeThru(tex(g => { g.fillStyle = '#9aa0a4'; for (let i = 0; i < 16; i += 4) { g.fillRect(i, 0, 1, 16); g.fillRect(0, i, 16, 1); } }, 4, 1));
 const RUN = [CO[1], -18.5, CO[2], CO[3] + 1.6];
@@ -293,7 +293,7 @@ const WM = [24, -7.5], WT = 9;
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const bx = WM[0] + sx * 1.4, bz = WM[1] + sz * 1.4, tx = WM[0] + sx * .3, tz = WM[1] + sz * .3, L = Math.hypot(bx - tx, WT, bz - tz);
     const l = box(.14, L, .14, steel); l.position.set((bx + tx) / 2, WT / 2, (bz + tz) / 2); l.lookAt(tx, WT, tz); l.rotateX(Math.PI / 2); add(l); building.cover.push(l);
-    solid(bx - .12, bx + .12, bz - .12, bz + .12, 0, 1.2, 'metal');
+    meshSolids(l, 'metal', .4);
   }
   for (const y of [2.5, 5, 7.4]) { const w = 2.8 * (1 - y / WT * .79); for (const s of [-1, 1]) { piece(w, .08, .08, steel, WM[0], y, WM[1] + s * w / 2); piece(.08, .08, w, steel, WM[0] + s * w / 2, y + .08, WM[1]); } }
   piece(.8, .6, .8, steel, WM[0], WT + .1, WM[1]); // the head holds the fan and the tail
@@ -312,7 +312,7 @@ const WM = [24, -7.5], WT = 9;
 {
   const TR = [5, -4.6], body = paint(0xd86a1c), hub = paint(0xe8c040);
   const wheel = (x, z, r, w) => {
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 14), rubber); t.rotation.x = Math.PI / 2; t.position.set(x, r, z); add(t); building.cover.push(t);
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 14), rubber); t.rotation.x = Math.PI / 2; t.position.set(x, r, z); add(t); building.cover.push(t); meshSolids(t, 'metal');
     const h = new THREE.Mesh(new THREE.CylinderGeometry(r * .5, r * .5, w + .04, 10), hub); h.rotation.x = Math.PI / 2; h.position.set(x, r, z); add(h);
   };
   for (const s of [-1, 1]) { wheel(TR[0] - 1, TR[1] + s * .8, .72, .45); wheel(TR[0] + 1.7, TR[1] + s * .65, .42, .25); }
@@ -336,8 +336,8 @@ const WM = [24, -7.5], WT = 9;
 }
 {
   const [x, z] = [-18.6, -6.2]; // the hay wagon
-  slab(x - 1.5, x + 1.5, z - .8, z + .8, .6, .9, oldWood); solid(x - 1.5, x + 1.5, z - .8, z + .8, 0, .6, 'wood');
-  for (const [dx, dz] of [[-1, -.86], [1, -.86], [-1, .86], [1, .86]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.4, .4, .12, 12), oldWood); w.rotation.x = Math.PI / 2; w.position.set(x + dx, .4, z + dz); add(w); }
+  slab(x - 1.5, x + 1.5, z - .8, z + .8, .6, .9, oldWood);
+  for (const [dx, dz] of [[-1, -.86], [1, -.86], [-1, .86], [1, .86]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.4, .4, .12, 12), oldWood); w.rotation.x = Math.PI / 2; w.position.set(x + dx, .4, z + dz); add(w); meshSolids(w, 'wood'); }
   for (const [bx, bz, y, a] of [[-19.3, -6.5, .9, 'x'], [-19.3, -5.9, .9, 'x'], [-18, -6.2, .9, 'z'], [-19.3, -6.2, 1.4, 'x']]) bale(bx, y, bz, a);
   const tongue = piece(1.72, .1, .1, oldWood, x + 2.28, .3, z); tongue.rotation.z = -.29; // from under the front down to the ground
 }
@@ -346,27 +346,24 @@ for (const [x, z, n, a] of [[2.4, 2.6, 2, 'x'], [-11, -3.4, 1, 'z'], [14.6, -2.4
 // round bales out in the pasture
 for (const [x, z] of [[-23, -1.5], [-22.8, -9.6], [-26.6, -6], [-14.4, 1.8]]) {
   const b = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, 1.3, 14), hay); b.rotation.z = Math.PI / 2; b.position.set(x, .75, z); add(b); building.cover.push(b);
-  solid(x - .65, x + .65, z - .7, z + .7, 0, 1.5, 'grass');
+  for (let k = 0; k < 6; k++) { const z0 = -.75 + k * .25, z1 = z0 + .25, e = Math.min(Math.abs(z0), Math.abs(z1)), c = z0 < 0 && z1 > 0 ? 0 : e; solid(x - .65, x + .65, z + z0, z + z1, .75 - Math.sqrt(.5625 - c * c), .75 + Math.sqrt(.5625 - c * c), 'grass'); } // slices across the round
 }
 // pumpkins behind the house
 const pumpkin = lam({ map: tex(g => { noise(g, [226, 120, 30], 18); g.fillStyle = 'rgba(140,60,10,.5)'; for (const x of [3, 8, 13]) g.fillRect(x, 0, 1, 16); }) }), stem = paint(0x4a6a2a);
 flat(-27.5, -18.5, 20, 27.5, furrowMat);
 for (let i = 0; i < 16; i++) {
   const x = -27 + rnd() * 8, z = 20.5 + rnd() * 6.5, s = .45 + rnd() * .3;
-  piece(s, s * .75, s, pumpkin, x, s * .375, z).rotation.y = rnd(); piece(.06, .14, .06, stem, x, s * .75 + .05, z);
-  solid(x - s / 2, x + s / 2, z - s / 2, z + s / 2, 0, s * .75, 'grass');
+  piece(s, s * .75, s, pumpkin, x, s * .375, z); rnd(); piece(.06, .14, .06, stem, x, s * .75 + .05, z); // square to the world, so they fit their hitboxes
 }
 
 // --- trees: big oaks you can stand in, one with a tire swing ---
-const trunks = [], leaves = [];
+const trunks = [], leaves = [], farTrunks = [], farLeaves = [];
 const oak = (x, z, s, inside) => {
-  const h = 4.6 * s, w = .9 * s, c = [0x9cc078, 0x88b068, 0xa8c888][rnd() * 3 | 0], ry = rnd() * Math.PI / 2;
-  trunks.push([x, h / 2, z, w, h, w, 0, 0xffffff]);
-  leaves.push([x, h + .9 * s, z, 6.4 * s, 2.4 * s, 6.4 * s, ry, c], [x, h + 2.6 * s, z, 4 * s, 1.6 * s, 4 * s, ry, c]);
-  if (!inside) return;
-  addSolid(x, z, w, w, h, 'wood');
-  const fit = 1 / (Math.abs(Math.cos(ry)) + Math.abs(Math.sin(ry)));
-  for (const [size, b, t] of [[6.4 * s, h - .3 * s, h + 2.1 * s], [4 * s, h + 1.8 * s, h + 3.4 * s]]) addSolid(x, z, size * fit, size * fit, t, 'grass').bot = b;
+  const h = 4.6 * s, w = .9 * s, c = [0x9cc078, 0x88b068, 0xa8c888][rnd() * 3 | 0], turn = rnd() * Math.PI / 2;
+  const near = inside || Math.max(Math.abs(x), Math.abs(z)) - 3.2 * s * (Math.cos(turn) + Math.sin(turn)) < M.half, ry = near ? 0 : turn; // ones whose leaves reach over the fence sit square, so their hitboxes fit
+  const t = [x, h / 2, z, w, h, w, 0, 0xffffff], l = [[x, h + .9 * s, z, 6.4 * s, 2.4 * s, 6.4 * s, ry, c], [x, h + 2.6 * s, z, 4 * s, 1.6 * s, 4 * s, ry, c]];
+  (near ? trunks : farTrunks).push(t); (near ? leaves : farLeaves).push(...l);
+  if (near) { boxSolids([[x, (h - .3 * s) / 2, z, w, h - .3 * s, w]], 'wood'); boxSolids(l, 'grass'); } // the trunk up to its leaves, the leaves you can stand in
 };
 oak(-11, 16, 1.05, true); oak(-27, 3, 1, true); oak(-10, 25.5, .95, true);
 for (let n = 0; n < 50;) {
@@ -374,8 +371,8 @@ for (let n = 0; n < 50;) {
   if (x > 30 && x < 54 && Math.abs(z) < 42) continue;
   oak(x, z, .9 + rnd() * .6, false); n++;
 }
-building.cover.push(instanced(unit, barkMat, trunks.slice(0, 3)), instanced(unit, leafMat, leaves.slice(0, 6)));
-instanced(unit, barkMat, trunks.slice(3)); instanced(unit, leafMat, leaves.slice(6));
+building.cover.push(instanced(unit, barkMat, trunks), instanced(unit, leafMat, leaves));
+instanced(unit, barkMat, farTrunks); instanced(unit, leafMat, farLeaves);
 const swing = live(new THREE.Group()); swing.position.set(-9.4, 4.6 * 1.05 - .1, 16); add(swing);
 for (const s of [-1, 1]) { const r = box(.03, 3.3, .03, oldWood); r.position.set(0, -1.65, s * .2); swing.add(r); }
 { const t = new THREE.Mesh(new THREE.TorusGeometry(.32, .12, 6, 12), rubber); t.position.y = -3.4; t.rotation.y = Math.PI / 2; swing.add(t); }
@@ -393,7 +390,9 @@ for (const s of [-1, 1]) { const r = box(.03, 3.3, .03, oldWood); r.position.set
   flat(-60, -31, -45, 30, furrowMat); flat(-31, 30, -60, -31, furrowMat);
 }
 
+propSolids(pieces.filter(b => Math.max(Math.abs(b.position.x), Math.abs(b.position.z)) < M.half + 1)); // every piece inside the fence, now they're all placed
 addSky(seeded(31), M.env.sunDir, 14, 60, 170, 40, 58);
+farRange(132, seeded(331), { lo: 17, hi: 30, peaks: 3, peak: 6, mat: farMat(0x6a88b8, M.env.fog, .45) }); // far off: a blue ridge past the hills
 
 // --- zombies walk out of the corn and follow you into the loft, onto the roofs and up to the catwalk ---
 const NV = makeNav(M, [0, 0, 0]);

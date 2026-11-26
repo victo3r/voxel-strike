@@ -277,9 +277,9 @@ const goldMat = lam({ color: 0xf2c440, emissive: 0x6a4a08 });
 const flameMat = new THREE.MeshBasicMaterial({ color: 0xffb040, transparent: true, opacity: .95 }), flameMat2 = new THREE.MeshBasicMaterial({ color: 0xffe080, transparent: true, opacity: .9 });
 const glowMat = new THREE.SpriteMaterial({ map: sunGlowTex, color: 0xffb060, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
 const rect = (x0, x1, z0, z1, bot, top, m, cover = true) => addSlab((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, bot, top, m, cover);
-const deco = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); return b; };
+const decos = [], deco = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); decos.push(b); return b; }; // they all get hitboxes once they're placed and turned
 const solid = (x0, x1, z0, z1, bot, top, sf, round) => { const s = { mesh: null, minX: x0, maxX: x1, minZ: z0, maxZ: z1, bot, top, surf: sf }; if (round) s.round = round; building.solids.push(s); return s; };
-const line = (a, b, m = darkRope, t = .04) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), r = box(t, t, L, m); r.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); r.lookAt(b[0], b[1], b[2]); add(r); return r; };
+const spars = [], line = (a, b, m = darkRope, t = .04) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), r = box(t, t, L, m); r.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); r.lookAt(b[0], b[1], b[2]); add(r); if (t >= .1) spars.push(r); return r; }; // beams and spars get hitboxes, ropes don't
 const glows = [], glow = (x, y, z, s = 2.2) => { const g = new THREE.Sprite(glowMat); g.scale.setScalar(s); g.position.set(x, y, z); add(g); glows.push(g); return g; };
 // lowest and highest ground under a rectangle
 const under = (x0, x1, z0, z1) => { let lo = 99, hi = -99; for (let j = ci(z0 + .01); j <= ci(z1 - .01); j++) for (let i = ci(x0 + .01); i <= ci(x1 - .01); i++) { const h = hAt(i - O + .5, j - O + .5); lo = Math.min(lo, h); hi = Math.max(hi, h); } return [lo, hi]; };
@@ -306,7 +306,7 @@ function cannon(x, z, y, yaw) {
   const b = new THREE.Mesh(new THREE.CylinderGeometry(.15, .21, 1.8, 10), iron); b.rotation.x = Math.PI / 2 - .1; b.position.set(0, .72, .25); g.add(b);
   p(.28, .28, .28, iron, 0, .7, -.72);
   building.cover.push(cart, b);
-  solid(x - .7, x + .7, z - .7, z + .7, y, y + .9, 'metal');
+  for (const m of g.children) meshSolids(m, m === b ? 'metal' : 'wood'); // its carriage, wheels and barrel as they are
 }
 // open wooden steps on two side boards; the foot at (x, z), climbing along ax in dir
 function stairs(x, z, ax, dir, y0, y1, n, run = .8, w = 1.3, legs = 0) {
@@ -324,7 +324,7 @@ function stairs(x, z, ax, dir, y0, y1, n, run = .8, w = 1.3, legs = 0) {
     const b = box(ax === 'x' ? len : .12, .32, ax === 'x' ? .12 : len, postMat);
     b.position.set(mx + (ax === 'x' ? 0 : s), top(end / 2) - half, mz + (ax === 'x' ? s : 0));
     if (ax === 'x') b.rotation.z = dir * a; else b.rotation.x = -dir * a;
-    add(b);
+    add(b); meshSolids(b);
     if (legs) for (const f of [.4, .75, 1]) { // posts down to the ground
       const d = Math.min(L * f - .1, end - .1), [px, pz] = P(d), h = top(d) - 2 * half + .05 - legs[1], qx = px + (ax === 'x' ? 0 : s), qz = pz + (ax === 'x' ? s : 0);
       if (h > .2) building.cover.push(deco(.14, h, .14, postMat, qx, legs[1] + h / 2, qz));
@@ -345,7 +345,7 @@ function bridge(x0, z0, y0, x1, z1, y1, w = 1.6, rails = true) {
   if (!rails) return;
   for (const o of [-hw, hw]) {
     const ox = ax ? 0 : o, oz = ax ? o : 0;
-    line([x0 + ox, y0 + .95, z0 + oz], [x1 + ox, y1 + .95, z1 + oz], ropeMat, .05);
+    meshSolids(line([x0 + ox, y0 + .95, z0 + oz], [x1 + ox, y1 + .95, z1 + oz], ropeMat, .05), 'wood'); // a rope rail you can't walk through
     for (const [x, z, y] of [[x0, z0, y0], [x1, z1, y1]]) deco(.1, 1, .1, postMat, x + ox, y + .5, z + oz);
   }
 }
@@ -382,11 +382,11 @@ barrel(-5.4, -15.6, 0); barrel(3.6, -15.8, 0); barrel(-6.4, -12.2, 0);
   for (const x of [NX - 1.4, NX + 1.4]) { building.cover.push(deco(.16, 2, .16, postMat, x, 1, NZ)); solid(x - .1, x + .1, NZ - .1, NZ + .1, 0, 2, 'wood'); }
   deco(3, .12, .12, postMat, NX, 1.95, NZ);
   const net = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 1.6), seeThru(tex(g => { g.clearRect(0, 0, 16, 16); g.fillStyle = '#5a5040'; for (let k = 0; k < 16; k += 4) { g.fillRect(k, 0, 1, 16); g.fillRect(0, k, 16, 1); } }, 3, 2)));
-  net.position.set(NX, 1.15, NZ); add(net);
+  net.position.set(NX, 1.15, NZ); add(net); solidBox(NX, 1.15, NZ, 2.7, 1.6, .04);
 }
 // driftwood and stones
 for (const [x, z, l, r] of [[-14, 7.6, 2.2, .4], [3, 8.4, 1.6, -.7], [17.5, 2, 2, 1.2], [-2, -9, 1.4, .2]]) deco(l, .22, .26, barkMat, x, .11, z).rotation.y = r;
-for (const [x, z, s] of [[-18.5, 6, 1], [19, -14, 1.1], [-19.5, -14.5, .9]]) onGround(x, z, s, s * .9, s * .8, boulder).rotation.y = rnd();
+for (const [x, z, s] of [[-18.5, 6, 1], [19, -14, 1.1], [-19.5, -14.5, .9]]) { onGround(x, z, s, s * .9, s * .8, boulder); rnd(); } // square to the world, so they fit their hitboxes
 // --- the cave ---
 for (const [x, z] of [[-4, -24], [2.5, -27], [-1.5, -29.2], [-1, -20.5]]) { const c = cellAt(x, z); if (c >= 0 && cave[c]) lantern(x, CC[c] - .5, z, .3); }
 for (const x of [-9.5, -14.5, -19.5]) { const c = cellAt(x, -24.5); if (c >= 0 && cave[c]) lantern(x, CF[c] + 1.7, -24.8); } // on the tunnel wall
@@ -410,7 +410,7 @@ const SX = -11.5, SW = 3, SZ0 = 12, SZ1 = 31, DECK = 2.25, QD = 4.05, FC = 3.15,
   const X0 = -5.5, X1 = -3, Z0 = 6.5, Z1 = 29.5, Y = .9;
   rect(X0, X1, Z0, Z1, Y - .25, Y, planks);
   rect(X0, X1, Z0 - 1, Z0, 0, LV, planks); // a step up from the sand
-  { const c = tbox(X1 - X0, Y - .25, 1, planks); c.position.set((X0 + X1) / 2, (Y - .25) / 2, Z0 + .5); add(c); building.cover.push(c); } // the deck's end resting on a crib behind it (nobody fits under the deck, so no solid)
+  { const c = tbox(X1 - X0, Y - .25, 1, planks); c.position.set((X0 + X1) / 2, (Y - .25) / 2, Z0 + .5); add(c); building.cover.push(c); solid(X0, X1, Z0, Z0 + 1, 0, Y - .25, 'wood'); } // the deck's end resting on a crib behind it
   for (let z = Z0 + 1.5; z < Z1; z += 2.5) for (const x of [X0 + .15, X1 - .15]) { const f = hAt(x, z); building.cover.push(deco(.26, Y - .25 - f, .26, postMat, x, (f + Y - .25) / 2, z)); solid(x - .13, x + .13, z - .13, z + .13, f - 1, Y - .25, 'wood'); }
   for (const [x, z] of [[X0 + .2, 12.2], [X1 - .2, 12.2], [X1 - .2, Z1 - .2], [X0 + .2, 20.8]]) { building.cover.push(deco(.28, .5, .28, postMat, x, Y + .25, z)); solid(x - .14, x + .14, z - .14, z + .14, Y, Y + .5, 'wood'); }
   torch(X0 + .2, Z1 - .2, Y, 1.6);
@@ -490,7 +490,7 @@ const along = (a, d, s) => a.map((v, i) => v + d[i] * s);
     const x = SX + s * SW;
     deco(.04, .46, .56, portMat, x + s * .01, 1.05, z); deco(.06, .07, .7, tarWood, x + s * .02, 1.31, z); deco(.06, .07, .7, tarWood, x + s * .02, .79, z);
     const lid = deco(.06, .5, .62, hullWood, x + s * .23, 1.2, z); lid.rotation.z = s * 1.15;
-    for (const [g, o] of [[muzzle, .2], [ring, .42]]) { const m = new THREE.Mesh(g, iron); m.rotation.z = Math.PI / 2; m.position.set(x + s * o, 1, z); add(m); }
+    for (const [g, o] of [[muzzle, .2], [ring, .42]]) { const m = new THREE.Mesh(g, iron); m.rotation.z = Math.PI / 2; m.position.set(x + s * o, 1, z); add(m); meshSolids(m, 'metal'); }
   }
   // rails: a planked wall with a cap and posts inside, open at the gangway and for the deck guns
   const rail = (s, z0, z1, y, ports = [], skip = []) => {
@@ -498,23 +498,23 @@ const along = (a, d, s) => a.map((v, i) => v + d[i] * s);
     solid(x - .1, x + .1, z0, z1, y, y + .9, 'wood');
     panel(x - .1, x + .1, z0, z1, y, y + .42, hullWood);
     let z = z0; for (const p of [...ports, z1 + .35]) { if (p - .35 > z) panel(x - .1, x + .1, z, p - .35, y + .42, y + .9, hullWood); z = p + .35; }
-    panel(x - .15, x + .15, z0, z1, y + .9, y + .98, deckWood);
+    panel(x - .15, x + .15, z0, z1, y + .9, y + .98, deckWood); solid(x - .15, x + .15, z0, z1, y + .9, y + .98, 'wood');
     for (let p = z0 + .25; p < z1 - .15; p += 1.4) if (![...ports, ...skip].some(q => Math.abs(q - p) < .55)) deco(.07, .9, .1, postMat, x - s * .135, y + .45, p);
   };
-  rail(-1, FZ, 16.2, DECK); rail(-1, 17.8, QZ, DECK, [20.6], [17.9, 18.6, 22, 23, 24]); rail(1, FZ, 18.4, DECK, [], [16.8, 17.7]); rail(1, 19.6, QZ, DECK, [20.6], [19.7, 22, 23, 24]);
+  rail(-1, FZ, 16.2, DECK); rail(-1, 17.8, QZ, DECK, [20.2], [17.9, 18.6, 22, 23, 24]); rail(1, FZ, 18.4, DECK, [], [16.8, 17.7]); rail(1, 19.6, QZ, DECK, [20.2], [19.7, 22, 23, 24]);
   rail(-1, QZ, SZ1, QD); rail(1, QZ, SZ1, QD);
-  solid(SX - SW + .2, SX + SW - .2, SZ1 - .2, SZ1, QD, QD + .9, 'wood'); panel(SX - SW + .2, SX + SW - .2, SZ1 - .2, SZ1, QD, QD + .9, hullWood); panel(SX - SW + .15, SX + SW - .15, SZ1 - .25, SZ1 + .05, QD + .9, QD + .984, planks);
+  solid(SX - SW + .2, SX + SW - .2, SZ1 - .2, SZ1, QD, QD + .9, 'wood'); panel(SX - SW + .2, SX + SW - .2, SZ1 - .2, SZ1, QD, QD + .9, hullWood); panel(SX - SW + .15, SX + SW - .15, SZ1 - .25, SZ1 + .05, QD + .9, QD + .984, planks); solid(SX - SW + .15, SX + SW - .15, SZ1 - .25, SZ1 + .05, QD + .9, QD + .984, 'wood');
   for (const [s, z] of [[-1, 16.1], [-1, 17.9], [1, 18.3], [1, 19.7]]) { deco(.22, 1.3, .22, postMat, SX + s * (SW - .1), DECK + .65, z); deco(.26, .08, .26, trim, SX + s * (SW - .1), DECK + 1.34, z); } // gangway posts
   // along the front of the quarterdeck, between the stairs: posts and a cap
   solid(SX - 1.4, SX + 1.4, QZ, QZ + .2, QD, QD + .9, 'wood');
-  panel(SX - 1.4, SX + 1.4, QZ, QZ + .2, QD, QD + .1, hullWood); panel(SX - 1.45, SX + 1.45, QZ - .03, QZ + .23, QD + .9, QD + .98, planks);
+  panel(SX - 1.4, SX + 1.4, QZ, QZ + .2, QD, QD + .1, hullWood); panel(SX - 1.45, SX + 1.45, QZ - .03, QZ + .23, QD + .9, QD + .98, planks); solid(SX - 1.45, SX + 1.45, QZ - .03, QZ + .23, QD + .9, QD + .98, 'wood');
   for (let k = 0; k < 10; k++) deco(.08, .8, .08, postMat, SX - 1.26 + k * .28, QD + .5, QZ + .1);
   for (const s of [-1, 1]) deco(.16, .9, .16, postMat, SX + s * 1.36, QD + .45, QZ + .1);
   // decks: light planks, a hatch, a step up to the forecastle and stairs to the quarterdeck
   panel(SX - SW + .2, SX + SW - .2, FZ, QZ, DECK, DECK + .02, deckWood, false); panel(SX - SW + .2, SX + SW - .2, QZ, SZ1 - .2, QD, QD + .02, deckWood, false);
   panel(SX - .7, SX + .7, 21.1, 22.4, DECK, DECK + .04, grate, false); for (const z of [21.1, 22.4]) deco(1.5, .06, .1, tarWood, SX, DECK + .03, z); for (const s of [-1, 1]) deco(.1, .06, 1.4, tarWood, SX + s * .75, DECK + .03, 21.75);
   rect(SX - .7, SX + .7, FZ, FZ + .9, DECK, DECK + LV, planks);
-  stairs(SX - SW + .2 + .65, QZ - 3.6, 'z', 1, DECK, QD, 4, .9); stairs(SX + SW - .2 - .65, QZ - 3.6, 'z', 1, DECK, QD, 4, .9);
+  stairs(SX - SW + .2 + .65, QZ - 3.4, 'z', 1, DECK, QD, 4, .85); stairs(SX + SW - .2 - .65, QZ - 3.4, 'z', 1, DECK, QD, 4, .85); // clear deck at their feet, past the guns
   // the cabin's front: a door and two windows; the stern: windows in gold frames, mouldings, corner posts and the rudder
   deco(1, 1.5, .06, postMat, SX, DECK + .75, QZ - .03); deco(1.16, .08, .08, trim, SX, DECK + 1.54, QZ - .04);
   for (const s of [-1, 1]) deco(.5, .4, .06, lanternMat, SX + s * 1.7, DECK + 1.1, QZ - .03);
@@ -522,6 +522,7 @@ const along = (a, d, s) => a.map((v, i) => v + d[i] * s);
   for (const y of [2.6, 3.5]) deco(SW * 2 - .2, .1, .1, trim, SX, y, SZ1 + .05);
   for (const s of [-1, 1]) { deco(.22, QD + .3, .22, postMat, SX + s * (SW - .08), QD / 2 + .75, SZ1 + .04); deco(.1, .36, .1, postMat, SX + s * 2.6, QD + 1.16, SZ1 - .1); lantern(SX + s * 2.6, QD + 1.3, SZ1 - .1); }
   panel(SX - .15, SX + .15, SZ1, SZ1 + .12, -SEA_D, 2.5, postMat); panel(SX - .12, SX + .12, SZ1 + .12, SZ1 + .95, -2.8, 1.7, hullWood);
+  solid(SX - .15, SX + .15, SZ1, SZ1 + .12, -SEA_D, 2.5, 'wood'); solid(SX - .12, SX + .12, SZ1 + .12, SZ1 + .95, -2.8, 1.7, 'wood'); // the rudder
   for (const y of [-.5, .4, 1.3]) deco(.3, .08, .5, iron, SX, y, SZ1 + .3);
   // masts with iron bands, a crow's nest, yards and sails
   const MASTS = [[13.6, FC, 12], [19.6, DECK, 14], [30.2, QD, 11.5]];
@@ -565,12 +566,12 @@ const along = (a, d, s) => a.map((v, i) => v + d[i] * s);
     line([x, FC + .5, z], [x, 2.85, z], darkRope, .05); deco(.1, 1.3, .1, iron, x, 2.2, z); deco(.08, .08, .8, iron, x, 2.85, z);
     for (const s of [-1, 1]) line([x, 1.58, z], [x, 1.86, z + s * .42], iron, .1); }
   // on deck
-  cannon(SX - SW + .9, 20.6, DECK, -Math.PI / 2); cannon(SX + SW - .9, 20.6, DECK, Math.PI / 2);
+  cannon(SX - SW + .9, 20.2, DECK, -Math.PI / 2); cannon(SX + SW - .9, 20.2, DECK, Math.PI / 2); // room to step up past them onto the quarterdeck stairs
   barrel(SX + SW - .7, 16.8, DECK); barrel(SX + SW - .7, 17.7, DECK); barrel(SX - SW + .7, 18.6, DECK);
   crate(SX, 23.3, DECK);
   // the wheel
   { const y = QD, z = 26.4; building.cover.push(deco(.2, 1, .2, postMat, SX, y + .5, z)); solid(SX - .12, SX + .12, z - .12, z + .12, y, y + 1, 'wood');
-    const wh = new THREE.Mesh(new THREE.TorusGeometry(.42, .05, 6, 12), darkWood); wh.position.set(SX, y + 1.05, z - .14); add(wh);
+    const wh = new THREE.Mesh(new THREE.TorusGeometry(.42, .05, 6, 12), darkWood); wh.position.set(SX, y + 1.05, z - .14); add(wh); meshSolids(wh, 'wood');
     for (let k = 0; k < 4; k++) deco(1.05, .05, .05, darkWood, SX, y + 1.05, z - .14).rotation.z = k * Math.PI / 4; }
 }
 // flags: a black flag with a white skull
@@ -608,7 +609,7 @@ bridge(ridgeEdge(16.2, 17.8) - .3, 17, RIDGE, SX - SW, 17, DECK, 1.6); // over t
   deco(1, .8, 1, crate1, x + 3.9, y + 1.2, z); line([x + 3.5, y + 1.6, z - .4], [x + 3.9, y + 2.1, z], ropeMat, .03); line([x + 4.3, y + 1.6, z + .4], [x + 3.9, y + 2.1, z], ropeMat, .03);
   rect(x - 1, x - .4, z - .5, z + .5, y, y + .7, darkWood); // the winch
 }
-for (const [x, z, s] of [[-33, -11, 1.3], [-26.5, 13.5, 1.1], [-33.5, -21, 1.2]]) onGround(x, z, s, s * .9, s * .85, boulder).rotation.y = rnd();
+for (const [x, z, s] of [[-33, -11, 1.3], [-26.5, 13.5, 1.1], [-33.5, -21, 1.2]]) { onGround(x, z, s, s * .9, s * .85, boulder); rnd(); }
 // --- the plateau ---
 { // the watchtower
   const X0 = 11.5, X1 = 16.5, Z0 = -30.5, Z1 = -25.5, y = PLAT, T = 9;
@@ -627,7 +628,7 @@ for (const [x, z, s] of [[-33, -11, 1.3], [-26.5, 13.5, 1.1], [-33.5, -21, 1.2]]
 }
 for (const x of [-6.5, 5.5]) cannon(x, cliffFoot(x) - 1.3, PLAT, 0); // over the beach
 for (const [x, z, w, d, h] of [[-2, -33.5, 4.4, .7, 1.1], [27, -25.5, .7, 3.6, 1.2], [7.5, -26, 3.2, .7, 1]]) onGround(x, z, w, d, h, mossy);
-for (const [x, z, s] of [[2, -34, 1.4], [33, -27, 1.2], [-19, -21.8, 1.1]]) onGround(x, z, s, s * .9, s * .85, boulder).rotation.y = rnd();
+for (const [x, z, s] of [[2, -34, 1.4], [33, -27, 1.2], [-19, -21.8, 1.1]]) { onGround(x, z, s, s * .9, s * .85, boulder); rnd(); }
 // --- the headland fort ---
 {
   const y = HEAD, X0 = 24, X1 = 34, Z0 = 3, Z1 = 13, T = .6, h = 1.2;
@@ -639,7 +640,7 @@ for (const [x, z, s] of [[2, -34, 1.4], [33, -27, 1.2], [-19, -21.8, 1.1]]) onGr
   cannon(26.7, 11.8, y, 0); cannon(29.7, 11.8, y, 0);
   crate(32.6, 4.4, y); barrel(25.4, 4.3, y); barrel(25.4, 11.6, y);
 }
-for (const [x, z, s] of [[34, -6, 1.2], [26, 20, 1.3]]) onGround(x, z, s, s * .9, s * .85, boulder).rotation.y = rnd();
+for (const [x, z, s] of [[34, -6, 1.2], [26, 20, 1.3]]) { onGround(x, z, s, s * .9, s * .85, boulder); rnd(); }
 // beach to headland: wooden steps along the cliff; beach to plateau: a switchback against the cliff
 stairs(21.35, -10.4, 'z', 1, 0, HEAD, 8, .8, 1.3, [1, 0]);
 stairs(-8.6, -14.95, 'x', -1, 0, RIDGE, 7, .8, 1.3, [1, 0]);
@@ -661,9 +662,9 @@ const pineMat = lam({ map: tex(g => { noise(g, [52, 104, 58], 26); g.fillStyle =
     const s = .8 + rnd() * .45, y = lo, c = LEAF_TINTS[rnd() * LEAF_TINTS.length | 0];
     pines.push([x, z]); addSlab(x, z, .45 * s, .45 * s, y, y + 1.5 * s, barkMat);
     for (const [k, w, t] of [[1.7, 2.6, .9], [2.5, 2, .8], [3.2, 1.4, .7], [3.8, .8, .6], [4.25, .35, .4]]) {
-      const ry = rnd() * .6, hw = w * s / 2 / (Math.cos(ry) + Math.sin(ry)); // the square that fits inside the turned layer
-      leaves.push([x, y + k * s, z, w * s, t * s, w * s, ry, c]);
-      if (w > .5) { const sol = addSolid(x, z, hw * 2, hw * 2, y + (k + t / 2) * s, 'grass'); sol.bot = y + (k - t / 2) * s; } // you can stand on the layers, and shoot through them
+      rnd(); // the layers used to be turned
+      leaves.push([x, y + k * s, z, w * s, t * s, w * s, 0, c]);
+      solidBox(x, y + k * s, z, w * s, t * s, w * s, 'grass'); // you can stand on the layers, and shoot through them
     }
   }
   instanced(unit, pineMat, leaves);
@@ -683,6 +684,7 @@ const pineMat = lam({ map: tex(g => { noise(g, [52, 104, 58], 26); g.fillStyle =
   }
   grassTufts(tufts);
 }
+propSolids([...decos, ...spars], m => m.material.transparent); // every prop and spar its own hitbox, now they're all placed and turned (flames aside)
 // beyond the walls: higher cliffs round three sides, open sea to the south
 {
   const rockM = lam({ map: rockT }), capM = lam({ map: lawn }), trees = [];
@@ -702,6 +704,11 @@ const pineMat = lam({ map: tex(g => { noise(g, [52, 104, 58], 26); g.fillStyle =
   instanced(unit, barkMat, trees.map(([x, y, z, s]) => [x, y + .6 * s, z, .4 * s, 1.2 * s, .4 * s, 0, 0xffffff]));
 }
 addSky(rnd, [-30, 11, 12], 14, 60, 170, 40, 58);
+{ // far off: green hills and blue mountains behind the cliffs, sinking into the sea to the south
+  const fr = seeded(77), F = M.env.fog, land = a => Math.min(1, Math.max(0, (.4 - Math.sin(a)) * 2));
+  farRange(122, fr, { lo: 18, hi: 30, mat: farMat(0x5f8466, F, .5), where: land });
+  farRange(134, fr, { lo: 26, hi: 40, peaks: 3, peak: 10, mat: farMat(0x7290b0, F, .42), where: land });
+}
 // gulls circling over the bay
 const gulls = [];
 {

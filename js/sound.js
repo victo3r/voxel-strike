@@ -1060,8 +1060,121 @@ SOUNDS.r_peregrine = [2.6, .45, s => {
   for (const t of [.6, 1.07, 1.54]) { s.scrape({ t, d: .16, f: 1100, v: .3 }); s.latch(t + .17); }
   s.thunk(2.2); s.click({ t: 2.4, f: 2800, v: .4 });
 }];
+// kill effects (killfx.js)
+SOUNDS.kfx_ghost = [1.4, .5, s => { // a wavering oooOOOooo
+  s.draw(0, 1.25, o => {
+    let ph = 0;
+    for (let i = 0; i < o.length; i++) {
+      const x = i / SR, p = x / 1.25, f = 300 + 170 * Math.sin(Math.PI * Math.min(1, p * 1.2)) + 10 * Math.sin(x * 6.2832 * 5.5);
+      ph += f / SR;
+      o[i] = (Math.sin(ph * 6.2832) + .3 * Math.sin(ph * 2 * 6.2832) + .12 * Math.sin(ph * 3 * 6.2832)) * Math.min(1, x / .2) * Math.max(0, 1 - Math.max(0, p - .55) / .45);
+    }
+  }, .75);
+  s.hiss({ ft: 'bandpass', f: 800, f2: 1600, q: 3, a: .35, d: .8, v: .1 });
+}];
+SOUNDS.kfx_shatter = [1, .65, s => {
+  s.crunch({ a: .002, d: .22, dens: .2, lo: 1500, hi: 9000, v: .8 }); s.thud({ f: 120, d: .06, v: .55 });
+  s.tone({ type: 'square', f: 420, f2: 150, d: .1, v: .2, lp: 2200 });
+  for (let i = 0; i < 8; i++) s.clack({ t: .03 + s.r() * .45, f: 1800 + s.r() * 2600, d: .015, v: .25 + s.r() * .25, body: .3 }); // blocks landing
+}];
+SOUNDS.kfx_frozen = [2.1, .6, s => {
+  s.hiss({ ft: 'highpass', f: 4500, f2: 9000, a: .04, d: .35, v: .22 }); s.crunch({ a: .02, d: .3, dens: .07, lo: 3000, hi: 9000, v: .35 }); // it freezes over
+  s.creak({ t: .45, d: .35, f: 700, f2: 500, v: .12 });
+  s.crunch({ t: .95, a: .002, d: .3, dens: .25, lo: 2500, hi: 10000, v: .9 }); s.thud({ t: .95, f: 160, d: .05, v: .45 }); // and smashes
+  for (let i = 0; i < 9; i++) s.tone({ t: .97 + s.r() * .55, f: 2600 + s.r() * 3200, d: .14, v: .08 + s.r() * .07 }); // ice tinkling down
+}];
+SOUNDS.kfx_tomb = [2.6, .6, s => {
+  s.thud({ t: .3, f: 90, d: .09, v: .9 }); s.crunch({ t: .3, d: .15, dens: .1, lo: 300, hi: 2000, v: .4 }); // flat on the ground
+  s.hiss({ t: .55, ft: 'lowpass', f: 420, f2: 180, a: .05, d: .5, v: .45 }); s.crunch({ t: .55, a: .05, d: .45, dens: .06, lo: 400, hi: 3000, v: .35 }); // the stone grinds up
+  s.ring({ t: 1, f: 175, d: 1.5, v: .3, ratios: [1, 2, 2.76, 5.4] }); // a far-off bell
+}];
+SOUNDS.kfx_fireworks = [2.2, .7, s => {
+  s.hiss({ ft: 'bandpass', f: 700, f2: 2600, q: 2, a: .05, d: .75, v: .35, sweep: .8 }); s.tone({ f: 900, f2: 2700, a: .05, d: .72, v: .16, glide: .78 }); // the whistle up
+  s.thud({ t: .8, f: 70, d: .2, v: 1 }); s.hiss({ t: .8, ft: 'lowpass', f: 2500, f2: 300, a: .003, d: .5, v: .7 }); // bang
+  for (let i = 0; i < 14; i++) s.click({ t: 1.12 + s.r() * .7, f: 2500 + s.r() * 3500, v: .25 + s.r() * .3 }); // crackling
+}];
+SOUNDS.kfx_lightning = [2.3, .9, s => {
+  s.hiss({ ft: 'highpass', f: 2500, a: .001, d: .08, v: 1 }); s.arc({ d: .25, rate: 300, buzz: 90, snap: 1.5, v: .6 }); // the crack
+  s.hiss({ t: .05, ft: 'lowpass', f: 600, f2: 90, a: .02, d: 1.8, v: .9, sweep: 1.5 }); s.tone({ t: .05, f: 60, f2: 35, a: .05, d: 1.4, v: .5 }); // thunder rolling
+  s.crunch({ t: .8, a: .01, d: .35, dens: .12, lo: 600, hi: 4000, v: .4 }); // crumbling to ash
+}];
+SOUNDS.kfx_blackhole = [1.7, .7, s => {
+  s.tone({ type: 'sawtooth', f: 260, f2: 45, a: .15, d: 1, v: .35, lp: 900, glide: 1.1 }); s.hiss({ ft: 'bandpass', f: 3000, f2: 250, q: 1.5, a: .2, d: .95, v: .5, sweep: 1.1 });
+  s.tone({ f: 55, f2: 40, a: .3, d: .9, v: .5 });
+  s.thud({ t: 1.2, f: 110, d: .07, v: .9 }); s.tone({ t: 1.2, f: 1600, f2: 400, d: .1, v: .3 }); s.hiss({ t: 1.2, ft: 'highpass', f: 3000, d: .06, v: .5 }); // it snaps shut
+}];
+const bawk = (s, t, long = false) => s.voice({ t, h: .005, d: long ? .2 : .08, f0: long ? 560 : 620, fpk: long ? 1050 : 820, pk: long ? .6 : .3, f1: long ? 760 : 600, rough: .5, rough2: .7, breath: .15, tail: .03, v: long ? .9 : .7,
+  fm: [[950, 160, 1], [1550, 180, .6], [2900, 260, .3]] });
+SOUNDS.kfx_chicken = [2.8, .6, s => {
+  s.hiss({ ft: 'bandpass', f: 1200, f2: 500, q: .8, a: .005, d: .18, v: .6 }); s.thud({ f: 200, d: .04, v: .4 }); // poof
+  for (const t of [.28, .44, .6]) bawk(s, t);
+  bawk(s, .8); bawk(s, .9, true); // ba-GAWK
+  for (const t of [1.45, 1.6, 1.95]) bawk(s, t);
+  bawk(s, 2.15); bawk(s, 2.25, true);
+}];
+SOUNDS.kfx_poof = [.5, .5, s => { s.hiss({ ft: 'bandpass', f: 1400, f2: 600, q: .8, a: .005, d: .16, v: .6 }); s.tone({ f: 600, f2: 1200, d: .08, v: .15 }); }];
+SOUNDS.kfx_confetti = [1.7, .7, s => {
+  s.tone({ type: 'triangle', f: 260, f2: 520, d: .15, v: .12 }); // the squeeze
+  s.hiss({ t: .16, ft: 'highpass', f: 1500, a: .001, d: .06, v: 1 }); s.thud({ t: .16, f: 140, d: .08, v: .5 }); s.click({ t: .16, f: 3200, v: .8 }); // pop
+  for (const f of [440, 446]) s.tone({ type: 'sawtooth', f: f * .85, f2: f, t: .22, a: .02, d: .5, v: .16, glide: .1, lp: 2400 }); // a party horn
+  s.hiss({ t: .25, ft: 'bandpass', f: 5000, q: 1.5, a: .15, d: 1.1, v: .07 });
+  for (let i = 0; i < 26; i++) s.click({ t: .25 + s.r() * 1.2, f: 4000 + s.r() * 4000, v: .04 + s.r() * .08 }); // paper fluttering down
+}];
 const FOOT_OK = s => FOOT[s] ? s : 'stone';
 
+// Alpha 17
+SOUNDS.firefly = [.15, .3, s => { // a light, quick pop
+  s.hiss({ ft: 'bandpass', f: 3200, f2: 1500, q: .9, d: .035, v: .75 }); s.tone({ f: 250, f2: 110, d: .035, v: .6 });
+  s.tone({ type: 'square', f: 560, f2: 320, d: .03, v: .14, lp: 3200 }); s.click({ f: 6000, v: .28 });
+}];
+SOUNDS.r_firefly = [1.3, .45, s => { s.magOut(.12); s.magIn(.6); s.rack(.98); }];
+SOUNDS.rhino = [.7, .85, s => { // a big round: a crack, a heavy thump and a rolling tail
+  s.hiss({ f: 3200, f2: 260, d: .14, v: .95 }); s.thud({ f: 68, d: .1, v: .95 }); s.tone({ f: 118, f2: 42, d: .22, v: 1 });
+  s.tone({ type: 'square', f: 170, f2: 64, d: .08, v: .28, lp: 1500 }); s.click({ f: 4300, v: .35 }); s.hiss({ ft: 'lowpass', f: 800, f2: 160, t: .03, a: .01, d: .45, v: .45 });
+}];
+SOUNDS.zin_rhino = [.32, .4, s => { s.hiss({ ft: 'bandpass', f: 500, f2: 1500, q: 1.4, a: .02, d: .07, v: .55, sweep: .08 }); s.clack({ t: .06, f: 1500, d: .014, v: .6, body: .5 }); s.tone({ type: 'square', f: 900, f2: 1400, t: .08, a: .004, d: .05, v: .15, lp: 2400, glide: .04 }); }];
+SOUNDS.zout_rhino = [.26, .34, s => { s.tone({ type: 'square', f: 1300, f2: 800, a: .004, d: .045, v: .13, lp: 2300, glide: .04 }); s.hiss({ ft: 'bandpass', f: 1400, f2: 480, q: 1.4, a: .015, d: .07, v: .45, sweep: .08 }); }];
+SOUNDS.r_rhino = [1.9, .45, s => { s.magOut(.2); s.magIn(.85); s.clack({ t: .98, f: 1500, d: .02, v: .6, body: .45 }); s.rack(1.42); }];
+SOUNDS.juggernaut = [.14, .36, s => { // heavier than the Eradicator's (the motor is in soundTick)
+  s.hiss({ ft: 'bandpass', f: 1200, f2: 520, d: .05, v: .95 }); s.tone({ f: 120, f2: 55, d: .06, v: .9 }); s.click({ f: 3000, v: .25 });
+}];
+SOUNDS.r_juggernaut = [3.2, .45, s => { s.latch(.25); s.rattle(1.15); s.rattle(1.75); s.latch(2.55); s.tone({ type: 'sawtooth', f: 50, f2: 150, t: 2.7, a: .25, d: .35, v: .15, lp: 800 }); }];
+SOUNDS.scytheSwing = [.6, .5, s => { // a long whoosh with a ghostly whisper in it
+  s.hiss({ ft: 'bandpass', f: 480, f2: 2100, q: 1.1, a: .07, d: .32, v: .8, sweep: .26 }); s.tone({ type: 'sine', f: 170, f2: 85, a: .05, d: .26, v: .14 });
+  s.hiss({ ft: 'bandpass', f: 2700, f2: 1300, q: 4, t: .08, a: .06, d: .32, v: .14 });
+}];
+SOUNDS.meteor = [.9, .7, s => { // the beacon leaves: a soft thump, a rising whoosh and a chime
+  s.thud({ f: 90, d: .08, v: .6 }); s.hiss({ ft: 'bandpass', f: 600, f2: 2400, q: 1.2, a: .01, d: .35, v: .6, sweep: .3 });
+  s.tone({ type: 'sine', f: 880, f2: 1320, t: .02, a: .01, d: .3, v: .1, glide: .25 }); s.ring({ f: 1760, t: .05, d: .4, v: .06, ratios: [1, 2.01] });
+}];
+SOUNDS.meteorFall = [1.3, .8, s => { // a roar coming down out of the sky
+  s.hiss({ ft: 'bandpass', f: 3200, f2: 380, q: .9, a: .35, d: .85, v: .85, sweep: .95 }); s.tone({ type: 'sawtooth', f: 950, f2: 180, a: .3, d: .85, v: .08, lp: 1400, glide: .9 });
+  s.crunch({ t: .3, a: .3, d: .8, dens: .02, lo: 800, hi: 4000, v: .25 });
+}];
+SOUNDS.meteorBoom = [2.2, 1, s => { // the strike: a huge boom and rocks falling back
+  s.hiss({ f: 1800, f2: 55, a: .004, d: 1.7, v: 1 }); s.tone({ f: 52, f2: 18, d: 1.1, v: 1 }); s.thud({ f: 44, d: .36, v: 1 });
+  s.tone({ type: 'square', f: 90, f2: 30, d: .5, v: .3, lp: 320 }); s.crunch({ t: .12, a: .05, d: 1.5, dens: .03, lo: 300, hi: 2600, v: .5 });
+}];
+SOUNDS.r_meteor = [2.8, .45, s => {
+  for (const t of [.7, 1.5]) { s.scrape({ t, d: .18, f: 700, v: .3 }); s.knock({ t: t + .15, f: 220, tau: .05, v: .7, grit: .2 }); }
+  s.tone({ type: 'sine', t: 2.05, f: 400, f2: 1200, a: .2, d: .4, v: .1, glide: .35 }); s.latch(2.5);
+}];
+SOUNDS.longbow = [.45, .45, s => { // the string lets go: a deep twang and the arrow's whip
+  s.tone({ type: 'triangle', f: 170, f2: 120, d: .3, v: .85 }); s.tone({ f: 340, f2: 240, d: .14, v: .3 });
+  s.hiss({ ft: 'bandpass', f: 1800, f2: 900, q: 1.3, t: .01, a: .01, d: .12, v: .4, sweep: .1 }); s.click({ f: 1400, v: .3 });
+}];
+SOUNDS.bowDraw = [.95, .4, s => { s.creak({ d: .5, f: 300, f2: 420, v: .22 }); s.creak({ t: .45, d: .4, f: 420, f2: 470, v: .16 }); s.hiss({ ft: 'bandpass', f: 900, f2: 1300, q: 2, a: .2, d: .5, v: .08 }); }];
+SOUNDS.bowFull = [.2, .3, s => { s.creak({ d: .12, f: 480, f2: 500, v: .2 }); s.click({ t: .02, f: 2200, v: .12 }); }];
+SOUNDS.r_longbow = [.5, .4, s => { s.scrape({ d: .12, f: 1300, v: .25 }); s.click({ t: .34, f: 1700, v: .35 }); }];
+SOUNDS.zin_longbow = [.2, .25, s => { s.creak({ d: .1, f: 380, f2: 420, v: .14 }); }];
+SOUNDS.zout_longbow = [.18, .22, s => { s.creak({ d: .08, f: 420, f2: 380, v: .12 }); }];
+SOUNDS.boomerang = [.5, .45, s => { // a flick of the wrist and a whirring spin
+  s.hiss({ ft: 'bandpass', f: 700, f2: 1600, q: 1.5, a: .01, d: .14, v: .55, sweep: .12 });
+  for (let k = 0; k < 6; k++) s.hiss({ ft: 'bandpass', f: 1100, q: 3, t: .06 + k * .06, a: .01, d: .03, v: .35 - k * .04 });
+}];
+SOUNDS.boomCatch = [.25, .4, s => { s.knock({ f: 340, tau: .03, v: .7, grit: .1 }); s.hiss({ ft: 'bandpass', f: 1500, d: .04, v: .2 }); }];
+SOUNDS.boomHit = [.25, .45, s => { s.thud({ f: 150, d: .05, v: .8 }); s.knock({ t: .005, f: 420, tau: .025, v: .55, grit: .3 }); }];
+SOUNDS.boomDrop = [.5, .4, s => { s.knock({ f: 300, tau: .03, v: .7, grit: .25 }); s.knock({ t: .14, f: 380, tau: .02, v: .4, grit: .25 }); s.knock({ t: .24, f: 420, tau: .015, v: .25, grit: .25 }); }];
 // close-up sounds get less echo
 const CLOSE = /^(r_|zin_|zout_|dry$|equip$|pick|hurt|die$|armorHit$|step_|land_|ui$|slash$|flip)/;
 // each sound is made once, the first time it's needed or after the lobby is up
@@ -1096,7 +1209,9 @@ function soundsLater() {
 }
 
 // play a sound, optionally out in the world at a position
+let sfxOff = false; // the lobby's backdrop match makes no sound
 function sfx(name, o = {}) {
+  if (sfxOff) return null;
   const { at = null, v = 1, rate = 1, far = 60 } = o;
   if (self.event) tapN++; // played by a click or key handler
   if (!BUF[name]) { const t = performance.now(); if (!o.late) makeSound(name)?.then(() => performance.now() - t < 150 && sfx(name, { ...o, late: true })); return null; } // not made yet: play it if that's quick

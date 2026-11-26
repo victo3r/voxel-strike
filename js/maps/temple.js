@@ -39,9 +39,11 @@ petalDots.polygonOffset = true; petalDots.polygonOffsetFactor = petalDots.polygo
 
 // helpers
 const FL = 1.5, T = .3; // the hall, the walkway and the bridges stand this high
-const piece = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); return b; };
-const tpiece = (w, h, d, m, x, y, z) => { const b = tbox(w, h, d, m); b.position.set(x, y, z); add(b); return b; };
-const cyl = (r0, r1, h, m, x, y, z, n = 10) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, n), m); c.position.set(x, y, z); add(c); return c; };
+const pieces = [], cyls = []; // they get their hitboxes once everything's placed and turned
+const piece = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); pieces.push(b); return b; };
+const tpiece = (w, h, d, m, x, y, z) => { const b = tbox(w, h, d, m); b.position.set(x, y, z); add(b); pieces.push(b); return b; };
+const own = b => { pieces.splice(pieces.lastIndexOf(b), 1); return b; }; // has a hitbox of its own
+const cyl = (r0, r1, h, m, x, y, z, n = 10) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, n), m); c.position.set(x, y, z); add(c); cyls.push(c); return c; };
 const slab = (x0, x1, z0, z1, bot, top, m, cover = true) => addSlab((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, bot, top, m, cover);
 const solid = (x0, x1, z0, z1, bot, top, s = 'stone', more) => { const o = { mesh: null, minX: x0, maxX: x1, minZ: z0, maxZ: z1, bot, top, surf: s, ...more }; building.solids.push(o); return o; };
 const flat = (x0, x1, z0, z1, m, y = .012, k = 2) => {
@@ -52,7 +54,7 @@ const UP = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3();
 // a beam of thickness th from a to b (branches, struts)
 const strut = (a, b, th, m) => { _d.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = _d.length(), s = box(th, L, th, m); s.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); s.quaternion.setFromUnitVectors(UP, _d.normalize()); add(s); return s; };
 // a post that stops you and bullets
-const post = (x, z, y0, y1, w = .3, m = red) => { const p = tpiece(w, y1 - y0, w, m, x, (y0 + y1) / 2, z); building.cover.push(p); solid(x - w / 2, x + w / 2, z - w / 2, z + w / 2, y0, y1, 'wood'); return p; };
+const post = (x, z, y0, y1, w = .3, m = red) => { const p = own(tpiece(w, y1 - y0, w, m, x, (y0 + y1) / 2, z)); building.cover.push(p); solid(x - w / 2, x + w / 2, z - w / 2, z + w / 2, y0, y1, 'wood'); return p; };
 // a wall along ax from lo to hi, across c0 to c1, with holes [middle, width, bottom, top]
 function wall(ax, c0, c1, lo, hi, bot, top, holes, m) {
   const put = (a, b, y0, y1) => { if (y1 - y0 > .01) ax === 'z' ? slab(c0, c1, a, b, y0, y1, m) : slab(a, b, c0, c1, y0, y1, m); };
@@ -87,7 +89,7 @@ function gable(ax, x0, x1, z0, z1, h, y1, m, o, th, rm, oe = [o, o]) {
     if (AX) { r.position.set(cl, cy, cc); r.rotation.x = e * a; } else { r.position.set(cc, cy, cl); r.rotation.z = -e * a; }
     add(r); building.cover.push(r);
   }
-  const rc = AX ? box(len + .2, .2, .34, capMat) : box(.34, .2, len + .2, capMat); rc.position.set(AX ? cl : mid, y1 + .05, AX ? mid : cl); add(rc); // the ridge
+  const rc = AX ? box(len + .2, .2, .34, capMat) : box(.34, .2, len + .2, capMat); rc.position.set(AX ? cl : mid, y1 + .05, AX ? mid : cl); add(rc); meshSolids(rc, 'stone'); // the ridge
   for (const e of [-1, 1]) { const tip = box(.3, .34, .3, capMat); tip.position.set(AX ? cl + e * (len / 2 + .1) : mid, y1 + .2, AX ? mid : cl + e * (len / 2 + .1)); tip.rotation[AX ? 'z' : 'x'] = e * .5 * (AX ? -1 : 1); detail(tip); add(tip); } // its ends turn up
   const d = th / 2 / Math.cos(a), sh = new THREE.Shape([[c0, h], [c1, h], [c1, yw - d], [mid, y1 - d], [c0, yw - d]].map(([p, q]) => new THREE.Vector2(p, q)));
   for (const at of [l0, l1 - T]) {
@@ -95,7 +97,10 @@ function gable(ax, x0, x1, z0, z1, h, y1, m, o, th, rm, oe = [o, o]) {
     if (AX) { g.rotation.y = -Math.PI / 2; g.position.x = at + T; } else g.position.z = at;
     add(g); building.cover.push(g);
   }
-  building.solids.push({ mesh: null, minX: AX ? x0 - oe[0] : mid - H, maxX: AX ? x1 + oe[1] : mid + H, minZ: AX ? mid - H : z0 - oe[0], maxZ: AX ? mid + H : z1 + oe[1], bot: h, top: y1, peak: { x: AX ? 0 : mid, z: AX ? mid : 0, rx: AX ? 1e6 : H, rz: AX ? H : 1e6, edge: ye }, surf: 'stone' });
+  for (const e of [-1, 1]) for (const s of slopeSolids(AX ? 'z' : 'x', mid + e * H, mid, ye, y1, l0 - oe[0], l1 + oe[1], th / Math.cos(a), 'stone')) { // each side, the ends filled up to it
+    const [u0, u1] = AX ? [Math.max(s.minZ, c0), Math.min(s.maxZ, c1)] : [Math.max(s.minX, c0), Math.min(s.maxX, c1)];
+    if (s.bot > h && u1 > u0) for (const at of [l0, l1 - T]) building.solids.push({ mesh: null, minX: AX ? at : u0, maxX: AX ? at + T : u1, minZ: AX ? u0 : at, maxZ: AX ? u1 : at + T, bot: h, top: s.bot, surf: 'stone' });
+  }
 }
 // stairs: a ramp you walk from a (y0) to b (y1) along ax, across c0..c1, and the steps you see; at(p) is the tread under a spot along them
 function stairs(ax, a, b, c0, c1, y0, y1, m = stone) {
@@ -128,7 +133,6 @@ function lantern(x, z, s = 1) {
   P(.62, .22, .62, stone, .11); building.cover.push(P(.26, .85, .26, stone, .645), P(.56, .14, .56, stone, 1.14));
   for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) piece(.08 * s, .36 * s, .08 * s, stone, x + dx * .18 * s, 1.39 * s, z + dz * .18 * s);
   P(.3, .3, .3, glowMat, 1.38); building.cover.push(P(.8, .1, .8, stone, 1.62), P(.56, .1, .56, stone, 1.72)); P(.14, .16, .14, stone, 1.85);
-  solid(x - .32 * s, x + .32 * s, z - .32 * s, z + .32 * s, 0, 1.93 * s, 'stone', { round: .32 * s });
 }
 // a rock, solid where you see it
 const stoneAt = (x, z, w, h, d, y0 = 0, m = rock) => { slab(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y0, y0 + h, m); };
@@ -137,37 +141,25 @@ const crowns = [];
 function blossom(x, z, s = 1) {
   const r = seeded(Math.round(x * 131 + z * 71) & 0xffff | 1), lean = r() * 6.28, lx = Math.cos(lean) * .35 * s, lz = Math.sin(lean) * .35 * s;
   building.cover.push(tpiece(.46 * s, 1.5 * s, .46 * s, bark, x, .75 * s, z));
-  const top = [x + lx, 2.5 * s, z + lz]; building.cover.push(strut([x, 1.4 * s, z], top, .4 * s, bark));
-  solid(x - .26 * s, x + .26 * s, z - .26 * s, z + .26 * s, 0, 2.5 * s, 'wood', { round: .26 * s });
+  const top = [x + lx, 2.5 * s, z + lz], up = strut([x, 1.4 * s, z], top, .4 * s, bark); building.cover.push(up); meshSolids(up, 'wood');
   const ends = [top.slice()], lv = [];
   for (let k = 0, n = 3 + (r() * 2 | 0); k < n; k++) {
     const a = k / n * 6.28 + r() * .8, L = (1.3 + r() * .8) * s, e = [top[0] + Math.cos(a) * L, top[1] + (.5 + r() * .7) * s, top[2] + Math.sin(a) * L];
-    strut([top[0], top[1] - .1, top[2]], e, .18 * s, bark); ends.push(e);
+    meshSolids(strut([top[0], top[1] - .1, top[2]], e, .18 * s, bark), 'wood'); ends.push(e);
   }
   ends[0][1] += 1.2 * s;
   for (const [ex, ey, ez] of ends) {
     for (let k = 0; k < 4; k++) {
       const w = (1 + r() * .8) * s, h = (.7 + r() * .5) * s, b = box(w, h, w * (.8 + r() * .4), blooms[r() * 3 | 0]);
-      b.position.set(ex + (r() - .5) * .9 * s, ey + (r() - .3) * .6 * s, ez + (r() - .5) * .9 * s); b.rotation.y = r() * 1.5;
+      b.position.set(ex + (r() - .5) * .9 * s, ey + (r() - .3) * .6 * s, ez + (r() - .5) * .9 * s); r(); // square to the world, so it fits its hitbox
       const y0 = b.position.y, near = y => lv.some(v => Math.abs(v - y + h / 2) < .008 || Math.abs(v - y - h / 2) < .008); // no two clumps level, they'd flicker
       for (let t = 1; t < 20 && near(b.position.y); t++) b.position.y = y0 + (t & 1 ? 1 : -1) * Math.ceil(t / 2) * .011;
-      lv.push(b.position.y - h / 2, b.position.y + h / 2); add(b); building.cover.push(b);
+      lv.push(b.position.y - h / 2, b.position.y + h / 2); add(b); building.cover.push(b); meshSolids(b, 'grass'); // you can stand in the blossom
     }
     crowns.push([ex, ey, ez, 1.1 * s]);
   }
   const fall = new THREE.Mesh(new THREE.PlaneGeometry(5 * s, 5 * s), petalDots); fall.rotation.x = -Math.PI / 2; fall.position.set(x + lx, .02 + crowns.length * .0015, z + lz); // each tree's a hair above the last, where two overlap
   const uv = fall.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2.5 * s, uv.getY(i) * 2.5 * s); detail(fall); add(fall);
-}
-// boxes [w, h, d, x, y, z, rotY] as one mesh: far scenery in one draw call (k: a tiled texture's size, laid at bake time)
-function boxesMesh(list, m, k) {
-  const pos = [], nor = [], uv = [], idx = [], o = new THREE.Object3D();
-  for (const [w, h, d, x, y, z, ry] of list) {
-    const g = new THREE.BoxGeometry(w, h, d); o.position.set(x, y, z); o.rotation.set(0, ry, 0); o.updateMatrix(); g.applyMatrix4(o.matrix);
-    const v = pos.length / 3; pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array); for (const i of g.index.array) idx.push(v + i);
-  }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setIndex(idx);
-  if (k) { g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); }
-  const mesh = new THREE.Mesh(g, m); if (k) mesh.userData.uvk = k; add(mesh); return mesh;
 }
 // a small pine, for the raised garden and the hill
 function pineTree(x, z, y0, s = 1) {
@@ -261,7 +253,7 @@ for (const z of [-26.6, -20]) piece(6.3, .16, .34, dark, -18.55, 5.22, z);
 gable('z', -21.5, -15.6, -26.6, -20, 5.3, 6.9, dark, .9, .22, tileZ);
 // the gong in its frame, its mallet
 for (const z of [-24.4, -21.6]) { post(-18.55, z, TY, 4.95, .22, dark); detail(piece(.6, .12, .3, dark, -18.55, TY + .06, z)); }
-piece(.22, .2, 3, dark, -18.55, 5.05, -23);
+piece(.22, .2, 3, dark, -18.55, 5.05, -23); solid(-18.65, -18.41, -23.86, -22.14, 3.04, 4.76, 'metal'); // the gong where it hangs (it only sways)
 const gong = live(new THREE.Group()); gong.position.set(-18.55, 4.95, -23); add(gong);
 {
   const disc = new THREE.Mesh(new THREE.CylinderGeometry(.82, .82, .08, 28), gongMat); disc.rotation.z = Math.PI / 2; disc.position.y = -1.05; gong.add(disc);
@@ -309,7 +301,6 @@ const inPond = (x, z) => { let c = false; for (let i = 0, j = POND.length - 1; i
   stoneAt(-17.4, 3.6, 1.3, .32, 1.1); stoneAt(-17.2, 3.4, .8, .2, .7, .32);
   for (const [dx, dz] of [[-.32, -.25], [.32, -.25], [0, .35]]) piece(.08, .6, .08, stone, -17.2 + dx, .82, 3.4 + dz);
   piece(.36, .3, .36, glowMat, -17.2, 1.25, 3.4); building.cover.push(piece(1.3, .1, 1.3, stone, -17.2, 1.45, 3.4), piece(.7, .1, .7, stone, -17.2, 1.55, 3.4)); piece(.14, .14, .14, stone, -17.2, 1.67, 3.4);
-  solid(-17.85, -16.55, 2.75, 4.05, .52, 1.6);
 }
 // the bridge: up and over in ten straight runs, red beams under the deck, rails along both sides
 {
@@ -318,7 +309,7 @@ const inPond = (x, z) => { let c = false; for (let i = 0, j = POND.length - 1; i
     const a = xs[k], b = xs[k + 1], ya = yAt(a), yb = yAt(b), lo = Math.min(ya, yb), hi = Math.max(ya, yb), ang = Math.atan2(yb - ya, b - a), L = Math.hypot(b - a, yb - ya);
     solid(a, b, -1.1, 1.1, lo, hi, 'wood', { ramp: { ax: 'x', a: ya < yb ? a : b, b: ya < yb ? b : a } });
     const dk = tbox(L + .04, .14, 2.2, deck); dk.position.set((a + b) / 2 - .07 * Math.sin(-ang), (ya + yb) / 2 - .07 * Math.cos(ang), 0); dk.rotation.z = ang; add(dk); building.cover.push(dk);
-    for (const s of [-1, 1]) { const bm = box(L + .06, .3, .12, red); bm.position.set((a + b) / 2, (ya + yb) / 2 - .24, s * 1.16); bm.rotation.z = ang; add(bm); }
+    for (const s of [-1, 1]) { const bm = box(L + .06, .3, .12, red); bm.position.set((a + b) / 2, (ya + yb) / 2 - .24, s * 1.16); bm.rotation.z = ang; add(bm); meshSolids(bm, 'wood', .5); }
   }
   for (const s of [-1, 1]) for (let k = 0; k < N; k += 2) rail(xs[k], yAt(xs[k]), s * 1.06, xs[k + 2], yAt(xs[k + 2]), s * 1.06, [true, k + 2 === N]);
   for (const s of [-1, 1]) lantern(-6.9, s * 2.3);
@@ -337,7 +328,6 @@ koi.forEach((f, i) => f.cols.forEach((c, k) => koiM.setColorAt(i * 4 + k, tint.s
   building.cover.push(cyl(.8, .55, .75, bronze, X, .675, Z, 14)); cyl(.86, .86, .08, bronze, X, 1.09, Z, 14); cyl(.76, .76, .02, lam({ color: 0xb8a88a }), X, 1.13, Z, 14);
   for (const s of [-1, 1]) piece(.12, .22, .3, bronze, X + s * .9, 1.02, Z);
   for (let i = 0; i < 7; i++) { const a = i * .9, rr = .15 + (i % 3) * .14; detail(piece(.025, .34, .025, cloth, X + Math.cos(a) * rr, 1.3, Z + Math.sin(a) * rr)); detail(piece(.03, .03, .03, glowMat, X + Math.cos(a) * rr, 1.48, Z + Math.sin(a) * rr)); }
-  solid(X - .8, X + .8, Z - .8, Z + .8, 0, 1.13, 'metal', { round: .8 });
 }
 for (const [x, z] of [[-3.6, -11.6], [3.6, -11.6], [-3.6, 19.4], [3.6, 19.4]]) lantern(x, z);
 for (const [x, z, rr] of [[6.4, -9.4, 1], [10.8, -5.6, .8], [7.6, 9.6, .9], [11.6, 5.4, 1.1]]) { // rocks set in the gravel, moss round their feet
@@ -365,7 +355,6 @@ stoneAt(-9.2, -9, 1, .7, .9); stoneAt(-8.7, -8.6, .6, 1.1, .5); stoneAt(-5.6, -1
   piece(2.8, .12, .5, dark, X, 1.96, Z);
   const r = seeded(9);
   for (const y of [1.2, 1.7]) for (let k = 0; k < 9; k++) { const p = piece(.18, .14, .02, deck, X - .9 + k * .225 + (r() - .5) * .05, y - .12, Z + (k % 2 ? .05 : -.05)); p.rotation.z = (r() - .5) * .3; detail(p); }
-  solid(X - 1.2, X + 1.2, Z - .1, Z + .1, 0, 2);
 }
 
 // --- the south-east: a stone pagoda, a water basin, a bamboo clump ---
@@ -375,7 +364,6 @@ stoneAt(-9.2, -9, 1, .7, .9); stoneAt(-8.7, -8.6, .6, 1.1, .5); stoneAt(-5.6, -1
   let y = .35;
   for (let k = 0; k < 5; k++) { const w = 1 - k * .12; building.cover.push(tpiece(w * .7, .45, w * .7, stone, X, y + .225, Z)); y += .45; building.cover.push(tpiece(w * 1.5, .14, w * 1.5, stone, X, y + .07, Z)); y += .14; }
   piece(.12, .5, .12, bronze, X, y + .25, Z);
-  solid(X - .8, X + .8, Z - .8, Z + .8, 0, y + .5);
 }
 {
   const X = 9, Z = 16;
@@ -384,7 +372,6 @@ stoneAt(-9.2, -9, 1, .7, .9); stoneAt(-8.7, -8.6, .6, 1.1, .5); stoneAt(-5.6, -1
 }
 {
   const X0 = 18.4, X1 = 22, Z0 = 20.5, Z1 = 26.5, r = seeded(51), bam = [0x7aa04a, 0x6a9442, 0x8ab05a].map(c => lam({ color: c }));
-  solid(X0, X1, Z0, Z1, 0, 8, 'wood');
   for (let i = 0; i < 26; i++) { const h = 5 + r() * 3, x = X0 + .2 + r() * (X1 - X0 - .4), z = Z0 + .2 + r() * (Z1 - Z0 - .4), s = piece(.12, h, .12, bam[i % 3], x, h / 2, z); building.cover.push(s); detail(piece(.9, .4, .9, pine, x, h, z)); }
   for (const [a, b] of [[[X0, Z0], [X1, Z0]], [[X0, Z0], [X0, Z1]]]) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.round(L / .5); for (let k = 0; k <= n; k++) piece(.07, .85, .07, bam[0], a[0] + (b[0] - a[0]) * k / n, .425, a[1] + (b[1] - a[1]) * k / n); for (const y of [.35, .75]) piece(b[0] - a[0] + .05, .05, b[1] - a[1] + .05, dark, (a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2); }
 }
@@ -418,6 +405,13 @@ for (const [x, z, w, d] of [[-21.2, 9, 1.4, 2.6], [-14, 25.6, 2.6, 1.6], [14.2, 
 // a path out of the gate between lanterns and pines, mountains in the haze
 flat(-2, 2, 27.4, 60, paveMat, .012, 2);
 for (let z = 31; z < 58; z += 5) for (const s of [-1, 1]) { lantern(s * 3, z, .9); pineTree(s * (6 + (z % 3)), z + 1.5, 0, 1.3); }
+
+const inside = o => Math.max(Math.abs(o.position.x), Math.abs(o.position.z)) < M.half;
+propSolids(pieces.filter(inside), m => m.material === glowMat && m.geometry.parameters.width < .1); // every piece inside the walls, now they're all placed (flames aside)
+for (const c of cyls) if (inside(c) && !detailObjs.includes(c)) { // cylinders stand round
+  const { radiusTop: a, radiusBottom: b, height: h } = c.geometry.parameters, R = Math.max(a, b), [x, y, z] = c.position.toArray();
+  if (c.rotation.x || c.rotation.z) meshSolids(c); else solid(x - R, x + R, z - R, z + R, y - h / 2, y + h / 2, c.material.userData?.surf, { round: R });
+}
 
 // --- outside the walls: bamboo east and west, the hill behind with a pagoda, mountains round ---
 {
@@ -462,10 +456,10 @@ const skyMat = new THREE.MeshBasicMaterial({ map: (() => {
 })(), side: THREE.BackSide, fog: false, depthWrite: false });
 const dome = live(new THREE.Mesh(new THREE.SphereGeometry(58, 24, 16), skyMat)); dome.renderOrder = -2; add(dome);
 const SUN = new THREE.Vector3(...M.env.sunDir).normalize();
-const sunS = live(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, color: 0xfff6e8, fog: false, depthWrite: false })));
-const sunG = live(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, color: 0xffe8d8, fog: false, transparent: true, opacity: .8, depthWrite: false, blending: THREE.AdditiveBlending })));
-sunS.scale.setScalar(4.5); sunG.scale.setScalar(22); sunS.renderOrder = sunG.renderOrder = -1; add(sunG); add(sunS);
-for (const [o, d] of [[dome, 0], [sunG, 52], [sunS, 53]]) { o.frustumCulled = false; o.onBeforeRender = (rr, sc, cam) => { o.position.copy(cam.position).addScaledVector(SUN, d); o.updateMatrixWorld(); }; }
+const sunS = skyCube(sunFaces([255, 207, 84], [255, 227, 135], [255, 239, 195]), SUN.clone().negate().add(new THREE.Vector3(-.4, .5, 0)), { amb: .6 }); // a block
+const sunG = skyBack(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunGlowTex, color: 0xffe8d8, fog: false, opacity: .8, blending: THREE.AdditiveBlending })));
+sunS.scale.setScalar(3); sunG.scale.setScalar(22); add(sunG); add(sunS);
+for (const [o, d] of [[dome, 0], [sunG, 52], [sunS, 53]]) { const own = o.onBeforeRender; o.frustumCulled = false; o.onBeforeRender = (rr, sc, cam, ...a) => { o.position.copy(cam.position).addScaledVector(SUN, d); o.updateMatrixWorld(); own.call(o, rr, sc, cam, ...a); }; } // round whatever camera looks
 // two cranes, their boxes [size, offset, colour, wing] in one instanced mesh
 const CRANE_PARTS = [[.36, .28, 1.1, 0, 0, 0, 0xf2eee6], [.12, .12, .8, 0, .06, .9, 0xf2eee6], [.14, .14, .2, 0, .06, 1.36, 0xf2eee6], [.1, .04, .1, 0, .15, 1.34, 0xd02a20], [.06, .06, .9, 0, -.04, -.95, 0x1c1814],
   ...[-1, 1].flatMap(e => [[1.6, .05, .6, e * .8, 0, 0, 0xf2eee6, e], [.6, .055, .5, e * 1.8, 0, -.05, 0x1c1814, e]])];

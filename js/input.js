@@ -127,8 +127,8 @@ $('vol').addEventListener('change', () => sfx('ui'));
 renderSens();
 // graphics settings
 const GFX_DESC = {
-  high: 'Full resolution and smooth edges, best on a gaming PC',
-  medium: 'No edge smoothing and standard resolution, good for laptops and Chromebooks',
+  high: 'Full resolution, smooth edges and shadows, best on a gaming PC',
+  medium: 'No shadows or edge smoothing and standard resolution, good for laptops and Chromebooks',
   low: 'Medium without the grass, fireflies and light shafts, and a shorter view',
 };
 const saveGfx = () => { try { localStorage.setItem('voxelstrike-gfx', JSON.stringify(gfx)); } catch {} };
@@ -360,7 +360,9 @@ document.addEventListener('pointerlockchange', () => {
     $('menuTitle').textContent = dead ? 'YOU DIED' : goes ? 'MENU' : 'PAUSED';
     $('menuPlay').textContent = dead ? 'TRY AGAIN' : goes ? 'BACK TO GAME' : 'RESUME';
     $('msg').textContent = dead ? `${newBest ? 'NEW BEST! ' : ''}Wave ${wave} · ${kills} kills. ${TAP} to try again` : goes ? '' : TAP + ' to resume';
-    $('armBtn').style.display = pvp() ? '' : 'none'; $('menuFriends').style.display = goes ? '' : 'none';
+    $('armBtn').style.display = pvp() && mode !== 'range' ? '' : 'none'; $('menuFriends').style.display = goes && mode !== 'range' ? '' : 'none';
+    if (mode === 'range') { $('menuTitle').textContent = 'PICK A GUN'; $('menuPlay').textContent = 'BACK TO THE RANGE'; $('msg').textContent = ''; }
+    renderRack();
     $('menuPlayers').style.display = net.on ? '' : 'none';
     renderHelp();
   }
@@ -374,26 +376,22 @@ document.addEventListener('pointerlockerror', () => {
 });
 
 function showLobby(on) {
-  inLobby = on; document.body.classList.toggle('inGame', !on);
+  inLobby = on; document.body.classList.toggle('inGame', !on); lobbySeen(on);
   $('lobby').style.display = on ? 'flex' : 'none';
   $('hud').style.display = on ? 'none' : '';
   vm.visible = !on;
   if (on) { $('menu').style.display = 'none'; showAway(false); camera.fov = fovBase; camera.updateProjectionMatrix(); musicLobby(); armIcon(); if (typeof renderMissions === 'function') renderMissions(); if (typeof renderEvent === 'function') renderEvent(); } // missions.js and events.js load later
 }
-$('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); restart(); showLobby(true); });
+$('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); rangeLeave(); restart(); showLobby(true); });
 
 // the play button brings up mode select, then map select
 const ALL_MAPS = ['roofs', 'forest', 'cove', 'resort', 'sky'];
-const V_MAPS = 14; // bump when the map pictures change
+const V_MAPS = 15; // bump when the map pictures change
 const Z_MAPS = ['yard', 'graveyard', 'farm']; // zombie-only maps (tables.js COOP_MAPS too)
 const DUEL_MAPS = ['ghosttown', 'temple']; // tables.js DUEL_MAPS too
 // ?walk=ghosttown on this PC: PLAY puts you on that map alone, no bots or clock, to look around (duel maps have no offline game)
 const walkMap = (w => /^(127\.0\.0\.1|localhost)$/.test(location.hostname) && MAPS[w] ? w : null)(new URLSearchParams(location.search).get('walk'));
 const MODES = [
-  { id: 'zombiesMenu', name: 'ZOMBIE WAVES', short: 'ZOMBIES', desc: 'Hold off endless zombie waves, on your own or with friends', sub: [
-    { id: 'zombies', name: 'SOLO', title: 'ZOMBIE WAVES · SOLO', desc: 'Test your loadout and strategy against endless zombie waves', maps: Z_MAPS },
-    { id: 'coop', name: 'CO-OP', title: 'ZOMBIE WAVES · CO-OP', desc: `Up to ${COOP_CAP} of you against the waves, so watch each other's backs`, maps: Z_MAPS },
-  ] },
   { id: 'dm', name: 'DEATHMATCH', desc: 'A 4 minute free-for-all, top score wins', maps: ALL_MAPS },
   { id: 'team', name: 'TEAM FIGHT', desc: '4 minutes of blue vs red, most kills wins', maps: ALL_MAPS },
   { id: 'blitzMenu', name: 'BLITZ', desc: '90 seconds to rack up all the kills you can', sub: [
@@ -401,15 +399,23 @@ const MODES = [
     { id: 'blitzTeam', name: 'TEAM', title: 'BLITZ · TEAM', desc: 'Blue vs red, most kills wins', maps: ALL_MAPS },
   ] },
   { id: 'duel', name: 'DUEL', desc: 'Just you and one rival, most kills wins', maps: DUEL_MAPS },
-  { id: 'private', name: 'PRIVATE MATCH', desc: 'Make a room for friends or join one with a code', priv: true },
+  { id: 'zombies', name: 'SOLO', title: 'ZOMBIE WAVES · SOLO', desc: 'Test your loadout and strategy against endless zombie waves', maps: Z_MAPS },
+  { id: 'coop', name: 'CO-OP', title: 'ZOMBIE WAVES · CO-OP', desc: `Up to ${COOP_CAP} of you against the waves, so watch each other's backs`, maps: Z_MAPS },
+  { id: 'range', name: 'TARGET RANGE', desc: 'Try out any gun on dummies that show every hit', maps: ['range'] },
 ];
-const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : m.priv ? [] : [m]);
-const upOf = m => pickPriv && m.id === 'coop' ? null : m.parent; // a private co-op room is picked from the private list
+// the first page: MAIN and ZOMBIES, each a page of its modes with the picked one's maps under them
+const PICK_GROUPS = [
+  { id: 'main', name: 'MAIN', desc: 'Deathmatch, Team\u00a0Fight, Blitz and Duel', modes: ['dm', 'team', 'blitzMenu', 'duel'] },
+  { id: 'zombies', name: 'ZOMBIES', desc: 'Solo or co-op against endless waves', modes: ['zombies', 'coop'] },
+];
+const PLAY_MODES = MODES.flatMap(m => m.sub ? m.sub.map(s => ({ ...s, parent: m.id })) : [m]);
+const tabOf = id => PLAY_MODES.find(m => m.id === id)?.parent || id; // both Blitzes sit under BLITZ
+const noPill = id => id === 'zombies' || id === 'coop' || id === 'duel'; // co-op and duels are always online
 if (!MAPS[mapId]) mapId = 'yard';
 const savedMode = localStorage.getItem('voxelstrike-mode');
-if (PLAY_MODES.some(m => m.id === savedMode)) mode = savedMode === 'coop' ? 'zombies' : savedMode;
-// which page of the picker you're on
-let pickMode = null, pickPriv = false;
+if (PLAY_MODES.some(m => m.id === savedMode && m.id !== 'range')) mode = savedMode === 'coop' ? 'zombies' : savedMode;
+// where the picker is: the first page, a group's page (one mode picked, maybe as a private room) or the code page
+let pickGrp = null, pickMode = null, pickPriv = false, pickJoin = false;
 // ONLINE / VS BOTS switch
 const onlinePref = () => { if (net.wsOk === false) return false; const s = localStorage.getItem('voxelstrike-online'); return s === null ? true : s === '1'; };
 function renderPill() {
@@ -421,58 +427,80 @@ $('pickPill').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   localStorage.setItem('voxelstrike-online', b.dataset.on); renderPill(); sfx('ui');
 });
-const PRIV_CARDS = [
-  { id: 'privCreate', name: 'CREATE ROOM', desc: 'Pick a mode and map, then share the code' },
-  { id: 'privJoin', name: 'JOIN WITH CODE', desc: 'Type in the 6-letter code from a friend' },
-];
+const modeIcon = id => `<span class="mi"><img src="${MODE_ICONS[id].src}" data-w="${MODE_ICONS[id].w}" data-h="${MODE_ICONS[id].h}"></span>`;
 function renderPick() {
-  const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
-  const priv = pickMode === 'private', join = pickMode === 'privJoin', create = pickMode === 'privCreate';
-  $('pickTitle').textContent = m ? m.title || m.name : group ? group.name : priv ? 'PRIVATE MATCH' : join ? 'JOIN WITH A CODE' : create ? 'PRIVATE · SELECT MODE' : 'SELECT MODE';
-  const up = m && MODES.find(g => g.id === upOf(m));
-  const back = m ? (up ? up.short || up.name : pickPriv ? 'PRIVATE' : 'MODES') : group ? (pickPriv ? 'PRIVATE' : 'MODES') : priv ? 'MODES' : join || create ? 'PRIVATE' : 'BACK';
-  $('pickBack').innerHTML = ico('left') + ' ' + back;
-  $('pickList').className = m ? 'maps' : join ? 'code' : 'modes';
-  const pill = !!m && m.id !== 'zombies' && m.id !== 'coop' && m.id !== 'duel' && !pickPriv; // co-op and duels are always online
-  $('pickPill').style.display = pill ? '' : 'none'; if (pill) renderPill();
-  const card = o => `<div class="mc" data-id="${o.id}"><button data-mode="${o.id}"><span class="mi"><img src="${MODE_ICONS[o.id].src}" data-w="${MODE_ICONS[o.id].w}" data-h="${MODE_ICONS[o.id].h}"></span><b>${o.name}</b></button><button class="go" data-go="${o.id}" tabindex="-1">${o.priv || o.id.startsWith('priv') ? 'OPEN' : 'PLAY'}</button></div>`;
-  pickSel = null; $('pickDesc').classList.remove('in'); $('pickDesc').textContent = m ? m.desc : '';
-  if (join) {
+  const g = PICK_GROUPS.find(g => g.id === pickGrp), m = g && PLAY_MODES.find(m => m.id === pickMode);
+  const page = !g ? 'top' : pickJoin ? 'code' : 'grp';
+  $('pick').dataset.page = page;
+  $('pickTitle').textContent = page === 'top' ? 'SELECT MODE' : page === 'code' ? 'JOIN WITH A CODE' : pickPriv ? 'PRIVATE MATCH' : g.name;
+  $('pickBack').innerHTML = ico('left') + ' ' + (page === 'top' ? 'BACK' : page === 'code' ? g.name : 'MODES');
+  if (page === 'top') {
+    $('pickList').className = 'top';
+    $('pickList').innerHTML = PICK_GROUPS.map(g => `<button data-grp="${g.id}">${modeIcon(g.id)}<b>${g.name}</b><small>${g.desc}</small></button>`).join('')
+      + `<div class="rngRow"><button data-go="range" title="${MODES.find(x => x.id === 'range').desc}">${modeIcon('range')}<b>TARGET RANGE</b></button></div>`;
+    fitModeIcons(); return;
+  }
+  if (page === 'code') {
+    $('pickList').className = 'code';
     $('pickList').innerHTML = `<div class="codeBox"><p>Ask a friend for their room code</p><input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" autocapitalize="characters"><button id="codeGo">JOIN</button><p id="codeErr"></p></div>`;
     $('codeIn').focus(); return;
   }
-  // map cards
-  $('pickList').innerHTML = m
-    ? m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
-        return `<button data-map="${id}" style="background-image:linear-gradient(transparent 45%,rgba(0,0,0,.72)),url('img/maps/${id}.jpg?v=${V_MAPS}')"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : m.id === 'coop' ? ` · ${COOP_CAP} players` : ''}</small></button>`; }).join('')
-    : (priv ? PRIV_CARDS : group ? group.sub : create ? [...MODES.filter(x => x.id !== 'zombiesMenu' && !x.priv), { ...PLAY_MODES.find(x => x.id === 'coop'), name: 'CO-OP ZOMBIES' }] : MODES).map(card).join('');
+  // the group's modes in a row
+  if ($('pickTabs').dataset.g !== g.id) {
+    $('pickTabs').dataset.g = g.id;
+    $('pickTabs').innerHTML = g.modes.map(id => `<button data-mode="${id}">${modeIcon(id)}<b>${MODES.find(x => x.id === id).name}</b></button>`).join('');
+  }
+  const tab = MODES.find(x => x.id === tabOf(pickMode));
+  document.querySelectorAll('#pickTabs button').forEach(b => b.classList.toggle('sel', b.dataset.mode === tab.id));
+  $('pickDesc').textContent = pickPriv ? 'Pick a map for your room, then share its code with friends' : tab.desc;
+  // Blitz comes as a free-for-all or in teams
+  $('pickSub').innerHTML = tab.sub ? tab.sub.map(s => `<button data-sub="${s.id}"${s.id === pickMode ? ' class="sel"' : ''}>${s.name}</button>`).join('') : '';
+  $('pickSub').style.display = tab.sub ? '' : 'none';
+  const bare = !tab.sub && noPill(pickMode); // DUEL and ZOMBIES have no switches
+  $('pickSegs').style.display = bare ? 'none' : '';
+  $('pick').classList.toggle('bare', bare && !g.modes.every(noPill)); // DUEL's maps come up, the modes stay put
+  $('pick').classList.toggle('many', PLAY_MODES.some(x => g.modes.includes(tabOf(x.id)) && x.maps.length > 3)); // a phone held upright keeps two rows of maps
+  const pill = !noPill(pickMode) && !pickPriv;
+  $('pickPill').style.display = pill ? '' : 'none'; $('pillNote').style.visibility = pill ? '' : 'hidden'; if (pill) renderPill();
+  if (!$('privBtn').innerHTML) { $('privBtn').innerHTML = `<img src="${MODE_ICONS.private.src}"> PRIVATE MATCH`; $('codeBtn').innerHTML = `<img src="${MODE_ICONS.code.src}"> JOIN WITH CODE`; }
+  $('privBtn').classList.toggle('sel', pickPriv);
+  $('pickList').className = 'maps';
+  $('pickList').innerHTML = m.maps.map(id => { const d = MAPS[id], size = d.size[0].toUpperCase() + d.size.slice(1), r = RULES[m.id];
+    return `<button data-map="${id}" style="background-image:linear-gradient(transparent 45%,rgba(0,0,0,.72)),url('img/maps/${id}.jpg?v=${V_MAPS}')"><b>${d.name.toUpperCase()}</b><small>${size}${r ? ` · ${r.players[d.size]} players` : m.id === 'coop' ? ` · ${COOP_CAP} players` : ''}</small></button>`; }).join('');
   fitModeIcons();
 }
-// mode icons at a whole number of screen pixels per art pixel, so every line is as thick as the rest (and stays so when a card lights up)
+// mode icons at a whole number of screen pixels per art pixel, so every line is as thick as the rest
 function fitModeIcons() {
   if (!pickOpen()) return;
   const dpr = devicePixelRatio || 1;
-  for (const im of document.querySelectorAll('#pickList .mi img')) {
+  for (const im of document.querySelectorAll('#pick .mi img')) {
     const r = zRect(im.parentNode), aw = +im.dataset.w, ah = +im.dataset.h, k = Math.max(1, Math.round(Math.min(r.width * dpr / aw, r.height * dpr / ah)));
     let z = 1; for (let a = im; a; a = a.parentElement) z *= parseFloat(getComputedStyle(a).zoom) || 1; // a zoomed menu
     im.style.width = aw * k / dpr / z + 'px'; im.style.height = ah * k / dpr / z + 'px';
   }
 }
 addEventListener('resize', () => { if (pickOpen()) fitModeIcons(); });
-// first click selects a mode card, second click opens it
-let pickSel = null;
-const PICK_CARDS = [...MODES, ...MODES.flatMap(m => m.sub || []), ...PRIV_CARDS];
-function pickCard(id) {
-  pickSel = id;
-  document.querySelectorAll('#pickList .mc').forEach(c => c.classList.toggle('sel', c.dataset.id === id));
-  const d = $('pickDesc'); d.textContent = PICK_CARDS.find(c => c.id === id)?.desc || '';
-  d.classList.remove('in'); void d.offsetWidth; d.classList.add('in');
+const replay = el => { el.classList.remove('in'); void el.offsetWidth; el.classList.add('in'); };
+// open MAIN or ZOMBIES on the mode you played last there
+function pickGroup(id) {
+  const g = PICK_GROUPS.find(g => g.id === id), saved = localStorage.getItem('voxelstrike-mode');
+  pickGrp = id; pickPriv = false; pickJoin = false; pickMode = null;
+  pickTo(g.modes.includes(tabOf(saved)) ? saved : g.modes[0]);
+}
+// one click on a mode shows its maps
+function pickTo(id) {
+  const tab = MODES.find(x => x.id === id);
+  if (tab?.sub) id = tab.sub.some(s => s.id === pickMode) ? pickMode : tab.sub.find(s => s.id === localStorage.getItem('voxelstrike-mode'))?.id || tab.sub[0].id;
+  if (id === 'zombies') pickPriv = false; // solo has no rooms
+  pickMode = id; mode = id === 'coop' ? 'zombies' : id; localStorage.setItem('voxelstrike-mode', id); // co-op plays zombie waves
+  const m = PLAY_MODES.find(m => m.id === id); if (!m.maps.includes(mapId)) mapId = m.maps[0];
+  renderPick(); replay($('pickDesc')); replay($('pickList'));
 }
 const pickOpen = () => $('pick').style.display === 'flex';
 function showPick(on) {
   $('pick').style.display = on ? 'flex' : 'none';
   $('lobbyUI').style.display = on ? 'none' : '';
-  if (on) { pickMode = null; pickPriv = false; renderPick(); }
+  if (on) { pickGrp = null; pickPriv = false; pickJoin = false; renderPick(); }
 }
 $('playBtn').addEventListener('click', () => { sfx('ui'); if (TOUCH) touchFull(true); if (walkMap) return startWalk(); if (needStarter()) return startStarter(); showPick(true); net.probe?.(); }); // your first game skips the picker
 // ?walk: alone on the map, a duel map from one end looking down it
@@ -482,11 +510,8 @@ function startWalk() {
   lockMouse();
 }
 $('pickBack').addEventListener('click', () => {
-  const m = PLAY_MODES.find(m => m.id === pickMode), group = MODES.find(g => g.id === pickMode && g.sub);
-  if (pickMode === 'private') pickMode = null;
-  else if (pickMode === 'privJoin' || pickMode === 'privCreate') { pickMode = 'private'; pickPriv = false; }
-  else if (m) pickMode = upOf(m) ?? (pickPriv ? 'privCreate' : null);
-  else if (group) pickMode = pickPriv ? 'privCreate' : null;
+  if (pickJoin) pickJoin = false;
+  else if (pickGrp) { pickGrp = null; pickPriv = false; }
   else { showPick(false); sfx('ui'); return; }
   renderPick(); sfx('ui');
 });
@@ -495,22 +520,23 @@ function joinWithCode() {
   if (code.length !== 6) { $('codeErr').textContent = 'A code is 6 letters and numbers'; return; }
   $('codeErr').textContent = ''; sfx('ui'); net.start({ code });
 }
+$('pickTabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]'); if (!b || tabOf(pickMode) === b.dataset.mode) return;
+  pickTo(b.dataset.mode); sfx('ui');
+});
+$('pickSub').addEventListener('click', e => {
+  const b = e.target.closest('[data-sub]'); if (!b || b.dataset.sub === pickMode) return;
+  pickTo(b.dataset.sub); sfx('ui');
+});
+// a private room of the mode you've picked (a private zombie room is co-op)
+$('privBtn').addEventListener('click', () => { pickPriv = !pickPriv; if (pickPriv && pickMode === 'zombies') pickTo('coop'); else { renderPick(); replay($('pickDesc')); } sfx('ui'); });
+$('codeBtn').addEventListener('click', () => { pickJoin = true; renderPick(); sfx('ui'); });
 $('pickList').addEventListener('click', e => {
   if (e.target.closest('#codeGo')) return joinWithCode();
-  const b = e.target.closest('button'); if (!b || !(b.dataset.mode || b.dataset.map || b.dataset.go)) return;
-  if (b.dataset.mode && pickSel !== b.dataset.mode) { pickCard(b.dataset.mode); sfx('ui'); return; }
-  if (b.dataset.mode || b.dataset.go) {
-    const id = b.dataset.mode || b.dataset.go;
-    if (id === 'private') { pickMode = 'private'; pickPriv = false; renderPick(); sfx('ui'); return; }
-    if (id === 'privCreate' || id === 'privJoin') { pickMode = id; pickPriv = id === 'privCreate'; renderPick(); sfx('ui'); return; }
-    pickMode = id;
-    const m = PLAY_MODES.find(m => m.id === pickMode);
-    if (m) {
-      mode = pickMode === 'coop' ? 'zombies' : pickMode; localStorage.setItem('voxelstrike-mode', pickMode); // co-op plays zombie waves
-      if (!m.maps.includes(mapId)) mapId = m.maps[0];
-    }
-    renderPick(); sfx('ui'); return;
-  }
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.grp) { pickGroup(b.dataset.grp); sfx('ui'); return; }
+  if (b.dataset.go === 'range') { showPick(false); startRange(); return; } // one map: straight in
+  if (!b.dataset.map) return;
   mapId = b.dataset.map; localStorage.setItem('voxelstrike-map', mapId);
   // online: net.js finds a room
   if (pickMode === 'coop') { net.start({ mode: 'coop', map: mapId, create: pickPriv }); return; }
@@ -588,7 +614,11 @@ const Z_ICON = artIcon([
   'KggggggggggK', 'KggggggggggK', 'KggKKKKKKggK', 'KggggggggggK', 'KggggggggggK', 'KKKKKKKKKKKK',
 ], { K: '#000', g: '#5aa844', d: '#3d7d2e' }, 11);
 const MODE_ICONS = {
-  zombiesMenu: Z_ICON, zombies: Z_ICON,
+  zombies: Z_ICON,
+  range: artIcon(Array.from({ length: 18 }, (_, y) => Array.from({ length: 18 }, (_, x) => { // a target with two holes in it
+    const d = Math.hypot(x - 8.5, y - 8.5);
+    return (x === 5 && y === 11) || (x === 12 && y === 5) ? 'K' : d > 8.9 ? '.' : d > 8 ? 'K' : d < 1.9 ? 'R' : 'RW'[Math.floor((8 - d) / 1.55) % 2];
+  }).join('')), { K: '#000', R: '#e0302a', W: '#f2efe6' }),
   coop: artIcon(TEAM_ICON, { K: '#000', h: '#5a3a1e', s: '#e8b48a', b: '#5aa844', r: '#8ff0b6' }),
   dm: artIcon([
     '....KKKKKKKK....', '..KKWWWWWWWWKK..', '.KWWWWWWWWWWWWK.', 'KWWWWWWWWWWWWWGK', 'KWWWWWWWWWWWWWGK', 'KWWKKKKWWKKKKWGK',
@@ -600,8 +630,11 @@ const MODE_ICONS = {
   blitz: artIcon(BOLT_ICON, { K: '#000', y: '#ffd23a' }),
   blitzTeam: artIcon(BOLT_ICON, { K: '#000', y: (x, y) => x + y < 11 ? '#3d7ce6' : '#e0453a' }),
   private: artIcon(LOCK_ICON, { K: '#000', y: '#e0b84a', b: '#aab2bc' }),
-  privCreate: artIcon(LOCK_ICON, { K: '#000', y: '#e0b84a', b: '#aab2bc' }),
-  privJoin: artIcon(KEY_ICON, { K: '#000', y: '#e0b84a' }),
+  code: artIcon(KEY_ICON, { K: '#000', y: '#e0b84a' }),
+  main: artIcon([ // a pistol
+    '...KK.............K...', '..KddKKKKKKKKKKKKKdK..', '.KwwwwwwwwwwwwwwwwwwK.', '.KsssdsdsdssssssssssK.', '.KsssdsdsdssssssssssK.', '..KddddddddddddddKKK..', '..KHhhhhKdKsKdKKK.....',
+    '..KHhhhhKdKKKdK.......', '.KHhhhhK.KdddK........', '.KHhhhhK..KKK.........', '.KHhhhhK..............', 'KHhhhhK...............', 'KHhhhhK...............', '.KKKKK................',
+  ], { K: '#000', w: '#f2f5f8', s: '#b9c0c9', d: '#5d6672', h: '#8a5a2e', H: '#b07a42' }),
   duel: artIcon([ // two swords crossed
     '.K.................K.', 'KwKK.............KKwK', '.KwsK...........KswK.', '..KwsK.........KswK..', '...KwsK.......KswK...', '....KwsK.....KswK....', '.....KwsK...KswK.....',
     '......KwsK.KswK......', '.......KwsKswK.......', '........KwsKK........', '........KKwsK........', '.......KswKwsK.......', '....KKKswK.KwsKKK....', '...KyyswK...KwsyyK...',
@@ -611,15 +644,18 @@ const MODE_ICONS = {
 showLobby(true);
 
 // reset the world for a new game (spot = where the server put you)
+// nothing left in the world: zombies, bots and other players, shots and effects
+function worldClear() {
+  zombies.forEach(z => { scene.remove(z.g); if (z.rock) scene.remove(z.rock); if (z.kfx) kfxGone(z); if (z.angel) angelGone(z); z.free?.(); }); zombies.length = 0;
+  booms.forEach(b => { scene.remove(b.m); b.m.geometry.dispose(); b.m.material.dispose(); }); booms.length = 0;
+  rockets.forEach(r => scene.remove(r.m)); rockets.length = 0; bomblets.forEach(b => scene.remove(b.m)); bomblets.length = 0; clearMeteors();
+  flames.forEach(f => scene.remove(f.m)); flames.length = 0; clearPatches();
+  flares.forEach(f => scene.remove(f.m)); flares.length = 0; grenades.forEach(g => scene.remove(g.m)); grenades.length = 0; clearBeams(); clearTracers(); clearLances(); clearBolts(scene); clearMyths();
+  parts.length = 0; partsDraw(); clearDrops(scene); kfxClear(scene); rangeClear(); heard.length = 0;
+}
 function restart(spot) {
   if (zLive || mode === 'zombies' && wave && !dead) saveBest(); // left a zombie run: it still counts
-  boostStart();
-  zombies.forEach(z => { scene.remove(z.g); if (z.rock) scene.remove(z.rock); }); zombies.length = 0;
-  booms.forEach(b => scene.remove(b.m)); booms.length = 0;
-  rockets.forEach(r => scene.remove(r.m)); rockets.length = 0; bomblets.forEach(b => scene.remove(b.m)); bomblets.length = 0;
-  flames.forEach(f => scene.remove(f.m)); flames.length = 0; clearPatches();
-  flares.forEach(f => scene.remove(f.m)); flares.length = 0; grenades.forEach(g => scene.remove(g.m)); grenades.length = 0; clearBeams(); clearTracers(); clearLances(); clearBolts(scene); clearMyths(); recoilReset();
-  parts.length = 0; partsDraw(); clearDrops(scene);
+  boostStart(); worldClear(); recoilReset();
   useMap(mapId); setupPads();
   Object.assign(P, { downed: false, waiting: false, drowned: false, swim: false, hitBy: null, burn: 0, slowT: 0, stunT: 0, stunCD: 0, vy: 0, mvx: 0, mvz: 0, yaw: 0, pitch: 0, hp: 100, max: 100, armor: 0, maxArmor: 0, dr: 0, kx: 0, kz: 0, lx: 0, lz: 0, onRamp: false }); P.pos.set(0, groundAt(0, 0, .35, floorY(0, 0)), 0); P.pos.lag = 0;
   if (spot) { P.pos.set(spot.x, spot.y ?? 0, spot.z); P.yaw = spot.yaw ?? 0; }

@@ -18,30 +18,52 @@ const ACH = [
   { id: 'k250', ic: 'skull', name: 'Slinger II', text: '250 kills', n: 'k', g: 250, xp: 150, c: 40 },
   { id: 'k1000', ic: 'skull', name: 'Slinger III', text: '1000 kills', n: 'k', g: 1000, xp: 300, k: 1 },
   { id: 'k5000', ic: 'skull', name: 'Slinger IV', text: '5000 kills', n: 'k', g: 5000, xp: 600, box: 'iron' },
+  { id: 'k15000', ic: 'skull', name: 'Slinger V', text: '15000 kills', n: 'k', g: 15000, xp: 1000, box: 'gold' },
   { id: 'h25', ic: 'head', name: 'Headhunter I', text: '25 headshot kills', n: 'h', g: 25, xp: 100 },
   { id: 'h200', ic: 'head', name: 'Headhunter II', text: '200 headshot kills', n: 'h', g: 200, xp: 250, k: 1 },
+  { id: 'h1000', ic: 'head', name: 'Headhunter III', text: '1000 headshot kills', n: 'h', g: 1000, xp: 600, box: 'iron' },
   { id: 'st5', ic: 'bolt', name: 'On a Roll', text: '5 kills without dying', n: 'st', g: 5, xp: 100 },
   { id: 'st10', ic: 'bolt', name: 'Unstoppable', text: '10 kills without dying', n: 'st', g: 10, xp: 250, k: 1 },
+  { id: 'st20', ic: 'bolt', name: 'Rampage', text: '20 kills without dying', n: 'st', g: 20, xp: 500, k: 2 },
+  { id: 'st50', ic: 'bolt', name: 'Violence', text: '50 kills without dying', n: 'st', g: 50, xp: 3000, c: 1500, k: 5, box: 'gold' }, // the hardest thing in the game
   { id: 'ml25', ic: 'blade', name: 'Up Close', text: '25 melee kills', n: 'ml', g: 25, xp: 100 },
+  { id: 'ml150', ic: 'blade', name: 'Up Close II', text: '150 melee kills', n: 'ml', g: 150, xp: 300, k: 1 },
+  { id: 'ml500', ic: 'blade', name: 'Up Close III', text: '500 melee kills', n: 'ml', g: 500, xp: 600, box: 'iron' },
   { id: 'used', ic: 'bullet', name: 'Jack of All Guns', text: 'A kill with a gun from every slot', n: 'used', g: 6, xp: 150 },
   { id: 'g25', ic: 'aim', name: 'Regular', text: 'Finish 25 games', n: 'g', g: 25, xp: 150, c: 40 },
   { id: 'g100', ic: 'aim', name: 'Veteran', text: 'Finish 100 games', n: 'g', g: 100, xp: 300, c: 100 },
+  { id: 'g500', ic: 'aim', name: 'Diehard', text: 'Finish 500 games', n: 'g', g: 500, xp: 800, c: 300 },
   { id: 'w10', ic: 'trophy', name: 'Champion', text: 'Win 10 matches', n: 'w', g: 10, xp: 150, k: 1 },
   { id: 'w50', ic: 'trophy', name: 'Legend', text: 'Win 50 matches', n: 'w', g: 50, xp: 400, box: 'iron' },
+  { id: 'w200', ic: 'trophy', name: 'Warlord', text: 'Win 200 matches', n: 'w', g: 200, xp: 800, box: 'gold' },
   { id: 'ow1', ic: 'cloud', name: 'Going Online', text: 'Win an online match', n: 'ow', g: 1, xp: 100, k: 1 },
+  { id: 'ow10', ic: 'cloud', name: 'Online Regular', text: 'Win 10 online matches', n: 'ow', g: 10, xp: 300, k: 2 },
+  { id: 'ow50', ic: 'cloud', name: 'Online Star', text: 'Win 50 online matches', n: 'ow', g: 50, xp: 700, box: 'iron' },
+  { id: 'dw10', ic: 'swords', name: 'Duelist', text: 'Win 10 duels', n: 'dw', g: 10, xp: 500, k: 2 },
   { id: 'z5', ic: 'skull', name: 'Survivor', text: 'Reach zombie wave 5', n: 'zw', g: 5, xp: 50 },
   { id: 'z10', ic: 'skull', name: 'Zombie Hunter', text: 'Reach zombie wave 10', n: 'zw', g: 10, xp: 150 },
   { id: 'z20', ic: 'skull', name: 'Nightmare', text: 'Reach zombie wave 20', n: 'zw', g: 20, xp: 300, k: 1 },
   { id: 'z30', ic: 'skull', name: 'Last One Standing', text: 'Reach zombie wave 30', n: 'zw', g: 30, xp: 500, box: 'iron' },
+  { id: 'z40', ic: 'skull', name: 'Deep End', text: 'Reach zombie wave 40', n: 'zw', g: 40, xp: 800, box: 'gold' },
+  { id: 'cw15', ic: 'zombie', name: 'Squad Up', text: 'Reach wave 15 in co-op zombie waves', n: 'cw', g: 15, xp: 400, k: 1 },
   { id: 'gun1', ic: 'bullet', name: 'New Toy', text: "Own a gun that isn't a starter", n: 'guns', g: 1, xp: 50 },
   { id: 'slots', ic: 'bullet', name: 'Full Rack', text: 'Own a gun for every slot, starters not counted', n: 'slots', g: 6, xp: 250, k: 1 },
   { id: 'gun10', ic: 'bullet', name: 'Collector', text: 'Own 10 guns, starters not counted', n: 'guns', g: 10, xp: 300, c: 100 },
+  { id: 'gun25', ic: 'bullet', name: 'Collector II', text: 'Own 25 guns, starters not counted', n: 'guns', g: 25, xp: 500, box: 'iron' },
+  { id: 'gun50', ic: 'bullet', name: 'Arsenal', text: 'Own 50 guns, starters not counted', n: 'guns', g: 50, xp: 1000, box: 'gold' },
   { id: 'star3', ic: 'star', name: 'Maxed Out', text: 'Get a gun to 3 stars', n: 'star3', g: 1, xp: 150 },
+  { id: 'star10', ic: 'star', name: 'Fully Loaded', text: 'Get 10 guns to 3 stars', n: 'star3', g: 10, xp: 500, k: 2 },
   { id: 'set', ic: 'shield', name: 'Matching Outfit', text: 'Own the armor, boots and hat of one set', n: 'set', g: 1, xp: 300, k: 1 },
+  { id: 'set3', ic: 'shield', name: 'Wardrobe', text: 'Own 3 full sets', n: 'set', g: 3, xp: 600, box: 'iron' },
   { id: 'ch10', ic: 'key', name: 'Treasure Hunter', text: 'Open 10 chests', n: 'ch', g: 10, xp: 100, c: 20 },
+  { id: 'ch50', ic: 'key', name: 'Treasure Hunter II', text: 'Open 50 chests', n: 'ch', g: 50, xp: 300, c: 100 },
   { id: 'gold1', ic: 'key', name: 'Gold Rush', text: 'Open a golden chest', n: 'gc', g: 1, xp: 150 },
+  { id: 'gold10', ic: 'key', name: 'Gold Rush II', text: 'Open 10 golden chests', n: 'gc', g: 10, xp: 500, k: 1 },
   { id: 'ms10', ic: 'check', name: 'On a Mission', text: 'Finish 10 daily missions', n: 'ms', g: 10, xp: 100 },
   { id: 'ms50', ic: 'check', name: 'Mission Master', text: 'Finish 50 daily missions', n: 'ms', g: 50, xp: 300, k: 1 },
+  { id: 'ms200', ic: 'check', name: 'Mission Master II', text: 'Finish 200 daily missions', n: 'ms', g: 200, xp: 600, box: 'iron' },
+  { id: 'dg30', ic: 'gift', name: 'Every Day', text: 'Claim 30 daily gifts', n: 'dg', g: 30, xp: 500, box: 'iron' },
+  { id: 'evf1', ic: 'flag', name: 'Event Finisher', text: "Reach a weekly event's last prize", n: 'evf', g: 1, xp: 500, k: 1 },
   { id: 'lv10', ic: 'star', name: 'Double Digits', text: 'Reach level 10', n: 'lv', g: 10, k: 1, b: 2 },
   { id: 'lv25', ic: 'star', name: 'Halfway There', text: 'Reach level 25', n: 'lv', g: 25, box: 'iron' },
   { id: 'lv50', ic: 'star', name: 'Top of the World', text: 'Reach level 50', n: 'lv', g: 50, box: 'gold' },
@@ -64,10 +86,12 @@ function achKill(head, streak) {
   const cat = BASE[cur]?.cat;
   achCount((n, A) => { n.k = (n.k | 0) + 1; if (head) n.h = (n.h | 0) + 1; if (cat === 'melee') n.ml = (n.ml | 0) + 1; if (streak) n.st = Math.max(n.st | 0, streak); if (cat) A.used[cat] = 1; });
 }
-const achWave = w => achCount(n => { n.zw = Math.max(n.zw | 0, w); });
-function achEnd(won, online) { achCount(n => { n.g = (n.g | 0) + 1; if (won) n.w = (n.w | 0) + 1; if (won && online) n.ow = (n.ow | 0) + 1; }); }
+const achWave = (w, coop) => achCount(n => { n.zw = Math.max(n.zw | 0, w); if (coop) n.cw = Math.max(n.cw | 0, w); });
+function achEnd(won, online, duel) { achCount(n => { n.g = (n.g | 0) + 1; if (won) n.w = (n.w | 0) + 1; if (won && online) n.ow = (n.ow | 0) + 1; if (won && duel) n.dw = (n.dw | 0) + 1; }); }
 const achChest = id => achCount(n => { n.ch = (n.ch | 0) + 1; if (id === 'gold') n.gc = (n.gc | 0) + 1; });
 const achMission = () => achCount(n => { n.ms = (n.ms | 0) + 1; });
+const achDaily = () => achCount(n => { n.dg = (n.dg | 0) + 1; });
+const achEvent = () => achCount(n => { n.evf = (n.evf | 0) + 1; });
 function achMark() { achNew = []; }
 // the results screen: what this game finished
 const achRow = () => achNew.length ? `<div class="rl acr">${ico('ach')} ${achNew.length > 1 ? achNew.length + ' ACHIEVEMENTS' : achNew[0].name.toUpperCase()} · CLAIM IN THE LOBBY</div>` : '';

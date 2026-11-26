@@ -36,7 +36,7 @@ function eventAdd(n) {
   if (!(n > 0)) return;
   eventNow(); const S = prof.event;
   S.pts += n; if (evGame) evGame.pts += n;
-  while (S.got < EV_TRACK.length && S.pts >= EV_TRACK[S.got].p) { const r = evPrize(EV_TRACK[S.got]); evPay(r); evGame?.got.push(r); S.got++; }
+  while (S.got < EV_TRACK.length && S.pts >= EV_TRACK[S.got].p) { const r = evPrize(EV_TRACK[S.got]); evPay(r); evGame?.got.push(r); if (++S.got === EV_TRACK.length) achEvent(); }
   saveProf(); showProf();
 }
 // what counts: kills on players and bots (the bonus comes when the match ends), a match's XP, zombie waves' XP
@@ -78,5 +78,6 @@ $('evCard').addEventListener('click', e => { e.stopPropagation(); if (e.target.i
 setInterval(() => { if (inLobby && !document.hidden) renderEvent(); }, 30000);
 renderEvent();
 // a phone held sideways: the event card goes left under your name, so the right side isn't crowded
-function placeEvent() { const p = TOUCH && phoneSide.matches ? $('lobbyTop') : $('side'); if ($('event').parentElement !== p) p.id === 'side' ? p.prepend($('event')) : p.append($('event')); }
+function placeEvent() { const p = TOUCH && phoneSide.matches ? $('lobbyTop') : $('side'), d = $('evDraw'); if (d.parentElement !== p) p.id === 'side' ? p.prepend(d) : p.append(d); }
 placeEvent(); phoneSide.addEventListener('change', placeEvent);
+sideDrawer('evDraw', 'evTab', 'voxelstrike-event-in', 'the weekly event');

@@ -94,15 +94,15 @@ const plankMat = surf(lam({ map: tex(g => { noise(g, [150, 112, 70], 18); g.fill
 for (const [x, z, d, rgb] of [[-6.5, 3.6, 1, [178, 64, 48]], [6.5, -3.6, -1, [52, 102, 160]]]) { // d: the ramp runs off this way along x
   addSlab(x, z, CL, CW, 0, CH, corr(rgb), true, 2.6);
   const doorX = x - d * CL / 2;
-  for (const oz of [-.6, .6]) { const door = box(.06, CH - .3, CW / 2 - .1, corr(rgb.map(c => c * .82))); door.position.set(doorX - d * .03, CH / 2, z + oz); add(door); }
-  for (const oz of [-.35, -.15, .15, .35]) { const bar = box(.06, CH - .5, .05, darkMetal); bar.position.set(doorX - d * .07, CH / 2, z + oz * 1.8); add(bar); }
+  for (const oz of [-.6, .6]) { const door = box(.06, CH - .3, CW / 2 - .1, corr(rgb.map(c => c * .82))); door.position.set(doorX - d * .03, CH / 2, z + oz); add(door); solidBox(doorX - d * .03, CH / 2, z + oz, .06, CH - .3, CW / 2 - .1, 'metal'); }
+  for (const oz of [-.35, -.15, .15, .35]) { const bar = box(.06, CH - .5, .05, darkMetal); bar.position.set(doorX - d * .07, CH / 2, z + oz * 1.8); add(bar); solidBox(doorX - d * .07, CH / 2, z + oz * 1.8, .06, CH - .5, .05, 'metal'); }
   const x0 = x + d * CL / 2, run = 4, n = 8; // the ramp, in slices so you can walk under its high end
   for (let k = 0; k < n; k++) {
     const a = x0 + d * run * k / n, b = x0 + d * run * (k + 1) / n, ya = CH * (1 - k / n), yb = CH * (1 - (k + 1) / n);
     building.solids.push({ mesh: null, minX: Math.min(a, b), maxX: Math.max(a, b), minZ: z - .7, maxZ: z + .7, bot: yb, top: ya, ramp: { ax: 'x', a: b, b: a }, surf: 'wood' });
   }
   const len = Math.hypot(run, CH), r = box(len, .12, 1.4, plankMat); r.position.set(x0 + d * run / 2, CH / 2 - .06, z); r.rotation.z = -d * Math.atan2(CH, run); add(r); building.cover.push(r);
-  for (const f of [.35, .7]) for (const oz of [-.6, .6]) { const h = CH * (1 - f) - .12, leg = box(.14, h, .14, plankMat); leg.position.set(x0 + d * run * f, h / 2, z + oz); add(leg); }
+  for (const f of [.35, .7]) for (const oz of [-.6, .6]) { const h = CH * (1 - f) - .12, leg = box(.14, h, .14, plankMat); leg.position.set(x0 + d * run * f, h / 2, z + oz); add(leg); solidBox(x0 + d * run * f, h / 2, z + oz, .14, h, .14, 'wood'); }
 }
 addCrates(MAPS.yard.crates);
 // tall grass
@@ -116,4 +116,9 @@ for (let tries = 0; yardTufts.length < 300 && tries < 6000; tries++) {
 grassTufts(yardTufts);
 MAPS.yard.tufts = yardTufts.length;
 addSky(seeded(4242), [3, 17, -36], 14, 45, 140, 38, 52);
+{ // far off: green hills, then blue mountains with snow on the highest
+  const fr = seeded(118), F = MAPS.yard.env.fog;
+  farRange(116, fr, { lo: 4, hi: 11, mat: farMat(0x5d8a4e, F, .6) });
+  farRange(130, fr, { lo: 10, hi: 22, peaks: 4, peak: 10, mat: farMat(0x6e86a8, F, .5), snow: farMat(0xffffff, F, .3), snowAt: 24 });
+}
 });

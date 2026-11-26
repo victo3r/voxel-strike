@@ -68,7 +68,11 @@ function gunAttrs(w) {
   if (w.pool) a.push('NO RELOADS');
   if (w.grenade) a.push('BOUNCES', 'EXPLOSIVE');
   if (w.laser || w.lance) a.push('LASER');
-  if (w.charge) a.push('CHARGE SHOT');
+  if (w.charge) a.push(w.bow ? 'DRAW TO SHOOT' : 'CHARGE SHOT');
+  if (w.windup) a.push('SPINS UP');
+  if (w.sweep) a.push('WIDE SWEEP');
+  if (w.boomer) a.push('COMES BACK');
+  if (w.meteor) a.push('METEOR STRIKE');
   if (w.grow) a.push('GROWS WITH YOU');
   if (w.wisp) a.push('HOMING');
   if (w.saw || w.ricochet) a.push('RICOCHET');
@@ -133,6 +137,13 @@ const DESC = {
   soulwand: 'A ghostly wand that takes a little life back from every foe it finishes',
   ancientwand: 'An old twisted wand that casts fire, ice or wind and never knows which',
   hornet: 'A striped rifle that stings in bursts of three',
+  firefly: 'A little machine pistol that glows as it fires, quick and light on your feet',
+  longbow: 'Draw it all the way back and the arrow hits like a sniper',
+  rhino: 'A heavy rifle whose big slow rounds hit like a charging rhino',
+  boomerang: 'Throw it out, catch it coming back, and hit them both ways',
+  juggernaut: 'A huge minigun that takes a moment to spin up, then never stops',
+  scythe: 'One wide sweep of the blade takes everyone in front of you',
+  meteor: 'Mark a spot and a meteor comes down on it a second later',
   salvo: 'Four tubes, four rockets and a very bad day for anyone in front',
   apex: 'A white tiger of a sniper, sitting at the top of the food chain',
   tracker: 'Tag them once and there is nowhere left to hide',
@@ -208,7 +219,8 @@ const PAGES = [['weapons', 'WEAPONS'], ['wear', 'WEAR'], ['exclusive', 'EXCLUSIV
 const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare', 'eradicator', 'rocket', 'hitman', 'heatray', 'thrasher', 'semisniper', 'herosword', 'shockbeam', 'tigerbite', 'executioner',
   'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
   'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
-  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong', 'monarch', 'quasar', 'wildfire', 'finale', 'moonbeam', 'bombard', 'peregrine'];
+  'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong', 'monarch', 'quasar', 'wildfire', 'finale', 'moonbeam', 'bombard', 'peregrine',
+  'firefly', 'longbow', 'rhino', 'boomerang', 'juggernaut', 'scythe', 'meteor'];
 const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
 function renderIndex() {
   const list = indexList(), have = list.filter(hasGun).length;
@@ -222,7 +234,7 @@ function renderIndex() {
     `<div class="at">${by.map(([r, l]) => `<span style="color:${RARITY[r][1]}">${RARITY[r][0]} ${l.filter(hasGun).length}/${l.length}</span>`).join('')}</div>`);
   heroGun(-1); placeAct();
 }
-const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS']];
+const WEAR_CATS = [['skins', 'SKINS'], ['armor', 'ARMOR'], ['boots', 'BOOTS'], ['hats', 'HATS'], ['kfx', 'KILL FX']];
 let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, gearSel = -1, suitSel = '';
 let armBare = false; // after TAKE OFF he shows what you wear, not the picked card
 const myArmor = () => Math.min(ARMOR_MAX, prof.armor | 0);
@@ -255,10 +267,10 @@ function renderArmory() {
 // ---- the item card in the corner
 const actCard = (name, stars, body, pick, btns) => `<div class="an"><span>${name} <span class="st">${stars}</span></span>` +
   (armDetOk() ? `<button class="more" data-det="1">${armDet ? ico('left') + ' LIST' : 'DETAILS ' + ico('right')}</button>` : '') + `</div>${body}${pick}<div class="ab">${btns}</div>`;
-const armDetOk = () => armPage !== 'wear' || (wearCat !== 'skins' && (wearCat !== 'armor' || armorCard || !!suitSel));
+const armDetOk = () => armPage !== 'wear' || (wearCat !== 'skins' && wearCat !== 'kfx' && (wearCat !== 'armor' || armorCard || !!suitSel));
 function renderAct() {
   renderHide();
-  if (armPage === 'wear') { if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
+  if (armPage === 'wear') { if (wearCat === 'kfx') renderKfxAct(); else if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(w.cat);
   let btns;
   const tr = i === trialNow() && trialOk() ? (i === eq ? `<button class="eq" disabled>${ico('check')} TRYING IT</button>` : '<button class="go" data-try="1">TRY IT FREE</button>') : '';
@@ -270,6 +282,7 @@ function renderAct() {
     if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${upgPrice(i)}</button>`;
   }
   if (tr) btns = tr + btns;
+  if (inLobby) btns += `<button data-range="${i}" title="Try it on the target range">${ico('target')} RANGE</button>`;
   const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   setAct(actCard(w.name + ' ' + gunTags(w), starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns));
   placeAct();
@@ -310,7 +323,7 @@ function hideToggle(k) { prof.hide = (prof.hide | 0) ^ HIDE_BIT[k]; saveProf(); 
 const HIDE_AT = [['hats', 'hat', 1.78], ['armor', 'armor', 1.1], ['boots', 'boots', .2]]; // [slot, name, height on him]
 function renderHide() {
   const a = wornArmor(), b = wornBoots(), h = wornHat(), pic = { armor: a && armorPic(a - 1), boots: b && bootPic(b.id, b.st), hats: h && hatPic(h.id, h.st, h.skin) };
-  $('heroHide').innerHTML = armPage !== 'wear' ? '' : HIDE_AT.filter(([k]) => pic[k]).map(([k, name]) =>
+  $('heroHide').innerHTML = armPage !== 'wear' || wearCat === 'kfx' ? '' : HIDE_AT.filter(([k]) => pic[k]).map(([k, name]) =>
     `<button data-hide="${k}"${hidOn(k) ? ' class="off"' : ''} title="${hidOn(k) ? 'Show' : 'Hide'} your ${name}"><img src="${pic[k]}"><span class="eb">${ico(hidOn(k) ? 'eyeShut' : 'eye')}</span></button>`).join('');
 }
 const _hideV = new THREE.Vector3();
@@ -333,13 +346,14 @@ $('heroHide').addEventListener('pointerdown', e => e.stopPropagation());
 const ARMOR_DESC = 'Armor soaks up hits before your health does';
 function renderWear() {
   const n = myArmor(), w = basicWorn(), T = armorOf(w || 1), sid = shownSuit();
-  const tabIcon = c => c === 'skins' ? headPic(prof.look) : c === 'armor' ? armorPic(Math.max(0, wornArmor() - 1)) : (G => { const on = G.worn(); return on ? G.pic(on.id, on.st) : G.pic(G.list[0].id, 1); })(GEAR[c]);
+  const tabIcon = c => c === 'skins' ? headPic(prof.look) : c === 'kfx' ? kfxPic(wornKfx()) : c === 'armor' ? armorPic(Math.max(0, wornArmor() - 1)) : (G => { const on = G.worn(); return on ? G.pic(on.id, on.st) : G.pic(G.list[0].id, 1); })(GEAR[c]);
   $('armTabs').innerHTML = WEAR_CATS.map(([c, label]) =>
     `<button data-wc="${c}" class="${c === wearCat ? 'sel' : ''}"><img class="${c === 'skins' ? 'hd ai' : 'ai'}" src="${tabIcon(c)}"><span>${label}</span></button>`).join('');
-  if (wearCat === 'skins') armDet = false;
+  if (wearCat === 'skins' || wearCat === 'kfx') armDet = false;
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (wearCat === 'skins') { renderSkins(); return; }
+  if (wearCat === 'kfx') { renderKfx(); return; }
   if (isGear()) { renderGear(); return; }
   wearGear();
   if (armDet) { if (sid) renderSuitDetail(); else renderArmorDetail(); }
@@ -477,6 +491,46 @@ function skinPic(look, head) {
   }, head ? { yaw: .5, tilt: .22, w: 128, h: 128, done: () => ch.dispose() } : { yaw: .45, tilt: .12, w: 160, h: 320, done: () => ch.dispose() });
 }
 const lookPic = L => skinPic(L, false), headPic = L => skinPic(L, true);
+// ---- WEAR page: kill effects (killfx.js)
+const KFX_DESC = 'What becomes of whoever you take down';
+const KFX_ABOUT = { '': 'They float off with a halo and wings', ghost: 'They drift off as a wailing ghost', tombstone: 'Down they go, and up comes a headstone',
+  chicken: 'Bawk! They turn into a chicken and run for it', shatter: 'They burst into a pile of their own blocks', frozen: 'Frozen solid, then smashed to bits',
+  fireworks: 'Up they go and out they pop in a burst of colour', lightning: 'A bolt from the blue leaves nothing but ash', blackhole: 'A tiny black hole swallows them whole', confetti: 'Pop! They go off in a shower of confetti' };
+let kfxSel = null; // the card picked ('' = angels)
+const kfxList = () => ['', ...KILL_FX.slice().sort((a, b) => (a.chest | 0) - (b.chest | 0) || a.unlock - b.unlock).map(K => K.id)];
+const kfxOwn = id => !id || !!prof.kfx?.[id], kfxLocked = K => !!K.id && !kfxOwn(K.id) && (K.chest || prof.lv < K.unlock);
+function renderKfx() {
+  heroArmor(shownArmor()); wearGear();
+  const on = wornKfx(); if (kfxSel === null || (kfxSel && !kfxOf(kfxSel))) kfxSel = on;
+  $('armList').innerHTML = `<p class="wd">${KFX_DESC}</p>` + kfxList().map(id => {
+    const K = kfxOf(id) ?? ANGEL_FX, worn = id === on;
+    const tag = worn ? 'EQUIPPED' : kfxOwn(id) ? '' : K.chest ? `${ico('lock')} GOLDEN CHEST` : prof.lv < K.unlock ? `${ico('lock')} LVL ${K.unlock}` : cost(K);
+    return `<div class="card rr${kfxLocked(K) ? ' locked' : ''}${id === kfxSel ? ' sel' : ''}${worn ? ' on' : ''}${rarCls(K)}" data-kfx="${id}">` +
+      (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${kfxPic(id)}"><div class="cn">${K.name}</div></div>`;
+  }).join('');
+  renderAct();
+  if (inLobby) heroGun(-1);
+}
+function renderKfxAct() {
+  const id = kfxSel ?? wornKfx(), K = kfxOf(id) ?? ANGEL_FX;
+  let btns = inLobby && wideArm() ? `<button data-kplay="1">${ico('eye')} PREVIEW</button>` : '';
+  if (id === wornKfx()) btns += '<button class="eq" disabled>EQUIPPED</button>';
+  else if (kfxOwn(id)) btns += '<button data-kwear="1">EQUIP</button>';
+  else if (K.chest) btns += `<button disabled>${ico('lock')} FOUND IN GOLDEN CHESTS</button>`;
+  else if (prof.lv < K.unlock) btns += `<button disabled>${ico('lock')} UNLOCKS AT LVL ${K.unlock}</button>`;
+  else btns += `<button data-kbuy="1" ${prof.coins < K.price ? 'disabled' : ''}>BUY ${cost(K)}</button>`;
+  setAct(actCard(K.name + ' ' + rarTag(K), '', `<div class="tn">${KFX_ABOUT[id]}</div>`, '', btns));
+  placeAct();
+}
+function kfxClick(d) {
+  const id = kfxSel ?? wornKfx(), K = kfxOf(id);
+  if (d.kplay) { kfxPlay(id); return; }
+  if (d.kbuy) {
+    if (!K || K.chest || kfxOwn(id) || prof.coins < K.price || prof.lv < K.unlock) return;
+    prof.coins -= K.price; prof.kfx = { ...prof.kfx, [id]: 1 }; prof.kfxOn = id; sfx('buy'); kfxPlay(id);
+  } else if (d.kwear) { if (!kfxOwn(id)) return; prof.kfxOn = id; sfx('equip'); }
+  saveProf(); showProf();
+}
 function renderSkins() {
   const list = lookChoices(), on = lookIndex();
   $('armList').innerHTML = `<p class="wd">${SKINS_DESC}</p>` + list.map((p, i) =>
@@ -756,6 +810,7 @@ $('armList').addEventListener('click', e => {
   if (c.dataset.dbuy) { drawBuy(); return; }
   if (c.dataset.dnew) { openDraw(-1); return; }
   if (c.dataset.skin) { drawSure = -1; codeOn = false; skinPick = +c.dataset.skin; wearLook(skinPick); renderArmory(); return; }
+  if (c.dataset.kfx !== undefined) { kfxSel = c.dataset.kfx; kfxPlay(kfxSel); sfx('ui'); renderArmory(); return; }
   if (c.dataset.code) { codeOn = true; codeMsg = ''; skinPick = -1; sfx('ui'); renderArmory(); $('secretIn')?.focus(); return; }
   if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = basicWorn() || 1; } else { armorCard = true; suitSel = ''; } sfx('ui'); renderArmory(); return; }
   if (c.dataset.suit) { const id = c.dataset.suit; if (suitSel === id) armDet = true; else { suitSel = id; armorCard = false; } sfx('ui'); renderArmory(); return; }
@@ -772,9 +827,10 @@ function armClick(e) {
   if (b.dataset.dedit) { openDraw(+b.dataset.dedit); return; }
   if (b.dataset.ddel) { const i = +b.dataset.ddel; if (drawSure === i) { drawSure = -1; drawDelete(i); } else { drawSure = i; sfx('ui'); renderAct(); } return; }
   if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; suitSel = ''; armSel = -1; gearSel = -1; skinPick = -1; codeOn = false; armBare = false; sfx('ui'); } }
-  else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; armDet = false; armorCard = false; suitSel = ''; armorPrev = 0; gearSel = -1; skinPick = -1; codeOn = false; armBare = false; sfx('ui'); } }
+  else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; kfxSel = null; armDet = false; armorCard = false; suitSel = ''; armorPrev = 0; gearSel = -1; skinPick = -1; codeOn = false; armBare = false; sfx('ui'); } }
   else if (b.dataset.gbuy || b.dataset.gup || b.dataset.gwear || b.dataset.goff || b.dataset.gu) gearClick(b.dataset);
   else if (b.dataset.hsko || 'hsk' in b.dataset) hskClick(b.dataset);
+  else if (b.dataset.kbuy || b.dataset.kwear || b.dataset.kplay) kfxClick(b.dataset);
   else if (b.dataset.av) { armorStep(+b.dataset.av); return; }
   else if (b.dataset.sbuy || b.dataset.sup || b.dataset.swear || b.dataset.soff || b.dataset.su) suitClick(b.dataset);
   else if (b.dataset.wa) wearStar(basicWorn() + +b.dataset.wa);
@@ -791,6 +847,7 @@ function armClick(e) {
     prof.coins -= T.price; prof.armor = n + 1; prof.armorUse = 0; if (armorOff()) { prof.armorOn = ''; unhide('armor'); } if (armDet) armorPrev = n + 1; saveProf(); showProf();
     armorSync(); sfx(n ? 'upgrade' : 'buy');
   }
+  else if (b.dataset.range) { closeArmory(); startRange(+b.dataset.range); return; }
   else if (b.dataset.det) { armDet = !armDet; if (armDet && armPage === 'wear' && wearCat === 'armor') armorPrev = basicWorn() || 1; sfx('ui'); }
   else if (b.dataset.c) { armCat = b.dataset.c; armDet = false; sfx('ui'); }
   else if (b.id === 'detBack') { armDet = false; hskOpen = false; hskSel = null; sfx('ui'); }
@@ -823,7 +880,7 @@ function armShow(on) {
   if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; }
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
-function openArmory() { armOpen = true; armDet = false; armSel = -1; armorCard = false; suitSel = ''; skinPick = -1; codeOn = false; armBare = false; armShow(true); renderArmory(); }
+function openArmory() { armOpen = true; kfxSel = null; armDet = false; armSel = -1; armorCard = false; suitSel = ''; skinPick = -1; codeOn = false; armBare = false; armShow(true); renderArmory(); }
 function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; gearSel = -1; suitSel = ''; heroArmor(shownArmor()); wearGear(); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // don't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);

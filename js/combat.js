@@ -29,6 +29,8 @@ function recoilTick(dt, w) {
 function recoilReset() { rec.tp = rec.ty = rec.p = rec.y = 0; }
 // tracers for your own shots
 const TRACER_SPD = 140, TRACER_LEN = 1.5, tracers = [], tracerPool = [];
+const SHOT_GEOS = {}, SHOT_MATS = {}; // shots share their shapes and colours, so nothing is left behind when they go
+const shotBox = (w, h, d, m) => new THREE.Mesh(SHOT_GEOS[w + ',' + h + ',' + d] ??= new THREE.BoxGeometry(w, h, d), m), shotMat = c => SHOT_MATS[c] ??= lam({ color: c });
 const tracerGeo = new THREE.BoxGeometry(1, 1, 1), tracerMat = new THREE.MeshBasicMaterial({ color: 0xffeab0, transparent: true, opacity: .4, depthWrite: false });
 const laserMat = new THREE.MeshBasicMaterial({ color: 0xd47bff, transparent: true, opacity: .9, depthWrite: false }); // Executioner bolts
 const trFrom = new THREE.Vector3(), trTo = new THREE.Vector3();
@@ -57,9 +59,9 @@ function shoot(k) { // k: how charged the Aurora Rail was
   if (w.melee) return stab(w);
   if (w.charge && k === undefined && ammo[cur] > 0) return; // it fires when you let go (chargeTick)
   if (ammo[cur] <= 0) { myBurst.bn = 0; if (reserve[cur]) reload(); else { cd = .3; dry(); } return; }
-  ammo[cur]--; cd = burstCd(w, myBurst); net.shot(w); botHear(P.pos.x, P.pos.z, YOU_T, w.quiet); // bots hear it
+  ammo[cur]--; cd = w.windup ? windGap(w, windK) : burstCd(w, myBurst); net.shot(w); botHear(P.pos.x, P.pos.z, YOU_T, w.quiet); // bots hear it
   if (gunShown === cur) coreFire(gunCore);
-  if (gunSpin) gunSpinV = spinKick(cur);
+  if (gunSpin) gunSpinV = shotSpin(w, cur, gunSpinV, windK);
   if (w.beam) heatBeam(w);
   else if (w.flame) flame(w);
   else if (w.lance) fireLance(w, k);
@@ -74,11 +76,13 @@ function shoot(k) { // k: how charged the Aurora Rail was
     else if (w.wisp) fireWisp(w);
     else if (w.vortex) fireVoid(w);
     else if (w.saw) fireSaw(w);
+    else if (w.boomer) fireBoomer(w);
     else if (w.spell) castSpell(w, camera.position.clone(), camera.getWorldDirection(fwd).clone(), null, flashMesh);
     else {
       flashMesh.getWorldPosition(trFrom);
       // only primaries spread, aiming halves it
-      const spread = w.spread * (1 - adsT * .5);
+      const spread = w.spread * (1 - adsT * .5), ck = chargeMul(w, k); // the Longbow hits as hard as it was drawn
+      if (w.charge) shotCharge = Math.min(1, k);
       for (let i = 0; i < w.pellets; i++) {
         ndc.set((Math.random() - .5) * spread * 2, (Math.random() - .5) * spread * 2);
         ray.setFromCamera(ndc, camera);
@@ -88,7 +92,7 @@ function shoot(k) { // k: how charged the Aurora Rail was
         if (!hit) continue;
         const zz = hit.object.userData.zombie;
         if (zz && !zz.dead) {
-          const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * (head ? headMul(w) : 1), hit.point, head, false, null, 0);
+          const head = !!hit.object.userData.head; hurtZombie(zz, w.dmg * ck * (head ? headMul(w) : 1), hit.point, head, false, null, 0);
           if (w.wand) wandHit(w, zz, camera.position, null);
           if (w.track) trackHit(zz, w.track);
           if (w.reel && !net.pvp && !zz.dead) reelIn(zz, camera.position, w.reel); // online the server sends the pull
@@ -96,6 +100,7 @@ function shoot(k) { // k: how charged the Aurora Rail was
         }
         else if (!w.wand) burst(hit.point, 0x999999, 2);
       }
+      shotCharge = 1;
     }
   }
   if (ammo[cur] === 0 && reserve[cur]) reload();
@@ -198,11 +203,29 @@ function fireLance(w, k = 1) {
   else showLance(from, L, w.lance, 1, scene, flashMesh, held);
 }
 // knife: a few rays around the crosshair so aim can be a bit off
+// the scythe: everyone in a wide arc in front, nearest first, up to w.sweep of them
+const SWEEP_COS = .5, _sw = new THREE.Vector3();
+function sweepFoes(by, eye, yaw, w) {
+  const out = [], fx = Math.sin(yaw), fz = Math.cos(yaw);
+  for (const z of foesOf(by)) {
+    const c = z === YOU_T ? P.pos : z.g.position, dx = c.x - eye.x, dz = c.z - eye.z, d = Math.hypot(dx, dz) || .01;
+    if (d - .35 > w.range || Math.abs(c.y + 1 - eye.y) > 1.8 || d > .3 && (dx * fx + dz * fz) / d < SWEEP_COS) continue;
+    if (!clearLine(eye, _sw.set(c.x, c.y + 1.2, c.z))) continue;
+    out.push({ z, d, at: new THREE.Vector3(c.x - dx / d * .35, Math.min(Math.max(eye.y, c.y + .4), c.y + 1.6), c.z - dz / d * .35) }); // the near side of them
+  }
+  return out.sort((a, b) => a.d - b.d).slice(0, w.sweep);
+}
 function stab(w) {
   if (w.swings) swingV = nextSwing(swingV, w.swings); // a blade with several swings picks another
   cd = w.rate; kick = 1; sfx(w.swing || 'swing', { rate: swingRate(w, swingV) }); crossKick(kickFor(w)); net.shot(w);
   const zap = p => { if (w.wand) stunZap(flashMesh.getWorldPosition(new THREE.Vector3()), p); }; // the Stun Wand throws a little blast
   const knock = (o, from) => { if (w.knock && !net.pvp && !o.dead) launch(o, o.g.position.clone().setY(o.g.position.y + 1), from, w.knock, false); }; // online the server sends the push
+  if (w.sweep) {
+    camera.getWorldDirection(fwd);
+    const hits = sweepFoes(null, camera.position, Math.atan2(fwd.x, fwd.z), w);
+    for (const h of hits) { sfx(w.hit || 'slash', { at: h.at, far: 20 }); hurtZombie(h.z, w.dmg, h.at, false, false, null, 1); }
+    if (hits.length) return;
+  }
   for (const [ox, oy] of [[0, 0], [.06, 0], [-.06, 0], [0, .06], [0, -.06]]) {
     ray2.setFromCamera(ndc.set(ox, oy), camera); ray2.far = w.range;
     const hit = ray2.intersectObjects(shotTargets(ray2), false)[0], zz = hit?.object.userData.zombie;
@@ -559,7 +582,8 @@ const targetsFor = (by, rc) => by ? shotTargets(rc).filter(o => o.userData.zombi
 const ROCKET_SPD = 46, ROCKET_R = 4, ROCKET_SELF = 12; // speed, blast radius, max self damage
 const LOB_SPD = 30, LOB_G = 18, LOB_TILT = .3, LOB_R = 5; // the Bombard's ball: speed, gravity, how far up it's thrown over your aim, its blast
 const SEEK_SPD = 28, SEEK_TURN = 1.5, SEEK_CONE = .82, SEEK_RANGE = 36, SEEK_ARM = .25, SEEK_R = 3.2; // the Peregrine's rockets: slow, turning gently toward whoever is ahead of them
-const boomR = w => w?.lob ? LOB_R : w?.seek ? SEEK_R : ROCKET_R, rocketSpd = w => w.lob ? LOB_SPD : w.seek ? SEEK_SPD : ROCKET_SPD;
+const METEOR_T = 1, METEOR_R = 5; // the Meteor Caller: how long after its beacon lands the meteor hits, its blast
+const boomR = w => w?.meteor ? METEOR_R : w?.lob ? LOB_R : w?.seek ? SEEK_R : ROCKET_R, rocketSpd = w => w.lob ? LOB_SPD : w.seek ? SEEK_SPD : ROCKET_SPD;
 const rockets = [];
 // rocket jumping: blasts push everyone away
 const LAUNCH = 13, LAUNCH_OTHER = .45, LAUNCH_JUMP = 1.25, LAUNCH_UP = .35, LAUNCH_MAX = 17;
@@ -636,14 +660,14 @@ function fireRocket(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; if (w.lob) dir = lobDir(fwd); }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
   const m = new THREE.Group();
-  if (w.gust) { m.add(box(.18, .18, .18, GUST_MATS[0])); for (const r of [0, Math.PI / 2]) { const b = box(.42, .06, .06, GUST_MATS[1]); b.rotation.z = r; m.add(b); } } // a ball of wind
-  else if (w.lob) { m.add(box(.26, .2, .2, BALL_MAT), box(.2, .26, .2, BALL_MAT), box(.2, .2, .26, BALL_MAT)); } // an iron ball, its corners off
+  if (w.gust) { m.add(shotBox(.18, .18, .18, GUST_MATS[0])); for (const r of [0, Math.PI / 2]) { const b = shotBox(.42, .06, .06, GUST_MATS[1]); b.rotation.z = r; m.add(b); } } // a ball of wind
+  else if (w.lob) { m.add(shotBox(.26, .2, .2, BALL_MAT), shotBox(.2, .26, .2, BALL_MAT), shotBox(.2, .2, .26, BALL_MAT)); } // an iron ball, its corners off
   else {
-    const [bc, tc] = ROCKET_COLS[w.id] ?? ROCKET_COLS.rocket, body = box(.1, .1, .4, lam({ color: bc })), tip = box(.12, .12, .12, lam({ color: tc })); tip.position.z = .24; m.add(body, tip);
-    if (w.seek) { const wing = box(.42, .03, .14, lam({ color: 0x5c6b7a })); wing.position.z = .02; m.add(wing); } // swept wings, like a diving falcon
+    const [bc, tc] = ROCKET_COLS[w.id] ?? ROCKET_COLS.rocket, body = shotBox(.1, .1, .4, shotMat(bc)), tip = shotBox(.12, .12, .12, shotMat(tc)); tip.position.z = .24; m.add(body, tip);
+    if (w.seek) { const wing = shotBox(.42, .03, .14, shotMat(0x5c6b7a)); wing.position.z = .02; m.add(wing); } // swept wings, like a diving falcon
   }
   m.position.copy(from).addScaledVector(dir, .6); m.lookAt(tmp.copy(m.position).add(dir)); scene.add(m);
-  rockets.push({ m, dir: dir.clone(), spd: rocketSpd(w), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust, cluster: !!w.cluster, lob: !!w.lob, seek: !!w.seek, age: 0, look: 0, lock: null });
+  rockets.push({ m, dir: dir.clone(), spd: rocketSpd(w), life: 3, dmg: w.dmg, smoke: 0, by, ghost: !!opts.ghost, id, g: w.id, gust: !!w.gust, cluster: !!w.cluster, lob: !!w.lob, seek: !!w.seek, meteor: !!w.meteor, age: 0, look: 0, lock: null });
 }
 const BALL_MAT = new THREE.MeshLambertMaterial({ color: 0x26282c });
 const lobDir = d => d.clone().setY(d.y + LOB_TILT).normalize(); // thrown up a little over your aim
@@ -690,7 +714,7 @@ function lobAim(w) {
   }
 }
 const GUST_MATS = [new THREE.MeshBasicMaterial({ color: 0xc8f0ff }), new THREE.MeshBasicMaterial({ color: 0xffffff })];
-const ROCKET_COLS = { rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c], tirocket: [0xaab5c2, 0x4f8fe0], finale: [0x2a46b0, 0xf2c230] }; // body, tip
+const ROCKET_COLS = { meteor: [0x2c3a66, 0xff8a3a], rocket: [0x4b5b3b, 0xaa3333], salvo: [0x222024, 0xe0342c], tirocket: [0xaab5c2, 0x4f8fe0], finale: [0x2a46b0, 0xf2c230] }; // body, tip
 // cluster bombs (the Grand Finale): the shell bursts into bomblets that go off in every colour
 const CLUSTER_N = 6, CLUSTER_R = 2.2, CLUSTER_K = .35, CLUSTER_PUSH = .35, CLUSTER_LIFE = 1.4, CLUSTER_REACH = 10; // how many, their blast, their share of the damage and the push, their fuse, how far from the burst they can get
 const CLUSTER_G = 14, CLUSTER_COLS = [0xff3a5a, 0x3aff7a, 0x4aa8ff, 0xffd23a, 0xc86aff, 0xffffff];
@@ -703,7 +727,7 @@ function clusterBurst(at, n, seed, by, ghost, pj, g, dmg = 0, pid = 0) { // n: t
   for (let k = 0; k < CLUSTER_N; k++) {
     const a = turn + (k + r() * .5) / CLUSTER_N * 6.28, h = 3 + r() * 2, v = n.clone().multiplyScalar(2.5 + r()).addScaledVector(_bU, Math.cos(a) * h).addScaledVector(_bV, Math.sin(a) * h);
     v.y += 2 + r();
-    const m = box(.13, .13, .13, CLUSTER_MATS[k]); m.position.copy(from); scene.add(m);
+    const m = shotBox(.13, .13, .13, CLUSTER_MATS[k]); m.position.copy(from); scene.add(m);
     const id = -(pj * 8 + k + 1); // the shell's own number, and which bomblet
     bomblets.push({ m, v, life: CLUSTER_LIFE, k, by, ghost, id, key: ghost ? pid + ':' + id : null, pj, g, dmg, tr: 0 });
   }
@@ -729,6 +753,45 @@ function bombletTick(dt) {
     if ((b.tr -= dt) <= 0) { b.tr = .035; fxBit(CLUSTER_BITS[b.k], scene, b.m.position, .07, new THREE.Vector3((Math.random() - .5) * .6, (Math.random() - .5) * .6, (Math.random() - .5) * .6), .35, 2); } // a sparkling trail
   }
 }
+// the meteor: a ring on the ground closes in while a burning rock comes down out of the sky onto it
+const meteors = [], METEOR_H = 40, METEOR_DIR = new THREE.Vector3(.35, 1, .2).normalize(), _md = new THREE.Vector3();
+let meteorKit = null;
+function meteorParts() { // made once, shared by every strike
+  if (meteorKit) return meteorKit;
+  const c = document.createElement('canvas'); c.width = 1; c.height = 32;
+  const x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 32); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, '#fff'); x.fillStyle = gr; x.fillRect(0, 0, 1, 32);
+  const glow = o => new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, fog: false, ...o }), add = THREE.AdditiveBlending;
+  const M = { ring: glow({ color: 0xff6a2a, opacity: .75, side: THREE.DoubleSide }), wall: glow({ color: 0xff6a2a, map: new THREE.CanvasTexture(c), opacity: .6, side: THREE.DoubleSide, blending: add }),
+    beam: glow({ color: 0xff8a3a, opacity: .32, blending: add }), rock: lam({ color: 0x3a2c26 }), hot: new THREE.MeshBasicMaterial({ color: 0xff7a2a }), core: new THREE.MeshBasicMaterial({ color: 0xffd890 }),
+    bits: [bitMat(0xff6a2a, PUFF_TEX), bitMat(0xffc860, PUFF_TEX)] };
+  const rock = new THREE.Group(); rock.add(box(1, 1, 1, M.rock), box(.7, 1.2, .7, M.hot), box(1.2, .55, .6, M.hot), box(.45, .45, 1.25, M.core));
+  return meteorKit = { M, rock, ring: new THREE.RingGeometry(METEOR_R - .7, METEOR_R, 48), close: new THREE.RingGeometry(.8, 1, 40), beam: new THREE.BoxGeometry(.8, METEOR_H, .8),
+    wall: new THREE.CylinderGeometry(METEOR_R, METEOR_R, 1.6, 48, 1, true).translate(0, .8, 0), shut: new THREE.CylinderGeometry(1, 1, 1, 40, 1, true).translate(0, .5, 0) };
+}
+function callMeteor(p, by, dmg, g, id, ghost, from = null) { // from: the way its beacon flew; the rock comes down out of the sky beyond the mark
+  const K = meteorParts(), M = K.M, mesh = (geo, mat) => new THREE.Mesh(geo, mat);
+  const fall = from && Math.hypot(from.x, from.z) > .05 ? _md.set(from.x, 0, from.z).normalize().multiplyScalar(.65).setY(1).normalize().clone() : METEOR_DIR;
+  const fx = new THREE.Group(), ring = mesh(K.ring, M.ring), close = mesh(K.close, M.ring), wall = mesh(K.wall, M.wall), shut = mesh(K.shut, M.wall), beam = mesh(K.beam, M.beam);
+  beam.position.copy(fall).multiplyScalar(METEOR_H / 2); beam.quaternion.setFromUnitVectors(UP_V, fall);
+  ring.rotation.x = close.rotation.x = -Math.PI / 2; ring.position.y = close.position.y = wall.position.y = shut.position.y = .06; fx.add(ring, close, wall, shut, beam); fx.position.copy(p); scene.add(fx);
+  const rock = K.rock.clone(); rock.visible = false; scene.add(rock);
+  meteors.push({ p: p.clone(), by, dmg, g, id, ghost, t: 0, fx, close, shut, rock, trail: 0, fall });
+  sfx('meteorFall', { at: p, far: 140 });
+}
+function meteorTick(dt) {
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i], k = Math.min(1, (m.t += dt) / METEOR_T), u = Math.max(0, (k - .25) / .75); // u: how far down the rock has come
+    const r = Math.max(.05, (1 - k) * METEOR_R), M = meteorKit.M; m.close.scale.setScalar(r); m.shut.scale.set(r, 1, r);
+    M.ring.opacity = .7 + .25 * Math.sin(m.t * 22); M.wall.opacity = .5 + .2 * Math.sin(m.t * 22);
+    m.rock.visible = u > 0; m.rock.position.copy(m.p).addScaledVector(m.fall, METEOR_H * (1 - u)); m.rock.rotation.x += dt * 5; m.rock.rotation.z += dt * 3;
+    if (u > 0 && (m.trail -= dt) <= 0) { m.trail = .016; for (const b of meteorKit.M.bits) fxBit(b, scene, m.rock.position, .5 + Math.random() * .4, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(2).addScaledVector(m.fall, 6), .5, 0); }
+    if (k < 1) continue;
+    meteors.splice(i, 1); scene.remove(m.fx); scene.remove(m.rock);
+    if (m.ghost) blastFx(m.p, METEOR_R, false, false, m.g); // the server says what someone else's did
+    else blast(m.p, METEOR_R, m.dmg, m.by ? m.dmg : ROCKET_SELF, null, m.by, m.g, m.id);
+  }
+}
+function clearMeteors() { for (const m of meteors) { scene.remove(m.fx); scene.remove(m.rock); } meteors.length = 0; }
 function popFx(at, k) { // a bomblet going off: a starburst in its own colour
   burst(at, CLUSTER_COLS[k], 8); burst(at, 0xffffff, 3);
   for (let j = 0, n = fxN(22); j < n; j++) fxBit(CLUSTER_BITS[k], scene, at, .14 + Math.random() * .06, new THREE.Vector3(Math.random() - .5, Math.random() - .35, Math.random() - .5).normalize().multiplyScalar(6 + Math.random() * 3), .8 + Math.random() * .5, 4);
@@ -742,7 +805,7 @@ const flares = [], flareMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
 function fireFlare(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
-  const m = box(.14, .14, .14, flareMat);
+  const m = shotBox(.14, .14, .14, flareMat);
   m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
   flares.push({ m, v: dir.clone().multiplyScalar(FLARE_SPD), life: 3, dmg: w.dmg, burn: w.burn, burnT: w.burnT, trail: 0, by, ghost: !!opts.ghost, id });
 }
@@ -792,7 +855,7 @@ const grenades = [], grenMats = [lam({ color: 0x3f7a3a }), lam({ color: 0xffc933
 function fireGrenade(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
-  const m = new THREE.Group(); m.add(box(.16, .16, .16, grenMats[0]), box(.18, .05, .18, grenMats[1]));
+  const m = new THREE.Group(); m.add(shotBox(.16, .16, .16, grenMats[0]), shotBox(.18, .05, .18, grenMats[1]));
   m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
   grenades.push({ m, v: dir.clone().multiplyScalar(GREN_SPD), life: GREN_FUSE, dmg: w.dmg, g: w.id, by, ghost: !!opts.ghost, id });
 }

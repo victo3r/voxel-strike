@@ -1,17 +1,10 @@
 // lobby scene
 const lobbyScene = new THREE.Scene();
 const lobbyCam = new THREE.PerspectiveCamera(30, scr.w / scr.h, .1, 300);
-{
-  const c = document.createElement('canvas'); c.width = 2; c.height = 256;
-  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#061a1e'); gr.addColorStop(.35, '#0f4d50'); gr.addColorStop(.55, '#22786a'); gr.addColorStop(.72, '#173f37'); gr.addColorStop(1, '#0e2a24');
-  g.fillStyle = gr; g.fillRect(0, 0, 2, 256);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  lobbyScene.background = t;
-}
-lobbyScene.fog = new THREE.Fog(0x173f37, 16, 62);
-lobbyScene.add(new THREE.HemisphereLight(0xcff6e8, 0x1d2f1a, 1));
+const lHemi = new THREE.HemisphereLight(0xcff6e8, 0x1d2f1a, 1); lobbyScene.add(lHemi);
 const lKey = new THREE.DirectionalLight(0xfff0d8, 1.6); lKey.position.set(-4, 8, 7); lobbyScene.add(lKey);
+lKey.castShadow = !!gfxQ().shadow; lKey.shadow.mapSize.set(2048, 2048); lKey.shadow.bias = -.0002; lKey.shadow.normalBias = .065; // on high it casts shadows round your platform (a pixel's bias, so round platforms' steps don't streak)
+Object.assign(lKey.shadow.camera, { left: -7, right: 7, bottom: -7, top: 7, near: -20, far: 30 }); lKey.shadow.camera.updateProjectionMatrix();
 const lRim = new THREE.DirectionalLight(0x5ff5e6, 1.4); lRim.position.set(3, 4, -6); lobbyScene.add(lRim);
 // bounce light so faces underneath aren't black
 const lBounce = new THREE.DirectionalLight(0xd8e8c0, .8); lBounce.position.set(0, -6, 2); lobbyScene.add(lBounce);
@@ -27,134 +20,9 @@ function pixMat(w, h, draw, extra) {
   return lam({ map: t, ...extra });
 }
 
-const lCube = new THREE.BoxGeometry(1, 1, 1);
-const lGround = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), lam({ map: tex(g => {
-  noise(g, [86, 150, 56], 30); g.fillStyle = 'rgba(25,70,20,.35)';
-  for (let i = 0; i < 10; i++) g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 2);
-}, 100, 100) }));
-lGround.rotation.x = -Math.PI / 2; lobbyScene.add(lGround);
-const lBark = pixMat(8, 16, g => { fillN(g, 8, 16, [92, 66, 42], 24); for (const x of [1, 4, 6]) for (let y = 0; y < 16; y++) if (Math.random() < .8) dot(g, rgb([62, 43, 27], (Math.random() - .5) * 18), x, y); });
-const lLeaf = pixMat(16, 16, g => { fillN(g, 16, 16, [72, 142, 52], 34); for (let i = 0; i < 14; i++) dot(g, 'rgba(10,40,10,.45)', Math.random() * 16 | 0, Math.random() * 16 | 0, 2, 1); });
-function lInst(mat, list) { // one draw call for a list of boxes
-  const m = new THREE.InstancedMesh(lCube, mat, list.length), o = new THREE.Object3D(), c = new THREE.Color();
-  list.forEach((p, i) => {
-    o.position.set(p[0], p[1], p[2]); o.scale.set(p[3], p[4], p[5]); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
-    if (p[6] !== undefined) m.setColorAt(i, c.set(p[6]));
-  });
-  lobbyScene.add(m);
-}
-const L_OAK = [0xffffff, 0xe2f5d0, 0xcfe8b8, 0xbad9a8], L_PINE = [0x8fb59a, 0x7fa58c, 0x9cc4a3];
-const lPick = a => a[Math.random() * a.length | 0];
-const lTrunks = [], lLeaves = [], lSpots = [];
-const lFree = (x, z, gap) => lSpots.every(([a, b]) => (a - x) ** 2 + (b - z) ** 2 > gap * gap);
-const lBlocksView = (x, z) => Math.hypot(x, z) < 8.5 || (z > -4 && Math.abs(x) < 12); // keep the view to the camera clear
-function lForestTree(x, z) {
-  if (Math.random() < .3) {
-    const h = 2 + Math.random() * 1.5, layers = 3 + (Math.random() * 2 | 0), col = lPick(L_PINE);
-    lTrunks.push([x, (h + layers) / 2, z, .8, h + layers, .8]);
-    for (let k = 0; k < layers; k++) { const s = 4 - k * (3 / layers); lLeaves.push([x, h + .6 + k * 1.1, z, s, 1.2, s, col]); }
-    lLeaves.push([x, h + .6 + layers * 1.1, z, .7, .8, .7, col]);
-  } else {
-    const big = Math.random() < .35, h = 3.5 + Math.random() * 4 + (big ? 2 : 0), w = big ? 1.4 : 1, s = (big ? 5.5 : 4) + Math.random(), col = lPick(L_OAK);
-    lTrunks.push([x, (h + 1) / 2, z, w, h + 1, w]);
-    lLeaves.push([x, h + .9, z, s, 2.6, s, col]);
-    lLeaves.push([x, h + 2.8, z, s * .6, 1.4, s * .6, col]);
-    if (Math.random() < .5) lLeaves.push([x + (Math.random() - .5) * s * .5, h - .3, z + (Math.random() - .5) * s * .5, s * .55, 1.2, s * .55, col]);
-  }
-}
-for (let tries = 0, k = 0; k < 240 && tries < 6000; tries++) {
-  const x = (Math.random() - .5) * 150, z = 25 - Math.random() * 105;
-  if (lBlocksView(x, z) || !lFree(x, z, 2.6)) continue;
-  lSpots.push([x, z]); lForestTree(x, z); k++;
-}
-const lBushes = [];
-for (let tries = 0, k = 0; k < 70 && tries < 3000; tries++) {
-  const a = Math.random() * Math.PI * 2, d = 6.5 + Math.random() * 30, x = Math.cos(a) * d, z = Math.sin(a) * d - 4;
-  if ((z > -3 && Math.abs(x) < 9) || !lFree(x, z, 1.6)) continue;
-  const s = .9 + Math.random() * .9; lBushes.push([x, s * .4, z, s * 1.3, s * .8, s * 1.1, lPick(L_OAK)]); k++;
-}
-lInst(lBark, lTrunks); lInst(lLeaf, lLeaves); lInst(lLeaf, lBushes);
-const lLog = box(3.6, .7, .7, lBark); lLog.position.set(-6.2, .35, -6.5); lLog.rotation.y = .5; lobbyScene.add(lLog);
-const lStem = lam({ color: 0xeee3cf }), lCap = lam({ color: 0xd8322e });
-for (let i = 0; i < 7; i++) {
-  const a = -Math.PI * (.1 + Math.random() * .8), d = 5 + Math.random() * 2.5, x = Math.cos(a) * d, z = Math.sin(a) * d - 1;
-  const st = box(.12, .22, .12, lStem); st.position.set(x, .11, z); lobbyScene.add(st);
-  const cp = box(.34, .14, .34, lCap); cp.position.set(x, .28, z); lobbyScene.add(cp);
-}
-const lRays = [];
-for (const [x, z, r] of [[-7, -14, .3], [3, -18, .25], [11, -12, .35], [-15, -22, .28]]) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 26), new THREE.MeshBasicMaterial({ color: 0xc8ffe8, transparent: true, opacity: .07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-  m.position.set(x, 9, z); m.rotation.z = r; lRays.push(m); lobbyScene.add(m);
-}
-
-const pedTop = stoneMat(2, 2), pedSide = stoneMat(2, .5);
-const ped = new THREE.Mesh(new THREE.BoxGeometry(2.2, .5, 2.2), [pedSide, pedSide, pedTop, pedTop, pedSide, pedSide]);
-ped.position.y = .25; lobbyScene.add(ped);
-const trim = box(2.34, .08, 2.34, lam({ color: 0xffd23f, emissive: 0x6a4d00 })); trim.position.y = .45; lobbyScene.add(trim); // gold trim
-const glowStrip = box(2.3, .06, 2.3, new THREE.MeshBasicMaterial({ color: 0x3ff0e0 })); glowStrip.position.y = .06; lobbyScene.add(glowStrip);
+// your shadow on the platform (lobbies.js has the rest)
 const shadow = new THREE.Mesh(new THREE.CircleGeometry(.42, 20), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .35 }));
 shadow.rotation.x = -Math.PI / 2; shadow.position.y = .505; lobbyScene.add(shadow);
-
-for (const [x, y, z, r] of [[-3.2, .5, -2.4, .2], [-4.2, .5, -1.5, -.3], [-3.5, 1.5, -2.1, .6], [3.8, .5, -2.8, .4]]) {
-  const c = box(1, 1, 1, crateMat(1)); c.position.set(x, y, z); c.rotation.y = r; lobbyScene.add(c);
-}
-function lTree(x, z, h) {
-  const t = box(1, h, 1, barkMat); t.position.set(x, h / 2, z); lobbyScene.add(t);
-  const l1 = box(3, 2, 3, leafMat); l1.position.set(x, h + .5, z); lobbyScene.add(l1);
-  const l2 = box(1.6, 1, 1.6, leafMat); l2.position.set(x, h + 2, z); lobbyScene.add(l2);
-}
-lTree(-4.6, -4.2, 3); lTree(4.9, -3.2, 2);
-const lamps = [];
-for (const x of [-3.1, 3.1]) {
-  const post = box(.16, 2.2, .16, lam({ color: 0x2b2f33 })); post.position.set(x, 1.1, -1.8); lobbyScene.add(post);
-  const lan = box(.38, .42, .38, lam({ color: 0xffc66b, emissive: 0xffa53a })); lan.position.set(x, 2.35, -1.8); lobbyScene.add(lan);
-  const cap = box(.5, .08, .5, lam({ color: 0x2b2f33 })); cap.position.set(x, 2.6, -1.8); lobbyScene.add(cap);
-  const pl = new THREE.PointLight(0xffb45a, 6, 7); pl.position.set(x, 2.3, -1.4); lobbyScene.add(pl);
-  lamps.push(pl);
-}
-// flowers
-const FLOWER_COLS = [[0xff4d6d, 0xffd23f], [0xffd23f, 0xc0641a], [0xb48cff, 0xfff0a0], [0xffffff, 0xffc82e], [0xff8a3d, 0x7a3a10]];
-const lStemMat = lam({ color: 0x3f8f3a }), lLeafMat2 = lam({ color: 0x4fa844 });
-const flowerMats = new Map(), fMat = c => { if (!flowerMats.has(c)) flowerMats.set(c, lam({ color: c })); return flowerMats.get(c); };
-function lFlower(x, z, tulip, [petal, mid]) {
-  const g = new THREE.Group(), h = (tulip ? .38 : .3) * (.8 + Math.random() * .4);
-  const head = new THREE.Group(); head.position.y = h;
-  const part = (to, w, ht, d, m, px, py, pz) => { const b = box(w, ht, d, m); b.position.set(px, py, pz); to.add(b); return b; };
-  part(g, .035, h, .035, lStemMat, 0, h / 2, 0);
-  for (const s of Math.random() < .5 ? [1] : [1, -1]) part(g, .12, .025, .05, lLeafMat2, s * .06, h * (.25 + Math.random() * .2), 0).rotation.z = s * .5;
-  const pm = fMat(petal);
-  if (tulip) {
-    for (const [px, pz] of [[.045, 0], [-.045, 0], [0, .045], [0, -.045]]) part(head, px ? .035 : .1, .12, pz ? .035 : .1, pm, px, .06, pz);
-    part(head, .06, .07, .06, fMat(mid), 0, .035, 0);
-  } else {
-    part(head, .07, .04, .07, fMat(mid), 0, .015, 0);
-    for (const [px, pz] of [[.075, 0], [-.075, 0], [0, .075], [0, -.075]]) part(head, px ? .08 : .065, .025, pz ? .08 : .065, pm, px, 0, pz);
-    head.rotation.x = .35 + Math.random() * .3; // tipped toward the camera
-  }
-  g.add(head);
-  g.position.set(x, 0, z); g.scale.setScalar(1.25); g.rotation.y = tulip ? Math.random() * 6.3 : (Math.random() - .5) * .8;
-  lobbyScene.add(g);
-}
-for (let c = 0; c < 6; c++) {
-  const a = Math.random() * Math.PI * 2, d = 2 + Math.random() * 3.4, cx = Math.cos(a) * d, cz = Math.sin(a) * d;
-  const col = FLOWER_COLS[c % FLOWER_COLS.length], tulip = c % 3 === 1;
-  for (let k = 0, n = 2 + (Math.random() * 3 | 0); k < n; k++) lFlower(cx + (Math.random() - .5) * .7, cz + (Math.random() - .5) * .7, tulip, col);
-}
-
-const flies = [];
-for (let i = 0; i < 45; i++) {
-  const s = .07 + Math.random() * .07;
-  const m = box(s, s, s, new THREE.MeshBasicMaterial({ color: i % 4 ? 0xd8ff6a : 0xffe27a, transparent: true, fog: false }));
-  const x = (Math.random() - .5) * 36, y = .3 + Math.random() * 3.5, z = 3 - Math.random() * 26;
-  m.position.set(x, y, z); lobbyScene.add(m);
-  flies.push({ m, x, y, z, p: Math.random() * 6.3, s: .4 + Math.random() * .8 });
-}
-{
-  const pts = [];
-  for (let i = 0; i < 260; i++) { const a = Math.random() * Math.PI - Math.PI, e = .25 + Math.random() * 1.1; pts.push(Math.cos(a) * 110 * Math.cos(e), 110 * Math.sin(e), Math.sin(a) * 110 * Math.cos(e)); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  lobbyScene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: .8 })));
-}
 
 // your character, arrows flip through the looks
 if (!prof.look) prof.look = { ...PRESETS[0].look };
@@ -193,7 +61,7 @@ function heroGun(i) {
   g.scale.setScalar(GUN_S);
   const st = statsAt(i, Math.max(0, gunUse(i) - 1));
   Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), flips: parts.flips, insp: -1, spin: parts.spin, spinV: 0, round: parts.round, rounds: parts.rounds, bn: 0, rs: { rk: -1 }, charges: parts.charges, chg: 0, pulse: parts.pulse, core: parts.core });
-  chargeShow(parts.charges, 0);
+  chargeShow(parts.charges, 0); clearBoomers(lobbyScene);
   hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   const kind = holdOf(BASE[i]), he = holdFor(i, true);
@@ -232,9 +100,9 @@ function heroReload() {
 const _hm = new THREE.Vector3(), _hd = new THREE.Vector3(), _hq = new THREE.Quaternion();
 function heroShot(k = 1) {
   const w = hf.st;
-  if (hf.rl > 0 || hf.cd > 0) return;
+  if (hf.rl > 0 || hf.cd > 0 || w.boomer && boomerOut(null, true)) return;
   if (!w.inf && hf.ammo <= 0) { hf.bn = 0; if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
-  hf.cd = burstCd(w, hf); if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
+  hf.cd = w.windup ? windGap(w, hf.wk || 0) : burstCd(w, hf); if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
   hf.kick = kickOf(w); coreFire(hf.core);
   if (w.melee) {
     if (w.swings) hf.sv = nextSwing(hf.sv, w.swings);
@@ -258,14 +126,15 @@ function heroShot(k = 1) {
     hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.frost ? FX_MATS.frost : w.water ? FX_MATS.water : w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
     hf.beamOn = .08; return;
   }
-  sfx(w.charge ? k >= 1 ? 'auroraFull' : 'aurora' : w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
+  sfx(w.lance && w.charge ? k >= 1 ? 'auroraFull' : 'aurora' : w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
   muzzleBits(w, hf.flashM, lobbyScene, .8);
-  if (hf.spin) hf.spinV = spinKick(hf.i);
+  if (hf.spin) hf.spinV = shotSpin(w, hf.i, hf.spinV, hf.wk || 0);
   if (w.lance) {
     const L = { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, held = (gi => () => hf.i === gi)(hf.i);
     if (w.charge) auroraBeam(_hm.clone(), L, k, .6, hf.flashM, held, lobbyScene); else showLance(_hm.clone(), L, w.lance, .6, lobbyScene, hf.flashM, held);
     return;
   }
+  if (w.boomer) { fireBoomer(w, _hm.clone(), _hd.clone(), null, { show: true, sc: lobbyScene, size: .3, hide: hf.g, home: out => hf.flashM.getWorldPosition(out), caught: () => { hf.ct = 1; } }); return; }
   if (w.wisp || w.vortex || w.saw) { wandBolt(w.wisp ? 'wisp' : w.saw ? 'saw' : 'voidorb', _hm.clone(), _hm.clone().addScaledVector(_hd, w.vortex ? 12 : 18), lobbyScene, null, .7); return; }
   if (w.wand || w.bolt) { if (w.wand) hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand || w.bolt, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
   const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : w.tracer ? tracerCol(w.tracer) : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
@@ -277,7 +146,7 @@ function heroShot(k = 1) {
   }
 }
 function heroTick(dt) {
-  lanceTick(dt); arcTick(dt);
+  lanceTick(dt); arcTick(dt); updateBoomers(dt);
   for (let k = heroFx.length - 1; k >= 0; k--) {
     const f = heroFx[k]; f.life -= dt; f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt); if (f.mats) f.m.material = flameAge(f);
     if (f.life <= 0) { lobbyScene.remove(f.m); heroFx.splice(k, 1); }
@@ -286,18 +155,19 @@ function heroTick(dt) {
   const w = hf.st;
   const can = heroCan();
   if (!heroLive()) { heroFireStop(); hf.bn = 0; }
-  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * kickFall(w)); hf.flash -= dt;
+  hf.cd -= dt; hf.kick = Math.max(0, hf.kick - dt * kickFall(w)); hf.ct = Math.max(0, (hf.ct || 0) - dt / CATCH_T); hf.flash -= dt;
   if (hf.insp >= 0) { const t0 = hf.insp; hf.insp += dt; if (hf.kick > 0 || !heroLive() || hf.insp >= inspLen(w)) hf.insp = -1; else inspSnd(w, t0, hf.insp, null, .6 * hv()); }
   if (w.charge) { // the Aurora Rail charges while it's held and fires when it's let go
     if (hf.held && can && hf.cd <= 0 && hf.rl <= 0 && hf.ammo > 0) {
-      if (!hf.chg) hf.chgSnd = sfx('chargeUp', { v: .6 * hv() });
-      const was = hf.chg; hf.chg = Math.min(1, hf.chg + dt / w.charge); if (hf.chg >= 1 && was < 1) sfx('chargeReady', { v: .6 * hv() });
+      if (!hf.chg) hf.chgSnd = sfx(w.bow ? 'bowDraw' : 'chargeUp', { v: .6 * hv() });
+      const was = hf.chg; hf.chg = Math.min(1, hf.chg + dt / w.charge); if (hf.chg >= 1 && was < 1) sfx(w.bow ? 'bowFull' : 'chargeReady', { v: .6 * hv() });
     } else if (hf.chg > 0) { const k = hf.chg; hf.chg = 0; stopSfx(hf.chgSnd); if (can) heroShot(k); }
     chargeShow(hf.charges, hf.chg);
   } else if (can && (hf.held && (autoFire(w) || hf.pend) || hf.bn > 0)) { hf.pend = false; heroShot(); }
   if (hf.rl > 0 && (hf.rl -= dt) <= 0) { hf.rl = 0; hf.ammo = w.mag; }
   if (hf.auto > 0 && (hf.auto -= dt) <= 0 && !w.inf && hf.ammo <= 0) heroReload();
   hf.flashM.visible = hf.flash > 0; if (hf.pulse) pulseShow(hf.pulse, hf.flash > 0);
+  if (w.windup) { hf.wk = hf.held && can && hf.rl <= 0 && hf.ammo > 0 ? Math.min(1, (hf.wk || 0) + dt / w.windup) : Math.max(0, (hf.wk || 0) - dt * 1.4 / w.windup); hf.spinV = Math.max(hf.spinV, 30 * hf.wk); } // a Juggernaut spins up while it's held, as in a match
   if (hf.spin) { spinTurn(hf.spin, hf.spinV + spinIdle(hf.i), dt); hf.spinV = Math.max(0, hf.spinV - dt * 25); }
   if (hf.round) hf.round.visible = hf.ammo > 0 || (hf.rl > 0 && hf.rl / w.reload < .4);
   if (hf.rounds) roundsShow(hf.rounds, hf.ammo, hf.rl > 0 ? 1 - hf.rl / w.reload : -1);
@@ -316,7 +186,7 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) $('heroSh
 $('heroReload').addEventListener('pointerdown', e => { e.stopPropagation(); heroReload(); });
 // lobby (armory shut): he pulls out a gun from your loadout most of the time, plays with it, puts it away
 const lob = { on: false, last: -1, next: 2, until: 0, act: 0, taps: [], rel: 0 };
-const LOB_PANELS = ['binds', 'boost', 'daily', 'lb', 'card', 'chests', 'pick', 'post'];
+const LOB_PANELS = ['binds', 'boost', 'daily', 'lb', 'card', 'chests', 'pick', 'post', 'lobPick'];
 const lobbyHush = () => LOB_PANELS.some(id => $(id)?.style.display === 'flex'); // no shooting behind a menu
 function lobbyGuns(t) {
   if (!inLobby || armOpen || custOpen() || drawOpen()) { lob.on = false; lob.taps.length = 0; lob.rel = 0; lob.next = Math.max(lob.next, t + 2.5); return; }
@@ -349,7 +219,7 @@ function lobbyGuns(t) {
 // fidgets with the gun every few seconds
 const FIDGETS = ['look', 'lower', 'shake', 'relax', 'heft', 'look', 'shake', 'lower', 'heft', 'relax'], FID_T = { look: 2, lower: 2.8, shake: 1, heft: .9, relax: 6 };
 let fid = null, fidN = 0, fidNext = 0;
-const SH_MID = new THREE.Vector3(0, SH_R[1] / 16, 0), X_AX = new THREE.Vector3(1, 0, 0), _wq = new THREE.Quaternion(), _fr = new THREE.Vector3();
+const SH_MID = new THREE.Vector3(0, SH_R[1] / 16, 0), X_AX = new THREE.Vector3(1, 0, 0), Y_AX = new THREE.Vector3(0, 1, 0), _wq = new THREE.Quaternion(), _fr = new THREE.Vector3();
 const smooth = x => x * x * (3 - 2 * x);
 function fidgetAt(t, sh, hv, easy) {
   const o = { low: 0, roll: 0, wy: 0, wz: 0, easy: 0 };
@@ -499,7 +369,7 @@ function frameLobby(dt = 0) {
   let left = r.left, sw = r.width || W, top = r.top, sh = r.height || H;
   if (TOUCH && H > W && !$('lobby').classList.contains('cust')) { // a phone held upright: between the menus above and below
     const ui = !armOpen && $('lobbyUI').style.display !== 'none', t = ui ? zRect($('side')).bottom : top;
-    const b = armOpen ? zRect($('armory')).top : ui ? Math.min(zRect($('lobbyArm')).top, zRect($('boostBtn')).top || H) : r.bottom;
+    const b = armOpen ? zRect($('armory')).top : $('lobPick').style.display === 'flex' ? zRect($('lobBox')).top : ui ? Math.min(zRect($('lobbyArm')).top, zRect($('boostBtn')).top || H) : r.bottom;
     if (b - t > 60) { top = t; sh = b - t; }
   } else if (armOpen && (W > 700 || TOUCH && W > H)) {
     const ph = TOUCH && phoneSide.matches, a = zRect($('armory')).right - (ph ? 0 : 40); if (a > left) { sw = r.right - a; left = a; }
@@ -556,10 +426,10 @@ function updateLobby(dt) {
     const q0 = _q.copy(_wq).multiply(tq).multiply(hQ);
     // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
     const w = hf.i >= 0 && hf.st, rk = w && hf.rl > 0 ? 1 - hf.rl / w.reload : -1;
-    const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, sv: hf.sv, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL, insp: hf.insp ?? -1 }) : null;
+    const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, sv: hf.sv, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL, insp: hf.insp ?? -1, draw: w.charge ? hf.chg || 0 : 0, ct: w.boomer ? hf.ct || 0 : 0 }) : null;
     flipShow(hf.flips, m);
     if (w) bladeTrail(hf.g, w, w.melee && hf.kick > 0 ? 1 - hf.kick : -1, lobbyScene);
-    let leftK = hLK;
+    let leftK = hLK, twist = 0;
     reloadSwap(hf.rs, w ? w.id : '', rk, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(m ? m.mx : 0, m ? m.my : 0, m ? m.mz : 0));
     if (m && !heldIdle(m)) {
@@ -570,6 +440,7 @@ function updateLobby(dt) {
       if (cl) _fr.add(_hcT); else move(_fr);
       move(_l); gp.copy(_hp); q0.copy(_q1);
       if (pose.fL && m.az) _l.add(_hv2.set(0, 0, m.az * GUN_S).applyQuaternion(q0));
+      if (m.dr) _fr.add(_hv2.set(0, 0, m.dr * GUN_S).applyQuaternion(q0)); // his drawing hand comes back with the string
       if (m.level > 0) { // a wand points straight while it fires
         const r = wandFlick(q0, m.level); _hv2.copy(P.hR).multiplyScalar(GUN_S).applyQuaternion(q0).add(gp);
         for (const v of [gp, _fr, _l]) v.sub(_hv2).applyQuaternion(r).add(_hv2);
@@ -584,8 +455,15 @@ function updateLobby(dt) {
         for (const v of [gp, _fr, _l]) { v.sub(SH_MID).applyQuaternion(_wq).add(SH_MID); v.z += m.push * GUN_S; }
         q0.premultiply(_wq);
       }
+      if (m.tw) { // and his chest turns with a sweep, shoulders and all
+        _wq.setFromAxisAngle(Y_AX, m.tw);
+        for (const v of [gp, _fr, _l]) v.sub(SH_MID).applyQuaternion(_wq).add(SH_MID);
+        q0.premultiply(_wq); twist = m.tw;
+      }
     }
-    armL.quaternion.slerp(armTo(SHR, _fr, _aq), e); armR.quaternion.slerp(armTo(SHL, _l, _aq), e * leftK);
+    _wq.setFromAxisAngle(Y_AX, twist * e); torso.rotation.y = twist * e;
+    armL.position.copy(SHR).sub(SH_MID).applyQuaternion(_wq).add(SH_MID); armR.position.copy(SHL).sub(SH_MID).applyQuaternion(_wq).add(SH_MID);
+    armL.quaternion.slerp(armTo(armL.position, _fr, _aq), e); armR.quaternion.slerp(armTo(armR.position, _l, _aq), e * leftK);
     holdG.quaternion.copy(LOW_Q).slerp(q0, e);
     holdG.position.copy(LOW_P).lerp(gp, e);
     if (w) heldToss(holdG.quaternion, holdG.position, m, w, GUN_S); // up out of his hand
@@ -601,13 +479,7 @@ function updateLobby(dt) {
   const away = Math.abs(rel), look = drawOpen() ? 0 : away < 1.2 ? 1 : Math.max(0, 1 - (away - 1.2) / 1.4);
   headPiv.rotation.y += (Math.sign(rel) * Math.min(.9, away) * look - headPiv.rotation.y) * Math.min(1, dt * 6);
   headPiv.rotation.x += (-mNY * .45 * look - headPiv.rotation.x) * Math.min(1, dt * 6);
-  for (const f of flies) {
-    f.m.position.set(f.x + Math.sin(t * f.s * .7 + f.p) * .6, f.y + Math.sin(t * f.s + f.p * 2) * .35, f.z + Math.cos(t * f.s * .5 + f.p) * .6);
-    f.m.material.opacity = .2 + .8 * Math.max(0, Math.sin(t * f.s * 2 + f.p));
-  }
-  for (const r of lRays) r.material.opacity = .055 + Math.sin(t * .5 + r.position.x) * .02;
-  for (const l of lamps) l.intensity = 5.5 + Math.sin(t * 9 + l.position.x) * .4 + Math.sin(t * 23) * .2;
-  glowStrip.material.color.setHSL(.48, .85, .5 + Math.sin(t * 2) * .08);
+  lobbyTick(dt, t); // the lobby's own life (lobbies.js)
   heroTick(dt);
   frameLobby(dt);
   if (armOpen) placeAct();

@@ -104,11 +104,13 @@ PATHS.forEach((pts, p) => {
 });
 lamps.forEach((l, i) => {
   const post = box(.22, 3.1, .22, postMat); post.position.set(l.x, 1.55, l.z); add(post);
-  building.cover.push(post); addSolid(l.x, l.z, .3, .3, 3.1);
-  const arm = box(.1, .1, .9, postMat); arm.position.set(l.x + l.ax * .4, 3, l.z + l.az * .4); arm.rotation.y = Math.atan2(l.ax, l.az); add(arm);
-  const hx = l.x + l.ax * .8, hz = l.z + l.az * .8;
+  building.cover.push(post); addSolid(l.x, l.z, .22, .22, 3.1);
+  const ax = Math.abs(l.ax) > Math.abs(l.az) ? Math.sign(l.ax) : 0, az = ax ? 0 : Math.sign(l.az); // the arm points straight along x or z, so its hitbox fits
+  const arm = box(.1, .1, .9, postMat); arm.position.set(l.x + ax * .4, 3, l.z + az * .4); arm.rotation.y = Math.atan2(ax, az); add(arm);
+  const hx = l.x + ax * .8, hz = l.z + az * .8;
   const lan = box(.32, .42, .32, lanternMat); lan.position.set(hx, 2.55, hz); add(lan);
   const cap = box(.42, .07, .42, ironMat); cap.position.set(hx, 2.8, hz); add(cap);
+  solidBox(l.x + ax * .4, 3, l.z + az * .4, ax ? .9 : .1, .1, ax ? .1 : .9); solidBox(hx, 2.55, hz, .32, .42, .32); solidBox(hx, 2.8, hz, .42, .07, .42);
   const hook = box(.04, .14, .04, ironMat); hook.position.set(hx, 2.88, hz); add(hook);
   const halo = new THREE.Sprite(haloMat); halo.scale.setScalar(1.8); halo.position.set(hx, 2.55, hz); add(halo);
   const pool = new THREE.Mesh(poolGeo, poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(hx, .06, hz); add(pool);
@@ -119,9 +121,10 @@ lamps.forEach((l, i) => {
 for (let k = 0; k < 4; k++) {
   const a = Math.PI / 8 + k * Math.PI / 2, x = Math.cos(a) * 6.8, z = Math.sin(a) * 6.8;
   if (M.crates.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.6)) continue;
-  const post = box(.22, 3.1, .22, postMat); post.position.set(x, 1.55, z); add(post); building.cover.push(post); addSolid(x, z, .3, .3, 3.1);
+  const post = box(.22, 3.1, .22, postMat); post.position.set(x, 1.55, z); add(post); building.cover.push(post); addSolid(x, z, .22, .22, 3.1);
   const lan = box(.32, .42, .32, lanternMat); lan.position.set(x, 3.3, z); add(lan);
   const cap = box(.42, .07, .42, ironMat); cap.position.set(x, 3.55, z); add(cap);
+  solidBox(x, 3.3, z, .32, .42, .32); solidBox(x, 3.55, z, .42, .07, .42);
   const halo = new THREE.Sprite(haloMat); halo.scale.setScalar(1.8); halo.position.set(x, 3.3, z); add(halo);
   const pool = new THREE.Mesh(poolGeo, poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(x, .06, z); add(pool);
   lamps.push({ x, z });
@@ -132,21 +135,13 @@ const pick = a => a[rnd() * a.length | 0];
 const trunks = [], edgeTrunks = [], leaves = [], spots = [];
 const roomFor = (x, z, gap) => spots.every(([a, b]) => Math.hypot(a - x, b - z) > gap) && lamps.every(l => Math.hypot(l.x - x, l.z - z) > 2.8);
 function bigTree(x, z, inside) {
-  const w = 1.3 + rnd() * .9, h = 7.5 + rnd() * 3, s = 8 + rnd() * 3.5, c = pick(F_TINTS), ry = rnd() * Math.PI;
-  (inside ? trunks : edgeTrunks).push([x, h / 2, z, w, h, w, 0]);
-  (inside ? trunks : edgeTrunks).push([x, .3, z, w * 1.4, .6, w * 1.4, 0]);
-  if (inside) addSolid(x, z, w * 1.4, w * 1.4, h - .9);
-  leaves.push([x, h + .6, z, s, 3, s, ry, c], [x, h + 2.8, z, s * .62, 2, s * .62, ry, c]);
-  // standable square inside each turned leaf clump
-  const fit = 1 / (Math.abs(Math.cos(ry)) + Math.abs(Math.sin(ry))), clump = (cx, cz, size, bot, top) => {
-    const hw = size / 2 * fit, sol = addSolid(cx, cz, hw * 2, hw * 2, top, 'grass'); sol.bot = bot;
-  };
-  if (inside) { clump(x, z, s, h - .9, h + 2.1); clump(x, z, s * .62, h + 1.8, h + 3.8); }
-  if (rnd() < .6) {
-    const a = rnd() * 6.28, lx = x + Math.cos(a) * s * .3, lz = z + Math.sin(a) * s * .3;
-    leaves.push([lx, h - 1, lz, s * .5, 1.8, s * .5, ry, c]);
-    if (inside) clump(lx, lz, s * .5, h - 1.9, h - .1);
-  }
+  const w = 1.3 + rnd() * .9, h = 7.5 + rnd() * 3, s = 8 + rnd() * 3.5, c = pick(F_TINTS), turn = rnd() * Math.PI, over = inside || Math.max(Math.abs(x), Math.abs(z)) < FA + 9, ry = over ? 0 : turn; // ones whose leaves reach over the map sit square, so their hitboxes fit
+  const base = [x, .3, z, w * 1.4, .6, w * 1.4, 0], clumps = [[x, h + .6, z, s, 3, s, ry, c], [x, h + 2.8, z, s * .62, 2, s * .62, ry, c]];
+  (inside ? trunks : edgeTrunks).push([x, h / 2, z, w, h, w, 0], base);
+  if (rnd() < .6) { const a = rnd() * 6.28; clumps.push([x + Math.cos(a) * s * .3, h - 1, z + Math.sin(a) * s * .3, s * .5, 1.8, s * .5, ry, c]); }
+  leaves.push(...clumps);
+  if (inside) boxSolids([[x, (h - .9) / 2, z, w, h - .9, w], base], 'wood'); // the trunk up to its leaves
+  if (over) boxSolids(clumps, 'grass'); // leaves you can stand on
   spots.push([x, z]);
 }
 {
@@ -180,15 +175,17 @@ function bigTree(x, z, inside) {
     for (let k = 0; k < n; k++) deck(x, edge + dir * (n - k - .5) * .5, 1.4, .5, y * (k + 1) / n, .12);
     const run = n * .5, k = y / run, end = run - Math.min(.3 / k, .5), start = -(y / n - .1) / k, c = (start + end) / 2; // the boards' top edge runs under the front of every step, from the ground to just short of the top
     const len = (end - start) * Math.hypot(1, k), mid = y / n - .1 + k * c - .15 * Math.hypot(1, k);
-    for (const ox of [-.76, .76]) { const r = box(.12, .3, len, postMat); r.position.set(x + ox, mid, edge + dir * (run - c)); r.rotation.x = dir * Math.atan2(y, run); add(r); }
+    const f = dir * Math.atan2(y, run), ez = edge + dir * (run - c), hy = len / 2 * Math.sin(f), hz = len / 2 * Math.cos(f);
+    for (const ox of [-.76, .76]) { const r = box(.12, .3, len, postMat); r.position.set(x + ox, mid, ez); r.rotation.x = f; add(r); tiltSolids([x + ox, mid + hy, ez - hz], [x + ox, mid - hy, ez + hz], .12, .3, 'wood'); }
   };
   stairs(A.x, A.z - TH_R, -1, A.y, steps); // up the south side of the first
   stairs(B.x, B.z + TH_R, 1, B.y, steps + 1); // and the north side of the second
   for (let k = 0; k < 6; k++) deck(A.x + TH_R + .5 + k, A.z, 1.05, 1.3, A.y + (B.y - A.y) * (k + .5) / 6, .15); // the bridge
   const xa = A.x + TH_R - .1, xb = B.x - TH_R + .1, rope = lam({ color: 0xc8b48a }); // a post on each deck's edge, a rope from top to top
   for (const oz of [-.75, .75]) {
-    for (const [x, y] of [[xa, A.y], [xb, B.y]]) { const p = box(.12, 1, .12, postMat); p.position.set(x, y + .5, A.z + oz); add(p); }
+    for (const [x, y] of [[xa, A.y], [xb, B.y]]) { const p = box(.12, 1, .12, postMat); p.position.set(x, y + .5, A.z + oz); add(p); solidBox(x, y + .5, A.z + oz, .12, 1, .12, 'wood'); }
     const r = box(Math.hypot(xb - xa, B.y - A.y), .05, .05, rope); r.position.set((xa + xb) / 2, (A.y + B.y) / 2 + .95, A.z + oz); r.rotation.z = Math.atan2(B.y - A.y, xb - xa); add(r);
+    tiltSolids([xa, A.y + .95, A.z + oz], [xb, B.y + .95, A.z + oz], .05, .05); // a rope rail you can't walk through
   }
   // grass on the hill
   const ht = [];
@@ -218,7 +215,7 @@ building.cover.push(instanced(unit, leafMat, bushes));
 for (const [x, z, len, alongX] of LOGS) {
   const logW = alongX ? len : .85, logD = alongX ? .85 : len;
   addBlock(x, z, logW, logD, .85, barkMat);
-  const stub = box(.4, .4, .4, barkMat); stub.position.set(x + (alongX ? len * .2 : .5), .9, z + (alongX ? .5 : len * .2)); add(stub);
+  const stub = box(.4, .4, .4, barkMat); stub.position.set(x + (alongX ? len * .2 : .5), .9, z + (alongX ? .5 : len * .2)); add(stub); solidBox(stub.position.x, .9, stub.position.z, .4, .4, .4, 'wood');
 }
 for (const [x, z, w, d, h] of ROCKS) addBlock(x, z, w, d, h, rockMat);
 addCrates(M.crates);
@@ -235,25 +232,45 @@ for (let i = 0; i < 40; i++) {
   const [tx, tz] = spots[rnd() * spots.length | 0], a = rnd() * 6.28, d = 1.4 + rnd() * 1.4, x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d;
   if (pathDist(x, z) < PW / 2) continue;
   const st = box(.1, .2, .1, stemMat); st.position.set(x, .1, z); add(st);
-  const cp = box(.3, .12, .3, capMats[i % 2]); cp.position.set(x, .25, z); add(cp);
+  const cp = box(.3, .12, .3, capMats[i % 2]); cp.position.set(x, .25, z); add(cp); solidBox(x, .1, z, .1, .2, .1); solidBox(x, .25, z, .3, .12, .3, 'grass');
 }
 
 // moon and light shafts
 const MOON = new THREE.Vector3(...M.env.sunDir).normalize(), MOON_C = 0xcfdcff;
-const moonTex = tex(g => {
-  g.clearRect(0, 0, 16, 16);
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const d = Math.hypot(x - 7.5, y - 7.5); if (d > 7.2) continue;
-    g.fillStyle = d > 6.2 ? '#c9d2df' : '#eef2f8'; g.fillRect(x, y, 1, 1);
-  }
-  g.fillStyle = '#c3ccd9'; for (const [x, y, w, h] of [[4, 4, 3, 2], [9, 3, 2, 2], [10, 8, 3, 3], [5, 10, 2, 2], [3, 7, 1, 1], [8, 12, 2, 1]]) g.fillRect(x, y, w, h);
-});
-moonTex.wrapS = moonTex.wrapT = THREE.ClampToEdgeWrapping;
-const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, fog: false, transparent: true }));
-moon.scale.setScalar(9);
-const moonGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: MOON_C, fog: false, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false }));
-moonGlow.scale.setScalar(42);
+const moon = skyCube(moonFaces([238, 242, 248], [195, 204, 217]), MOON.clone().negate().add(new THREE.Vector3(-.5, .6, 0)), { amb: .3 }); // full, a block
+moon.scale.setScalar(4.4); moon.position.copy(MOON).multiplyScalar(120); // up in the sky from the start, so nothing takes it for part of the map
+const moonGlow = skyBack(new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: MOON_C, fog: false, opacity: .35, blending: THREE.AdditiveBlending })));
+moonGlow.scale.setScalar(34);
 add(moonGlow); add(moon); // follows the camera so it looks far away
+// the night sky over the leaves: dark green down at the trees to deep blue overhead, stars thickest along a faint Milky Way, now and then a shooting star
+add(skyDome(90, [[-1, 0x15342b], [0, 0x15342b], [.03, 0x2a4a43], [.18, 0x23413e], [.34, 0x162d33], [.52, 0x0b1829], [.75, 0x050c19], [1, 0x03060e]])); // a faint glow behind the far trees
+{ // far off: tree lines on rolling hills, paler the farther they are, so the stars set behind trees
+  const fr = seeded(606), F = M.env.fog, GLOW = 0x2a4a43, S = 1.5; // S: all of it moved out past the edge trees, the same seen from the middle
+  for (const [R, mat, h0, hv, tw] of [[78, farMat(0x0e2419, F, 0, true), 13, 3, 7], [100, farMat(F, GLOW, .22), 17, 5, 6]]) { // the nearest in the fog, like the trees in front of it
+    const n = Math.round(R * 6.28 / tw), ph = fr() * 6, top = [...Array(n)].map((_, i) => (h0 + hv * (rollAt((i + .5) / n * 6.28, ph) * 2 - 1) + fr() * 2.4) * S);
+    skyline(R * S, n, i => top[i], mat); // the canopy, a crown at a time
+    skyline((R - 1) * S, n, i => fr() < .5 ? [top[i] - .5 * S, top[i] + (1.4 + fr() * 2.2) * S, .55] : [0, 0], mat); // and smaller crowns on some
+  }
+  farRange(128 * S, fr, { lo: 19 * S, hi: 32 * S, peaks: 5, peak: 11 * S, n: 200, mat: farMat(F, GLOW, .45) }); // mountains behind it all, a few peaks standing up into the stars
+}
+const BAND = new THREE.Euler(1.1, .7, .2);
+{
+  const pos = [], s = [], c = [], C = new THREE.Color(), v = new THREE.Vector3();
+  for (let i = 0; i < 6000; i++) {
+    const a = Math.random() * Math.PI * 2;
+    if (i < 3800) { const y = Math.random() * 2 - 1, r = Math.sqrt(1 - y * y); v.set(r * Math.cos(a), y, r * Math.sin(a)); }
+    else { const b = (Math.random() + Math.random() + Math.random() - 1.5) * .17; v.set(Math.cos(a) * Math.cos(b), Math.sin(b), Math.sin(a) * Math.cos(b)).applyEuler(BAND); }
+    if (v.y < .05) continue;
+    const q = Math.random(), big = q > .99 ? 3 : q > .93 ? 2 : 1;
+    pos.push(v.x * 85, v.y * 85, v.z * 85); s.push(big * .17, big > 1 ? .8 + Math.random() * .2 : .4 + Math.random() * .5, .15 + Math.random() * .4, Math.random());
+    C.set([0xffffff, 0xe4ecff, 0xd0dcff, 0xfff4e0, 0xffe2c4][Math.random() * 5 | 0]); c.push(C.r, C.g, C.b);
+  }
+  add(camStars(pos, s, c, 16)); // fading out low down, into the haze
+}
+const band = skyBand(88, .4, BAND_FS, { h: { value: 16 } }); band.rotation.copy(BAND); band.onBeforeRender = (r, sc, cam) => band.matrixWorld.setPosition(cam.position); add(band);
+const shoot = skyBack(box(.15, .15, 10, new THREE.MeshBasicMaterial({ color: 0xe8f0ff, blending: THREE.AdditiveBlending, fog: false, opacity: 0 })), -1.4), shotP = new THREE.Vector3(), shotV = new THREE.Vector3(); add(shoot);
+let shotAt = 0, shotT = -1, shotD = 1, lastT = 0;
+shoot.visible = false; shoot.onBeforeRender = (r, sc, cam) => { const p = shoot.position.copy(cam.position).addScaledVector(shotP, 80).addScaledVector(shotV, shotT * 45); shoot.lookAt(p.x + shotV.x, p.y + shotV.y, p.z + shotV.z); shoot.updateMatrixWorld(); }; // across the sky of whoever looks
 
 // shafts only where the moon shows through the leaves
 const CANOPY = 34;
@@ -303,7 +320,11 @@ M.tick = () => { // every frame
   }
   for (const l of lampLights) l.intensity = 9 + Math.sin(t * 9 + l.position.x) * .7 + Math.sin(t * 23 + l.position.z) * .35;
   for (const s of shafts) s.m.material.opacity = .07 + Math.sin(t * .4 + s.x) * .02;
-  moon.position.copy(camera.position).addScaledVector(MOON, 150); moonGlow.position.copy(moon.position);
+  moon.position.copy(camera.position).addScaledVector(MOON, 120); moonGlow.position.copy(moon.position);
+  const dt = Math.min(.1, t - lastT); lastT = t;
+  if (shotT < 0 && t > shotAt) { shotT = 0; shotD = .6 + Math.random() * .5; shotP.setFromSphericalCoords(1, .35 + Math.random() * .75, Math.random() * 6.3); shotV.set(Math.random() - .5, -.4, Math.random() - .5).projectOnPlane(shotP).normalize(); } // a shooting star every 5 to 15 s
+  if (shotT >= 0) { const k = (shotT += dt) / shotD; shoot.material.opacity = Math.sin(Math.min(1, k) * Math.PI) * .9; if (k > 1) { shotT = -1; shotAt = t + 5 + Math.random() * 10; } }
+  shoot.visible = shotT >= 0;
 };
 });
 useMap('yard'); // default map

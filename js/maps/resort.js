@@ -340,13 +340,12 @@ for (let k = 1; k <= FLOORS; k++) {
 }
 flatPlane(LI * 2, LI * 2, decal({ map: tex(g => { noise(g, [150, 145, 135], 14); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16); }, LI, LI) }), LX, LAND_Y + .01, LZ);
 for (const s of [-1, 1]) for (let i = -2.4; i <= 2.41; i += 1.2) { // brackets under the overhang
-  const b1 = box(.8, .5, .25, ironMat); b1.position.set(LX + s * (LO + .4), GY - .55, LZ + i); add(b1);
-  const b2 = box(.25, .5, .8, ironMat); b2.position.set(LX + i, GY - .55, LZ + s * (LO + .4)); add(b2);
+  const b1 = box(.8, .5, .25, ironMat); b1.position.set(LX + s * (LO + .4), GY - .55, LZ + i); add(b1); meshSolids(b1, 'metal');
+  const b2 = box(.25, .5, .8, ironMat); b2.position.set(LX + i, GY - .55, LZ + s * (LO + .4)); add(b2); meshSolids(b2, 'metal');
 }
-// railing, too high to jump off
+// railing, as high as its top rail
 for (const s of [-1, 1]) {
-  building.solids.push({ mesh: null, minX: LX - GA, maxX: LX + GA, minZ: LZ + s * GA - .15, maxZ: LZ + s * GA + .15, bot: GY, top: GY + 1.9 });
-  building.solids.push({ mesh: null, minX: LX + s * GA - .15, maxX: LX + s * GA + .15, minZ: LZ - GA, maxZ: LZ + GA, bot: GY, top: GY + 1.9 });
+  solidBox(LX, GY + .52, LZ + s * (GA - .05), GA * 2, 1.035, .1, 'metal'); solidBox(LX + s * (GA - .05), GY + .52, LZ, .1, 1.035, GA * 2, 'metal');
   for (const y of [GY + .5, GY + 1]) {
     const r1 = box(GA * 2, .07, .07, ironMat); r1.position.set(LX, y, LZ + s * (GA - .05)); add(r1);
     const r2 = box(.07, .07, GA * 2, ironMat); r2.position.set(LX + s * (GA - .05), y, LZ); add(r2);
@@ -365,14 +364,14 @@ const glass = box(LR * 2 - .1, 1.8, LR * 2 - .1, new THREE.MeshLambertMaterial({
 glass.position.set(LX, GY + 1.5, LZ); add(glass);
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = box(.1, 1.8, .1, ironMat); p.position.set(LX + sx * (LR - .04), GY + 1.5, LZ + sz * (LR - .04)); add(p); }
 const CY = GY + 2.9; // underside of the canopy
-const chimney = box(1.3, CY - GY - 2.4, 1.3, ironMat); chimney.position.set(LX, (GY + 2.4 + CY) / 2, LZ); add(chimney);
+const chimney = box(1.3, CY - GY - 2.4, 1.3, ironMat); chimney.position.set(LX, (GY + 2.4 + CY) / 2, LZ); add(chimney); meshSolids(chimney, 'metal');
 // red canopy
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(LX + sx * (GA - .12), LZ + sz * (GA - .12), .16, .16, GY, CY, ironMat);
 const CW = GA + .3;
 addSlab(LX, LZ, CW * 2, CW * 2, CY, CY + .25, red);
 const roofM = new THREE.Mesh(new THREE.ConeGeometry(CW * Math.SQRT2, 2.2, 4), red); roofM.rotation.y = Math.PI / 4; roofM.position.set(LX, CY + .25 + 1.1, LZ); add(roofM);
 standOn(LX, LZ, CW, CW, CY + .25, CY + .25, CY + 2.45, false, 'metal');
-const knob = box(.3, .45, .3, ironMat); knob.position.set(LX, CY + .25 + 2.2 + .15, LZ); add(knob);
+const knob = box(.3, .45, .3, ironMat); knob.position.set(LX, CY + .25 + 2.2 + .15, LZ); add(knob); meshSolids(knob, 'metal');
 const LAMP_Y = GY + 1.4;
 const stand = box(.36, LAMP_Y - .35 - (GY + .6), .36, ironMat); stand.position.set(LX, (GY + .6 + LAMP_Y - .35) / 2, LZ); add(stand); // the lamp sits on this
 const standTop = box(.56, .08, .56, ironMat); standTop.position.set(LX, LAMP_Y - .39, LZ); add(standTop);
@@ -433,6 +432,7 @@ for (const z of [PS.z0 - .04, PS.z1 + .04]) { // handrails, the pool end fixed t
   const up = box(.07, 1, .07, chrome); up.position.set(PS.x0 - .55, DECK_Y + .5, z); add(up);
   const top = box(.9, .07, .07, chrome); top.position.set(PS.x0 - .1, DECK_Y + 1, z); add(top);
   const down = box(.07, 1.3, .07, chrome); down.position.set(PS.x0 + .35, DECK_Y + .35, z); add(down);
+  for (const m of [up, top, down]) meshSolids(m);
 }
 // down in the pool
 const POOL_LOW = p => inPool(p.x, p.z) && p.y < DECK_Y - .05;
@@ -484,7 +484,7 @@ function lounger(x, z, y0, along, dir, c) {
   const back = box(ax ? .1 : W, .75, ax ? W : .1, loungeMat);
   back.position.set(x + (ax ? dir * (L / 2 - .2) : 0), y0 + .72, z + (ax ? 0 : dir * (L / 2 - .2)));
   if (ax) back.rotation.z = -dir * .55; else back.rotation.x = dir * .55;
-  add(back); building.cover.push(back);
+  add(back); building.cover.push(back); meshSolids(back, 'wood');
   for (const a of [-1, 1]) for (const b of [-1, 1]) { const leg = box(.06, .35, .06, legMat); leg.position.set(x + (ax ? a * .8 : b * .3), y0 + .175, z + (ax ? b * .3 : a * .8)); add(leg); }
 }
 function umbrella(x, z, y0, cols) {
@@ -493,7 +493,7 @@ function umbrella(x, z, y0, cols) {
   t.repeat.set(2, 1);
   const top = new THREE.Mesh(new THREE.ConeGeometry(1.7, .55, 16, 1, true), lam({ map: t, side: THREE.DoubleSide }));
   top.position.set(x, y0 + 2.55, z); add(top);
-  standOn(x, z, 1.7, 1.7, y0 + 2.275, y0 + 2.275, y0 + 2.825, true);
+  for (let k = 0; k < 3; k++) { const r = 1.7 * (1 - k / 3), b = y0 + 2.275 + .55 * k / 3; standOn(x, z, r, r, b, b, y0 + 2.825, true); } // cones inside cones, so under it you reach up into the canopy
 }
 let uc = 0;
 for (const z of [-6.5, 6.5]) {
@@ -512,7 +512,7 @@ function openSteps(x, z, ax, dir, y, n, m, side) {
   for (let k = 0; k < n; k++) { const o = dir * (n - k - .5) * .5, t = y * (k + 1) / n; addSlab(x + (ax ? o : 0), z + (ax ? 0 : o), ax ? .5 : 1.4, ax ? 1.4 : .5, t - .12, t, m); }
   for (const s of [-.76, .76]) {
     const r = box(ax ? len : .12, .3, ax ? .12 : len, side); r.position.set(x + (ax ? dir * (run - end / 2) : s), mid, z + (ax ? s : dir * (run - end / 2)));
-    if (ax) r.rotation.z = -dir * Math.atan2(y, run); else r.rotation.x = dir * Math.atan2(y, run); add(r);
+    if (ax) r.rotation.z = -dir * Math.atan2(y, run); else r.rotation.x = dir * Math.atan2(y, run); add(r); meshSolids(r);
   }
 }
 // --- water slide ---
@@ -533,7 +533,7 @@ const SL = { x0: -12, x1: -4.4, z0: 3, z1: 4.2, y0: 1, y1: 4.2 }, slideH = x => 
   }
   const len = Math.hypot(SL.x1 - SL.x0, SL.y1 - SL.y0), tilt = Math.atan2(SL.y1 - SL.y0, SL.x1 - SL.x0), mx = (SL.x0 + SL.x1) / 2, my = (SL.y0 + SL.y1) / 2;
   for (const [d, h, z, y, m] of [[SL.z1 - SL.z0, .1, (SL.z0 + SL.z1) / 2, -.05, slideMat], [.15, .7, SL.z0 - .075, .25, rim], [.15, .7, SL.z1 + .075, .25, rim]]) {
-    const c = box(len, h, d, m); c.position.set(mx, my + y, z); c.rotation.z = tilt; add(c); building.cover.push(c);
+    const c = box(len, h, d, m); c.position.set(mx, my + y, z); c.rotation.z = tilt; add(c); building.cover.push(c); if (m === rim) meshSolids(c, 'metal');
   }
   const film = box(len, .02, SL.z1 - SL.z0 - .1, waterMat([150, 225, 245], .55, len / 2, 1)); film.position.set(mx, my + .01, (SL.z0 + SL.z1) / 2); film.rotation.z = tilt; add(film); slideFilm = film;
   for (const x of [-7, -9.8]) addSlab(x, (SL.z0 + SL.z1) / 2, .2, .2, x < -9 ? POOL_F : DECK_Y, slideH(x) - .12, teal); // legs
@@ -578,15 +578,15 @@ function pyramid(w, d, h, m, k = 1) {
 const BX = 0, BZ = -18;
 addSlab(BX, BZ + 2, 6.4, .6, 0, 1.1, wood);
 for (const s of [-1, 1]) addSlab(BX + s * 2.9, BZ + .4, .6, 2.6, 0, 1.1, wood); // gaps so you can walk behind the bar
-const counterTop = box(7, .1, 1, plain(0x6a4428)); counterTop.position.set(BX, 1.15, BZ + 2); add(counterTop);
+const counterTop = box(7, .1, 1, plain(0x6a4428)); counterTop.position.set(BX, 1.15, BZ + 2); add(counterTop); meshSolids(counterTop, 'wood');
 addSlab(BX, BZ - 2.2, 6.4, .5, 0, 1.6, wood);
 const bottleCols = [0x3a7a3a, 0x8a3a1a, 0xd8d0b0, 0x2a5a8a, 0xb04a2a, 0x5a3a7a];
-for (let i = 0; i < 11; i++) { const b = box(.12, .32 + (i % 3) * .06, .12, plain(bottleCols[i % bottleCols.length])); b.position.set(BX - 2.7 + i * .54, 1.76 + (i % 3) * .03, BZ - 2.2); add(b); }
+for (let i = 0; i < 11; i++) { const b = box(.12, .32 + (i % 3) * .06, .12, plain(bottleCols[i % bottleCols.length])); b.position.set(BX - 2.7 + i * .54, 1.76 + (i % 3) * .03, BZ - 2.2); add(b); meshSolids(b, 'stone'); }
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(BX + sx * 3.3, BZ + .1 + sz * 2.55, .3, .3, 0, 3, wood);
 const barRoof = tbox(8, .25, 6.6, thatch); barRoof.position.set(BX, 3.125, BZ); add(barRoof); building.cover.push(barRoof);
 const barTop = pyramid(8.6, 7.2, 1.9, thatch); barTop.position.set(BX, 3.25, BZ); add(barTop);
 standOn(BX, BZ, 4.3, 3.6, 3, 3.25, 5.15, false, 'wood'); // the thatch, up to its peak
-for (const x of [-2.2, -.7, .8, 2.3]) { addSlab(BX + x, BZ + 3, .45, .45, 0, .6, wood); const seat = box(.55, .08, .55, plain(0xc0392b)); seat.position.set(BX + x, .64, BZ + 3); add(seat); }
+for (const x of [-2.2, -.7, .8, 2.3]) { addSlab(BX + x, BZ + 3, .45, .45, 0, .6, wood); const seat = box(.55, .08, .55, plain(0xc0392b)); seat.position.set(BX + x, .64, BZ + 3); add(seat); meshSolids(seat, 'wood'); }
 
 // --- beach huts ---
 function hut(x, z, face) { // face = door direction
@@ -631,10 +631,10 @@ flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(
   addSlab(cx, 0, w, CZ * 2, BOT, TOP, stucco);
   const stripes = tex(g => { for (let i = 0; i < 16; i++) { g.fillStyle = (i >> 1) % 2 ? '#f6f3ea' : '#2fb5a8'; g.fillRect(0, i, 16, 1); } }, 1, CZ);
   flatPlane(w - .1, CZ * 2 - .1, decal({ map: stripes }), cx, TOP + .005, 0);
-  const fascia = box(.08, .34, CZ * 2 + .16, teal); fascia.position.set(X1 + .04, (BOT + TOP) / 2, 0); add(fascia);
-  for (const s of [-1, 1]) { const f = box(w + .08, .34, .08, teal); f.position.set(cx + .04, (BOT + TOP) / 2, s * (CZ + .04)); add(f); }
+  const fascia = box(.08, .34, CZ * 2 + .16, teal); fascia.position.set(X1 + .04, (BOT + TOP) / 2, 0); add(fascia); meshSolids(fascia, 'stone');
+  for (const s of [-1, 1]) { const f = box(w + .08, .34, .08, teal); f.position.set(cx + .04, (BOT + TOP) / 2, s * (CZ + .04)); add(f); meshSolids(f, 'stone'); }
   for (const z of [-1.1, 1.1]) { // lights
-    const l = box(.32, .04, .32, new THREE.MeshLambertMaterial({ color: 0xfff4d0, emissive: 0xffe2a0, emissiveIntensity: .9 })); l.position.set(cx + .2, BOT - .02, z); add(l);
+    const l = box(.32, .04, .32, new THREE.MeshLambertMaterial({ color: 0xfff4d0, emissive: 0xffe2a0, emissiveIntensity: .9 })); l.position.set(cx + .2, BOT - .02, z); add(l); meshSolids(l, 'stone');
   }
   const PY = 0;
   for (const s of [-1, 1]) {
@@ -643,12 +643,13 @@ flatPlane(HX1 - HX0 - HT * 2, HZ1 - HZ0 - HT * 2, decal({ map: tex(g => { noise(
     const base = box(.46, .18, .46, stucco); base.position.set(px, PY + .09, pz); add(base);
     const cap = box(.46, .16, .46, stucco); cap.position.set(px, BOT - .08, pz); add(cap);
     const band = box(.34, .1, .34, teal); band.position.set(px, BOT - .26, pz); add(band);
+    for (const m of [base, cap, band]) meshSolids(m, 'stone');
   }
 }
 // reception desk, sofa and plants
 addSlab(-36.6, 0, .7, 3, 0, 1.05, wood);
-const desk = box(.9, .08, 3.2, plain(0x6a4428)); desk.position.set(-36.6, 1.09, 0); add(desk);
-const keyBoard = box(.04, .9, 2.2, teal); keyBoard.position.set(HX0 + HT + .02, 1.9, 0); add(keyBoard);
+const desk = box(.9, .08, 3.2, plain(0x6a4428)); desk.position.set(-36.6, 1.09, 0); add(desk); meshSolids(desk, 'wood');
+const keyBoard = box(.04, .9, 2.2, teal); keyBoard.position.set(HX0 + HT + .02, 1.9, 0); add(keyBoard); meshSolids(keyBoard, 'wood');
 for (let i = 0; i < 8; i++) { const k = box(.03, .1, .06, plain(0xe8c860)); k.position.set(HX0 + HT + .05, 1.7 + (i >> 2) * .35, -.75 + (i % 4) * .5); add(k); }
 const sofaMat = plain(0x3a7fa8);
 addSlab(-33.5, 5.1, 2.6, .9, 0, .45, sofaMat); addSlab(-33.5, 5.55, 2.6, .3, .45, 1, sofaMat);
@@ -697,20 +698,20 @@ function hotelNav(p, t) {
 const PIT = [.5, 15.5, 16.5, 27.5];
 flatPlane(PIT[1] - PIT[0], PIT[3] - PIT[2], decal({ map: tex(drawSand, PIT[1] - PIT[0], PIT[3] - PIT[2]) }), 8, LAND_Y + .01, 22);
 for (const [w, d, x, z] of [[15.2, .2, 8, PIT[2]], [15.2, .2, 8, PIT[3]], [.2, 11.2, PIT[0], 22], [.2, 11.2, PIT[1], 22]]) {
-  const b = box(w, .12, d, wood); b.position.set(x, .06, z); add(b);
+  const b = box(w, .12, d, wood); b.position.set(x, .06, z); add(b); meshSolids(b);
 }
 const lineMat = decal({ color: 0xffffff });
 for (const [w, d, x, z] of [[12, .12, 8, 18], [12, .12, 8, 26], [.12, 8, 2, 22], [.12, 8, 14, 22]]) flatPlane(w, d, lineMat, x, LAND_Y + .015, z);
 for (const z of [18, 26]) addSlab(8, z, .15, .15, 0, 2.6, plain(0xdcdcdc));
 const net = new THREE.Mesh(new THREE.PlaneGeometry(8, 1), seeThru(tex(g => { g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 16, 2); for (let i = 0; i < 16; i += 4) { g.fillRect(i, 0, 1, 16); g.fillRect(0, i, 16, 1); } }, 8, 1)));
-net.rotation.y = Math.PI / 2; net.position.set(8, 2, 22); add(net);
-const ball = box(.3, .3, .3, plain(0xf4f0e0)); ball.position.set(10.5, .15, 20.4); add(ball);
+net.rotation.y = Math.PI / 2; net.position.set(8, 2, 22); add(net); solidBox(8, 2, 22, .04, 1, 8);
+const ball = box(.3, .3, .3, plain(0xf4f0e0)); ball.position.set(10.5, .15, 20.4); add(ball); meshSolids(ball);
 
 // --- pier and boats ---
 const PZ = 12, PX0 = 18, PX1 = 60, PW = 3;
 building.solids.push({ mesh: null, minX: PX0, maxX: PX1, minZ: PZ - PW / 2, maxZ: PZ + PW / 2, bot: 0, top: .5, surf: 'wood' });
 const pierDeck = tbox(PX1 - PX0, .12, PW, plank); pierDeck.position.set((PX0 + PX1) / 2, .44, PZ); add(pierDeck); building.cover.push(pierDeck);
-for (let x = PX0 + .4; x < PX1; x += 3) for (const s of [-1, 1]) { const p = box(.26, SEA_D + .5, .26, wood); p.position.set(x, (.5 - SEA_D) / 2, PZ + s * (PW / 2 - .15)); add(p); building.cover.push(p); } // posts
+for (let x = PX0 + .4; x < PX1; x += 3) for (const s of [-1, 1]) { const p = box(.26, SEA_D + .5, .26, wood); p.position.set(x, (.5 - SEA_D) / 2, PZ + s * (PW / 2 - .15)); add(p); building.cover.push(p); meshSolids(p); } // posts
 for (const x of [26, 34, 40]) for (const s of [-1, 1]) addSlab(x, PZ + s * 1.25, .3, .3, .5, .85, ironMat); // bollards
 const hullBlue = plain(0x1f4e8c), hullWhite = plain(0xf6f6f2), seatMat = plain(0xd8cfb8), navy = plain(0x14284a), glassDark = plain(0x1b2a3a);
 const chromeM = plain(0xdfe5ea), blackM = plain(0x222326), accentM = plain(0xe8505a);
@@ -748,8 +749,17 @@ function bowRail(L, W, bow, x, z, y0, y, from) {
 // speedboat you can walk onto
 const SB = { x0: 35, x1: 40.6, z: 15.25, w: 2.4 };
 const sbx = (SB.x0 + SB.x1) / 2, sL = 6.45, sBow = 2.1;
-building.solids.push({ mesh: null, minX: SB.x0, maxX: SB.x1, minZ: SB.z - SB.w / 2, maxZ: SB.z + SB.w / 2, bot: 0, top: 1 });
-building.solids.push({ mesh: null, minX: SB.x1, maxX: SB.x1 + 1, minZ: SB.z - .7, maxZ: SB.z + .7, bot: 0, top: 1 });
+// hitboxes along a hull's outline (hullShape, square stern): its straight part in one, the bow in slices as wide as their back ends
+function hullSolids(L, W, bow, x0, z, bot, top, surf) {
+  const A = L - bow, C = L - bow * .15, X = t => x0 + (1 - t) ** 2 * A + 2 * (1 - t) * t * C + t * t * L, n = 10;
+  solidBox(x0 + A / 2, (bot + top) / 2, z, A, top - bot, W, surf);
+  for (let i = 0; i < n; i++) { const t = i / n, xa = X(t), xb = X(t + 1 / n); solidBox((xa + xb) / 2, (bot + top) / 2, z, xb - xa, top - bot, W * (1 - t * t), surf); }
+}
+hullSolids(sL, SB.w, sBow, SB.x0, SB.z, 0, 1, 'wood');
+hullSolids(sL - .35, SB.w - .6, sBow - .1, SB.x0 + .15, SB.z, -.4, 0); // the keel under the water
+hullSolids(sBow + .1, SB.w, sBow, SB.x0 + sL - sBow - .1, SB.z, 1, 1.13); // the foredeck
+for (const s of [-1, 1]) solidBox(SB.x0 + (sL - sBow) / 2, 1.075, SB.z + s * (SB.w / 2 - .08), sL - sBow, .15, .16); // the rim round the cockpit
+solidBox(SB.x0 + .08, 1.075, SB.z, .16, .15, SB.w);
 // hull
 hullPiece(hullShape(sL - .35, SB.w - .6, sBow - .1), -.4, .15, hullBlue, SB.x0 + .15, SB.z);
 hullPiece(hullShape(sL, SB.w, sBow), .15, .56, hullBlue, SB.x0, SB.z);
@@ -759,6 +769,7 @@ hullPiece(hullShape(sL + .04, SB.w + .04, sBow + .02), .8, .86, accentM, SB.x0 -
 hullPiece(rim(sL, SB.w, sBow, .16), 1, 1.15, hullWhite, SB.x0, SB.z, false);
 hullPiece(hullShape(sL - .4, SB.w - .32, sBow - .24, 0, .16), 1, 1.01, plank, SB.x0, SB.z, false); // teak floor
 hullPiece(hullShape(sBow + .1, SB.w, sBow), 1, 1.13, hullWhite, SB.x0 + sL - sBow - .1, SB.z, false); // the foredeck
+const sbFrom = building.root.children.length; // the fittings from here on get hitboxes
 bowRail(sL - .24, SB.w - .2, sBow - .14, SB.x0 + .1, SB.z, 1.13, 1.42, sL - sBow - .5);
 // steering console
 addSlab(sbx + .9, SB.z - .4, .8, .7, 1, 1.75, hullWhite);
@@ -806,6 +817,7 @@ for (const fx of [36.6, 39.2]) {
 const ropeM = plain(0xd8c8a0);
 rod([SB.x0 + sL - .9, 1.2, SB.z - .2], [40, .85, PZ + 1.25], ropeM, .04);
 rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
+propSolids(sbFrom);
 
 // yacht, out of reach
 {
@@ -859,13 +871,13 @@ rod([SB.x0 + .3, 1.2, SB.z - SB.w / 2 + .12], [34, .85, PZ + 1.25], ropeM, .04);
   hullPiece(hullShape(L, W, 1.3, 1.1), .12, .42, boards([92, 168, 176]), X0, Z);
   hullPiece(hullShape(L - .2, W - .25, 1.2, 1, .1), .42, .62, boards([170, 64, 44]), X0, Z);
   hullPiece(hullShape(L - .6, W - .7, 1, .85, .3), .62, .78, boards([170, 64, 44]), X0, Z);
-  const keel = box(L - .6, .08, .1, plain(0x4a2e18)); keel.position.set(X0 + L / 2, .82, Z); add(keel);
+  const keel = box(L - .6, .08, .1, plain(0x4a2e18)); keel.position.set(X0 + L / 2, .82, Z); add(keel); meshSolids(keel, 'wood');
   for (const [oz, ry] of [[Z + 1.35, .08], [Z + 1.7, -.05]]) {
     const oar = new THREE.Group(), wd = plain(0xb08a58);
     const shaft = box(2.3, .07, .07, wd); oar.add(shaft);
     const blade = box(.6, .03, .2, wd); blade.position.x = 1.4; oar.add(blade);
     const grip = box(.25, .08, .08, plain(0x6a4428)); grip.position.x = -1.2; oar.add(grip);
-    oar.position.set(X0 + L / 2, .045, oz); oar.rotation.y = ry; add(oar);
+    oar.position.set(X0 + L / 2, .045, oz); oar.rotation.y = ry; add(oar); for (const m of oar.children) meshSolids(m, 'wood');
   }
 }
 // --- palm trees ---
@@ -998,6 +1010,10 @@ for (let L = .5; L <= 8; L += .5) {
 }
 // --- sky ---
 addSky(rnd, [12, 17, -32], 16, 50, 160, 40, 58);
+{ // far off: hazy islands across the sea, one with a peak
+  const isl = [[.7, .32, 1], [2.5, .45, .7], [4.4, .26, .55]], at = a => Math.max(0, ...isl.map(([c, w, k]) => { const d = Math.abs(Math.atan2(Math.sin(a - c), Math.cos(a - c))); return d < w ? k * Math.cos(d / w * Math.PI / 2) ** .7 : 0; }));
+  farRange(130, seeded(512), { lo: 4, hi: 16, peaks: 2, peak: 8, mat: farMat(0x5e8a72, M.env.fog, .55), where: at });
+}
 
 // ground height, the sea and pool drop to their floor
 M.floor = (x, z) => inPool(x, z) ? POOL_F : kindAt(x, z) === SEA ? seaFloor(ci(x), ci(z)) : 0;

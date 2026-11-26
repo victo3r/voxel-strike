@@ -517,7 +517,7 @@ function sheenTick(z, dt) {
 function secretTick(dt) {
   if (heroCh?.zap) heroCh.zap.tick(heroCh.zap, dt);
   heroCh?.hat?.fx?.tick(dt); // hat skins move too
-  if (inLobby) return;
+  if (inLobby && !SHOW.on) return; // the lobby's showcase has people in it
   for (const z of zombies) {
     if (z.hatFx && !z.dead) z.hatFx.tick(dt);
     if (!z.zap) continue;

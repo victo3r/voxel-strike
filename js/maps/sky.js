@@ -271,7 +271,7 @@ const bridgeSlabs = [];
       const y = hA + (hB - hA) * (k + 1) / (n + 1) + (gaps[k] > 1 ? .2 : 0), th = .5 + rnd() * .35;
       addSlab(cx, cz, sw, sd, y - th, y, slab);
       bridgeSlabs.push([cx, cz, sw, sd, y]);
-      const under = box(sw * .7, .7, sd * .7, rock); under.position.set(cx, y - th - .35, cz); add(under);
+      const under = box(sw * .7, .7, sd * .7, rock); under.position.set(cx, y - th - .35, cz); add(under); meshSolids(under, 'stone');
       if (rnd() < .55) { // moss, kept on top
         const mw = Math.min(sw - .3, .7 + rnd() * .8), md = Math.min(sd - .3, .7 + rnd() * .8);
         const mo = box(mw, .05, md, moss); mo.position.set(cx + (rnd() - .5) * (sw - mw - .2), y + .025, cz + (rnd() - .5) * (sd - md - .2)); detail(mo); add(mo);
@@ -336,7 +336,7 @@ const gy = (x, z) => hAt(x, z);
   // broken walls, stepping down where they crumbled
   for (const [x, z, w, d, h] of [[-2.6, -3, 1.6, .8, 1.8], [-1.1, -3, 1.4, .8, 1.1], [2.6, 3, 1.4, .8, 1.5], [1.6, 3, .8, .8, .7], [4, -.6, .8, 1.6, 1.2], [4, .9, .8, 1.4, .6]]) addSlab(RX + x, RZ + z, w, d, y, y + h, stone);
   // fallen roof slabs and rubble
-  for (const [x, z, w, d, h, r] of [[.6, .4, 2.6, 1.8, .45, .3], [-1.8, 1.6, 1.4, 1, .35, -.5], [2.2, -1.2, 1, .8, .5, .8]]) addSlab(RX + x, RZ + z, w, d, y, y + h, stone).rotation.y = r;
+  for (const [x, z, w, d, h] of [[.6, .4, 2.6, 1.8, .45], [-1.8, 1.6, 1.4, 1, .35], [2.2, -1.2, 1, .8, .5]]) addSlab(RX + x, RZ + z, w, d, y, y + h, stone); // square to the world, so they fit their hitboxes
   for (let k = 0; k < 9; k++) addSlab(RX - 5.5, RZ + 3 - k * .75, 1, .75, y, y + .5 + k * .5, stone); // steps up to it
   for (const [x, z, s] of [[-6.5, 5, .9], [6, -4.5, .8], [-2, 6, .7]]) addSlab(RX + x, RZ + z, s, s, y, y + s, rock);
 }
@@ -346,7 +346,7 @@ for (const [x, z, h] of [[-3, -1, 2.6], [4, 4, 2], [-3, 5, 2.4]]) { const y = gy
 // walls and boulders for cover
 for (const [x, z, w, d, h] of [[-22, -2, 4, .8, 1.5], [-34, 10, .8, 3, 1.4], [20, -7, .8, 4, 1.6], [29, 2, 3.5, .8, 1.4], [5, 29, 3.5, .8, 1.4], [-38, -27, 2.8, .8, 1.3], [37, 32, .8, 2.8, 1.3]]) { const y = gy(x, z); addSlab(x, z, w, d, y, y + h, stone); }
 const boulders = [[-27, 9, 1.4], [16, -9, 1.5], [33, -1, 1.6], [-9, -37, 1.2], [42, 27, 1.1], [-41, -30, 1.1]];
-for (const [x, z, s] of boulders) { const y = gy(x, z), b = addSlab(x, z, s, s * .9, y, y + s * .9, rock); b.rotation.y = rnd(); }
+for (const [x, z, s] of boulders) { const y = gy(x, z); addSlab(x, z, s, s * .9, y, y + s * .9, rock); rnd(); } // square, to fit their hitboxes
 for (const [x, z, tall] of M.crates) { const y = gy(x, z); addSlab(x, z, 1.2, 1.2, y, y + (tall ? 2.4 : 1.2), tall ? crate2 : crate1); }
 // trees: solid trunks, leaves you can stand on but shoot through
 const flat = (x, z, r = 1) => { const h = gy(x, z); for (let b = -r; b <= r; b++) for (let a = -r; a <= r; a++) { const c = cellAt(x + a, z + b); if (c < 0 || kind[c] !== GRASS || H[c] !== h) return false; } return true; };

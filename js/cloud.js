@@ -32,14 +32,14 @@ function applySave(s) {
   applying = true;
   const keepBest = better(best, s.best || {});
   for (const k of Object.keys(prof)) delete prof[k];
-  Object.assign(prof, { v: 1, lv: 1, xp: 0, coins: 0, earned: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, suits: {}, suitUse: {}, armorOn: '', boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '', skins: {}, hatSkin: {} }, s.prof);
-  prof.guns = { ...prof.guns }; prof.loadout = { ...prof.loadout }; prof.use = { ...prof.use }; prof.suits = { ...prof.suits }; prof.suitUse = { ...prof.suitUse }; fixArmor(); prof.boots = { ...prof.boots }; prof.bootUse = { ...prof.bootUse }; prof.hats = { ...prof.hats }; prof.hatUse = { ...prof.hatUse }; prof.skins = { ...prof.skins }; prof.hatSkin = { ...prof.hatSkin };
+  Object.assign(prof, { v: 1, lv: 1, xp: 0, coins: 0, earned: 0, guns: {}, loadout: {}, use: {}, armor: 0, armorUse: 0, suits: {}, suitUse: {}, armorOn: '', boots: {}, bootUse: {}, bootOn: '', hats: {}, hatUse: {}, hatOn: '', skins: {}, hatSkin: {}, kfx: {}, kfxOn: '', lobbies: {} }, s.prof);
+  prof.guns = { ...prof.guns }; prof.loadout = { ...prof.loadout }; prof.use = { ...prof.use }; prof.suits = { ...prof.suits }; prof.suitUse = { ...prof.suitUse }; fixArmor(); prof.boots = { ...prof.boots }; prof.bootUse = { ...prof.bootUse }; prof.hats = { ...prof.hats }; prof.hatUse = { ...prof.hatUse }; prof.skins = { ...prof.skins }; prof.hatSkin = { ...prof.hatSkin }; prof.kfx = { ...prof.kfx }; prof.lobbies = { ...prof.lobbies };
   if (!prof.look) prof.look = { ...PRESETS[0].look };
   try { localStorage.setItem(PROF_KEY, JSON.stringify(prof)); } catch {}
   const n = cleanName(auth?.cg ? auth.user : s.name); // on CrazyGames your name is your CrazyGames username
   if (n) { myName = n; $('nameIn').value = n; try { localStorage.setItem('voxelstrike-name', n); } catch {} }
   if (!keepBest && s.best) { best = { wave: s.best.wave | 0, kills: s.best.kills | 0 }; try { localStorage.setItem('voxelstrike-best', JSON.stringify(best)); } catch {} }
-  showProf(); dressHero(); armIcon();
+  showProf(); dressHero(); armIcon(); lobbyBack();
   if (armOpen) renderArmory();
   applying = false;
   if (keepBest) markDirty(); // this device has a better zombie run
