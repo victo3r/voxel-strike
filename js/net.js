@@ -83,7 +83,7 @@ net = (() => {
     const load = CATS.map(([c]) => BASE[loadoutGun(c)].id), stars = {};
     BASE.forEach((w, i) => { if (hasGun(i)) stars[w.id] = Math.max(0, Math.min(2, gunUse(i) - 1)); });
     if (trialOn()) stars[BASE[trialNow()].id] = 0;
-    return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), kfx: wornKfx(), stars, load, lv: prof.lv }; // lv: how grown a gun that grows is
+    return { armor: wornArmor(), boots: wornBoots(), hat: wornHat(), kfx: wornKfx(), stars, load, lv: prof.lv, skins: Object.fromEntries(load.map(id => [id, gunSkin(gi(id))]).filter(([, s]) => s)) }; // lv: how grown a gun that grows is; skins: what your guns wear
   }
   function hello(rejoin = null) {
     const m = { t: 'hello', v: NET_V, gen: NET_GEN, build: NET_BUILD, name: myName, look: lookSent(), gear: myGear(), lv: prof.lv, boost: boostSet() > 0 }; // a drawn skin follows in its own message
@@ -334,7 +334,8 @@ net = (() => {
     const boots = gear.boots && bootOf(gear.boots.id) ? { id: gear.boots.id, st: Math.max(1, Math.min(3, gear.boots.st | 0)) } : null;
     const hat = gear.hat && hatOf(gear.hat.id) ? { id: gear.hat.id, st: Math.max(1, Math.min(3, gear.hat.st | 0)), ...(hatSkinOf(gear.hat.skin) ? { skin: gear.hat.skin } : {}) } : null;
     const armor = Math.max(0, Math.min(ARMOR_ALL, gear.armor | 0));
-    return { stars, load, W, lv, boots, hat, armor, kfx: kfxOf(gear.kfx) ? gear.kfx : '', fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
+    const skins = {}; BASE.forEach((w, i) => { const s = gsFor(i, gear.skins?.[w.id]); if (s) skins[i] = s; });
+    return { stars, load, W, lv, boots, hat, armor, skins, kfx: kfxOf(gear.kfx) ? gear.kfx : '', fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
   }
   function gearMsg(m) { // someone changed gear mid-match
     if (m.pid === undefined) { if (roomMode !== 'coop') { P.maxArmor = m.maxArmor; P.armor = m.armor; } return; } // the server's answer to your own change (co-op: your armor's yours, shop plates and all)
@@ -475,7 +476,7 @@ net = (() => {
       const st = killer && STREAKS[m.streak]; if (st) feed(`${nameTag(killer)} <b style="color:#8ff0b6">${st[1]}!</b>`);
     }
     if (m.by === pid && m.v !== pid) {
-      killNotice(`KILL${m.head ? ' · HEADSHOT' : ''}`, m.streak, m.head, eventKill(m.head)); hitMarker('kill'); missionKill(m.head, m.streak);
+      killNotice(`KILL${m.head ? ' · HEADSHOT' : ''}`, m.streak, m.head, eventKill(m.head)); hitMarker('kill'); missionKill(m.head, m.streak); seasonKill(m.head, victim?.b?.g.position, m.streak); gsKill(m.head, m.streak);
     } else if ((m.assists || []).includes(pid)) toast('+15 ASSIST', '#e8e8e8');
     if (m.v === pid) {
       alive = false; readySent = false; respawnAt = m.respawnAt || now() + 3000;
@@ -594,6 +595,8 @@ net = (() => {
     if (sb >= 0) { const b = bolts[sb]; b.ms.forEach(x => b.sc.remove(x)); bolts.splice(sb, 1); spellFx(p, b.el); return; }
     if (mythBoom(id, p, m.g, bodyOf(m.pid))) return; // a wisp, or a void opening
     if (BASE[gi(m.g)]?.meteor) { const k = rockets.findIndex(x => x.ghost && x.id === id), r = rockets[k]; if (r) { scene.remove(r.m); rockets.splice(k, 1); } callMeteor(p, bodyOf(m.pid), 0, m.g, id, true, r?.dir); return; } // a beacon: the meteor's on its way
+    if (BASE[gi(m.g)]?.sleigh) { const k = rockets.findIndex(x => x.ghost && x.id === id), r = rockets[k]; if (r) { scene.remove(r.m); rockets.splice(k, 1); } callSleigh(p, bodyOf(m.pid), 0, m.g, id, true, r?.dir); return; } // the sleigh's on its way
+    if (BASE[gi(m.g)]?.globe) snowCloud(p, bodyOf(m.pid), 0, m.g, id, true); // a Snow Globe's blizzard
     let kind = 'rocket', gust = false;
     for (const list of [rockets, flares, grenades]) {
       const k = list.findIndex(x => x.ghost && x.id === id);
@@ -689,18 +692,18 @@ net = (() => {
         z.sv = r.sv | 0; sfx(W.swing || 'swing', { at: pos, far: 20, rate: swingRate(W, z.sv) }); z.stab = swingT(W); z.insp = -1;
         if (W.wand && z.flashM) { eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); stunZap(z.flashM.getWorldPosition(fv).clone(), zapEnd(W, eyeV, dirV, z)); } // their stun blast, just for show
       }
-      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); z.kick = kickOf(W); for (let k = 0; k < n; k++) { const f = () => sfx(W.charge ? full ? 'auroraFull' : 'aurora' : W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
+      else if (!W.flame && !W.beam) { z.muzzle = flashTime(W); z.kick = kickOf(W); dualFlip(z.flashM, z.dual); for (let k = 0; k < n; k++) { const f = () => sfx(W.charge ? full ? 'auroraFull' : 'aurora' : W.id, { at: pos, far: W.quiet ? 35 : 100 }); if (k && W.burst) setTimeout(f, k * BURST_GAP * 1000); else f(); } if (z.flashM) muzzleBits(W, z.flashM); } // a burst's shots a moment apart
       if ((W.wand || W.bolt) && !W.melee && !W.beam) { // a wand flicks and throws a bolt, a dart just flies (a spell comes in its own message)
         if (W.wand) z.wandT = .15;
         if (!W.spell && z.flashM) { // where it lands, just for show: the first wall or body, you included
           eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV);
           const L = lanceLine(eyeV, dirV, W, targetsFor(z)), yd = rayHitsYou(lanceRay.ray, eyeV.distanceTo(L.end));
-          wandBolt(W.wand || W.bolt, z.flashM.getWorldPosition(fv).clone(), yd < Infinity ? youHitP.clone() : L.end);
+          wandBolt(W.wand || W.bolt, z.flashM.getWorldPosition(fv).clone(), yd < Infinity ? youHitP.clone() : L.end, scene, null, 1, altBy(z, z.gun));
         }
       }
       if (W.lance) { // their beam, just for show
         eyeV.set(pos.x, pos.y + 1.6, pos.z); aimDir(yaw, pitch, dirV); const g = z.gun, L = lanceLine(eyeV, dirV, W.charge ? { ...W, wallBreak: full } : W, [ground, ...crateMeshes]), held = () => z.gun === g && !z.dead;
-        if (W.charge) auroraBeam(z.flashM.getWorldPosition(fv).clone(), L, full ? 1 : .4, 1, z.flashM, held); else showLance(z.flashM.getWorldPosition(fv).clone(), L, W.lance, 1, scene, z.flashM, held);
+        if (W.charge) auroraBeam(z.flashM.getWorldPosition(fv).clone(), L, full ? 1 : .4, 1, z.flashM, held, scene, altBy(z, g)); else showLance(z.flashM.getWorldPosition(fv).clone(), L, shotCol(g, skinBy(z, g), W.lance), 1, scene, z.flashM, held);
       }
     }
     z.muzzle -= dt; z.flashM.visible = z.muzzle > 0; if (z.pulse) pulseShow(z.pulse, z.muzzle > 0);
@@ -725,7 +728,7 @@ net = (() => {
         beamRay.set(eyeV, dirV); beamRay.far = W.range || 30;
         const hit = beamRay.intersectObjects(targetsFor(z, beamRay), false)[0];
         const end = hit ? hit.point : eyeV.clone().addScaledVector(dirV, beamRay.far);
-        if (!W.chain) showBeam(z, fv.clone(), end, beamKind(W));
+        if (!W.chain) showBeam(z, fv.clone(), end, beamKind(W), altBy(z, z.gun));
         else if ((z.arcT = (z.arcT || 0) - dt) <= 0) { // their lightning and where it jumps, just for show
           z.arcT = 1 / 15; arc(z, fv, end, .1, scene, a => z.flashM.getWorldPosition(a));
           const hz = hit?.object.userData.zombie; if (hz && !hz.dead) chainJumps(hz, W, z, z.rec.stars?.[z.gun] | 0, false);

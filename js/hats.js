@@ -7,6 +7,7 @@ const HATS = [
   { id: 'thornwood', rar: 'epic', name: 'Thornwood Helm', unlock: 14, price: 240, thorns: [.35, .5, .65] },
   { id: 'skyrunner', rar: 'legend', name: 'Skyrunner Helm', unlock: 26, price: 360, sky: [.15, .2, .25] },
   { id: 'titanium', rar: 'mythic', name: 'Titanium Helm', unlock: 50, price: 500, bars: 2, dr: [.05, .07, .09], hs: [.3, .4, .5] },
+  { id: 'elf', rar: 'legend', name: 'Elf Hat', season: 'xmas26', unlock: 20, price: 360, dr: [.03, .05, .07], bell: [8, 10, 12] }, // bell: it jingles when someone gets this close behind you (a season's: only from its chests)
 ];
 const HAT_I = Object.fromEntries(HATS.map((H, i) => [H.id, i]));
 const hatOf = id => HATS[HAT_I[id]] ?? null;
@@ -22,6 +23,10 @@ const HAT_SKINS = [
   { id: 'laurel', name: 'Golden Laurel', about: 'Gold leaves for a champion, sparkling wherever you go' },
   { id: 'octopus', name: 'Octopus Hat', about: 'A bright little octopus who likes the view, all eight arms waving', secret: true },
   { id: 'map', name: 'Map Hat', about: 'A treasure map you can wear, X marks your head', secret: true }, // from a code, hidden till it's yours
+  // a season's own (season.js): from its presents, or only from its chests (chest); shown locked while the season is on, hidden after unless it's yours
+  { id: 'antlers', name: 'Reindeer Antlers', about: 'Antlers, ears and a jingle bell, ready to pull a sleigh', season: 'xmas26' },
+  { id: 'santa', name: 'Santa Hat', about: 'Red felt, white fluff and a bobble that never sits still', season: 'xmas26' },
+  { id: 'startopper', name: 'Star Topper', about: 'The star off the top of the tree, shining away up there', season: 'xmas26', chest: 1 },
 ];
 const HSKIN_I = Object.fromEntries(HAT_SKINS.map((S, i) => [S.id, i]));
 const hatSkinOf = id => HAT_SKINS[HSKIN_I[id]] ?? null;
@@ -35,7 +40,7 @@ function gearFx(b, h) {
   f.thorns = H.thorns?.[L] ?? 0; f.sky = H.sky?.[L] ?? 0;
   return f;
 }
-const youFx = () => { const b = wornBoots(), h = wornHat(); return armorFx(gearFx(b, h), wornArmor(), b, h); };
+const youFx = () => { const b = wornBoots(), h = wornHat(), f = armorFx(gearFx(b, h), wornArmor(), b, h); f.warm = !!(b && bootOf(b.id)?.warm); f.bell = h ? hatOf(h.id)?.bell?.[h.st - 1] || 0 : 0; f.cheer = armorOf(wornArmor())?.cheer || 0; return f; }; // warm, bell and cheer are yours alone: the Elf set's
 const HEAD_MUL = 1.5; // headshot damage multiplier
 // helmet can block a headshot, hood can halve a hit
 function gearHit(fx, d, head) {
@@ -46,7 +51,7 @@ function gearHit(fx, d, head) {
 // bots get random hats, only ones your level unlocks, never better than yours
 const HAT_BARE = .3;
 function botHat() {
-  const list = HATS.filter(H => hatStars(H.id) || prof.lv >= H.unlock);
+  const list = HATS.filter(H => hatStars(H.id) || prof.lv >= H.unlock && !H.season);
   if (!list.length || Math.random() < HAT_BARE) return null;
   const H = list[Math.random() * list.length | 0];
   return { id: H.id, st: 1 + (Math.random() * Math.max(1, hatStars(H.id)) | 0) };
@@ -56,7 +61,17 @@ function botHat() {
 function hatPieces(id, st) {
   const out = [], B = pieceBox(out), hex = a => palIdx(rgbHex(a), false, polished(id, a), id === 'titanium');
   const head = () => B(-8, 8, 0, 16, -8, 8, 0); // hollow out where the head goes
-  if (id === 'raider') {
+  if (id === 'elf') {
+    // a green pointed hat, its tip bent back with a gold bell on it, over a red band cut in points; gold trim at 2 stars, a bell on the brow at 3
+    const C = hex([46, 132, 76]), HI = hex([84, 176, 110]), RD = hex([204, 44, 44]), GOLD = hex([240, 196, 64]);
+    B(-9, 9, 11, 14, -9, 9, RD); B(-9, 9, 14, 17, -9, 9, C); // the band and the hat's rim, one face: the points are painted in it (standing proud they'd be all outline)
+    for (let a = -8; a < 8; a += 4) { B(a, a + 3, 14, 15, -9, 9, RD); B(a + 1, a + 2, 15, 16, -9, 9, RD); B(-9, 9, 14, 15, a, a + 3, RD); B(-9, 9, 15, 16, a + 1, a + 2, RD); }
+    if (st >= 2) B(-9, 9, 12, 13, -9, 9, GOLD);
+    head();
+    B(-8, 8, 16, 21, -8, 8, C); B(-6, 6, 21, 25, -6, 6, C); B(-4, 4, 25, 29, -5, 3, C); B(-8, 8, 18, 19, -8, 8, HI); // nothing of it below the top of your head
+    B(-3, 3, 26, 30, -9, -3, C); B(-2, 2, 22, 26, -12, -9, GOLD); // bent back, a bell on the end
+    if (st >= 3) B(-2, 2, 11, 14, 9, 11, GOLD);
+  } else if (id === 'raider') {
     // hood, scarf at 2 stars, gold trim at 3
     const C = hex([56, 62, 78]), HI = hex([92, 102, 124]), TRIM = st >= 3 ? hex([240, 196, 64]) : hex([34, 200, 186]);
     B(-9, 9, 1, 18, -9, 9, C); B(-9, 9, -2, 1, -9, -6, C);
@@ -206,6 +221,34 @@ function skinPieces(id) {
     head();
     B(-7, 7, 1, 14, 8, 11, 0); // face opening
     B(-10, 10, 14, 19, 9, 10, pick()); B(-7, -3, 12, 14, 8, 10, pick()); B(3, 7, 12, 14, 8, 10, pick()); // a shaggy brow
+  } else if (id === 'santa') {
+    // a red felt hat with a white fur band, leaning over to one side: its tip and bobble hang from there on a hinge (santaBob)
+    const R = hex([204, 40, 40]), RD = hex([156, 26, 30]), W = hex([248, 246, 240]), WD = hex([216, 214, 208]);
+    B(-9, 9, 12, 16, -9, 9, W); B(-9, 9, 11, 12, -9, 9, WD); // the fur band, up to the top of the head
+    head();
+    B(-8, 8, 16, 20, -8, 8, R); B(-8, 8, 16, 17, -8, 8, RD); B(-6, 7, 20, 24, -6, 6, R); B(-3, 9, 24, 28, -4, 4, R); B(5, 16, 27, 31, -3, 3, R); // three tiers leaning over, then out to the side
+  } else if (id === 'antlers') {
+    // a brown band with a red ribbon and a bell on its brow, a reindeer's ears and a pair of antlers
+    const BR = hex([134, 92, 56]), BD = hex([96, 64, 38]), AN = hex([232, 212, 172]), AD = hex([196, 172, 130]), EAR = hex([158, 110, 70]), PINK = hex([236, 176, 168]), BELL = hex([255, 208, 80], true), RED = hex([204, 40, 40]);
+    B(-9, 9, 11, 16, -9, 9, BR); B(-9, 9, 11, 12, -9, 9, BD); B(-9, 9, 13, 15, -9, 9, RED); // the band (clear of your eyes), its ribbon right round
+    head();
+    B(-2, 2, 11, 15, 9, 11, BELL); // the bell
+    for (const sx of [-1, 1]) {
+      B(...X(sx, 4, 8), 16, 28, -2, 2, AN); B(...X(sx, 8, 13), 20, 24, -2, 2, AN); B(...X(sx, 10, 14), 24, 29, -2, 2, AN); B(...X(sx, 4, 8), 23, 27, 2, 7, AN); B(...X(sx, 1, 5), 26, 31, -2, 2, AN); // an antler: its beam and three tines, thick enough to show their colour, clear of the other one
+      B(...X(sx, 4, 8), 16, 18, -2, 2, AD); // darker where it leaves the band
+      B(...X(sx, 9, 14), 12, 18, -3, 2, EAR); B(...X(sx, 10, 13), 13, 17, 1, 2, PINK); // an ear, pink inside
+    }
+  } else if (id === 'startopper') {
+    // the top of the tree on your head: three tiers of boughs hung with lit baubles, and the gold star standing on its tip
+    const G = hex([46, 122, 70]), G2 = hex([58, 142, 84]), G3 = hex([72, 160, 96]), ST = hex([255, 226, 120], true), SH = hex([255, 248, 204], true);
+    const LIT = [[230, 60, 60], [80, 150, 240], [255, 200, 70], [240, 120, 220]].map(c => hex(c, true));
+    B(-9, 9, 11, 16, -9, 9, G); B(-7, 7, 16, 20, -7, 7, G2); B(-5, 5, 20, 24, -5, 5, G3);
+    [[-6, 12, 9], [2, 13, 9], [6, 12, 9], [-2, 12, -9], [5, 13, -9], [-7, 13, -9], [-4, 17, 7], [3, 17, 7], [0, 17, -7], [-2, 21, 5], [1, 21, -5]].forEach(([x, y, z], k) => B(x, x + 2, y, y + 2, Math.min(z, z - Math.sign(z)), Math.max(z, z - Math.sign(z)), LIT[k % 4])); // baubles front and back, set in the boughs
+    [[9, 12, -5], [9, 13, 3], [-9, 12, 4], [-9, 13, -3], [7, 17, 1], [-7, 17, -2], [5, 21, -1], [-5, 21, 0]].forEach(([x, y, z], k) => B(Math.min(x, x - Math.sign(x)), Math.max(x, x - Math.sign(x)), y, y + 2, z, z + 2, LIT[(k + 2) % 4])); // and down both sides
+    head();
+    B(-1, 1, 24, 28, -1, 1, ST); // the star's foot on the tip
+    [[[6, 2]], [[6, 2]], [[5, 4]], [[5, 4]], [[0, 14]], [[1, 12]], [[2, 10]], [[3, 8]], [[3, 8]], [[2, 4], [8, 4]], [[2, 3], [9, 3]], [[1, 2], [11, 2]]].forEach((runs, r) => { for (const [c, n] of runs) B(c - 7, c - 7 + n, 36 - r, 37 - r, -1, 1, ST); }); // a five-pointed star
+    B(-3, 3, 29, 32, -1, 1, SH); B(-1, 1, 32, 34, -1, 1, SH); // lighter at its heart
   } else if (id === 'laurel') {
     // a golden laurel wreath, leaves along both sides, a smooth band over the brow, tied with a red ribbon at the back
     const G = hex([240, 192, 52]), GH = hex([255, 228, 124]), GD = hex([188, 134, 28]), RB = hex([204, 38, 46]), RD = hex([150, 24, 34]);
@@ -256,13 +299,20 @@ function octoArm(len, hp) {
     return voxelGeos(out, hp).lit;
   })();
 }
-// the jar's glass and the octopus's arms, in pictures too
+// the Santa Hat's tip and bobble, hung from where the hat goes over
+const santaGeo = {};
+const santaBob = hp => santaGeo[hp] ??= (() => {
+  const out = [], B = pieceBox(out); B(-2, 2, -9, 0, -2, 2, palIdx(rgbHex([204, 40, 40]))); B(-3, 3, -15, -9, -3, 3, palIdx(rgbHex([248, 246, 240])));
+  return voxelGeos(out, hp).lit;
+})();
+// the jar's glass, the octopus's arms and the Santa Hat's bobble, in pictures too
 const SKIN_GLASS = new THREE.MeshLambertMaterial({ color: 0xd2ffcc, transparent: true, opacity: .24, depthWrite: false });
 function skinExtras(id, g, hp) {
   if (id === 'octopus') for (const [x, z, turn, len] of OCTO_ARMS) {
     const piv = new THREE.Group(), arm = new THREE.Mesh(octoArm(len, hp), g.material);
     piv.position.set(x * hp, 13 * hp, z * hp); piv.rotation.y = turn; arm.rotation.x = -.2; arm.userData.arm = true; piv.add(arm); g.add(piv);
   }
+  if (id === 'santa') { const piv = new THREE.Group(); piv.position.set(13 * hp, 29 * hp, 0); piv.userData.bob = true; piv.add(new THREE.Mesh(santaBob(hp), g.material)); g.add(piv); }
   if (id !== 'brainjar') return;
   const m = new THREE.Mesh(ZAP_BOX, SKIN_GLASS); m.scale.set(17.6 * hp, 10 * hp, 17.6 * hp); m.position.y = 21 * hp; m.renderOrder = 2; g.add(m);
 }
@@ -284,7 +334,7 @@ function skinFx(id, g, hp) { // { tick, own: a material of its own to dispose },
   }
   if (id === 'hunter') {
     const own = new THREE.MeshBasicMaterial({ color: 0xff3a3a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
-    const ring = new THREE.Mesh(skinRingGeo ??= new THREE.RingGeometry(.8, 1, 20), own); at(ring, 0, 17, 9.3); g.add(ring);
+    const ring = new THREE.Mesh(skinRingGeo ??= pxFlatRing(.8, 1, 0, 1 / 6), own); at(ring, 0, 17, 9.3); g.add(ring);
     let t = R() * 2;
     return { own, tick: dt => { t += dt; const k = t % 2.6 / .7; ring.visible = k < 1; if (k < 1) { ring.scale.setScalar(hp * (1.5 + k * 4)); own.opacity = .7 * (1 - k); } } };
   }
@@ -319,6 +369,19 @@ function skinFx(id, g, hp) { // { tick, own: a material of its own to dispose },
     const arms = []; g.traverse(o => { if (o.userData.arm) arms.push(o); });
     let t = R() * 9;
     return { tick: dt => { t += dt; arms.forEach((a, i) => { a.rotation.x = -.14 - .2 * (.5 + .5 * Math.sin(t * (1.7 + i % 3 * .35) + i * 1.9)); a.rotation.z = .1 * Math.sin(t * 1.3 + i * 2.4); }); } };
+  }
+  if (id === 'santa') { // the bobble swings out and back, never over the band
+    const bob = g.children.find(o => o.userData.bob); let t = R() * 9;
+    return { tick: dt => { t += dt; bob.rotation.z = .13 + .08 * Math.sin(t * 2.3) + .03 * Math.sin(t * 5.1); bob.rotation.x = .1 * Math.sin(t * 1.7); } };
+  }
+  if (id === 'startopper') { // the star twinkles
+    const ss = Array.from({ length: few ? 2 : 3 }, () => ({ s: new THREE.Sprite(skinSprite(0xfff2b0)), t: 1 + R() * 2, wait: 0 }));
+    for (const o of ss) { o.s.visible = false; g.add(o.s); }
+    return { tick: dt => { for (const o of ss) {
+      if ((o.t += dt * 1.8) < 1) { o.s.visible = true; o.s.scale.setScalar(hp * 5 * Math.sin(o.t * Math.PI)); continue; }
+      o.s.visible = false;
+      if ((o.wait -= dt) <= 0) { o.wait = .2 + R() * 1.2; o.t = 0; at(o.s, (R() - .5) * 14, 26 + R() * 11, R() < .5 ? 2 : -2); }
+    } } };
   }
   if (id === 'laurel') {
     const ss = Array.from({ length: few ? 2 : 3 }, () => ({ s: new THREE.Sprite(skinSprite(0xffe9a0)), t: 1 + R() * 2, wait: 0 }));

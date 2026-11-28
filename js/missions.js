@@ -51,10 +51,11 @@ function missionKill(head, streak) {
   if (head) missionStep(m => m.k === 'head', n => n + 1);
   if (streak) missionStep(m => m.k === 'streak', n => Math.max(n, streak));
 }
-function missionWave(w, coop) { achWave(w, coop); missionStep(m => m.k === 'wave', n => Math.max(n, w)); }
+function missionWave(w, coop) { achWave(w, coop); seasonWave(w); missionStep(m => m.k === 'wave', n => Math.max(n, w)); }
 function missionEnd(won) {
   missionStep(m => m.k === 'play', n => n + 1);
   if (won) missionStep(m => m.k === 'win', n => n + 1);
+  seasonGame(won); gsEnd(won);
   saveProf();
 }
 function missionReroll(i) {

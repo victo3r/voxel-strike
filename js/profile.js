@@ -22,6 +22,7 @@ function devAll() {
   if (!DEV_ALL) return;
   prof.lv = LV_MAX; prof.xp = 0; prof.coins = Math.max(prof.coins, 99999); prof.keys = Math.max(prof.keys | 0, 99); prof.boosts = Math.max(prof.boosts | 0, 50); prof.bars = Math.max(prof.bars | 0, 20);
   for (const w of BASE) if (!w.start && !prof.guns[w.id]) prof.guns[w.id] = 1;
+  prof.gs = Object.fromEntries(BASE.filter(w => !w.start).map(w => [w.id, [9999, 999, 999, 99, 99, 99]])); // and every gun's skins (gunskins.js)
   prof.armor = ARMOR_MAX;
   for (const S of SUITS) prof.suits[S.id] ||= 1;
   for (const b of BOOTS) prof.boots[b.id] ||= 1;
@@ -62,9 +63,9 @@ const barChest = () => CHESTS.findIndex(c => c.id === BAR_CHEST), boxTile = n =>
 const barWord = () => barNext() ? 'BAR' : 'CHESTS';
 const xpText = () => prof.lv >= LV_MAX ? `NEXT ${barNext() ? 'BAR' : BAR_CHESTS + ' CHESTS'} ${prof.barXp | 0} / ${BAR_XP} XP` : `${prof.xp} / ${xpNeed(prof.lv)} XP`;
 // what the armory opens at a level: [picture, name] for its guns (not ones you have), armor, boots, hats and kill effects
-const unlocksAt = lv => [...BASE.map((w, i) => w.price && !w.chest && w.unlock === lv && !prof.guns[w.id] && [gunPic(i), w.name]), ...SUITS.map(S => S.unlock[0] === lv && [armorPic(suitN(S.id, 1) - 1), S.name]),
-  ...BOOTS.map(b => b.unlock === lv && [bootPic(b.id, 1), b.name]), ...HATS.map(h => h.unlock === lv && [hatPic(h.id, 1), h.name]),
-  ...KILL_FX.map(K => !K.chest && K.unlock === lv && !prof.kfx?.[K.id] && [kfxPic(K.id), K.name])].filter(Boolean);
+const unlocksAt = lv => [...BASE.map((w, i) => w.price && !w.chest && !w.season && w.unlock === lv && !prof.guns[w.id] && [gunPic(i), w.name]), ...SUITS.map(S => !S.season && S.unlock[0] === lv && [armorPic(suitN(S.id, 1) - 1), S.name]),
+  ...BOOTS.map(b => !b.season && b.unlock === lv && [bootPic(b.id, 1), b.name]), ...HATS.map(h => !h.season && h.unlock === lv && [hatPic(h.id, 1), h.name]),
+  ...KILL_FX.map(K => !K.chest && !K.season && K.unlock === lv && !prof.kfx?.[K.id] && [kfxPic(K.id), K.name])].filter(Boolean);
 const unlockPics = list => list.slice(0, 4).map(([pic, name]) => `<span><img src="${pic}">${name.replace(/"/g, '').toUpperCase()}</span>`).join('');
 // results screen: what the levels you just reached opened, or what the next one will
 function unlockRow(ups = 0) {

@@ -222,9 +222,9 @@ for (const [x, z] of [[-13, 8], [-10, 12.5]]) { addSlab(x, z, 2, 1.4, 4.5, 5.05,
   for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) addSlab(X + a * 1.1, Z + b * 1.1, .22, .22, Y, Y + LH, metal);
   addSlab(X, Z, 2.8, 2.8, Y + LH, Y + LH + .2, plank);
   const tankMat = surf(lam({ map: tex(g => { noise(g, [120, 84, 56], 14); g.fillStyle = 'rgba(30,18,8,.5)'; for (const x of [0, 4, 8, 12]) g.fillRect(x, 0, 1, 16); g.fillStyle = '#3a3a3e'; g.fillRect(0, 3, 16, 1); g.fillRect(0, 12, 16, 1); }) }), 'wood');
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 2.4, 12), tankMat); tank.position.set(X, Y + LH + 1.4, Z); add(tank); building.cover.push(tank);
+  const tank = new THREE.Mesh(pxCyl(1.35, 1.35, 2.4, 12), tankMat); tank.position.set(X, Y + LH + 1.4, Z); add(tank); building.cover.push(tank);
   building.solids.push({ mesh: null, minX: X - 1.35, maxX: X + 1.35, minZ: Z - 1.35, maxZ: Z + 1.35, bot: Y + LH + .2, top: Y + LH + 2.6, round: 1.35, surf: 'wood' });
-  const lidM = new THREE.Mesh(new THREE.ConeGeometry(1.5, .8, 12), lam({ color: 0x5a3e2a })); lidM.position.set(X, Y + LH + 3, Z); add(lidM);
+  const lidM = new THREE.Mesh(pxCone(1.5, .8, 12), lam({ color: 0x5a3e2a })); lidM.position.set(X, Y + LH + 3, Z); add(lidM);
   building.solids.push({ mesh: null, minX: X - 1.5, maxX: X + 1.5, minZ: Z - 1.5, maxZ: Z + 1.5, bot: Y + LH + 2.6, top: Y + LH + 3.4, round: 1.5, peak: { x: X, z: Z, rx: 1.5, rz: 1.5, edge: Y + LH + 2.6 }, surf: 'wood' }); // its pointed lid
 }
 // a billboard on the north-west roof, facing the crossroads
@@ -241,7 +241,7 @@ for (const [x, z] of [[-13, 8], [-10, 12.5]]) { addSlab(x, z, 2, 1.4, 4.5, 5.05,
 }
 // antennas and a dish on the tower
 for (const [x, z, h] of [[18.95, -5.15, 3], [18.35, -5.35, 2]]) { const a = box(.08, h, .08, dark); a.position.set(x, 7.5 + h / 2, z); add(a); solidBox(x, 7.5 + h / 2, z, .08, h, .08, 'metal'); } // in the corner, clear of the way up
-{ const pole = box(.12, .7, .12, dark); pole.position.set(13.5, 7.85, -11); add(pole); const base = box(.5, .1, .5, dark); base.position.set(13.5, 7.55, -11); add(base); const dish = new THREE.Mesh(new THREE.CylinderGeometry(.6, .1, .25, 10), steel); dish.position.set(13.5, 8.3, -11.1); dish.rotation.x = -.9; add(dish);
+{ const pole = box(.12, .7, .12, dark); pole.position.set(13.5, 7.85, -11); add(pole); const base = box(.5, .1, .5, dark); base.position.set(13.5, 7.55, -11); add(base); const dish = new THREE.Mesh(pxCyl(.6, .1, .25, 10), steel); dish.position.set(13.5, 8.3, -11.1); dish.rotation.x = -.9; add(dish);
   solidBox(13.5, 7.85, -11, .12, .7, .12, 'metal'); solidBox(13.5, 7.55, -11, .5, .1, .5, 'metal'); tiltSolids([13.5, 7.83, -11.47], [13.5, 8.77, -10.73], 1, .25, 'metal', .15); } // the dish leans back: a plate from its low edge to its high one
 
 // --- round the edge: a fence, a ring road, then city blocks ---

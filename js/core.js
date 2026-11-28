@@ -61,7 +61,7 @@ function zRect(el) {
 
 const allTex = []; // so a quality change can update every texture
 // item rarity: name and colour
-const RARITY = { common: ['COMMON', '#c9ced6'], rare: ['RARE', '#4fa3ff'], epic: ['EPIC', '#c06bff'], legend: ['LEGENDARY', '#ff4a4a'], mythic: ['MYTHIC', '#ffc531'] };
+const RARITY = { common: ['COMMON', '#c9ced6'], rare: ['RARE', '#4fa3ff'], epic: ['EPIC', '#c06bff'], legend: ['LEGENDARY', '#ff4a4a'], mythic: ['MYTHIC', '#ffc531'], event: ['EVENT', '#3fe3c2'] }; // event: what a season's presents bring, no code and never sold
 const rarOf = o => o?.rar || 'common';
 // bots pick rarer things less often
 const BOT_RAR = { common: 4, rare: 3, epic: 2, legend: 1, mythic: .5 };
@@ -81,6 +81,83 @@ function tex(draw, rx = 1, ry = 1) {
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry);
   return t;
+}
+// round things are made of pixels too: stepped tubes, balls, cones, rings and discs that stand in for three's smooth ones (the same sizes, and a picture wraps them the same way)
+const pxFor = r => r < .3 ? 1 / 16 : r < 1.2 ? 1 / 8 : r < 4 ? 1 / 4 : 1; // the pixel for something this big
+function pxSolid(N, ys, cx, inside, uvAt, ends = true) { // N cells across (x and z), each cx wide, in layers between the heights in ys; ends: its top and bottom faces too
+  const L = ys.length - 1, h = (N - 1) / 2, on = new Uint8Array(N * N * L), pos = [], nor = [], uv = [], idx = [];
+  for (let j = 0; j < L; j++) for (let k = 0; k < N; k++) for (let i = 0; i < N; i++) if (inside(i - h, j, k - h)) on[(j * N + k) * N + i] = 1;
+  const at = (i, j, k) => i >= 0 && i < N && k >= 0 && k < N && j >= 0 && j < L && on[(j * N + k) * N + i];
+  const quad = (pts, n) => {
+    const v = pos.length / 3, us = pts.map(q => uvAt(q, n)), far = Math.max(...us.map(u => u[0])) - Math.min(...us.map(u => u[0])) > .5;
+    pts.forEach((q, e) => { pos.push(...q); nor.push(...n); uv.push(far && us[e][0] < .5 ? us[e][0] + 1 : us[e][0], us[e][1]); }); // a face across the seam keeps going round
+    idx.push(v, v + 1, v + 2, v, v + 2, v + 3);
+  };
+  for (let j = 0; j < L; j++) for (let k = 0; k < N; k++) for (let i = 0; i < N; i++) {
+    if (!at(i, j, k)) continue;
+    const x0 = (i - N / 2) * cx, x1 = x0 + cx, z0 = (k - N / 2) * cx, z1 = z0 + cx, y0 = ys[j], y1 = ys[j + 1];
+    if (!at(i + 1, j, k)) quad([[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], [1, 0, 0]);
+    if (!at(i - 1, j, k)) quad([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [-1, 0, 0]);
+    if (!at(i, j, k + 1)) quad([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, 1]);
+    if (!at(i, j, k - 1)) quad([[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], [0, 0, -1]);
+    if (!at(i, j + 1, k) && (ends || j < L - 1)) quad([[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], [0, 1, 0]);
+    if (!at(i, j - 1, k) && (ends || j)) quad([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [0, -1, 0]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  return g;
+}
+const PX_TAU = Math.PI * 2, pxTurn = (x, z) => (Math.atan2(x, z) / PX_TAU + 1) % 1;
+// a tube or a barrel (wider at one end: stepped in), as CylinderGeometry takes them; open: no ends
+function pxCyl(rt, rb = rt, h = 1, _n, _hs, open = false, px = pxFor(Math.max(rt, rb))) {
+  const R = Math.max(rt, rb), N = Math.max(1, Math.round(2 * R / px)), nl = Math.abs(rt - rb) < px * .6 ? 1 : Math.max(1, Math.round(h / px)), ys = Array.from({ length: nl + 1 }, (_, j) => -h / 2 + h * j / nl); // a taper under a pixel is no taper
+  const least = N % 2 ? .1 : .75, rr = j => nl < 2 ? N / 2 : Math.max(least, N / 2 * (rb + (rt - rb) * (rt < rb ? j : j + 1) / nl) / R); // each step as wide as its wide end, never thinner than the middle pixels
+  const g = pxSolid(N, ys, 2 * R / N, (x, j, z) => Math.hypot(x, z) <= rr(j), (q, n) => n[1] ? [q[2] / (2 * R) + .5, q[0] / (2 * R) * n[1] + .5] : [pxTurn(q[0], q[2]), q[1] / h + .5], !open);
+  g.parameters = { radiusTop: rt, radiusBottom: rb, height: h }; return g;
+}
+const pxN = r => Math.max(1, Math.round(2 * r / pxFor(r))); // how many pixels across something this big is
+const pxBand = (r, h, out = .03) => pxCyl(r + out, r + out, h, 0, 1, false, 2 * (r + out) / pxN(r)); // a hoop round a pxCyl of radius r: the same steps, standing a little proud
+const pxCone = (r, h, n, _hs, open) => n === 4 ? new THREE.ConeGeometry(r, h, 4, 1, open) : pxCyl(0, r, h, n, 1, open); // a four-sided one is a pyramid already
+// a ball, or its top half (as SphereGeometry's last two arguments ask for)
+function pxSphere(r, _ws, _hs, _p0, _pl, t0 = 0, tl = Math.PI, px = pxFor(r)) {
+  const N = Math.max(2, Math.round(2 * r / px)), cx = 2 * r / N, half = t0 === 0 && tl < 1.6, j0 = half ? Math.ceil(N / 2) : 0, ys = Array.from({ length: N - j0 + 1 }, (_, j) => -r + (j + j0) * cx);
+  const g = pxSolid(N, ys, cx, (x, j, z) => Math.hypot(x, j + j0 - (N - 1) / 2, z) <= N / 2,
+    q => { const l = Math.hypot(...q) || 1; return [(Math.atan2(q[2], -q[0]) / PX_TAU + 1) % 1, 1 - Math.acos(Math.max(-1, Math.min(1, q[1] / l))) / Math.PI]; });
+  g.parameters = { radius: r }; return g;
+}
+// a ring standing in x and y, as TorusGeometry does: R to the middle of its tube, r the tube
+function pxTorus(R, r, _a, _b, px = Math.max(1 / 32, Math.min(pxFor(R + r), 2 * r))) {
+  const Ro = R + r, N = Math.max(3, Math.round(2 * Ro / px)), cx = 2 * Ro / N, nl = Math.max(1, Math.round(2 * r / cx)), ys = Array.from({ length: nl + 1 }, (_, j) => -r + 2 * r * j / nl);
+  const g = pxSolid(N, ys, cx, (x, j, z) => Math.hypot(Math.hypot(x, z) - R / cx, nl > 2 ? (j + .5) * 2 * r / nl / cx - r / cx : 0) <= Math.max(r / cx, .72), q => [q[0] / (2 * Ro) + .5, q[2] / (2 * Ro) + .5]);
+  g.rotateX(Math.PI / 2); return g;
+}
+// a flat ring facing +z, as RingGeometry makes, in steps and never thinner than a pixel
+function pxFlatRing(r0, r1, _n, px = Math.min(pxFor(r1), Math.max(1 / 16, r1 - r0))) {
+  const N = Math.max(3, Math.round(2 * r1 / px)), c = 2 * r1 / N, mid = (r0 + r1) / 2 / c, half = Math.max((r1 - r0) / 2 / c, .72), pos = [], nor = [], uv = [], idx = [];
+  for (let j = 0; j < N; j++) for (let i = 0, run = -1; i <= N; i++) {
+    const on = i < N && Math.abs(Math.hypot(i - (N - 1) / 2, j - (N - 1) / 2) - mid) <= half;
+    if (on && run < 0) run = i;
+    if (!on && run >= 0) { const x0 = (run - N / 2) * c, x1 = (i - N / 2) * c, y0 = (j - N / 2) * c, y1 = y0 + c, v = pos.length / 3; run = -1; // a row's run of pixels is one face
+      for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) { pos.push(x, y, 0); nor.push(0, 0, 1); uv.push((x / r1 + 1) / 2, (y / r1 + 1) / 2); } idx.push(v, v + 1, v + 2, v, v + 2, v + 3); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  return g;
+}
+// a flat disc facing +z, as CircleGeometry makes (ry: an oval), its rim stepped
+function pxDisc(r, _n, px = pxFor(r), ry = r) {
+  const N = Math.max(2, Math.round(2 * ry / px)), ch = 2 * ry / N, M = Math.max(2, Math.round(2 * r / px)), cw = 2 * r / M, pos = [], nor = [], uv = [], idx = [];
+  for (let j = 0; j < N; j++) {
+    const yc = (j - (N - 1) / 2) * ch, w = r * Math.sqrt(Math.max(0, 1 - (yc / ry) ** 2)); let n = 0;
+    for (let i = 0; i < M; i++) if (Math.abs((i - (M - 1) / 2) * cw) <= w) n++;
+    if (!n) n = M % 2 ? 1 : 2;
+    const x1 = n * cw / 2, y0 = yc - ch / 2, y1 = yc + ch / 2, v = pos.length / 3;
+    for (const [x, y] of [[-x1, y0], [x1, y0], [x1, y1], [-x1, y1]]) { pos.push(x, y, 0); nor.push(0, 0, 1); uv.push((x / r + 1) / 2, (y / ry + 1) / 2); }
+    idx.push(v, v + 1, v + 2, v, v + 2, v + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  g.type = 'CircleGeometry'; g.parameters = { radius: r }; return g; // the winter look knows a flat thing by this
 }
 function noise(g, [r, gr, b], v) {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
@@ -223,7 +300,7 @@ function modelPic(key, build, { yaw = 0, tilt = .3, w = 320, h = 160, ref = null
   if (ref) { const rk = [ref[0], yaw, tilt, w / h].join(); if (!picRef.has(rk)) picRef.set(rk, span(fit(ref[1]))); rs = picRef.get(rk); }
   const b = fit(build), cx = (b.min.x + b.max.x) / 2, cy = (b.min.y + b.max.y) / 2, fw = Math.max(rs, span(b)) * 1.06 / 2, fh = fw * h / w;
   Object.assign(cam, { left: cx - fw, right: cx + fw, top: cy + fh, bottom: cy - fh }); cam.updateProjectionMatrix();
-  const st = SHINE_T.value; SHINE_T.value = 3; // pictures catch no shine line
+  const st = SHINE_T.value; SHINE_T.value = 1.2; // pictures catch no shine line (a moment none of the shines is passing)
   r.setSize(w, h, false); r.render(sc, cam); turn.clear(); done?.(); SHINE_T.value = st;
   const url = r.domElement.toDataURL();
   if (key) picCache.set(key, url);

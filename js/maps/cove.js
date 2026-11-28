@@ -284,7 +284,7 @@ const glows = [], glow = (x, y, z, s = 2.2) => { const g = new THREE.Sprite(glow
 // lowest and highest ground under a rectangle
 const under = (x0, x1, z0, z1) => { let lo = 99, hi = -99; for (let j = ci(z0 + .01); j <= ci(z1 - .01); j++) for (let i = ci(x0 + .01); i <= ci(x1 - .01); i++) { const h = hAt(i - O + .5, j - O + .5); lo = Math.min(lo, h); hi = Math.max(hi, h); } return [lo, hi]; };
 const onGround = (x, z, w, d, h, m) => { const [lo, hi] = under(x - w / 2, x + w / 2, z - d / 2, z + d / 2); return addSlab(x, z, w, d, lo, hi + h, m); };
-const barrelGeo = new THREE.CylinderGeometry(.4, .4, 1, 10);
+const barrelGeo = pxCyl(.4, .4, 1, 10);
 const barrel = (x, z, y) => { const m = new THREE.Mesh(barrelGeo, barrelMat); m.position.set(x, y + .5, z); add(m); building.cover.push(m); solid(x - .4, x + .4, z - .4, z + .4, y, y + 1, 'wood', .4); };
 const crate = (x, z, y, tall) => addSlab(x, z, 1.2, 1.2, y, y + (tall ? 2.4 : 1.2), tall ? crate2 : crate1);
 const flames = [];
@@ -303,7 +303,7 @@ function cannon(x, z, y, yaw) {
   const p = (w, h, d, m, px, py, pz) => { const b = box(w, h, d, m); b.position.set(px, py, pz); g.add(b); return b; };
   const cart = p(.8, .32, 1.3, planks, 0, .36, 0);
   for (const sx of [-.46, .46]) for (const sz of [-.42, .42]) p(.12, .44, .44, darkWood, sx, .22, sz);
-  const b = new THREE.Mesh(new THREE.CylinderGeometry(.15, .21, 1.8, 10), iron); b.rotation.x = Math.PI / 2 - .1; b.position.set(0, .72, .25); g.add(b);
+  const b = new THREE.Mesh(pxCyl(.15, .21, 1.8, 10), iron); b.rotation.x = Math.PI / 2 - .1; b.position.set(0, .72, .25); g.add(b);
   p(.28, .28, .28, iron, 0, .7, -.72);
   building.cover.push(cart, b);
   for (const m of g.children) meshSolids(m, m === b ? 'metal' : 'wood'); // its carriage, wheels and barrel as they are
@@ -485,7 +485,7 @@ const along = (a, d, s) => a.map((v, i) => v + d[i] * s);
   for (let k = 0; k < SY.length - 1; k++) { const a = stem(SY[k]), b = stem(SY[k + 1]), l = Math.hypot(b[1] - a[1], b[2] - a[2]), d = [0, (b[1] - a[1]) / l, (b[2] - a[2]) / l]; line(along(a, d, -.16), along(b, d, .16), tarWood, .38); }
   deco(.46, .55, .5, postMat, SX, FC + .78, SZ0 + .1); deco(.52, .06, .56, trim, SX, FC + 1.08, SZ0 + .1); // the knighthead the bowsprit runs through
   // gun ports with their lids up and guns run out
-  const muzzle = new THREE.CylinderGeometry(.1, .12, .5, 8), ring = new THREE.CylinderGeometry(.15, .15, .08, 8);
+  const muzzle = pxCyl(.1, .12, .5, 8), ring = pxCyl(.15, .15, .08, 8);
   for (const s of [-1, 1]) for (const z of [17.6, 20.6, 23.4]) {
     const x = SX + s * SW;
     deco(.04, .46, .56, portMat, x + s * .01, 1.05, z); deco(.06, .07, .7, tarWood, x + s * .02, 1.31, z); deco(.06, .07, .7, tarWood, x + s * .02, .79, z);
@@ -571,7 +571,7 @@ const along = (a, d, s) => a.map((v, i) => v + d[i] * s);
   crate(SX, 23.3, DECK);
   // the wheel
   { const y = QD, z = 26.4; building.cover.push(deco(.2, 1, .2, postMat, SX, y + .5, z)); solid(SX - .12, SX + .12, z - .12, z + .12, y, y + 1, 'wood');
-    const wh = new THREE.Mesh(new THREE.TorusGeometry(.42, .05, 6, 12), darkWood); wh.position.set(SX, y + 1.05, z - .14); add(wh); meshSolids(wh, 'wood');
+    const wh = new THREE.Mesh(pxTorus(.42, .05, 6, 12), darkWood); wh.position.set(SX, y + 1.05, z - .14); add(wh); meshSolids(wh, 'wood');
     for (let k = 0; k < 4; k++) deco(1.05, .05, .05, darkWood, SX, y + 1.05, z - .14).rotation.z = k * Math.PI / 4; }
 }
 // flags: a black flag with a white skull

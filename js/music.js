@@ -91,8 +91,24 @@ const SONGS = {
     bass: [[0, 0, 3], [3, 7, 1], [4, 12, 2], [8, 0, 3], [11, 7, 1], [12, 10, 4]],
     keys: true, steel: true, amb: 'wind', hats: .7, reese: .35,
   },
+  workshop: { // busy and bright, sleigh bells going, C major
+    bpm: 172,
+    chords: [[36, [55, 60, 64, 67]], [33, [57, 60, 64, 69]], [41, [57, 60, 65, 69]], [43, [55, 59, 62, 67]]],
+    pad: { cut: 1900, a: .7, v: .7 },
+    kit: { kickD: .12, snare: 208, drive: 1.15, bright: 1.2, room: .22, ride: .9 },
+    bass: [[0, 0, 2], [2, 7, 2], [4, 12, 2], [6, 7, 2], [8, 0, 2], [10, 7, 2], [12, 12, 2], [14, 7, 2]],
+    keys: true, steel: true, bells: 1, amb: 'wind', hats: .9, reese: .35,
+  },
+  town: { // warm and glowing, a carol's chords, F major
+    bpm: 156,
+    chords: [[41, [57, 60, 65, 69]], [38, [57, 62, 65, 69]], [34, [58, 62, 65, 70]], [36, [55, 60, 64, 70]]],
+    pad: { cut: 1500, a: 1.5, v: .9 },
+    kit: { kickD: .13, snare: 196, drive: 1.15, bright: 1.05, room: .4, ride: .9 },
+    bass: [[0, 0, 4], [4, 7, 2], [6, 12, 2], [8, 0, 4], [12, 7, 2], [14, 12, 2]],
+    keys: true, lead: true, bells: .6, amb: 'wind', hats: .65, reese: .35,
+  },
 };
-const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky', 'cove', 'graveyard', 'farm', 'ghosttown', 'temple'];
+const LOBBY_SONGS = ['forest', 'resort', 'roofs', 'yard', 'sky', 'cove', 'graveyard', 'farm', 'ghosttown', 'temple'].map(seasonMap); // this month's maps stand in
 let muLobbyAt = () => 0; // which of them the lobby music starts on (lobbies.js: the map behind you)
 
 // what should be playing
@@ -307,6 +323,34 @@ function steel(S, t, m, v) {
     o.connect(g).connect(lp);
   }
 }
+// sleigh bells: a few little bells shaken together, each struck two or three times and left to ring (made once)
+function bellBufs() {
+  if (MU.bells) return MU.bells;
+  const r = rng(1225), n = SR * .5 | 0, PARTS = [[1, 1, .09], [1.52, .55, .07], [2.41, .45, .055], [3.07, .25, .04], [3.9, .12, .03]]; // each ring: pitch, level, how long it lasts
+  return MU.bells = [0, 1, 2, 3].map(() => {
+    const buf = ac.createBuffer(1, n, SR), d = buf.getChannelData(0);
+    for (let bell = 0; bell < 3; bell++) {
+      const f0 = 2600 + r() * 1700;
+      for (let hit = 0, hits = 2 + (r() * 2 | 0); hit < hits; hit++) {
+        const i0 = (hit ? .014 + r() * .07 : r() * .01) * SR | 0, a = hit ? .3 + r() * .4 : 1;
+        for (const [q, lv, dec] of PARTS) {
+          const f = f0 * q * (1 + (r() - .5) * .006); if (f > 12000) continue;
+          const w = 2 * Math.PI * f / SR, k = Math.exp(-1 / (dec * SR)), c = Math.cos(w) * k, sn = Math.sin(w) * k, end = Math.min(n, i0 + (dec * 7 * SR | 0));
+          let x = 0, y = a * lv;
+          for (let i = i0; i < end; i++) { d[i] += x * Math.min(1, (i - i0) / 60); const nx = x * c + y * sn; y = y * c - x * sn; x = nx; }
+        }
+      }
+    }
+    let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i]));
+    for (let i = 0; i < n; i++) d[i] *= .9 / pk * Math.min(1, (n - i) / 800);
+    return buf;
+  });
+}
+function jingle(S, t, v) {
+  const B = bellBufs(), n = ac.createBufferSource(), g = ac.createGain();
+  n.buffer = B[Math.random() * B.length | 0]; n.playbackRate.value = .96 + Math.random() * .08; g.gain.value = v * .55;
+  n.connect(g).connect(S.steel); n.start(t + Math.random() * .006);
+}
 // steel pan riff, ending each phrase on a roll
 const PAN_RHYTHMS = [[0, 3, 6, 8, 10, 12], [0, 3, 6, 10, 12, 14], [0, 2, 4, 7, 10], [0, 6, 8, 11, 14], [2, 4, 6, 10, 12]];
 function steelBar(S, t, ch, r, inPh, v) {
@@ -433,6 +477,7 @@ function muBar(S, t) {
     for (const s of quiet ? [0] : hits) ch[1].forEach((m, i) => key(S, t + s * st + i * .012, m + 12, s ? .035 : .05, s ? .8 : 1.6));
   }
   if (song.steel && !quiet && stage !== 'intro' && (ph % 2 === 0 || heat > .5)) steelBar(S, t, ch, pr, inPh, .075);
+  if (song.bells && stage !== 'intro') for (let s = 0; s < 16; s += 2) jingle(S, t + s * st, .05 * song.bells * (s % 4 ? .6 : 1) * (quiet ? .5 : 1));
   if (song.lead && !quiet && stage !== 'intro' && (ph % 2 || heat > .5)) {
     const steps = [[0, 6, 10], [3, 8, 14], [0, 3, 6, 12], [2, 10]][pr() * 4 | 0], idx = steps.map(() => pr() * 4 | 0);
     steps.forEach((s, i) => pluck(S, t + s * st, ch[1][idx[i]] + 12, .07));
@@ -450,6 +495,7 @@ function muLobbyBar(S, t) {
   if (!(b & 1)) { pad(S, t, ch[1], S.barDur * 2, song.pad); sub(S, t, ch[0], S.barDur * 2 - .15, .5, .4); }
   const up = b & 1 ? [...ch[1]].reverse() : ch[1];
   up.forEach((m, i) => key(S, t + (b & 1 ? 4 : 0) * st + i * 2 * st, m + 12, .03, 2));
+  if (song.bells && (b & 7) >= 2) for (let s = 0; s < 16; s += 4) jingle(S, t + s * st, .028 * song.bells);
   if (song.steel) { if ((b & 7) >= 2) steelBar(S, t, ch, pr, b & 7, .045); }
   else if ((b & 7) >= 4) {
     const steps = [[0, 6, 10], [4, 10], [0, 3, 8]][pr() * 3 | 0], idx = steps.map(() => pr() * 4 | 0);

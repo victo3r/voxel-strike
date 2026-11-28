@@ -385,8 +385,9 @@ function showLobby(on) {
 $('lobbyBtn').addEventListener('click', e => { e.stopPropagation(); net.leave(); rangeLeave(); restart(); showLobby(true); });
 
 // the play button brings up mode select, then map select
-const ALL_MAPS = ['roofs', 'forest', 'cove', 'resort', 'sky'];
-const V_MAPS = 15; // bump when the map pictures change
+const BASE_MAPS = ['roofs', 'forest', 'cove', 'resort', 'sky'], ALL_MAPS = BASE_MAPS.map(seasonMap); // the rotation: a season swaps some out (season.js)
+const rotMaps = () => { ALL_MAPS.splice(0, ALL_MAPS.length, ...BASE_MAPS.map(seasonMap)); }; // again whenever the picker opens, in case the month turned
+const V_MAPS = 16; // bump when the map pictures change
 const Z_MAPS = ['yard', 'graveyard', 'farm']; // zombie-only maps (tables.js COOP_MAPS too)
 const DUEL_MAPS = ['ghosttown', 'temple']; // tables.js DUEL_MAPS too
 // ?walk=ghosttown on this PC: PLAY puts you on that map alone, no bots or clock, to look around (duel maps have no offline game)
@@ -500,7 +501,7 @@ const pickOpen = () => $('pick').style.display === 'flex';
 function showPick(on) {
   $('pick').style.display = on ? 'flex' : 'none';
   $('lobbyUI').style.display = on ? 'none' : '';
-  if (on) { pickGrp = null; pickPriv = false; pickJoin = false; renderPick(); }
+  if (on) { rotMaps(); pickGrp = null; pickPriv = false; pickJoin = false; renderPick(); }
 }
 $('playBtn').addEventListener('click', () => { sfx('ui'); if (TOUCH) touchFull(true); if (walkMap) return startWalk(); if (needStarter()) return startStarter(); showPick(true); net.probe?.(); }); // your first game skips the picker
 // ?walk: alone on the map, a duel map from one end looking down it
@@ -648,7 +649,7 @@ showLobby(true);
 function worldClear() {
   zombies.forEach(z => { scene.remove(z.g); if (z.rock) scene.remove(z.rock); if (z.kfx) kfxGone(z); if (z.angel) angelGone(z); z.free?.(); }); zombies.length = 0;
   booms.forEach(b => { scene.remove(b.m); b.m.geometry.dispose(); b.m.material.dispose(); }); booms.length = 0;
-  rockets.forEach(r => scene.remove(r.m)); rockets.length = 0; bomblets.forEach(b => scene.remove(b.m)); bomblets.length = 0; clearMeteors();
+  rockets.forEach(r => scene.remove(r.m)); rockets.length = 0; bomblets.forEach(b => scene.remove(b.m)); bomblets.length = 0; clearMeteors(); clearSeasonFx();
   flames.forEach(f => scene.remove(f.m)); flames.length = 0; clearPatches();
   flares.forEach(f => scene.remove(f.m)); flares.length = 0; grenades.forEach(g => scene.remove(g.m)); grenades.length = 0; clearBeams(); clearTracers(); clearLances(); clearBolts(scene); clearMyths();
   parts.length = 0; partsDraw(); clearDrops(scene); kfxClear(scene); rangeClear(); heard.length = 0;

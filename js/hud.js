@@ -107,6 +107,12 @@ const CROSSES = {
   boomerang: () => [...xDot(), ...xArcs(9, [0, 180], 70)],
   scythe: () => [...xDot(), ...xArcs(12, [90], 120)], // one wide sweep
   meteor: () => [...xDot(), ...xCorners(15, 5), ...xLines(5, 6, 2, 'u')], // a big blast, coming down from above
+  candycane: () => [...xDot(), ...xArcs(10, [90], 80), ...xLines(8, 4, 2, 'd')], // the crook over the top
+  sleighbells: () => [...xDot(), ...xLines(7, 4, 2, 'lr'), ...xArcs(11, [0, 180], 40)], // one either side
+  nutcracker: () => [...xDot(), ...xArcs(15, DIAG, 50), ...xLines(18, 3, 2, 'lr')], // a wide spread, two barrels
+  northstar: () => [...xDot(), ...xLines(9, 7, 2, 'lrd'), ...xTicks(6, 8)], // a star's points
+  snowglobe: () => [...xDot(), ...xArcs(12, [90, 210, 330], 70), ...xLines(5, 5, 2, 'd')], // round, and down it comes
+  delivery: () => [...xDot(), ...xCorners(9, 4), ...xLines(15, 7, 2, 'lr')], // a row of blasts
   // wands: rings for the spells
   flamewand: () => [...xDot(), ...xLines(4, 5), ...xArcs(11, DIAG, 34)],
   windwand: () => [...xDot(), ...xArcs(8, DIAG, 50)],

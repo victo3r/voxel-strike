@@ -7,6 +7,7 @@ const BOOTS = [
   { id: 'thornwood', rar: 'epic', name: 'Thornwood Boots', unlock: 13, price: 220, heal: [2, 3, 4] },
   { id: 'skyrunner', rar: 'legend', name: 'Skyrunner Boots', unlock: 25, price: 340, spd: [.06, .09, .12], jmp: [.1, .15, .2] },
   { id: 'titanium', rar: 'mythic', name: 'Titanium Greaves', unlock: 50, price: 500, bars: 2, spd: [.05, .07, .09], dmg: [.05, .08, .11] },
+  { id: 'elf', rar: 'legend', name: 'Elf Shoes', season: 'xmas26', unlock: 20, price: 340, spd: [.07, .1, .13], warm: true }, // warm: frost never slows you (a season's: only from its chests)
 ];
 const BOOT_I = Object.fromEntries(BOOTS.map((B, i) => [B.id, i]));
 const bootOf = id => BOOTS[BOOT_I[id]] ?? null;
@@ -22,7 +23,7 @@ function bootFx(b) {
 // bots get random boots, only ones your level unlocks, never better than yours
 const BOOT_BARE = .3;
 function botBoots() {
-  const list = BOOTS.filter(B => bootStars(B.id) || prof.lv >= B.unlock);
+  const list = BOOTS.filter(B => bootStars(B.id) || prof.lv >= B.unlock && !B.season);
   if (!list.length || Math.random() < BOOT_BARE) return null;
   const B = list[Math.random() * list.length | 0];
   return { id: B.id, st: 1 + (Math.random() * Math.max(1, bootStars(B.id)) | 0) };
@@ -91,6 +92,14 @@ function bootPieces(id, st, s = 1) {
     B(-5, 6, -13, -11, -6, 6, HI); // cuff
     if (st >= 2) { B(-3, 3, -18, -12, 5, 7, HI); B(-1, 1, -17, -13, 6, 7, BLUE); } // shin plate
     if (st >= 3) B(4, 5, -20, -17, -3, 3, BLUE);
+  } else if (id === 'elf') {
+    // green shoes with a red cuff and a toe that curls up, a gold bell on its tip at 2 stars
+    const C = hex([46, 132, 76]), DK = hex([28, 86, 48]), RD = hex([204, 44, 44]), GOLD = hex([240, 196, 64]);
+    B(-5, 5, -24, -14, -5, 5, C); B(-5, 5, -24, -19, 5, 10, C); B(-5, 5, -24, -22, -5, 10, DK);
+    B(-3, 3, -21, -16, 8, 12, C); B(-3, 3, -17, -14, 6, 10, C); // the curl
+    B(-5, 6, -16, -13, -6, 6, RD); for (const z of [-6, -2, 2]) B(-5, 6, -17, -16, z, z + 2, RD); // a pointed cuff
+    if (st >= 2) B(-2, 2, -14, -11, 6, 9, GOLD);
+    if (st >= 3) B(4, 5, -21, -18, -3, 3, GOLD);
   } else if (id === 'skyrunner') {
     // sleek white runners with a teal sole and a heel fin, gold at 3 stars
     const C = hex([222, 228, 236]), DK = hex([146, 160, 178]), TEAL = st >= 3 ? hex([240, 196, 64]) : hex([40, 200, 210]), SOLE = hex([60, 70, 84]);
@@ -111,7 +120,7 @@ function bootPieces(id, st, s = 1) {
     if (st >= 3) B(-1, 1, -17, -13, 7, 8, DK);
   }
   // hollow inside so it looks wearable in the armory
-  const [top, floor] = { raider: [-14, -22], ironclad: [-11, -22], arcane: [-14, -22], thornwood: [-13, -22], skyrunner: [-14, -22], titanium: [-11, -22] }[id] ?? [-10, -21];
+  const [top, floor] = { raider: [-14, -22], ironclad: [-11, -22], arcane: [-14, -22], thornwood: [-13, -22], skyrunner: [-14, -22], titanium: [-11, -22], elf: [-14, -22] }[id] ?? [-10, -21];
   B(-4, 4, floor, top, -4, 4, 0); B(-4, 4, floor, floor + 1, -4, 4, hex([40, 40, 46]));
   if (s < 0) for (const p of out) p[4] = -p[4];
   return out;

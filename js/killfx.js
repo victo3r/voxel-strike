@@ -10,13 +10,16 @@ const KILL_FX = [
   { id: 'lightning', name: 'Lightning', rar: 'legend', unlock: 26, price: 1000, chest: 1 },
   { id: 'blackhole', name: 'Black Hole', rar: 'mythic', unlock: 34, price: 1400, chest: 1 },
   { id: 'confetti', name: 'Confetti', rar: 'rare', unlock: 7, price: 250 },
+  // a season's own (season.js): from its presents, or only from its chests (chest)
+  { id: 'snowman', name: 'Snowman', rar: 'epic', unlock: 15, price: 600, season: 'xmas26' },
+  { id: 'present', name: 'Present', rar: 'legend', unlock: 20, price: 1000, season: 'xmas26', chest: 1 },
 ];
 const ANGEL_FX = { id: '', name: 'Angel', rar: 'common' };
 const kfxOf = id => KILL_FX.find(K => K.id === id);
 const wornKfx = () => prof.kfx?.[prof.kfxOn] && kfxOf(prof.kfxOn) ? prof.kfxOn : '';
 // bots: angels about half the time, else one they could have
 function botKfx() {
-  const list = KILL_FX.filter(K => prof.kfx?.[K.id] || prof.lv >= K.unlock);
+  const list = KILL_FX.filter(K => prof.kfx?.[K.id] || prof.lv >= K.unlock && (!K.season || seasonOn(K.season))); // a season's only in its month
   return list.length && Math.random() < .5 ? pickRare(list).id : '';
 }
 
@@ -194,6 +197,7 @@ const PIC_ART = {
   ghost: () => artPieces(['....WWWW....', '..WWWWWWWW..', '.WWWWWWWWWW.', '.WWKKWWKKWW.', 'WWWKKWWKKWWW', 'WWWWWWWWWWWW', 'WWWWWKKWWWWW', 'WWWWWKKWWWWW', 'WWWWWWWWWWWW', 'WWWWWWWWWWWW', 'WWW.WWWW.WWW', '.W...WW...W.'],
     { W: palIdx(0xeaf6ff), K: palIdx(0x2a2a3a) }, 6, -3),
   tombstone: () => tombPieces(),
+  snowman: () => snowmanPieces(), present: () => [...presentPieces(), ...presentLid().map(([w, h, d, m, x, y, z]) => [w, h, d, m, x + 3, y + 3, z])],
   shatter: () => { const [S, B, P, H, L, W] = [0xf0c8a0, 0x3a6ad8, 0x3a3a4e, 0x7a4a2a, 0x6fb8ff, 0xe8e8e8].map(c => palIdx(c));
     return [[-6, 4, -2, H], [-1, 6, 1, S], [3, 3, -1, B], [-5, -2, 1, B], [0, 0, -2, L], [4, -3, 2, P], [-3, -7, -1, P], [2, -8, 0, W], [-8, 8, 2, S], [7, 7, -2, H], [8, -8, 1, L]]
       .map(([x, y, z, c], i) => vb(x - (i < 8 ? 2 : 1), y - (i < 8 ? 2 : 1), z - (i < 8 ? 2 : 1), x + 2, y + 2, z + 2, c)); },
@@ -365,6 +369,82 @@ function tombRise(k, back) {
     return t >= 3.9;
   }, end() { sc.remove(g); } });
 }
+// a snowman: they're gone in a puff of snow and one stands where they stood, then the snow melts from under what it wore
+function snowmanParts() {
+  const W = palIdx(0xf6f9fd), S = palIdx(0xdce6f2), K = palIdx(0x1e1e24), R = palIdx(0xc8322c), O = palIdx(0xf08a2a), B = palIdx(0x5e3c26);
+  const snow = [vb(-6, 0, -6, 6, 10, 6, W), vb(-6, 0, -6, 6, 2, 6, S), vb(-5, 10, -5, 5, 18, 5, W), vb(-4, 18, -4, 4, 25, 4, W)]; // three balls of snow
+  const wear = [ // at: where it sits on the snow (its foot); sx: slides aside as it comes down, lay: tips over, on: comes to rest on the scarf
+    { p: [vb(-5, 25, -5, 5, 26, 5, K), vb(-3, 26, -3, 3, 31, 3, K), vb(-3, 26, -3, 3, 28, 3, R)], at: [0, 25, 0], on: 1 }, // a top hat with a red band
+    { p: [vb(-3, 21, 3, -1, 23, 4, K), vb(1, 21, 3, 3, 23, 4, K)], at: [0, 21, 4] }, { p: [vb(-1, 19, 4, 1, 21, 8, O)], at: [0, 19, 4] }, // coal eyes, a carrot
+    { p: [vb(-1, 15, 4, 1, 17, 5, K)], at: [0, 15, 5], sx: -2 }, { p: [vb(-1, 11, 4, 1, 13, 5, K)], at: [0, 11, 5], sx: 2 }, // buttons
+    { p: [vb(-5, 17, -5, 5, 19, 5, R)], at: [0, 17, 0] }, { p: [vb(2, 12, 5, 4, 18, 6, R)], at: [3, 12, 5], lay: 1 }, // a scarf and its tail
+    { p: [vb(5, 13, -1, 12, 15, 1, B), vb(10, 15, -1, 12, 18, 1, B)], at: [5, 13, 0] }, { p: [vb(-12, 13, -1, -5, 15, 1, B), vb(-12, 15, -1, -10, 18, 1, B)], at: [-5, 13, 0] }, // stick arms
+  ];
+  return { snow, wear };
+}
+const snowmanPieces = () => { const P = snowmanParts(); return [...P.snow, ...P.wear.flatMap(w => w.p)]; };
+const SNOWBIT_MATS = puffMats([0xffffff, 0xe6f2ff, 0xcfe6fa]), WEAR_MAT = Object.assign(gunLit.clone(), { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }); // what it wears wins where it lies flush in the snow
+KFX.snowman = {
+  start(b, k) {
+    const at = _kv.set(k.pos.x, k.y0 + .9, k.pos.z);
+    kBits(SNOWBIT_MATS, k.sc, at, 18, 2.6, 1.2, .8, .22, 3);
+    b.g.visible = false;
+    const P = snowmanParts(), G = kGeo.snowman ??= { snow: voxelGeos(fine(P.snow), BOT_U / 2), wear: P.wear.map(w => voxelGeos(fine(w.p.map(([a, h, d, m, x, y, z]) => [a, h, d, m, x - w.at[0], y - w.at[1], z - w.at[2]])), BOT_U / 2).lit) };
+    const g = new THREE.Group(), snow = voxMesh(new THREE.Group(), G.snow), s = k.s0, sc = k.sc;
+    const wear = G.wear.map(geo => { const o = new THREE.Mesh(geo, WEAR_MAT); o.userData.shared = true; g.add(o); return o; }); // each its own piece: only the snow changes shape
+    g.add(snow); g.position.copy(k.pos).setY(k.y0); g.rotation.y = k.yaw; g.scale.setScalar(.01); sc.add(g);
+    let t = 0, drip = 0;
+    kfxKeep({ sc, tick(dt) {
+      t += dt;
+      const up = t < .35 ? ease(t / .35) : 1, melt = ease(clamp01((t - 2.3) / 1.2)), w = 1 + melt * .7, f = 1 - melt * .97, left = Math.max(.01, 1 - ease(clamp01((t - 3.55) / .4)));
+      g.scale.setScalar(s * Math.max(.01, up * (1 + (t < .35 ? Math.sin(t / .35 * Math.PI) * .12 : 0))));
+      g.rotation.z = t > .35 && t < 2.3 ? Math.sin(t * 5) * .03 : 0;
+      snow.scale.set(w * left, f, w * left);
+      P.wear.forEach((W, i) => {
+        const o = wear[i];
+        o.position.set((W.at[0] * w + (W.sx || 0) * melt) * BOT_U, (Math.max(W.at[1] * f, W.on ? 17 * f + 2 : 0) + (W.lay ? melt : 0)) * BOT_U, W.at[2] * w * BOT_U);
+        o.rotation.x = W.lay ? melt * Math.PI / 2 : 0; o.scale.setScalar(left);
+      });
+      if (t > 2.3 && t < 3.6) for (drip -= dt; drip < 0; drip += .07) fxBit(kPick(SNOWBIT_MATS), sc, _kv.set(k.pos.x + (Math.random() - .5) * .9, k.y0 + .1 + Math.random() * .5 * (1 - melt), k.pos.z + (Math.random() - .5) * .9), .16, new THREE.Vector3((Math.random() - .5) * .6, .3, (Math.random() - .5) * .6), .5, 2);
+      return t >= 3.95;
+    }, end() { sc.remove(g); } });
+    kSnd(b, k, 'kfx_snowman');
+  },
+  tick() {},
+};
+// a present: they're wrapped up in a big gift, it shakes, and off comes the lid in a burst of ribbon
+const GIFT_IN = 0x7a1c1a; // the dark inside of the box and its lid (a piece of colour 0 cuts a hole)
+function presentPieces() { const R = palIdx(0xc8322c), G = palIdx(0xf0c040), D = palIdx(GIFT_IN); return [vb(-7, 0, -7, 7, 12, 7, R), vb(-1, 0, -7, 1, 12, 7, G), vb(-7, 0, -1, 7, 12, 1, G), vb(-6, 1, -6, 6, 12, 6, D), vb(-5, 2, -5, 5, 12, 5, 0)]; }
+function presentLid() { const R = palIdx(0xdc4038), G = palIdx(0xf0c040), D = palIdx(GIFT_IN); return [vb(-8, 12, -8, 8, 15, 8, R), vb(-1, 12, -8, 1, 15, 8, G), vb(-8, 12, -1, 8, 15, 1, G), vb(-5, 15, -1, -1, 19, 1, G), vb(1, 15, -1, 5, 19, 1, G), vb(-1, 15, -1, 1, 17, 1, G), vb(-7, 12, -7, 7, 14, 7, D), vb(-6, 12, -6, 6, 13.5, 6, 0)]; }
+KFX.present = {
+  start(b, k) {
+    const s = k.s0, sc = k.sc, g = new THREE.Group(), boxM = voxMesh(new THREE.Group(), kGeo.present ??= voxelGeos(fine(presentPieces()), BOT_U / 2)), lid = voxMesh(new THREE.Group(), kGeo.presentLid ??= voxelGeos(fine(presentLid()), BOT_U / 2));
+    const S0 = s * 1.9, Y0 = 13.5 * BOT_U, pv = new THREE.Group(); pv.position.y = Y0; lid.position.y = -Y0; pv.add(lid); // the lid turns about its own middle
+    g.add(boxM, pv); g.position.copy(k.pos).setY(k.y0); g.rotation.y = k.yaw; g.scale.setScalar(.01); sc.add(g);
+    const vy = 5.2 / S0, G = 13 / S0, rest = 1.5 * BOT_U, Tf = (vy + Math.sqrt(vy * vy + 2 * G * (Y0 - rest))) / G, far = 2.1 / S0; // up, over and down beside it
+    let t = 0, popped = false, lt = 0;
+    kfxKeep({ sc, tick(dt) {
+      t += dt;
+      if (t > .16) b.g.visible = false; // wrapped
+      const up = t < .28 ? ease(t / .28) * (1 + Math.sin(t / .28 * Math.PI) * .15) : t < 2.6 ? 1 : 1 - ease(clamp01((t - 2.6) / .4));
+      g.scale.setScalar(S0 * Math.max(.01, up));
+      g.rotation.z = t > .4 && t < 1.25 ? Math.sin(t * 34) * .05 * (t - .4) / .85 : 0;
+      if (t >= 1.25 && !popped) {
+        popped = true;
+        const at = _kv.set(k.pos.x, k.y0 + 1.1 * s, k.pos.z);
+        kBits(FW_MATS, sc, at, 26, 3.4, 3.4, 1.2, .2, 5); kBits(SNOWBIT_MATS, sc, at, 8, 2, 1.5, .6, .18, 2); kFlash(sc, 0xffe08a, at, 2.2, .2);
+        kSnd(b, k, 'kfx_presentPop');
+      }
+      if (popped) {
+        lt += dt; const q = Math.min(1, lt / Tf), tt = Math.min(lt, Tf), hop = lt > Tf && lt < Tf + .22 ? Math.sin((lt - Tf) / .22 * Math.PI) * .1 / S0 : 0;
+        pv.position.set(far * q, Math.max(rest, Y0 + vy * tt - G * tt * tt / 2) + hop, 0); pv.rotation.set(0, q * .7, -q * Math.PI * 2); // once right round, so it lands the right way up
+      }
+      return t >= 3;
+    }, end() { sc.remove(g); } });
+    kSnd(b, k, 'kfx_present');
+  },
+  tick() {},
+};
 // fireworks: up they go in a trail of sparks and burst in colour
 KFX.fireworks = {
   start(b, k) {
@@ -391,7 +471,7 @@ KFX.fireworks = {
   },
 };
 // black hole: it opens in them, pulls them in spinning and snaps shut
-const HOLE_GEO = new THREE.SphereGeometry(1, 16, 12), DISC_GEO = new THREE.TorusGeometry(1, .1, 6, 40);
+const HOLE_GEO = pxSphere(1), DISC_GEO = pxTorus(1, .1);
 KFX.blackhole = {
   start(b, k) {
     const c = new THREE.Vector3(k.pos.x, k.y0 + 17 * k.u, k.pos.z), g = new THREE.Group();

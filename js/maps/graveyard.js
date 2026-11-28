@@ -108,7 +108,7 @@ for (const s of [-1, 1]) meshSolids(piece(.16, .2, .16, darkStone, TX + s * (DOO
 meshSolids(piece(DOOR * 2 + .5, .3, .22, darkStone, TX, DOOR_H + .15, TZ + TO + .11));
 for (const [u, v] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) tw(u * TO - (u > 0 ? .55 : 0), u * TO + (u < 0 ? .55 : 0), v * TO - (v > 0 ? .55 : 0), v * TO + (v < 0 ? .55 : 0), DECK + PAR, DECK + 3); // belfry pillars
 for (const s of [-1, 1]) { meshSolids(piece(TO * 2, .3, .55, darkStone, TX, DECK + 3.15, TZ + s * (TO - .275))); meshSolids(piece(.55, .3, TO * 2 - 1.1, darkStone, TX + s * (TO - .275), DECK + 3.15, TZ)); }
-{ const roof = new THREE.Mesh(new THREE.ConeGeometry(TO * 1.45, 3.2, 4), slate); roof.rotation.y = Math.PI / 4; roof.position.set(TX, DECK + 4.9, TZ); add(roof); building.cover.push(roof);
+{ const roof = new THREE.Mesh(pxCone(TO * 1.45, 3.2, 4), slate); roof.rotation.y = Math.PI / 4; roof.position.set(TX, DECK + 4.9, TZ); add(roof); building.cover.push(roof);
   const r = TO * 1.45 / Math.SQRT2; building.solids.push({ mesh: null, minX: TX - r, maxX: TX + r, minZ: TZ - r, maxZ: TZ + r, bot: DECK + 3.3, top: DECK + 6.5, peak: { x: TX, z: TZ, rx: r, rz: r, edge: DECK + 3.3 }, surf: 'stone' }); } // the spire, up to its point
 meshSolids(piece(.12, 1.5, .12, iron, TX, DECK + 6.95, TZ)); meshSolids(piece(.7, .1, .1, iron, TX, DECK + 7.2, TZ)); // a cross out of the spire's tip
 // the bell
@@ -239,7 +239,7 @@ LAMPS.forEach(([x, z], i) => {
   piece(.2, 2.9, .2, iron, x, 1.45, z); addSolid(x, z, .2, .2, 2.9);
   meshSolids(piece(.34, .44, .34, lanternMat, x, 3.1, z), 'metal'); meshSolids(piece(.44, .08, .44, iron, x, 3.36, z));
   const halo = new THREE.Sprite(haloMat); halo.scale.setScalar(1.8); halo.position.set(x, 3.1, z); add(halo);
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(3.6, 20), poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(x, .03, z); add(pool);
+  const pool = new THREE.Mesh(pxDisc(3.6, 20), poolMat); pool.rotation.x = -Math.PI / 2; pool.position.set(x, .03, z); add(pool);
   if (i % 2 === 0) { const pl = new THREE.PointLight(LAMP_C, 8, 12, 1.4); pl.position.set(x, 2.9, z); add(pl); }
 });
 const deadBark = surf(lam({ map: tex(g => { noise(g, [58, 50, 44], 14); g.fillStyle = 'rgba(0,0,0,.3)'; for (const x of [3, 9, 13]) g.fillRect(x, 0, 1, 16); }) }), 'wood');

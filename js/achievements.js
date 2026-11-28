@@ -9,6 +9,7 @@ const ACH_NOW = {
   set: () => SUITS.filter(S => prof.suits?.[S.id] && prof.boots?.[S.id] && prof.hats?.[S.id]).length,
   zw: () => Math.max(achN('zw'), best.wave | 0),
   used: () => CATS.filter(([c]) => prof.ach?.used?.[c]).length,
+  xmasset: () => setHas(GUN_SETS.find(T => T.id === 'xmas26')),
 };
 // n = what's counted, g = how many, then the pay: xp, c coins, k keys, b boosters, box a chest
 const ACH = [
@@ -67,10 +68,12 @@ const ACH = [
   { id: 'lv10', ic: 'star', name: 'Double Digits', text: 'Reach level 10', n: 'lv', g: 10, k: 1, b: 2 },
   { id: 'lv25', ic: 'star', name: 'Halfway There', text: 'Reach level 25', n: 'lv', g: 25, box: 'iron' },
   { id: 'lv50', ic: 'star', name: 'Top of the World', text: 'Reach level 50', n: 'lv', g: 50, box: 'gold' },
+  { id: 'xmasset', ic: 'gift', name: 'Under the Tree', text: 'Earn all six Christmas weapons', n: 'xmasset', g: 6, xp: 1500, c: 1000, box: 'gold', set: 'xmas26' }, // set: paid on that weapon set's card in the armory, not listed here
 ];
+const ACH_LIST = ACH.filter(a => !a.set);
 const achAt = a => Math.min(a.g, ACH_NOW[a.n] ? ACH_NOW[a.n]() : achN(a.n));
 const achGot = a => !!prof.ach?.got?.[a.id], achDone = a => achAt(a) >= a.g;
-const achReady = () => ACH.filter(a => achDone(a) && !achGot(a));
+const achReady = () => ACH_LIST.filter(a => achDone(a) && !achGot(a));
 // counting: tell whoever's playing when one is done
 let achNew = [];
 function achCount(fn) {
@@ -108,7 +111,7 @@ function achClaim(id) {
   const r = grant(a.xp | 0, 0);
   sfx(r.ups ? 'levelUp' : 'buy');
   if (r.ups && !lvlShow()) netToast(`LEVEL UP! LVL ${prof.lv}`);
-  renderAch(); renderAchBtn(); renderChests(); renderBoost();
+  renderAch(); renderAchBtn(); renderChests(); renderBoost(); if (a.set && armOpen) renderArmory();
 }
 function renderAchBtn() {
   const n = achReady().length;
@@ -117,9 +120,9 @@ function renderAchBtn() {
 }
 function renderAch() {
   if ($('ach').style.display !== 'flex') return;
-  const rank = a => achGot(a) ? 2 : achDone(a) ? 0 : 1, list = ACH.map((a, i) => [a, i]).sort((x, y) => rank(x[0]) - rank(y[0]) || x[1] - y[1]).map(x => x[0]);
+  const rank = a => achGot(a) ? 2 : achDone(a) ? 0 : 1, list = ACH_LIST.map((a, i) => [a, i]).sort((x, y) => rank(x[0]) - rank(y[0]) || x[1] - y[1]).map(x => x[0]);
   const keep = $('achBox').querySelector('.acList')?.scrollTop | 0;
-  $('achBox').innerHTML = `<div class="lbTop"><h1>${ico('ach')} ACHIEVEMENTS</h1><span class="acN">${ACH.filter(achGot).length} / ${ACH.length}</span></div>` +
+  $('achBox').innerHTML = `<div class="lbTop"><h1>${ico('ach')} ACHIEVEMENTS</h1><span class="acN">${ACH_LIST.filter(achGot).length} / ${ACH_LIST.length}</span></div>` +
     '<div class="acList">' + list.map(a => {
       const at = achAt(a), got = achGot(a), done = at >= a.g;
       return `<div class="ac${got ? ' got' : done ? ' ok' : ''}"><span class="aci">${ico(a.ic)}</span><div class="act"><b>${a.name}</b><small>${a.text}</small><u><i style="width:${at / a.g * 100}%"></i></u></div>` +

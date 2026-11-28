@@ -1479,7 +1479,7 @@ LOBBY_MAKE.candy = () => {
   const bank = curve.getPoints(80), rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rv, 3)); rg.setIndex(ri); rg.computeVertexNormals();
   const choc = { c1: 0x4a2414, c2: 0x6a3a1e, c3: 0xa86a3a, c4: 0xffe0b8, sun: .3, sunW: .2, gli: .5 };
   add(new THREE.Mesh(rg, lobWater({ ...choc, flow: [.12, -.06] })));
-  const pool = add(new THREE.Mesh(new THREE.CircleGeometry(3, 24), lobWater({ ...choc, flow: [.05, .08] }))); pool.rotation.x = -Math.PI / 2; pool.position.set(-18, .025, -40.2);
+  const pool = add(new THREE.Mesh(pxDisc(3, 24), lobWater({ ...choc, flow: [.05, .08] }))); pool.rotation.x = -Math.PI / 2; pool.position.set(-18, .025, -40.2);
   const fall = add(new THREE.Mesh(new THREE.PlaneGeometry(2.5, 7.25), lobWater({ ...choc, uvs: [2.5, 7.25], flow: [0, .9], gli: .2 }))); fall.position.set(-18, 3.625, -42.3);
   // the fudge cliff it pours from, icing on top
   const FR = lumpy(4.5, .14, [1, 2, 0]), FX = -18, FZ = -46.5;

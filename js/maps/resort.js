@@ -369,7 +369,7 @@ const chimney = box(1.3, CY - GY - 2.4, 1.3, ironMat); chimney.position.set(LX, 
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) addSlab(LX + sx * (GA - .12), LZ + sz * (GA - .12), .16, .16, GY, CY, ironMat);
 const CW = GA + .3;
 addSlab(LX, LZ, CW * 2, CW * 2, CY, CY + .25, red);
-const roofM = new THREE.Mesh(new THREE.ConeGeometry(CW * Math.SQRT2, 2.2, 4), red); roofM.rotation.y = Math.PI / 4; roofM.position.set(LX, CY + .25 + 1.1, LZ); add(roofM);
+const roofM = new THREE.Mesh(pxCone(CW * Math.SQRT2, 2.2, 4), red); roofM.rotation.y = Math.PI / 4; roofM.position.set(LX, CY + .25 + 1.1, LZ); add(roofM);
 standOn(LX, LZ, CW, CW, CY + .25, CY + .25, CY + 2.45, false, 'metal');
 const knob = box(.3, .45, .3, ironMat); knob.position.set(LX, CY + .25 + 2.2 + .15, LZ); add(knob); meshSolids(knob, 'metal');
 const LAMP_Y = GY + 1.4;
@@ -491,7 +491,7 @@ function umbrella(x, z, y0, cols) {
   addSlab(x, z, .12, .12, y0, y0 + 2.7, plain(0xf0ece2));
   const t = tex(g => { for (let i = 0; i < 16; i++) { g.fillStyle = cols[(i >> 1) % 2]; g.fillRect(i, 0, 1, 16); } });
   t.repeat.set(2, 1);
-  const top = new THREE.Mesh(new THREE.ConeGeometry(1.7, .55, 16, 1, true), lam({ map: t, side: THREE.DoubleSide }));
+  const top = new THREE.Mesh(pxCone(1.7, .55, 16, 1, true), lam({ map: t, side: THREE.DoubleSide }));
   top.position.set(x, y0 + 2.55, z); add(top);
   for (let k = 0; k < 3; k++) { const r = 1.7 * (1 - k / 3), b = y0 + 2.275 + .55 * k / 3; standOn(x, z, r, r, b, b, y0 + 2.825, true); } // cones inside cones, so under it you reach up into the canopy
 }
@@ -717,12 +717,15 @@ const hullBlue = plain(0x1f4e8c), hullWhite = plain(0xf6f6f2), seatMat = plain(0
 const chromeM = plain(0xdfe5ea), blackM = plain(0x222326), accentM = plain(0xe8505a);
 // boat hull outline from above
 function hullShape(L, W, bow, stern = 0, ox = 0, hole = false) {
-  const s = hole ? new THREE.Path() : new THREE.Shape(), h = W / 2;
+  const s = hole ? new THREE.Path() : new THREE.Shape(), h = W / 2, mx = ox + L / 2;
+  const curve = (cx, cy, x, y, n = 4) => { const a = s.currentPoint.clone(); for (let k = 1; k <= n; k++) { // a curve in steps: pixels, like everything else (each corner on the outside)
+    const t = k / n, u = 1 - t, px = u * u * a.x + 2 * u * t * cx + t * t * x, py = u * u * a.y + 2 * u * t * cy + t * t * y, c = s.currentPoint;
+    Math.hypot(px - mx, c.y) > Math.hypot(c.x - mx, py) ? s.lineTo(px, c.y) : s.lineTo(c.x, py); s.lineTo(px, py); } };
   s.moveTo(ox + stern, -h); s.lineTo(ox + L - bow, -h);
-  s.quadraticCurveTo(ox + L - bow * .15, -h, ox + L, 0);
-  s.quadraticCurveTo(ox + L - bow * .15, h, ox + L - bow, h);
+  curve(ox + L - bow * .15, -h, ox + L, 0);
+  curve(ox + L - bow * .15, h, ox + L - bow, h);
   s.lineTo(ox + stern, h);
-  if (stern) { s.quadraticCurveTo(ox + stern * .15, h, ox, 0); s.quadraticCurveTo(ox + stern * .15, -h, ox + stern, -h); }
+  if (stern) { curve(ox + stern * .15, h, ox, 0); curve(ox + stern * .15, -h, ox + stern, -h); }
   else s.lineTo(ox, -h);
   return s;
 }
@@ -774,7 +777,7 @@ bowRail(sL - .24, SB.w - .2, sBow - .14, SB.x0 + .1, SB.z, 1.13, 1.42, sL - sBow
 // steering console
 addSlab(sbx + .9, SB.z - .4, .8, .7, 1, 1.75, hullWhite);
 const dash = box(.5, .08, .66, blackM); dash.rotation.z = .5; dash.position.set(sbx + .95, 1.79, SB.z - .4); add(dash);
-const wheel = new THREE.Mesh(new THREE.TorusGeometry(.17, .03, 6, 14), blackM); wheel.rotation.y = Math.PI / 2; wheel.rotation.x = .5; wheel.position.set(sbx + .44, 1.78, SB.z - .4); add(wheel);
+const wheel = new THREE.Mesh(pxTorus(.17, .03, 6, 14), blackM); wheel.rotation.y = Math.PI / 2; wheel.rotation.x = .5; wheel.position.set(sbx + .44, 1.78, SB.z - .4); add(wheel);
 rod([sbx + .44, 1.78, SB.z - .4], [sbx + .6, 1.7, SB.z - .4], blackM, .05);
 rod([sbx + .7, 1.75, SB.z - .02], [sbx + .6, 1.92, SB.z - .02], chromeM, .05);
 {
@@ -811,7 +814,7 @@ const benchB = box(.16, .42, SB.w - .52, seatMat); benchB.position.set(SB.x0 + .
 for (const [s, c] of [[-1, 0xe03a3a], [1, 0x3ad06a]]) { const l = box(.12, .08, .04, new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: .6 })); l.position.set(SB.x0 + sL - sBow + .1, 1.06, SB.z + s * (SB.w / 2 + .01)); add(l); }
 for (const [cx, cz] of [[SB.x0 + .3, SB.z - SB.w / 2 + .12], [SB.x0 + .3, SB.z + SB.w / 2 - .12], [SB.x0 + sL - .9, SB.z - .2]]) { const c = box(.22, .06, .07, chromeM); c.position.set(cx, 1.18, cz); add(c); }
 for (const fx of [36.6, 39.2]) {
-  const f = new THREE.Mesh(new THREE.CylinderGeometry(.13, .13, .5, 8), hullWhite); f.position.set(fx, .55, SB.z - SB.w / 2 - .1); add(f);
+  const f = new THREE.Mesh(pxCyl(.13, .13, .5, 8), hullWhite); f.position.set(fx, .55, SB.z - SB.w / 2 - .1); add(f);
   rod([fx, .8, SB.z - SB.w / 2 - .1], [fx, 1.15, SB.z - SB.w / 2 + .05], plain(0xe8dcc0), .03);
 }
 const ropeM = plain(0xd8c8a0);
@@ -830,7 +833,7 @@ propSolids(sbFrom);
   hullPiece(hullShape(L - .5, W - .4, BOW - .3, 0, .2), 1.7, 1.72, plank, X0, Z, false);
   for (const s of [-1, 1]) { // windows and portholes
     const win = box(4.2, .26, .02, glassDark); win.position.set(X0 + 4, 1.12, Z + s * (W / 2 + .01)); add(win);
-    for (const px of [7.1, 7.9, 8.7]) { const p = new THREE.Mesh(new THREE.CircleGeometry(.12, 10), glassDark); p.position.set(X0 + px, 1.12, Z + s * (W / 2 + .012)); if (s < 0) p.rotation.y = Math.PI; add(p); }
+    for (const px of [7.1, 7.9, 8.7]) { const p = new THREE.Mesh(pxDisc(.12, 10), glassDark); p.position.set(X0 + px, 1.12, Z + s * (W / 2 + .012)); if (s < 0) p.rotation.y = Math.PI; add(p); }
     const anchor = box(.3, .34, .04, blackM); anchor.position.set(X0 + L - 1.6, 1.25, Z + s * (W / 2 - .25 + .02)); add(anchor);
   }
   // swim platform
@@ -848,7 +851,7 @@ propSolids(sbFrom);
   bowRail(4.4, 3, 1.4, X0 + 2, Z, 3.7, 4.1, 1.2);
   for (const s of [-1, 1]) { const leg = rod([X0 + 2.2, 3.7, Z + s * 1.3], [X0 + 2.6, 5, Z + s * 1.15], hullWhite, .26); }
   const bar = box(.45, .24, 2.6, hullWhite); bar.position.set(X0 + 2.6, 5.05, Z); add(bar);
-  const radar = new THREE.Mesh(new THREE.CylinderGeometry(.36, .36, .26, 14), hullWhite); radar.position.set(X0 + 2.6, 5.3, Z - .5); add(radar);
+  const radar = new THREE.Mesh(pxCyl(.36, .36, .26, 14), hullWhite); radar.position.set(X0 + 2.6, 5.3, Z - .5); add(radar);
   rod([X0 + 2.6, 5.15, Z + .7], [X0 + 2.6, 6.6, Z + .7], blackM, .04);
   rod([X0 + 2.6, 5.15, Z + .95], [X0 + 2.6, 6.1, Z + .95], blackM, .04);
   // bow rail, flag, table, life ring
@@ -859,7 +862,7 @@ propSolids(sbFrom);
   const table = box(.9, .06, .9, plank); table.position.set(X0 + 1, 2.45, Z); add(table);
   rod([X0 + 1, 1.72, Z], [X0 + 1, 2.42, Z], chromeM, .08);
   const bench = box(.5, .4, W - 1, seatMat); bench.position.set(X0 + .4, 1.92, Z); add(bench);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(.28, .08, 6, 14), plain(0xff7a2a)); ring.rotation.y = Math.PI / 2; ring.position.set(X0 + 1.76, 2.45, Z + 1.05); add(ring);
+  const ring = new THREE.Mesh(pxTorus(.28, .08, 6, 14), plain(0xff7a2a)); ring.rotation.y = Math.PI / 2; ring.position.set(X0 + 1.76, 2.45, Z + 1.05); add(ring);
 }
 
 // upside-down rowboat
@@ -964,7 +967,7 @@ for (const [gx, gz, gr] of GROVES) {
 // little islands
 const isleMat = lam({ map: tex(drawSand, 6, 6) });
 for (const [x, z, r] of [[92, -48, 7], [-78, 74, 6], [-96, -36, 8], [34, 104, 5], [-30, -100, 6]]) {
-  const isle = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 2, SEA_D + .4, 12), isleMat); isle.position.set(x, (.4 - SEA_D) / 2, z); add(isle);
+  const isle = new THREE.Mesh(pxCyl(r, r + 2, SEA_D + .4, 12), isleMat); isle.position.set(x, (.4 - SEA_D) / 2, z); add(isle);
   const n = 2 + (r > 6 ? 2 : 1);
   for (let i = 0; i < n; i++) { const a = rnd() * 6.28, d = rnd() * (r - 2); palm(x + Math.cos(a) * d, z + Math.sin(a) * d, false, .4); }
 }

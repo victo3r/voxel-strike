@@ -16,8 +16,9 @@ const wisps = [], WISP_SPR = [bitMat(0x5fe8d8, PUFF_TEX), bitMat(0xeafffb, PUFF_
 function fireWisp(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
-  const ms = WISP_SPR.map((m, j) => { const s = new THREE.Sprite(m); s.scale.setScalar(j ? .13 : .34); scene.add(s); return s; });
-  const o = { ms, p: from.clone().addScaledVector(dir, .6), v: dir.clone().multiplyScalar(WISP_SPD), life: WISP_LIFE, dmg: w.dmg, by, ghost: !!opts.ghost, id, g: w.id, tgt: null, look: 0, trail: 0, t: Math.random() * 6, gone: 0 };
+  const alt = opts.ghost && !by ? -1 : altBy(by, gi(w.id)); // in its own skin a gun's wisps take the skin's colours
+  const ms = WISP_SPR.map((m, j) => { const s = new THREE.Sprite(alt < 0 ? m : bitTint(m, alt)); s.scale.setScalar(j ? .13 : .34); scene.add(s); return s; });
+  const o = { alt, ms, p: from.clone().addScaledVector(dir, .6), v: dir.clone().multiplyScalar(WISP_SPD), life: WISP_LIFE, dmg: w.dmg, by, ghost: !!opts.ghost, id, g: w.id, tgt: null, look: 0, trail: 0, t: Math.random() * 6, gone: 0 };
   wisps.push(o); wispDraw(o);
 }
 function wispSeek(o) {
@@ -60,7 +61,7 @@ function updateWisps(dt) {
       continue;
     }
     o.p.addScaledVector(o.v, dt); wispDraw(o);
-    if ((o.trail -= dt) <= 0) { o.trail = .03; wandBits('wisp', o.p, scene, 1, .4, .8); }
+    if ((o.trail -= dt) <= 0) { o.trail = .03; wandBits('wisp', o.p, scene, 1, .4, .8, o.alt); }
   }
 }
 
@@ -71,9 +72,9 @@ const VOID_HALO = new THREE.SpriteMaterial({ map: PUFF_TEX, color: 0x5a24a8, dep
 function fireVoid(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : net.launch(w.id, from, dir, by);
-  const m = new THREE.Group(), glow = new THREE.Sprite(ORB_GLOW); glow.scale.setScalar(.75); m.add(new THREE.Mesh(orbGeo, ORB_MAT), glow);
+  const alt = opts.ghost && !by ? -1 : altBy(by, gi(w.id)), m = new THREE.Group(), glow = new THREE.Sprite(alt < 0 ? ORB_GLOW : bitTint(ORB_GLOW, alt)); glow.scale.setScalar(.75); m.add(new THREE.Mesh(orbGeo, ORB_MAT), glow);
   m.position.copy(from).addScaledVector(dir, .6); scene.add(m);
-  orbs.push({ m, dir: dir.clone(), life: VOID_LIFE, dmg: w.dmg, by, ghost: !!opts.ghost, id, g: w.id, trail: 0, wait: 0 });
+  orbs.push({ alt, m, dir: dir.clone(), life: VOID_LIFE, dmg: w.dmg, by, ghost: !!opts.ghost, id, g: w.id, trail: 0, wait: 0 });
 }
 function updateOrbs(dt) {
   for (let i = orbs.length - 1; i >= 0; i--) {
@@ -93,7 +94,7 @@ function updateOrbs(dt) {
       continue;
     }
     o.m.position.addScaledVector(o.dir, step); o.m.children[0].rotation.x += dt * 7; o.m.children[0].rotation.y += dt * 5;
-    if ((o.trail -= dt) <= 0) { o.trail = .04; wandBits('void', o.m.position, scene, 1, .3, .9); }
+    if ((o.trail -= dt) <= 0) { o.trail = .04; wandBits('void', o.m.position, scene, 1, .3, .9, o.alt); }
   }
 }
 // who a void of by's pulls: only the bodies this game moves (other players' own games pull them)
@@ -104,9 +105,9 @@ function pullable(by, p) {
   return out;
 }
 function openVoid(p, by, dmg, g, id, ghost) {
-  const fx = new THREE.Group(), core = new THREE.Mesh(orbGeo, ORB_MAT), halo = new THREE.Sprite(VOID_HALO);
+  const alt = by || !ghost ? altBy(by, gi(g)) : -1, fx = new THREE.Group(), core = new THREE.Mesh(orbGeo, ORB_MAT), halo = new THREE.Sprite(alt < 0 ? VOID_HALO : bitTint(VOID_HALO, alt));
   fx.add(core, halo); fx.position.copy(p); scene.add(fx);
-  voids.push({ p: p.clone(), by, dmg, g, id, ghost, t: VOID_T, caught: ghost && !by ? [] : pullable(by, p), fx, core, halo, bits: 0, snd: sfx('voidOpen', { at: p, far: 70 }) });
+  voids.push({ alt, p: p.clone(), by, dmg, g, id, ghost, t: VOID_T, caught: ghost && !by ? [] : pullable(by, p), fx, core, halo, bits: 0, snd: sfx('voidOpen', { at: p, far: 70 }) });
 }
 function pullBody(o, pos, r, c, dt) {
   const fx = fxOf(o); if (fx?.steady) return; // Ironclad stands its ground
@@ -117,7 +118,7 @@ function pullBody(o, pos, r, c, dt) {
 }
 function voidPop(p) {
   burst(p, 0xb46bff, 22); burst(p, 0xffffff, 8); wandBits('void', p, scene, 18, 7, 1.4); sfx('voidPop', { at: p, far: 110 });
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xb46bff, transparent: true, opacity: .7 }));
+  const m = new THREE.Mesh(pxSphere(1), new THREE.MeshBasicMaterial({ color: 0xb46bff, transparent: true, opacity: .7 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R: VOID_R });
 }
 function updateVoids(dt) {
@@ -133,7 +134,7 @@ function updateVoids(dt) {
     for (v.bits += dt * fxN(40); v.bits >= 1; v.bits--) { // bits drawn in from all round
       const a = Math.random() * 6.283, y = (Math.random() - .5) * 2.4, r = VOID_PULL_R * (.6 + Math.random() * .4);
       _my.set(v.p.x + Math.cos(a) * r, v.p.y + y, v.p.z + Math.sin(a) * r);
-      fxBit(VOID_IN, scene, _my, .12, v.p.clone().sub(_my).multiplyScalar(4), .45, 0); // fast enough to get there through the drag
+      fxBit(v.alt >= 0 ? bitTint(VOID_IN, v.alt) : VOID_IN, scene, _my, .12, v.p.clone().sub(_my).multiplyScalar(4), .45, 0); // fast enough to get there through the drag
     }
     if (v.t > 0) continue;
     voids.splice(i, 1); scene.remove(v.fx); stopSfx(v.snd);
@@ -221,14 +222,14 @@ function updateSaws(dt) {
 // ---- the Boomerang: straight out along your aim and back to whoever threw it, through everyone in its way, once each way. A wall knocks it down, and it's back in the hand a moment later
 const BOOMER_T = 1.15, BOOMER_R = 20, BOOMER_W = .25, BOOMER_LOST = .6, BOOMER_SPIN = 24, BOOMER_HIT = .4; // a trip's time, how far out it goes and how far it bows aside coming back, how long a knocked-down one takes, its spin, how far from its middle it still hits
 const boomers = [], _bm = new THREE.Vector3(), _bm2 = new THREE.Vector3(), _bmD = new THREE.Vector3(), _bmU = new THREE.Vector3(), _bmW = new THREE.Vector3(), _bmE = new THREE.Vector3(), _bmO = new THREE.Vector3(), _bmY = new THREE.Vector3(0, 1, 0);
-let boomerParts = null, boomCatchK = 0; // boomCatchK: your catch, 1 to 0
-function boomerMesh(size) { // the gun's own model, spinning about its middle with its face toward whoever threw it
-  if (!boomerParts) {
-    const geos = gunGeos(gi('boomerang'), 0, 0).main, g = new THREE.Group();
-    for (const [geo, mat] of [[geos.lit, gunLit], [geos.glow, gunGlow], [geos.shine, gunShine]]) if (geo) g.add(new THREE.Mesh(geo, mat));
-    boomerParts = { g, c: new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()) };
-  }
-  const m = new THREE.Group(), spin = new THREE.Group(), turn = new THREE.Group(), flat = boomerParts.g.clone();
+const boomerParts = { skins: {}, c: null }; let boomCatchK = 0; // boomCatchK: your catch, 1 to 0
+function boomerMesh(size, skin = '') { // the gun's own model (in the skin it wears), spinning about its middle with its face toward whoever threw it
+  const P = boomerParts.skins[skin] ??= (() => {
+    const geos = gunGeos(gi('boomerang'), 0, 0, skin).main, g = new THREE.Group();
+    for (const [k, mat] of Object.entries(GUN_MATS)) if (geos[k]) g.add(new THREE.Mesh(geos[k], mat));
+    boomerParts.c ??= new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()); return { g };
+  })();
+  const m = new THREE.Group(), spin = new THREE.Group(), turn = new THREE.Group(), flat = P.g.clone();
   flat.position.copy(boomerParts.c).negate(); turn.rotation.y = Math.PI / 2; turn.add(flat); spin.add(turn); m.add(spin); // the model stands in y and z: turned to face along the flight's axis
   m.scale.setScalar(2 * size); m.userData.spin = spin;
   return m;
@@ -236,7 +237,7 @@ function boomerMesh(size) { // the gun's own model, spinning about its middle wi
 function fireBoomer(w, from = null, dir = null, by = null, opts = {}) {
   if (!from) { camera.getWorldDirection(fwd); from = camera.position; dir = fwd; }
   const id = opts.ghost ? opts.id : opts.show ? 0 : net.launch(w.id, from, dir, by), k = opts.size || 1, sc = opts.sc || scene;
-  const m = boomerMesh(k), off = !by && !opts.ghost && !opts.show && gunG?.visible && WEAPONS[gunShown]?.boomer ? gunG.localToWorld(boomerParts.c.clone()).sub(from) : null; m.position.copy(from); sc.add(m); // yours leaves your hand
+  const bi = gi('boomerang'), m = boomerMesh(k, by ? gsFor(bi, by.rec?.skins?.[bi]) : opts.show ? heroSkin ?? gunSkin(bi) : opts.ghost ? '' : gunSkin(bi)), off = !by && !opts.ghost && !opts.show && gunG?.visible && WEAPONS[gunShown]?.boomer ? gunG.localToWorld(boomerParts.c.clone()).sub(from) : null; m.position.copy(from); sc.add(m); // yours leaves your hand
   if (off) { m.position.add(off); m.scale.multiplyScalar(.5); }
   const side = _bm.set(dir.z, 0, -dir.x); if (side.lengthSq() < 1e-4) side.set(1, 0, 0); side.normalize();
   boomers.push({ m, sc, o: from.clone(), d: dir.clone().normalize(), side: side.clone(), k, t: 0, dmg: w.dmg, by, ghost: !!opts.ghost, show: !!opts.show, home: opts.home, hide: opts.hide ?? by?.gunM, caught: opts.caught, id, g: w.id, cut: [new Set(), new Set()], at: from.clone(), lost: 0, off, grow: off ? .5 : 1 });
@@ -336,11 +337,11 @@ function chargeTick(dt, w) {
   if (gunShown === cur) chargeShow(gunCharges, chargeT / w.charge);
 }
 // the beam: thin and teal for a tap, a full charge is a wide band of every color
-function auroraBeam(from, L, k, s, tip, held, sc = scene) { // s: how thick
-  const full = k >= 1;
-  if (!full) { showLance(from, L, 0x3dffd6, (.45 + .4 * k) * s, sc, tip, held); return; }
-  showLance(from, L, 0xa07bff, 2.2 * s, sc, tip, held);
-  showLance(from, { ...L, walls: [], stop: false }, 0x4dff9a, 1.2 * s, sc, tip, held);
+function auroraBeam(from, L, k, s, tip, held, sc = scene, alt = -1) { // s: how thick; alt: the gun, when it wears its own skin
+  const full = k >= 1, C = c => alt < 0 ? c : shotCol(alt, 'alt', c);
+  if (!full) { showLance(from, L, C(0x3dffd6), (.45 + .4 * k) * s, sc, tip, held); return; }
+  showLance(from, L, C(0xa07bff), 2.2 * s, sc, tip, held);
+  showLance(from, { ...L, walls: [], stop: false }, C(0x4dff9a), 1.2 * s, sc, tip, held);
   for (const q of L.walls) wandBits('aurora', q, sc, 8, 3);
   if (L.stop) wandBits('aurora', L.end, sc, 10, 3.5);
 }

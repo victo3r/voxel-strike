@@ -43,7 +43,7 @@ const pieces = [], cyls = []; // they get their hitboxes once everything's place
 const piece = (w, h, d, m, x, y, z) => { const b = box(w, h, d, m); b.position.set(x, y, z); add(b); pieces.push(b); return b; };
 const tpiece = (w, h, d, m, x, y, z) => { const b = tbox(w, h, d, m); b.position.set(x, y, z); add(b); pieces.push(b); return b; };
 const own = b => { pieces.splice(pieces.lastIndexOf(b), 1); return b; }; // has a hitbox of its own
-const cyl = (r0, r1, h, m, x, y, z, n = 10) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, n), m); c.position.set(x, y, z); add(c); cyls.push(c); return c; };
+const cyl = (r0, r1, h, m, x, y, z, n = 10) => { const c = new THREE.Mesh(pxCyl(r0, r1, h, n), m); c.position.set(x, y, z); add(c); cyls.push(c); return c; };
 const slab = (x0, x1, z0, z1, bot, top, m, cover = true) => addSlab((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, bot, top, m, cover);
 const solid = (x0, x1, z0, z1, bot, top, s = 'stone', more) => { const o = { mesh: null, minX: x0, maxX: x1, minZ: z0, maxZ: z1, bot, top, surf: s, ...more }; building.solids.push(o); return o; };
 const flat = (x0, x1, z0, z1, m, y = .012, k = 2) => {
@@ -256,9 +256,9 @@ for (const z of [-24.4, -21.6]) { post(-18.55, z, TY, 4.95, .22, dark); detail(p
 piece(.22, .2, 3, dark, -18.55, 5.05, -23); solid(-18.65, -18.41, -23.86, -22.14, 3.04, 4.76, 'metal'); // the gong where it hangs (it only sways)
 const gong = live(new THREE.Group()); gong.position.set(-18.55, 4.95, -23); add(gong);
 {
-  const disc = new THREE.Mesh(new THREE.CylinderGeometry(.82, .82, .08, 28), gongMat); disc.rotation.z = Math.PI / 2; disc.position.y = -1.05; gong.add(disc);
-  const rim = new THREE.Mesh(new THREE.CylinderGeometry(.86, .86, .16, 28, 1, true), bronze); rim.rotation.z = Math.PI / 2; rim.position.y = -1.05; gong.add(rim);
-  const boss = new THREE.Mesh(new THREE.CylinderGeometry(.2, .24, .16, 16), bronze); boss.rotation.z = -Math.PI / 2; boss.position.set(.06, -1.05, 0); gong.add(boss);
+  const disc = new THREE.Mesh(pxCyl(.82, .82, .08, 28), gongMat); disc.rotation.z = Math.PI / 2; disc.position.y = -1.05; gong.add(disc);
+  const rim = new THREE.Mesh(pxBand(.82, .16, .04), bronze); rim.rotation.z = Math.PI / 2; rim.position.y = -1.05; gong.add(rim);
+  const boss = new THREE.Mesh(pxCyl(.2, .24, .16, 16), bronze); boss.rotation.z = -Math.PI / 2; boss.position.set(.06, -1.05, 0); gong.add(boss);
   for (const z of [-.45, .45]) { const r = box(.03, .4, .03, black); r.position.set(0, -.2, z); gong.add(r); }
 }
 detail(piece(.18, .05, .05, dark, -18.35, TY + 2, -21.6)); detail(piece(.02, .2, .02, black, -18.3, TY + 1.88, -21.6)); detail(piece(.05, .7, .05, dark, -18.3, TY + 1.43, -21.6)); detail(cyl(.13, .13, .24, cloth, -18.3, TY + .96, -21.6, 8)); // the mallet hangs on a peg

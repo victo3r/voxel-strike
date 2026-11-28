@@ -29,7 +29,7 @@ PATHS.forEach((pts, p) => {
     const m = new THREE.Mesh(scaleUV(new THREE.PlaneGeometry(PW, len), PW / 2.5, len / 2.5), dirtMat);
     m.rotation.order = 'YXZ'; m.rotation.set(-Math.PI / 2, Math.atan2(-dx, -dz), 0);
     m.position.set((ax + bx) / 2, .02 + p * .012, (az + bz) / 2); add(m);
-    if (i) { const j = new THREE.Mesh(scaleUV(new THREE.CircleGeometry(PW / 2, 14), PW / 2.5, PW / 2.5), dirtMat); j.rotation.x = -Math.PI / 2; j.position.set(ax, .045, az); add(j); }
+    if (i) { const j = new THREE.Mesh(scaleUV(pxDisc(PW / 2, 14), PW / 2.5, PW / 2.5), dirtMat); j.rotation.x = -Math.PI / 2; j.position.set(ax, .045, az); add(j); }
   }
 });
 function pathDist(x, z) {
@@ -85,7 +85,7 @@ const ironMat = lam({ color: 0x2b2f33 });
 const lanternMat = lam({ color: 0xffd08a, emissive: 0xffa040, emissiveIntensity: 1.2 });
 const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: LAMP_C, transparent: true, opacity: .34, blending: THREE.AdditiveBlending, depthWrite: false });
 const haloMat = new THREE.SpriteMaterial({ map: glowTex, color: LAMP_C, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false });
-const poolGeo = new THREE.CircleGeometry(4.2, 24);
+const poolGeo = pxDisc(4.2, 24);
 const lamps = [], lampLights = [];
 PATHS.forEach((pts, p) => {
   let next = 4 + p * 5, walked = 0, side = p ? -1 : 1;

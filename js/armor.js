@@ -35,9 +35,12 @@ const SUITS = [
     unlock: [24, 28, 33, 42, 50], price: [450, 560, 720, 900, 1200], c: [222, 228, 236], hi: [255, 255, 255], dk: [146, 160, 178], bar: [[150, 250, 255], [50, 204, 216], [24, 128, 140]] },
   { id: 'titanium', rar: 'mythic', name: 'Titanium Plate', mob: 2, jump: 2, hp: [100, 100, 100, 100, 100], dr: [.16, .18, .20, .22, .24], bars: 3,
     unlock: [50, 50, 50, 50, 50], price: [1000, 700, 800, 900, 1000], c: [190, 200, 212], hi: [234, 240, 246], dk: [54, 60, 70], bar: [[236, 242, 248], [176, 188, 202], [96, 108, 124]] },
+  // a season's set (season.js): its first star only from that month's chests; cheer: health back for each kill
+  { id: 'elf', rar: 'legend', name: 'Elf Tunic', season: 'xmas26', mob: 3, jump: 3, hp: [70, 80, 90, 100, 100], dr: [0, 0, .04, .07, .1], cheer: [15, 18, 20, 22, 25],
+    unlock: [20, 26, 32, 40, 50], price: [450, 560, 720, 900, 1200], c: [46, 132, 76], hi: [84, 176, 110], dk: [28, 86, 48], bar: [[150, 232, 150], [60, 176, 96], [28, 110, 60]] },
 ];
 for (const S of SUITS) for (let k = 0; k < SUIT_ST; k++) ARMOR_TIERS.push({ id: S.id + (k + 1), suit: S.id, st: k + 1, rar: S.rar, name: S.name,
-  hp: S.hp[k], dr: S.dr[k], mob: S.mob, jump: S.jump, grow: S.grow, glide: S.glide, unlock: S.unlock[k], price: S.price[k], c: S.c, hi: S.hi, dk: S.dk, bar: S.bar });
+  hp: S.hp[k], dr: S.dr[k], mob: S.mob, jump: S.jump, grow: S.grow, glide: S.glide, cheer: S.cheer?.[k], season: S.season, unlock: S.unlock[k], price: S.price[k], c: S.c, hi: S.hi, dk: S.dk, bar: S.bar });
 const ARMOR_ALL = ARMOR_TIERS.length;
 const armorOf = n => ARMOR_TIERS[n - 1] ?? null;
 // mobility and jump levels, 2 = medium (no change)
@@ -45,7 +48,7 @@ const LEVEL_NAMES = ['VERY LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY HIGH'];
 const MOB_FX = [-.12, -.06, 0, .06, .12], JUMP_FX = [-.16, -.08, 0, .1, .2];
 // full set bonuses: boots, hat and armor of one set
 const SET_FX = { warrior: { dmg: .05, dr: .05 }, raider: { spd: .08, air: 1 }, ironclad: { dr: .05, steady: true }, arcane: { wand: .1, long: .5 },
-  thornwood: { wait: 2 }, skyrunner: { spd: .04, dash: true }, titanium: { dmg: .05, dr: .05, spd: .04 } };
+  thornwood: { wait: 2 }, skyrunner: { spd: .04, dash: true }, titanium: { dmg: .05, dr: .05, spd: .04 }, elf: { spd: .04, dr: .04 } };
 const GROW_WAIT = 4; // seconds without a hit before Thornwood grows back
 function armorFx(f, n, b, h) {
   const T = armorOf(n), set = T?.suit && b?.id === T.suit && h?.id === T.suit ? T.suit : '', S = SET_FX[set] ?? {};
@@ -76,7 +79,7 @@ const matchArmor = () => wornArmor();
 // bots get random armor up to your best tier, now and then a set piece
 const BOT_BARE = .15, BOT_SUIT = .25;
 function botArmor() {
-  const sets = SUITS.filter(S => suitStars(S.id) || prof.lv >= S.unlock[0]);
+  const sets = SUITS.filter(S => suitStars(S.id) || prof.lv >= S.unlock[0] && !S.season); // a season's only once it's yours
   if (sets.length && Math.random() < BOT_SUIT) { const S = sets[Math.random() * sets.length | 0]; return suitN(S.id, 1 + (Math.random() * Math.max(1, suitStars(S.id)) | 0)); }
   const n = Math.max(1, Math.min(ARMOR_MAX, prof.armor | 0));
   return Math.random() >= BOT_BARE ? ARMOR_TIERS.indexOf(pickRare(ARMOR_TIERS.slice(0, n))) + 1 : 0;
@@ -190,6 +193,7 @@ function suitPieces(T, team) {
   const FB = (x0, x1, y0, y1, m, d = 0) => { B(x0, x1, y0, y1, 4, zf + d, m); B(x0, x1, y0, y1, -zf - d, -4, m); };
   const P = (x0, x1, y0, y1, m) => { B(x0, x1, y0, y1, zf - 1, zf, m); B(x0, x1, y0, y1, -zf, -zf + 1, m); }; // painted on, front and back
   FB(-8, 8, yb, 13, C); if (plate) FB(-8, 8, yb, yb + 1, DK); M(5, 8, 12, 13, -4, 4, C);
+  if (T.suit === 'elf') { const RD = hex([204, 44, 44]); P(-8, 8, -3, -1, RD); P(-2, 2, -3, -1, GOLD); for (const y of [3, 7]) P(-1, 1, y, y + 2, st >= 3 ? GOLD : RD); for (const x of [-8, -4, 0, 4]) P(x, x + 2, yb, yb + 2, RD); P(-8, 8, 11, 13, RD); } // a red belt with a gold buckle, buttons, a pointed hem, a red collar
   if (iron) { // thick dark iron in bands, bronze trim, gold at 5 stars
     const TRIM = st >= 5 ? GOLD : hex([150, 110, 60]);
     for (const y of [-2, 4]) P(-8, 8, y, y + 1, DK); // plate seams
@@ -266,7 +270,7 @@ function suitPadPieces(T, s) {
   const C = hex(T.c), HI = hex(T.hi), GOLD = hex([240, 196, 64]);
   const warrior = T.suit === 'warrior', iron = T.suit === 'ironclad', arc = T.suit === 'arcane', thorn = T.suit === 'thornwood', sky = T.suit === 'skyrunner', ti = T.suit === 'titanium';
   const TRIM = ti ? (st >= 5 ? hex([150, 205, 255]) : hex([79, 157, 255])) : st >= 5 ? (arc ? hex([255, 214, 90]) : thorn ? hex([255, 186, 50]) : GOLD) : warrior ? hex([158, 34, 40]) : iron ? hex([150, 110, 60]) : arc ? hex([196, 150, 60])
-    : thorn ? hex([50, 96, 40]) : sky ? hex([40, 200, 210]) : hex([34, 200, 186]);
+    : thorn ? hex([50, 96, 40]) : sky ? hex([40, 200, 210]) : T.suit === 'elf' ? hex([204, 44, 44]) : hex([34, 200, 186]);
   const x1 = iron ? 19 : warrior || thorn || ti ? 18 : 17, zp = iron ? 7 : warrior || thorn || ti ? 6 : 5, ylo = iron ? 3 : warrior || sky || ti ? 5 : thorn ? 4 : arc ? -8 : -6, y1 = iron ? 17 : warrior || thorn ? 16 : 15;
   const ring = (y0, y1, m) => { B(8, x1, y0, y1, 4, zp, m); B(8, x1, y0, y1, -zp, -4, m); B(16, x1, y0, y1, -zp, zp, m); };
   B(8, x1, 12, y1, -zp, zp, C); B(8, x1, y1 - 1, y1, -zp, zp, HI);

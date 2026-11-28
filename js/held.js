@@ -1,8 +1,8 @@
 // held weapons: one set of moves for every view (first person in weapons.js, bots and other players in deathmatch.js, the lobby)
 const KICK = { shoulder: [.2, .1], heavy: [.1, .06], orb: [.1, .06], bow: [.06, .03], all: [.25, .08] }; // muzzle climb, slide back
 const SWING = { arm: .65, lift: .35, wrist: .45, sweep: .35, push: .1 }; // arm and hand share a swing; the wind-up barely lifts the arm, so it stays out of your view
-const THROW_T = .4, CATCH_T = .3; // the Boomerang's throw and catch
-const kickFall = w => (w.melee ? 1 / swingT(w) : w.boomer ? 1 / THROW_T : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1);
+const THROW_T = .4, CATCH_T = .3, PULL_T = .5; // the Boomerang's throw and catch, and bringing out the next thing to throw
+const kickFall = w => (w.melee ? 1 / swingT(w) : w.thrown ? 1 / (THROW_T + PULL_T) : w.boomer ? 1 / THROW_T : w.scope ? 4 : 8) * (heavyKick(w) ? HEAVY.settle : 1);
 const RL_KEYS = ['x', 'y', 'z', 'rx', 'ry', 'rz', 'mx', 'my', 'mz'];
 const kickOf = w => w.beam ? 0 : w.flame ? .3 : 1; // a beam can't kick: its far end would jump
 const heldIdle = a => !(a.sw || a.push || a.tw || a.wx || a.wy || a.wz || a.left || a.az || a.level || a.fb || a.fh || a.toss || a.tossR || a.dr || RL_KEYS.some(c => a[c]));
@@ -14,12 +14,12 @@ function palmAt(h, left) {
 }
 // a weapon's moves at this moment: the arms swing at the shoulders, it turns in the hand, a reload moves it and the left hand
 function heldAnim(w, st) {
-  const o = { sw: 0, push: 0, tw: 0, wx: 0, wy: 0, wz: 0, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, mx: 0, my: 0, mz: 0, left: 0, az: 0, level: st.level || 0, fb: 0, fh: 0, toss: 0, tossR: 0, dr: w.bow && w.charge ? Math.min(1, st.draw || 0) * BOW_PULL * GPX * (GUN_SCALE[w.id] || 1) : 0 }; // dr: how far a drawing hand has come back
+  const o = { sw: 0, push: 0, tw: 0, wx: 0, wy: 0, wz: 0, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, mx: 0, my: 0, mz: 0, left: 0, az: 0, level: st.level || 0, fb: 0, fh: 0, toss: 0, tossR: 0, gone: 0, dr: w.bow && w.charge ? Math.min(1, st.draw || 0) * BOW_PULL * GPX * (GUN_SCALE[w.id] || 1) : 0 }; // dr: how far a drawing hand has come back
   if (w.melee) {
     if (st.swing >= 0) w.sweep ? sweepPose(st.swing, st.sv | 0, o) : swingPose(st.swing, w.swings ? st.sv | 0 : 0, o);
     else if (st.insp >= 0) inspectPose(w, st.insp, o);
-  } else if (w.boomer) {
-    if (st.kick > 0) throwPose(1 - st.kick, o);
+  } else if (w.boomer || w.thrown) {
+    if (st.kick > 0) w.thrown ? thrownPose(1 - st.kick, o) : throwPose(1 - st.kick, o);
     if (st.ct > 0) catchPose(st.ct, o);
   } else if (st.kick > 0) {
     const [up, back] = KICK[w.hold] || KICK.all, k = st.kick * (heavyKick(w) ? HEAVY.lift : 1);
@@ -47,6 +47,11 @@ function sweepPose(t, v, o) {
 }
 // the Boomerang's throw (t 0 to 1): let go at once, high and out in front, the arm follows through down, then comes back; its catch (c 1 to 0): the hand gives with it
 function throwPose(t, o) { const a = inspK(t, 0, .3), k = 1 - inspK(t, .3, 1), sw = (.55 * a - .2) * k; o.sw = sw; o.push = (.22 - .1 * a) * k; o.wx = -.9 * sw; o.wy = .1 * k; }
+function thrownPose(p, o) { // thrown for good: your hand's empty through the throw, drops, and comes back up with the next one (gone: nothing in it)
+  const t = p * (THROW_T + PULL_T); if (t < THROW_T) { throwPose(t / THROW_T, o); o.gone = 1; return; }
+  const u = (t - THROW_T) / PULL_T, d = u < .4 ? inspK(u, 0, .4) : 1 - inspK(u, .4, 1); o.sw = .7 * d; o.wx = -.9 * o.sw; o.gone = u < .4 ? 1 : 0;
+}
+function heldShow(g, gone) { if (!g || !!g.userData.gone === !!gone) return; g.userData.gone = !!gone; for (const c of g.children) if (c.userData.shared) c.visible = !gone; } // hide or show the thing itself, in any view
 function catchPose(c, o) { const u = 1 - c, e = u < .25 ? inspK(u, 0, .25) : 1 - inspK(u, .25, 1); o.z += .1 * e; o.wx += .4 * e; }
 const nextSwing = (v, n) => n > 1 ? ((v | 0) + 1 + Math.random() * (n - 1) | 0) % n : 0; // never the same twice running
 const swingRate = (w, v) => w.swings ? [1, 1.07, .93, .97][v | 0] : 1; // each swing sounds a little different

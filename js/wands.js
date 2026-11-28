@@ -13,7 +13,8 @@ const TI_MATS = [0xeaf4ff, 0x8fc4ff, 0xffffff].map(c => bitMat(c, SHARD_TEX)), C
 const PLASMA_MATS = puffMats([0x8aff3a, 0xc8ff8a, 0xf2ffe0]); // the Quasar's
 const CONFETTI_MATS = [0xff3a5a, 0x3aff7a, 0x4aa8ff, 0xffd23a, 0xc86aff].map(c => bitMat(c, SHARD_TEX)); // the Grand Finale's
 const MOON_MATS = [0xd8ecff, 0xffffff, 0xfff4c8, 0xa8d4ff].map(c => bitMat(c, STAR_MATS[0].map)); // the Moonbeam's little stars
-const WAND_BITS = { plasma: [PLASMA_MATS, 7, 3.2, 2.4, .3, .085, 0], confetti: [CONFETTI_MATS, 10, 4, 3, .5, .08, 6], ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0],
+const TWINKLE_MATS = [0xffe9a0, 0xffffff, 0xffd060].map(c => bitMat(c, STAR_MATS[0].map)); // the North Star's
+const WAND_BITS = { twinkle: [TWINKLE_MATS, 6, 1.2, 1, .7, .1, -.4], plasma: [PLASMA_MATS, 7, 3.2, 2.4, .3, .085, 0], confetti: [CONFETTI_MATS, 10, 4, 3, .5, .08, 6], ember: [EMBER_MATS, 7, 2.5, 1.6, .35, .09, -3], wind: [WIND_MATS, 8, 3, 2.4, .3, .1, 0], soul: [SOUL_MATS, 6, 1.5, 1.2, .5, .08, -2], rune: [RUNE_MATS, 7, 2.5, 2.2, .4, .09, 0], ice: [ICE_MATS, 7, 2.5, 2.2, .4, .09, 6], spark: [SPARK_MATS, 8, 4, 3.2, .22, .08, 0],
   crystal: [CRYSTAL_MATS, 3, 4, 2.6, .4, .08, 5], ti: [TI_MATS, 5, 4, 3, .25, .07, 4], wisp: [WISP_MATS, 6, 1.6, 1.4, .5, .08, -2], void: [VOID_MATS, 8, 2.2, 2, .4, .1, 0], aurora: [AURORA_MATS, 8, 3, 2.2, .45, .1, -1], moon: [MOON_MATS, 7, 2.4, 2, .5, .09, -1] };
 // what flies off a bot or player when hit, by what hit them: lasers break off pixels in their own colour, guns throw sparks
 const PIXEL_TEX = (() => {
@@ -55,8 +56,8 @@ function hitBits(w, at, head) {
     fxBit(mats[Math.random() * mats.length | 0], scene, at, sz * (.7 + Math.random() * .6), new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread), life * (.8 + Math.random() * .4), g);
 }
 const moonGlint = (at, sc) => wandBits('moon', at, sc, 6, 2.2); // where a Moonbeam bounces
-function wandBits(k, at, sc, n, spread, size = 1) {
-  const [mats, , , , life, sz, g] = WAND_BITS[k];
+function wandBits(k, at, sc, n, spread, size = 1, alt = -1) { // alt: the gun, when it wears its own skin
+  let [mats, , , , life, sz, g] = WAND_BITS[k]; if (alt >= 0) mats = mats.map(m => bitTint(m, alt));
   for (let i = fxN(n); i > 0; i--)
     fxBit(mats[Math.random() * mats.length | 0], sc, at, sz * size * (.7 + Math.random() * .6), new THREE.Vector3(Math.random() - .5, Math.random() - .3, Math.random() - .5).multiplyScalar(spread), life * (.8 + Math.random() * .4), g);
 }
@@ -75,6 +76,7 @@ const WAND_BOLT = {
   wisp: { spd: 26, glow: 0x5fe8d8, core: 0xeafffb, size: .34, bits: 'wisp', gap: .35 }, // the armory's wisps and void orbs (the real ones are in mythics.js)
   voidorb: { spd: 20, glow: 0x9a5aff, core: 0xe8d2ff, size: .45, bits: 'void', gap: .3 },
   saw: { spd: 60, glow: 0x8fc4ff, core: 0xffffff, size: .3, bits: 'ti', gap: 0 },
+  star: { spd: 330, glow: 0xffd870, core: 0xffffff, size: .2, bits: 'twinkle', gap: .7 }, // the North Star
   arrow: { spd: 150, glow: 0xf4ead8, core: 0xffffff, size: .1, bits: 'wind', gap: 0, mesh: (d, size) => arrowMesh(d, size) }, // the Longbow's own arrow
 };
 let arrowGeos = null;
@@ -87,11 +89,12 @@ function arrowMesh(d, size) {
 }
 for (const K of Object.values(WAND_BOLT)) { K.mg = bitMat(K.glow, PUFF_TEX); K.mc = bitMat(K.core, PUFF_TEX); }
 const bolts = [], _bp = new THREE.Vector3(), _bt = new THREE.Vector3();
-function wandBolt(kind, from, to, sc = scene, onArrive = null, size = 1) {
-  const K = WAND_BOLT[kind], len = Math.max(.01, from.distanceTo(to));
+function wandBolt(kind, from, to, sc = scene, onArrive = null, size = 1, alt = -1) { // alt: the gun, when it wears its own skin: the bolt takes its colours
+  const K0 = WAND_BOLT[kind], K = alt < 0 || K0.mesh ? K0 : WAND_BOLT[kind + ':' + alt] ??= (() => { const g = shotCol(alt, 'alt', K0.glow), c = shotCol(alt, 'alt', K0.core); return { ...K0, glow: g, core: c, mg: bitMat(g, PUFF_TEX), mc: bitMat(c, PUFF_TEX) }; })();
+  const len = Math.max(.01, from.distanceTo(to));
   const ms = K.mesh ? [K.mesh(to.clone().sub(from), size)] : [K.mg, K.mc].map((m, j) => { const s = new THREE.Sprite(m); s.scale.setScalar(K.size * size * (j ? .5 : 1)); return s; });
   for (const m of ms) { m.position.copy(from); sc.add(m); }
-  const b = { ms, K, sc, from: from.clone(), to: to.clone(), dir: to.clone().sub(from).divideScalar(len), len, d: 0, gap: 0, size, onArrive, ghost: 0 };
+  const b = { ms, K, sc, from: from.clone(), to: to.clone(), dir: to.clone().sub(from).divideScalar(len), len, d: 0, gap: 0, size, onArrive, ghost: 0, alt };
   bolts.push(b); return b;
 }
 function boltTick(dt) {
@@ -99,12 +102,12 @@ function boltTick(dt) {
     const b = bolts[i], K = b.K, was = b.d; b.d = Math.min(b.len, b.d + K.spd * dt);
     _bp.copy(b.from).addScaledVector(b.dir, b.d);
     for (const m of b.ms) { m.position.copy(_bp); if (m.userData.spin) m.userData.spin.rotation.y += dt * 16; }
-    if (K.gap) for (b.gap += b.d - was; b.gap >= K.gap; b.gap -= K.gap) wandBits(K.bits, _bt.copy(b.from).addScaledVector(b.dir, b.d - b.gap), b.sc, 1, .5, b.size * .8); // a trail
+    if (K.gap) for (b.gap += b.d - was; b.gap >= K.gap; b.gap -= K.gap) wandBits(K.bits, _bt.copy(b.from).addScaledVector(b.dir, b.d - b.gap), b.sc, 1, .5, b.size * .8, b.alt); // a trail
     if (b.d < b.len) continue;
     for (const m of b.ms) b.sc.remove(m);
     bolts.splice(i, 1);
     if (b.ghost) continue; // someone else's spell: the server says where it went off
-    wandBits(K.bits, b.to, b.sc, 8, 3.5, b.size);
+    wandBits(K.bits, b.to, b.sc, 8, 3.5, b.size, b.alt);
     b.onArrive?.(b.to);
   }
   stunStars(); spellOrbTick();
@@ -142,7 +145,7 @@ function zapEnd(w, eye, dir, by) {
 }
 function stunZap(from, to, sc = scene, size = 1) {
   wandBolt('stun', from, to, sc, sc !== scene ? null : p => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(.35, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe14a, transparent: true, opacity: .6 }));
+    const m = new THREE.Mesh(pxSphere(.35, 0, 0, 0, 0, 0, Math.PI, .1), new THREE.MeshBasicMaterial({ color: 0xffe14a, transparent: true, opacity: .6 }));
     m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R: 1 });
   }, size);
 }
@@ -216,7 +219,7 @@ function spellFx(p, el) {
   const [a, c, snd, bits] = SPELL_FX[el] ?? SPELL_FX[0];
   burst(p, a, 18); burst(p, c, 10); wandBits(bits, p, scene, 16, 7);
   sfx(snd, { at: p, far: 100 });
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: a, transparent: true, opacity: .6 }));
+  const m = new THREE.Mesh(pxSphere(1), new THREE.MeshBasicMaterial({ color: a, transparent: true, opacity: .6 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R: ROCKET_R });
 }
 // the next spell glows in the crystal

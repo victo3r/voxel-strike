@@ -85,7 +85,8 @@ const rewardFor = place => { const t = rewardTable(); return t[Math.min(place, t
 // team modes: winners get 1st place pay
 const teamReward = res => { const t = rewardTable(); return res > 0 ? t[0] : res === 0 ? t[1] : t[t.length - 1]; };
 // bot loadouts: one gun per category, rarer guns less often
-const botGun = (c, top = botTop()) => pickRare(BASE.filter(w => w.cat === c && (w.unlock || 0) <= top)).id;
+const SEASON_BOT = .2; // how often a bot brings one of the month's guns for a slot
+const botGun = (c, top = botTop()) => { const all = BASE.filter(w => w.cat === c && (w.unlock || 0) <= top), mine = all.filter(w => w.season && seasonOn(w.season)), rest = all.filter(w => !w.season); return pickRare(mine.length && Math.random() < SEASON_BOT ? mine : rest).id; };
 // how far a bot likes to stay from its target with each gun
 const BOT_KEEP = {
   voxel: [5, 12], hitman: [6, 16], shotgun: [2.5, 6], ar: [8, 16], thrasher: [9, 18], hornet: [8, 18], salvo: [9, 18], apex: [18, 36], tracker: [6, 16], tempest: [6, 16], eradicator: [6, 12], sniper: [16, 32], semisniper: [14, 28],
@@ -96,6 +97,7 @@ const BOT_KEEP = {
   daybreak: [6, 18], highnoon: [12, 28], cutlass: [1, 1.9], harpoon: [14, 30], conch: [5, 14], tishot: [2.5, 7], tipistol: [6, 16], tisword: [1, 2.2], tisaw: [8, 20], tisniper: [18, 36], tirocket: [9, 18],
   moonbeam: [9, 22], bombard: [11, 24], peregrine: [10, 22],
   firefly: [5, 14], longbow: [14, 30], rhino: [9, 22], boomerang: [6, 16], juggernaut: [6, 14], scythe: [1, 2.4], meteor: [12, 28],
+  sleighbells: [4, 12], candycane: [1, 2.1], nutcracker: [2, 5.5], northstar: [18, 36], snowglobe: [8, 18], delivery: [12, 28],
 };
 // how good each gun is at a distance
 const GUN_FIT = {
@@ -146,6 +148,12 @@ const GUN_FIT = {
   juggernaut: d => d < 16 ? 1 : .5,
   scythe: d => d < 3.2 ? 1.33 : d < 4.8 ? .42 : 0,
   meteor: d => d < 7 ? 0 : d < 30 ? .8 : .45,
+  sleighbells: d => d < 3 ? .65 : d < 13 ? .8 : .4,
+  candycane: d => d < 3 ? 1.2 : d < 4.2 ? .4 : 0,
+  nutcracker: d => d < 5 ? 1 : d < 9 ? .6 : .2,
+  northstar: d => d > 16 ? .95 : d > 9 ? .55 : .2,
+  snowglobe: d => d < 5 ? .1 : d < 20 ? .85 : .4,
+  delivery: d => d < 7 ? 0 : d < 30 ? .8 : .45,
   flare: d => d < 3 ? .1 : d < 20 ? .6 : .35,
   windwand: d => d < 3 ? .6 : d < 20 ? .78 : .5,
   stunwand: d => d < 4 ? 1.3 : d < 6 ? .4 : 0,
@@ -190,7 +198,7 @@ function botWear() {
 function botGearNet() {
   const load = CATS.map(([c]) => botGun(c)), stars = {};
   for (const id of load) { const top = Math.max(0, gunUse(gi(id)) - 1); stars[id] = Math.random() * (top + 1) | 0; }
-  return { ...botWear(), stars, load, lv: Math.min(LV_MAX, botTop()) }; // lv: how grown a gun that grows is
+  return { ...botWear(), stars, load, lv: Math.min(LV_MAX, botTop()), skins: Object.fromEntries(load.map(id => [id, gsBot(gi(id))]).filter(([, s]) => s)) }; // lv: how grown a gun that grows is
 }
 function botLoadout(easy, top = botTop()) {
   const load = CATS.map(([c]) => gi(easy ? pickRare(BASE.filter(w => w.cat === c && rarOf(w) === 'common')).id : botGun(c, top))), taste = tasteFor(load);
@@ -198,7 +206,7 @@ function botLoadout(easy, top = botTop()) {
   const stars = {}, W = {}, lv = Math.min(LV_MAX, top); // lv: how grown a gun that grows is
   for (const g of load) { const top = easy ? 0 : Math.max(0, gunUse(g) - 1); stars[g] = Math.random() * (top + 1) | 0; W[g] = statsAt(g, stars[g], lv); }
   const { armor, boots, hat, kfx } = easy ? { armor: 0, boots: null, hat: null, kfx: '' } : botWear();
-  return { load, taste, stars, W, lv, armor, boots, hat, kfx, fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
+  return { load, taste, stars, W, lv, armor, boots, hat, kfx, skins: easy ? {} : Object.fromEntries(load.map(g => [g, gsBot(g)])), fx: armorFx(gearFx(boots, hat), armor, boots, hat) };
 }
 
 const BOT_U = 1.85 / 33; // one skin pixel, so bots are as tall as you
@@ -289,7 +297,8 @@ function scoreKill(killer, victim, head, helpers) {
     const pts = MR.kills ? 1 : KILL_PTS + (head ? HEAD_PTS : 0) + (st ? st[0] : killer.streak > STREAK_PTS_AFTER ? STREAK_PTS : 0);
     killer.score += pts;
     if (killer.you) {
-      missionKill(head, killer.streak);
+      missionKill(head, killer.streak); seasonKill(head, victim.b?.g.position, killer.streak); gsKill(head, killer.streak);
+      if (!net.on && youFx().cheer && respawnT <= 0) soulHeal(null, victim.b ? victim.b.g.position.clone().setY(victim.b.g.position.y + 1) : P.pos.clone(), youFx().cheer); // the Elf Tunic
       killNotice(`${MR.kills ? '+1 KILL' : '+' + pts}${head ? ' · HEADSHOT' : ''}`, killer.streak, head, eventKill(head));
     }
   }
@@ -323,7 +332,7 @@ function holdGun(b) {
   const u = BOT_U;
   if (b.gunM) { b.aim.remove(b.gunM); b.gunM.traverse(o => { if (o.geometry && o !== b.flashM && !o.userData.shared) o.geometry.dispose(); }); }
   b.core?.dispose();
-  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag, rounds, charges, pulse, core, flips } = makeGun(b.gun, gunM, b.rec.stars[b.gun], growStage(b.gun, b.rec.lv));
+  const gunM = new THREE.Group(), { muzzle: [my, mz], spin, round, mag, rounds, charges, pulse, core, flips, dual } = makeGun(b.gun, gunM, b.rec.stars[b.gun], growStage(b.gun, b.rec.lv), gsFor(b.gun, b.rec.skins?.[b.gun]));
   // the hold pose from hold.js
   const h = holdFor(b.gun);
   gunM.position.set(h.T[0] * u, (h.T[1] - 22) * u, h.T[2] * u); gunM.quaternion.fromArray(h.q);
@@ -332,7 +341,7 @@ function holdGun(b) {
   b.holdTurn = h.turn; // sideways stance so the gun points where it aims
   b.round = round; b.rounds = rounds; b.bn = 0; b.charges = charges; b.chargeK = 0; chargeShow(charges, 0); b.pulse = pulse; b.core = core; b.flips = flips; b.insp = -1;
   b.flashM ??= makeFlash(.1); b.flashM.material = flashOf(BASE[b.gun]);
-  b.flashM.position.set(0, my, mz - .03); b.flashM.visible = false;
+  b.flashM.position.set(dual, my, mz - .03); b.flashM.visible = false; b.dual = dual;
   gunM.add(b.flashM); b.aim.add(gunM);
   b.gunM = gunM; b.spin = spin; b.spinV = 0; b.wf = 0; b.kick = 0;
   // reload start pose
@@ -356,7 +365,7 @@ function heldTick(b, dt, left, total) {
   if (lan) b.lanT = b.muzzle > 0 ? 0 : (b.lanT ?? 9) + dt;
   b.kick = Math.max(0, (b.kick || 0) - dt * kickFall(W)); b.ct = Math.max(0, (b.ct || 0) - dt / CATCH_T);
   const a = heldAnim(W, { kick: lan ? 0 : b.kick, swing: W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, sv: b.sv, rl: k, level: wand ? b.wf : 0, two: !!R.fL, insp: b.insp ?? -1, draw: b.chargeK || 0, ct: W.boomer ? b.ct : 0 });
-  bladeTrail(g, W, W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, scene); flipShow(b.flips, a);
+  bladeTrail(g, W, W.melee && b.stab > 0 ? 1 - b.stab / swingT(W) : -1, scene, altBy(b, b.gun)); flipShow(b.flips, a); if (W.thrown) heldShow(g, a.gone);
   b.aim.rotation.x += a.sw; b.aim.position.z = a.push; b.aim.rotation.y = b.body.rotation.y = a.tw; // the arms swing at the shoulders, the chest turns with a sweep
   if (heldIdle(a) && !lan) {
     if (R.on) { R.on = false; g.position.copy(R.p); g.quaternion.copy(R.q); b.armR.quaternion.copy(R.qR); b.armL.quaternion.copy(R.qL); if (b.mag) b.mag.position.copy(R.magAt); }
@@ -458,7 +467,7 @@ function botDown(b, by, head, nobody = false) {
   scoreKill(nobody ? null : by ? by.rec : youRec, b.rec, head, b.helpers);
 }
 // dead bots turn into an angel that floats away
-const haloGeo = new THREE.TorusGeometry(4 * BOT_U, .5 * BOT_U, 6, 16), wingGeo = new THREE.BoxGeometry(1, 1, 1);
+const haloGeo = pxTorus(4 * BOT_U, .5 * BOT_U), wingGeo = new THREE.BoxGeometry(1, 1, 1);
 function angel(b) {
   const u = BOT_U;
   if (b.gunM) b.gunM.visible = false;
@@ -691,9 +700,9 @@ function botFlame(b, W) {
 }
 function botFire(b, W, dist) {
   botHear(b.g.position.x, b.g.position.z, b, W.quiet || W.flame);
-  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); b.kick = kickOf(W); coreFire(b.core); net.shot(W, b);
+  b.ammo--; b.muzzle = W.flame || W.beam ? 0 : flashTime(W); b.kick = kickOf(W); coreFire(b.core); dualFlip(b.flashM, b.dual); net.shot(W, b);
   const bolt = W.wand && !W.beam; if (bolt) b.wandT = .15; // a wand flicks forward
-  muzzleBits(W, b.flashM);
+  muzzleBits(W, b.flashM, scene, 1, altBy(b, b.gun));
   // beams in long sweeps, everything else in short bursts
   if (W.burst) { b.cd = burstCd(W, b); if (!b.bn) b.cd += Math.random() * .3; } // whole bursts, a little apart
   else if (autoFire(W)) { b.cd = W.windup ? windGap(W, b.wk || 0) : W.rate; if (W.windup) b.wk = Math.min(1, (b.wk || 0) + b.cd / W.windup); if (--b.burst <= 0) { b.wk = (b.wk || 0) * .5; b.burst = W.beam ? 14 + (Math.random() * 20 | 0) : 4 + (Math.random() * 6 | 0); b.cd = .35 + Math.random() * .35; } }
@@ -736,8 +745,8 @@ function botFire(b, W, dist) {
     const bot = others.length ? losRay.intersectObjects(others, false)[0] : null, botD = bot ? bot.distance : Infinity;
     const onYou = youUp && losRay.ray.intersectBox(pBox, hitV), youD = onYou ? eye.distanceTo(hitV) : Infinity;
     const near = Math.min(wallD, botD, youD);
-    if (W.beam) { b.flashM.getWorldPosition(beamFrom); beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)); if (W.chain) arc(b, beamFrom, beamTo, .1); else showBeam(b, beamFrom, beamTo, beamKind(W)); }
-    if (bolt || W.bolt) wandBolt(W.wand || W.bolt, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, 90)));
+    if (W.beam) { b.flashM.getWorldPosition(beamFrom); beamTo.copy(eye).addScaledVector(dirV, Math.min(near, W.range)); if (W.chain) arc(b, beamFrom, beamTo, .1); else showBeam(b, beamFrom, beamTo, beamKind(W), altBy(b, b.gun)); }
+    if (bolt || W.bolt) wandBolt(W.wand || W.bolt, b.flashM.getWorldPosition(beamFrom), beamTo.copy(eye).addScaledVector(dirV, Math.min(near, 90)), scene, null, 1, altBy(b, b.gun));
     if (near === Infinity) continue;
     if (near === youD) {
       const head = hitV.y > P.pos.y + 1.45, was = respawnT;
@@ -777,7 +786,7 @@ function botLance(b, W) {
   }
   shotCharge = 1;
   const g = b.gun, from = b.flashM.getWorldPosition(beamFrom).clone(), held = () => b.gun === g && !b.dead;
-  if (W.charge) auroraBeam(from, L, k, 1, b.flashM, held); else showLance(from, L, W.lance, 1, scene, b.flashM, held);
+  if (W.charge) auroraBeam(from, L, k, 1, b.flashM, held, scene, altBy(b, b.gun)); else showLance(from, L, shotCol(b.gun, skinBy(b, b.gun), W.lance), 1, scene, b.flashM, held);
 }
 
 function updateBot(b, dt) {
@@ -1084,7 +1093,7 @@ function endMatch(results) {
     + (!results && place === 1 ? `<div class="rl">Win online to earn chest keys ${ico('key')}</div>` : '')
     + (D?.forfeit && results.won ? `<div class="rl">${D.rival || 'Your rival'} ${quick ? 'left too soon for this one to count' : 'left, so the win is yours'}</div>` : '')
     + (results?.priv ? '<div class="rl">Private match: pay for taking part. Public matches pay for placing</div>' : '')
-    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + unlockRow(ups) + achRow() + missionsRow() + dailyRow();
+    + (ups ? `<div class="lvup"><span>LEVEL UP! LVL ${prof.lv}</span><span>+${bonus} ${COIN}</span><span>+${boostUp} ${ico('bolt')}</span></div>` : `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>`) + xpBar() + unlockRow(ups) + achRow() + seasonRow() + gsRow() + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(won ? 'win' : 'lose'); musicEnd();
   if (!MR.starter) setTimeout(cgMidgame, 1500); // CrazyGames midgame ad, not after your first game
@@ -1121,6 +1130,6 @@ function setupMode() {
     cur = slotGun[0]; buildGun(); renderHotbar();
   }
   musicMatch(mapId, pvp() ? 'dm' : mode); // bot matches use the deathmatch music
-  tipStart(); missionMark(); achMark(); eventMark();
+  tipStart(); missionMark(); achMark(); eventMark(); seasonMark(); gsMark();
   if (mode === 'range') rangeSetup();
 }

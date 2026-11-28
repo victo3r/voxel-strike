@@ -21,7 +21,7 @@ function pixMat(w, h, draw, extra) {
 }
 
 // your shadow on the platform (lobbies.js has the rest)
-const shadow = new THREE.Mesh(new THREE.CircleGeometry(.42, 20), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .35 }));
+const shadow = new THREE.Mesh(pxDisc(.42), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .35 }));
 shadow.rotation.x = -Math.PI / 2; shadow.position.y = .505; lobbyScene.add(shadow);
 
 // your character, arrows flip through the looks
@@ -36,7 +36,7 @@ const ownSecret = id => SECRET_OWNER[id] ? secretMine(SECRET_OWNER[id]) : Array.
 // a secret skin that isn't yours comes off
 function secretCheck() { const s = prof.look?.secret; if (!s || !SECRETS[s] || ownSecret(s)) return; prof.look = { ...PRESETS[0].look }; saveProf(); if (typeof dressHero === 'function') dressHero(); }
 const lookChoices = () => [...PRESETS, ...(prof.myLook && !isPreset(prof.myLook) ? [{ name: 'CUSTOM', look: prof.myLook }] : []),
-  ...Object.keys(SECRETS).filter(ownSecret).map(id => ({ name: SECRETS[id].name, look: SECRETS[id].look, secret: id })),
+  ...Object.keys(SECRETS).filter(ownSecret).map(id => ({ name: SECRETS[id].name, look: SECRETS[id].look, secret: id, event: SECRETS[id].event })),
   ...(prof.draws || []).map((d, i) => ({ name: d.n, look: { ...lookBase(), px: d.px }, drawn: i }))];
 const lookIndex = () => { const k = lookKey(prof.look); return lookChoices().findIndex(p => lookKey(p.look) === k); };
 const hero = new THREE.Group(); hero.position.y = .5; lobbyScene.add(hero);
@@ -49,20 +49,25 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 const SHR = new THREE.Vector3(...SH_R).divideScalar(16), SHL = new THREE.Vector3(...SH_L).divideScalar(16);
 const armTo = (sh, p, out) => out.setFromUnitVectors(DOWN, _av.copy(p).sub(sh).normalize());
 const _av = new THREE.Vector3();
+let heroSkin = null; // a skin being looked at in the armory, instead of the one the gun wears
+let cardLive = false; // a player card is open with them standing here (boards.js)
+let heroGuest = null; // someone else standing in your lobby while you read their card: { look, armor, boots, hat, load, stars, skins }
+const heroWears = () => heroSkin ?? (heroGuest ? heroGuest.skins[hf.i] || '' : gunSkin(hf.i)), heroAlt = () => heroWears() === 'alt' ? hf.i : -1; // the skin on the gun in his hands; the gun itself when that's its own skin (its shots take its colours)
+const heroUse = i => heroGuest ? 1 + (heroGuest.stars[i] | 0) : gunUse(i);
 function heroGun(i) {
-  const key = i < 0 ? '' : i + ':' + gunUse(i) + ':' + growStage(i);
+  const skin = i < 0 ? '' : heroSkin ?? (heroGuest ? heroGuest.skins[i] || '' : gunSkin(i)), key = i < 0 ? '' : i + ':' + heroUse(i) + ':' + growStage(i) + ':' + skin;
   if (key === holdKey) return;
   holdKey = key;
   holdG.clear();
-  heroFireStop(); stopSfx(hf.chgSnd);
-  if (i < 0) { pose = null; hf.i = -1; return; }
+  heroFireStop(); stopSfx(hf.chgSnd); stopSfx(hf.rlSnd); hf.chg = 0;
+  if (i < 0) { pose = null; hf.i = -1; hf.spin = null; hf.spinV = 0; hf.wk = 0; hf.held = false; return; } // put away: nothing of it left turning (its motor whirred on)
   const g = new THREE.Group(); hf.core?.dispose();
-  const parts = makeGun(i, g, Math.max(0, gunUse(i) - 1));
+  const parts = makeGun(i, g, Math.max(0, heroUse(i) - 1), undefined, skin);
   g.scale.setScalar(GUN_S);
-  const st = statsAt(i, Math.max(0, gunUse(i) - 1));
+  const st = statsAt(i, Math.max(0, heroUse(i) - 1));
   Object.assign(hf, { i, st, g, ammo: st.mag, rl: 0, cd: 0, kick: 0, flash: 0, held: false, auto: 0, wf: 0, mag: parts.mag, magAt: parts.mag && parts.mag.position.clone(), flips: parts.flips, insp: -1, spin: parts.spin, spinV: 0, round: parts.round, rounds: parts.rounds, bn: 0, rs: { rk: -1 }, charges: parts.charges, chg: 0, pulse: parts.pulse, core: parts.core });
   chargeShow(parts.charges, 0); clearBoomers(lobbyScene);
-  hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(0, parts.muzzle[0], parts.muzzle[1] - .03); hf.flashM.visible = false; g.add(hf.flashM);
+  hf.flashM = makeFlash(.1, flashOf(BASE[i])); hf.flashM.position.set(parts.dual, parts.muzzle[0], parts.muzzle[1] - .03); hf.dual = parts.dual; hf.flashM.visible = false; g.add(hf.flashM);
   const h = holdFor(i), fist = (S, d) => S.clone().addScaledVector(new THREE.Vector3().fromArray(d), ARM_LEN / 16);
   const kind = holdOf(BASE[i]), he = holdFor(i, true);
   const asPose = h => ({ pos: new THREE.Vector3().fromArray(h.T).divideScalar(16), q: new THREE.Quaternion().fromArray(h.q), fR: fist(SHR, h.dR), fL: h.dL && fist(SHL, h.dL), turn: h.turn, hR: palmAt(h, false) });
@@ -74,7 +79,7 @@ function heroGun(i) {
 const hf = { i: -1, rs: { rk: -1 } };
 const heroFx = [], fxGeo = new THREE.BoxGeometry(1, 1, 1);
 const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: .9, depthWrite: false });
-const FX_MATS = { rocket: new THREE.MeshBasicMaterial({ color: 0xffa040 }), gust: new THREE.MeshBasicMaterial({ color: 0xd8f4ff }), flare: new THREE.MeshBasicMaterial({ color: 0xff5a3a }),
+const FX_MATS = {
   beam: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .75, depthWrite: false }),
   shock: new THREE.MeshBasicMaterial({ color: 0x6fdcff, transparent: true, opacity: .8, depthWrite: false }), frost: new THREE.MeshBasicMaterial({ color: 0xc8f4ff, transparent: true, opacity: .8, depthWrite: false }), water: new THREE.MeshBasicMaterial({ color: 0x5fc4ee, transparent: true, opacity: .8, depthWrite: false }), laser: new THREE.MeshBasicMaterial({ color: 0xd47bff }) };
 const heroLive = () => inLobby && (armOpen ? armPage !== 'wear' : lob.on);
@@ -95,7 +100,7 @@ function heroReload() {
   const w = hf.st; if (w?.melee) return heroInspect();
   if (!heroCan() || !w || w.pool || hf.rl > 0) return;
   heroFireStop(); hf.rl = w.reload; hf.bn = 0;
-  sfx('r_' + w.id, { v: .7 * hv(), rate: BASE[hf.i].reload / w.reload });
+  hf.rlSnd = sfx('r_' + w.id, { v: .7 * hv(), rate: BASE[hf.i].reload / w.reload });
 }
 const _hm = new THREE.Vector3(), _hd = new THREE.Vector3(), _hq = new THREE.Quaternion();
 function heroShot(k = 1) {
@@ -103,7 +108,7 @@ function heroShot(k = 1) {
   if (hf.rl > 0 || hf.cd > 0 || w.boomer && boomerOut(null, true)) return;
   if (!w.inf && hf.ammo <= 0) { hf.bn = 0; if (!hf.held || !autoFire(w)) sfx('dry', { v: .6 * hv() }); hf.auto = .25; return; }
   hf.cd = w.windup ? windGap(w, hf.wk || 0) : burstCd(w, hf); if (!w.inf && !w.pool) hf.ammo--; // a wand can't reload, so here it never runs dry
-  hf.kick = kickOf(w); coreFire(hf.core);
+  hf.kick = kickOf(w); coreFire(hf.core); dualFlip(hf.flashM, hf.dual);
   if (w.melee) {
     if (w.swings) hf.sv = nextSwing(hf.sv, w.swings);
     sfx(w.swing || 'swing', { v: .7 * hv(), rate: swingRate(w, hf.sv) });
@@ -123,32 +128,38 @@ function heroShot(k = 1) {
     if (w.frost) frostHeld = .12; else if (w.chain) stormHeld = .12; else if (w.water) waterHeld = .12; else beamHeld = .12;
     if ((w.shock || w.chain) && Math.random() < .25) sfx('zap', { v: .4 * hv() });
     if (w.chain) { const L = w.range; arc('hero', _hm, _hm.clone().addScaledVector(_hd, L), .1, lobbyScene, (a, b) => { hf.flashM.getWorldPosition(a); hf.g.getWorldQuaternion(_hq); b.set(0, 0, -1).applyQuaternion(_hq).multiplyScalar(L).add(a); }); return; }
-    hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = w.frost ? FX_MATS.frost : w.water ? FX_MATS.water : w.shock ? FX_MATS.shock : FX_MATS.beam; lobbyScene.add(hf.beamM);
+    hf.beamM ??= new THREE.Mesh(fxGeo, FX_MATS.beam); hf.beamM.material = (m => heroAlt() < 0 ? m : bitTint(m, heroAlt()))(w.frost ? FX_MATS.frost : w.water ? FX_MATS.water : w.shock ? FX_MATS.shock : FX_MATS.beam); lobbyScene.add(hf.beamM);
     hf.beamOn = .08; return;
   }
   sfx(w.lance && w.charge ? k >= 1 ? 'auroraFull' : 'aurora' : w.id, { v: .5 * hv() }); hf.flash = flashTime(w);
-  muzzleBits(w, hf.flashM, lobbyScene, .8);
+  muzzleBits(w, hf.flashM, lobbyScene, .8, heroAlt());
   if (hf.spin) hf.spinV = shotSpin(w, hf.i, hf.spinV, hf.wk || 0);
   if (w.lance) {
     const L = { walls: [], end: _hm.clone().addScaledVector(_hd, 30), stop: false }, held = (gi => () => hf.i === gi)(hf.i);
-    if (w.charge) auroraBeam(_hm.clone(), L, k, .6, hf.flashM, held, lobbyScene); else showLance(_hm.clone(), L, w.lance, .6, lobbyScene, hf.flashM, held);
+    const sk = heroWears();
+    if (w.charge) auroraBeam(_hm.clone(), L, k, .6, hf.flashM, held, lobbyScene, sk === 'alt' ? hf.i : -1); else showLance(_hm.clone(), L, shotCol(hf.i, sk, w.lance), .6, lobbyScene, hf.flashM, held);
     return;
   }
   if (w.boomer) { fireBoomer(w, _hm.clone(), _hd.clone(), null, { show: true, sc: lobbyScene, size: .3, hide: hf.g, home: out => hf.flashM.getWorldPosition(out), caught: () => { hf.ct = 1; } }); return; }
-  if (w.wisp || w.vortex || w.saw) { wandBolt(w.wisp ? 'wisp' : w.saw ? 'saw' : 'voidorb', _hm.clone(), _hm.clone().addScaledVector(_hd, w.vortex ? 12 : 18), lobbyScene, null, .7); return; }
-  if (w.wand || w.bolt) { if (w.wand) hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand || w.bolt, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7); return; }
-  const n = w.pellets > 1 ? 5 : 1, mat = w.gust ? FX_MATS.gust : w.rocket || w.grenade ? FX_MATS.rocket : w.flare ? FX_MATS.flare : w.laser ? FX_MATS.laser : w.tracer ? tracerCol(w.tracer) : TRACER_MAT, thick = w.rocket || w.grenade ? .09 : w.flare ? .06 : w.laser ? .04 : .02;
+  if (w.wisp || w.vortex || w.saw) { wandBolt(w.wisp ? 'wisp' : w.saw ? 'saw' : 'voidorb', _hm.clone(), _hm.clone().addScaledVector(_hd, w.vortex ? 12 : 18), lobbyScene, null, .7, heroAlt()); return; }
+  if (w.wand || w.bolt) { if (w.wand) hf.wt = .15; wandBolt(w.spell ? 'spell' + rollEl() : w.wand || w.bolt, _hm.clone(), _hm.clone().addScaledVector(_hd, 25), lobbyScene, null, .7, heroAlt()); return; }
+  if (w.rocket || w.grenade || w.flare) { // the thing itself, as a match throws it: thrown ones fall, the rest fly straight
+    const m = shotMesh(w, heroAlt()), drop = w.lob ? LOB_G : w.grenade ? GREN_GRAV : w.flare ? FLARE_DROP : 0, d = w.lob ? lobDir(_hd) : _hd.clone();
+    m.scale.setScalar(.8); m.position.copy(_hm).addScaledVector(d, .2); m.lookAt(_hm.clone().addScaledVector(d, 10)); lobbyScene.add(m);
+    heroFx.push({ m, v: d.multiplyScalar((w.flare ? FLARE_SPD : w.grenade ? GREN_SPD : rocketSpd(w)) * .55), life: w.lob ? 1.2 : .8, drop, turn: !!drop && !w.flare }); return;
+  }
+  const n = w.pellets > 1 ? 5 : 1, mat = w.laser ? FX_MATS.laser : w.tracer ? tracerCol(shotCol(hf.i, heroWears(), w.tracer)) : TRACER_MAT, thick = w.laser ? .04 : .02;
   for (let k = 0; k < n; k++) {
     const d = _hd.clone(); if (n > 1) d.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(w.spread * 3)).normalize();
-    const len = w.rocket || w.flare || w.grenade ? .6 : 3, m = new THREE.Mesh(fxGeo, mat);
+    const len = 3, m = new THREE.Mesh(fxGeo, mat);
     m.scale.set(thick, thick, len); m.position.copy(_hm).addScaledVector(d, len / 2); m.lookAt(_hm.clone().addScaledVector(d, 10)); lobbyScene.add(m);
-    heroFx.push({ m, v: d.multiplyScalar(w.rocket || w.grenade ? 25 : w.flare ? 30 : 90), life: w.rocket || w.flare || w.grenade ? .8 : .12 });
+    heroFx.push({ m, v: d.multiplyScalar(90), life: .12 });
   }
 }
 function heroTick(dt) {
   lanceTick(dt); arcTick(dt); updateBoomers(dt);
   for (let k = heroFx.length - 1; k >= 0; k--) {
-    const f = heroFx[k]; f.life -= dt; f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt); if (f.mats) f.m.material = flameAge(f);
+    const f = heroFx[k]; f.life -= dt; if (f.drop) { f.v.y -= f.drop * dt; if (f.turn) f.m.lookAt(_hm.copy(f.m.position).add(f.v)); } f.m.position.addScaledVector(f.v, dt); if (f.grow) f.m.scale.multiplyScalar(1 + f.grow * dt); if (f.mats) f.m.material = flameAge(f);
     if (f.life <= 0) { lobbyScene.remove(f.m); heroFx.splice(k, 1); }
   }
   if (hf.i < 0) return;
@@ -186,15 +197,15 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) $('heroSh
 $('heroReload').addEventListener('pointerdown', e => { e.stopPropagation(); heroReload(); });
 // lobby (armory shut): he pulls out a gun from your loadout most of the time, plays with it, puts it away
 const lob = { on: false, last: -1, next: 2, until: 0, act: 0, taps: [], rel: 0 };
-const LOB_PANELS = ['binds', 'boost', 'daily', 'lb', 'card', 'chests', 'pick', 'post', 'lobPick'];
-const lobbyHush = () => LOB_PANELS.some(id => $(id)?.style.display === 'flex'); // no shooting behind a menu
+const LOB_PANELS = ['binds', 'boost', 'daily', 'lb', 'card', 'chests', 'pick', 'post', 'lobPick', 'season'];
+const lobbyHush = () => LOB_PANELS.some(id => $(id)?.style.display === 'flex' && !(id === 'card' && cardLive)); // no shooting behind a menu
 function lobbyGuns(t) {
   if (!inLobby || armOpen || custOpen() || drawOpen()) { lob.on = false; lob.taps.length = 0; lob.rel = 0; lob.next = Math.max(lob.next, t + 2.5); return; }
   if (!lob.on) {
     if (holdK > .02) return; // still putting the last one away
     if (hf.i >= 0) heroGun(-1);
     if (t < lob.next) return;
-    const list = CATS.map(([c]) => loadoutGun(c)).filter(i => i >= 0), pick = list.filter(i => i !== lob.last);
+    const list = heroGuest ? heroGuest.load : CATS.map(([c]) => loadoutGun(c)).filter(i => i >= 0), pick = list.filter(i => i !== lob.last);
     const i = (pick.length ? pick : list)[Math.random() * (pick.length || list.length) | 0];
     if (i === undefined) return;
     heroGun(i); lob.last = i; lob.on = true; lob.until = t + 8 + Math.random() * 8; lob.act = t + 2.5 + Math.random() * 2;
@@ -249,10 +260,11 @@ const _hv2 = new THREE.Vector3(), _hp = new THREE.Vector3(), _q0i = new THREE.Qu
 function dressHero() {
   if (heroCh) heroCh.dispose();
   hero.clear();
-  heroCh = buildChar(prof.look, 1 / 16, true);
-  dressArmor(heroCh, heroArmorN = shownArmor());
-  dressBoots(heroCh, heroBootsB = hidOn('boots') ? null : wornBoots());
-  dressHat(heroCh, heroHatH = hidOn('hats') ? null : wornHat());
+  const G = heroGuest;
+  heroCh = buildChar(G ? G.look : prof.look, 1 / 16, true);
+  dressArmor(heroCh, heroArmorN = G ? G.armor : shownArmor());
+  dressBoots(heroCh, heroBootsB = G ? G.boots : hidOn('boots') ? null : wornBoots());
+  dressHat(heroCh, heroHatH = G ? G.hat : hidOn('hats') ? null : wornHat());
   hero.add(heroCh.g); torso = heroCh.body; headPiv = heroCh.headPiv; armL = heroCh.armR; armR = heroCh.armL;
   heroCh.g.add(holdG);
 }
@@ -371,6 +383,7 @@ function frameLobby(dt = 0) {
     const ui = !armOpen && $('lobbyUI').style.display !== 'none', t = ui ? zRect($('side')).bottom : top;
     const b = armOpen ? zRect($('armory')).top : $('lobPick').style.display === 'flex' ? zRect($('lobBox')).top : ui ? Math.min(zRect($('lobbyArm')).top, zRect($('boostBtn')).top || H) : r.bottom;
     if (b - t > 60) { top = t; sh = b - t; }
+  } else if (cardLive) { const a = zRect($('cardBox')).left; if (a > left + 120) sw = a - left; // a player card: them on the left, the card on the right
   } else if (armOpen && (W > 700 || TOUCH && W > H)) {
     const ph = TOUCH && phoneSide.matches, a = zRect($('armory')).right - (ph ? 0 : 40); if (a > left) { sw = r.right - a; left = a; }
     const c = zRect($('armAct'));
@@ -427,8 +440,8 @@ function updateLobby(dt) {
     // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
     const w = hf.i >= 0 && hf.st, rk = w && hf.rl > 0 ? 1 - hf.rl / w.reload : -1;
     const m = w ? heldAnim(w, { kick: w.hold === 'lantern' ? 0 : hf.kick || 0, swing: w.melee && hf.kick > 0 ? 1 - hf.kick : -1, sv: hf.sv, rl: rk, level: w.wand && !w.melee ? hf.wf : 0, two: !!pose.fL, insp: hf.insp ?? -1, draw: w.charge ? hf.chg || 0 : 0, ct: w.boomer ? hf.ct || 0 : 0 }) : null;
-    flipShow(hf.flips, m);
-    if (w) bladeTrail(hf.g, w, w.melee && hf.kick > 0 ? 1 - hf.kick : -1, lobbyScene);
+    flipShow(hf.flips, m); if (w && w.thrown) heldShow(hf.g, m.gone);
+    if (w) bladeTrail(hf.g, w, w.melee && hf.kick > 0 ? 1 - hf.kick : -1, lobbyScene, heroAlt());
     let leftK = hLK, twist = 0;
     reloadSwap(hf.rs, w ? w.id : '', rk, hf.mag, lobbyScene, .5);
     if (hf.mag) hf.mag.position.copy(hf.magAt).add(_hv2.set(m ? m.mx : 0, m ? m.my : 0, m ? m.mz : 0));

@@ -162,10 +162,10 @@ for (let k = 0; k < 5; k++) for (let j = 0; j <= k; j++) bale(-1.3, j * .5, LT[3
 // --- the silo, its catwalk, a bridge from the hay door and stairs down the east side ---
 const SX = 8.5, SZ = -15, SR = 2.2, SH = 10, CAT = 6, CW = [5.2, 11.8, -18.3, -11.7];
 {
-  const s = new THREE.Mesh(new THREE.CylinderGeometry(SR, SR, SH, 24), concrete); s.position.set(SX, SH / 2, SZ); add(s); building.cover.push(s);
-  const d = new THREE.Mesh(new THREE.SphereGeometry(SR + .05, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2), steel); d.position.set(SX, SH, SZ); add(d); building.cover.push(d);
+  const s = new THREE.Mesh(pxCyl(SR, SR, SH, 24), concrete); s.position.set(SX, SH / 2, SZ); add(s); building.cover.push(s);
+  const d = new THREE.Mesh(pxSphere(SR, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2), steel); d.position.set(SX, SH, SZ); add(d); building.cover.push(d);
   piece(.5, .4, .5, steel, SX, SH + SR + .1, SZ);
-  for (const y of [.3, 3.3, SH - .3]) { const r = new THREE.Mesh(new THREE.CylinderGeometry(SR + .06, SR + .06, .18, 24), iron); r.position.set(SX, y, SZ); add(r); }
+  for (const y of [.3, 3.3, SH - .3]) { const r = new THREE.Mesh(pxBand(SR, .18, .06), iron); r.position.set(SX, y, SZ); add(r); }
   building.solids.push({ mesh: null, minX: SX - SR, maxX: SX + SR, minZ: SZ - SR, maxZ: SZ + SR, top: SH + SR, round: SR, surf: 'stone' });
   piece(.1, 1.8, .9, dark, SX - SR - .02, CAT + .9, SZ); // a hatch onto the catwalk
 }
@@ -303,8 +303,8 @@ const WM = [24, -7.5], WT = 9;
   piece(.08, .08, 2.2, steel, WM[0], WT + .3, WM[1] - 1.1); piece(.04, 1, 1, paint(0xb03a2a), WM[0], WT + .3, WM[1] - 2.2);
   M.fan = fan;
   const T = [21.2, -4.6], tankMat = surf(lam({ map: steel.map, side: THREE.DoubleSide }), 'metal');
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 1.9, 20, 1, true), tankMat); tank.position.set(T[0], .95, T[1]); add(tank); building.cover.push(tank);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(1.29, 20), waterMat); water.rotation.x = -Math.PI / 2; water.position.set(T[0], 1.75, T[1]); add(water);
+  const tank = new THREE.Mesh(pxCyl(1.3, 1.3, 1.9, 20, 1, true), tankMat); tank.position.set(T[0], .95, T[1]); add(tank); building.cover.push(tank);
+  const water = new THREE.Mesh(pxDisc(1.29, 20), waterMat); water.rotation.x = -Math.PI / 2; water.position.set(T[0], 1.75, T[1]); add(water);
   building.solids.push({ mesh: null, minX: T[0] - 1.3, maxX: T[0] + 1.3, minZ: T[1] - 1.3, maxZ: T[1] + 1.3, top: 1.9, round: 1.3, surf: 'metal' });
 }
 
@@ -312,23 +312,23 @@ const WM = [24, -7.5], WT = 9;
 {
   const TR = [5, -4.6], body = paint(0xd86a1c), hub = paint(0xe8c040);
   const wheel = (x, z, r, w) => {
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 14), rubber); t.rotation.x = Math.PI / 2; t.position.set(x, r, z); add(t); building.cover.push(t); meshSolids(t, 'metal');
-    const h = new THREE.Mesh(new THREE.CylinderGeometry(r * .5, r * .5, w + .04, 10), hub); h.rotation.x = Math.PI / 2; h.position.set(x, r, z); add(h);
+    const t = new THREE.Mesh(pxCyl(r, r, w, 14), rubber); t.rotation.x = Math.PI / 2; t.position.set(x, r, z); add(t); building.cover.push(t); meshSolids(t, 'metal');
+    const h = new THREE.Mesh(pxCyl(r * .5, r * .5, w + .04, 10), hub); h.rotation.x = Math.PI / 2; h.position.set(x, r, z); add(h);
   };
   for (const s of [-1, 1]) { wheel(TR[0] - 1, TR[1] + s * .8, .72, .45); wheel(TR[0] + 1.7, TR[1] + s * .65, .42, .25); }
   building.cover.push(piece(2.2, .7, .8, body, TR[0] + 1.1, .95, TR[1]), piece(1.4, .5, 1.1, body, TR[0] - .9, .75, TR[1]));
   piece(2.24, .08, .84, iron, TR[0] + 1.1, 1.34, TR[1]); piece(.08, .5, .74, iron, TR[0] + 2.23, .95, TR[1]);
   for (const s of [-1, 1]) piece(1.3, .14, .5, body, TR[0] - 1, 1.5, TR[1] + s * .8);
   piece(.5, .12, .5, dark, TR[0] - 1.1, 1.06, TR[1]); piece(.12, .55, .5, dark, TR[0] - 1.38, 1.4, TR[1]);
-  piece(.06, .5, .06, iron, TR[0] - .3, 1.25, TR[1]); { const w = new THREE.Mesh(new THREE.TorusGeometry(.2, .03, 6, 12), iron); w.position.set(TR[0] - .35, 1.52, TR[1]); w.rotation.y = Math.PI / 2; w.rotation.x = .5; add(w); }
+  piece(.06, .5, .06, iron, TR[0] - .3, 1.25, TR[1]); { const w = new THREE.Mesh(pxTorus(.2, .03, 6, 12), iron); w.position.set(TR[0] - .35, 1.52, TR[1]); w.rotation.y = Math.PI / 2; w.rotation.x = .5; add(w); }
   piece(.1, .9, .1, iron, TR[0] + 1.6, 1.75, TR[1] + .2);
   solid(TR[0] - 1.7, TR[0] + 2.2, TR[1] - 1.05, TR[1] + 1.05, 0, 1, 'metal'); solid(TR[0], TR[0] + 2.27, TR[1] - .42, TR[1] + .42, 0, 1.38, 'metal');
   for (const s of [-1, 1]) solid(TR[0] - 1.65, TR[0] - .35, TR[1] + s * .8 - .25, TR[1] + s * .8 + .25, 0, 1.57, 'metal');
 }
 {
   const W = [-8, 3.4];
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(.95, 1, .9, 16), stone); ring.position.set(W[0], .45, W[1]); add(ring); building.cover.push(ring);
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(.72, 16), decal({ color: 0x0c0e10 })); hole.rotation.x = -Math.PI / 2; hole.position.set(W[0], .9, W[1]); add(hole);
+  const ring = new THREE.Mesh(pxCyl(.95, 1, .9, 16), stone); ring.position.set(W[0], .45, W[1]); add(ring); building.cover.push(ring);
+  const hole = new THREE.Mesh(pxDisc(.72, 16), decal({ color: 0x0c0e10 })); hole.rotation.x = -Math.PI / 2; hole.position.set(W[0], .9, W[1]); add(hole);
   building.solids.push({ mesh: null, minX: W[0] - 1, maxX: W[0] + 1, minZ: W[1] - 1, maxZ: W[1] + 1, top: .9, round: 1, surf: 'stone' });
   for (const s of [-1, 1]) { building.cover.push(piece(.14, 1.1, .14, oldWood, W[0] + s * .82, 1.45, W[1])); solid(W[0] + s * .82 - .07, W[0] + s * .82 + .07, W[1] - .07, W[1] + .07, .9, 2, 'wood'); }
   piece(1.8, .12, .12, oldWood, W[0], 1.95, W[1]); piece(.3, .3, .3, oldWood, W[0] - .15, 1.6, W[1]);
@@ -337,7 +337,7 @@ const WM = [24, -7.5], WT = 9;
 {
   const [x, z] = [-18.6, -6.2]; // the hay wagon
   slab(x - 1.5, x + 1.5, z - .8, z + .8, .6, .9, oldWood);
-  for (const [dx, dz] of [[-1, -.86], [1, -.86], [-1, .86], [1, .86]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.4, .4, .12, 12), oldWood); w.rotation.x = Math.PI / 2; w.position.set(x + dx, .4, z + dz); add(w); meshSolids(w, 'wood'); }
+  for (const [dx, dz] of [[-1, -.86], [1, -.86], [-1, .86], [1, .86]]) { const w = new THREE.Mesh(pxCyl(.4, .4, .12, 12), oldWood); w.rotation.x = Math.PI / 2; w.position.set(x + dx, .4, z + dz); add(w); meshSolids(w, 'wood'); }
   for (const [bx, bz, y, a] of [[-19.3, -6.5, .9, 'x'], [-19.3, -5.9, .9, 'x'], [-18, -6.2, .9, 'z'], [-19.3, -6.2, 1.4, 'x']]) bale(bx, y, bz, a);
   const tongue = piece(1.72, .1, .1, oldWood, x + 2.28, .3, z); tongue.rotation.z = -.29; // from under the front down to the ground
 }
@@ -345,7 +345,7 @@ trough(-15.8, -14.6, -13.6, -11); trough(-23, -20.6, 6.4, 7.2);
 for (const [x, z, n, a] of [[2.4, 2.6, 2, 'x'], [-11, -3.4, 1, 'z'], [14.6, -2.4, 2, 'z'], [-3, 6.6, 1, 'x'], [8.2, 1.6, 1, 'x'], [-25, -12, 2, 'x']]) for (let j = 0; j < n; j++) bale(x, j * .5, z, a);
 // round bales out in the pasture
 for (const [x, z] of [[-23, -1.5], [-22.8, -9.6], [-26.6, -6], [-14.4, 1.8]]) {
-  const b = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, 1.3, 14), hay); b.rotation.z = Math.PI / 2; b.position.set(x, .75, z); add(b); building.cover.push(b);
+  const b = new THREE.Mesh(pxCyl(.75, .75, 1.3, 14), hay); b.rotation.z = Math.PI / 2; b.position.set(x, .75, z); add(b); building.cover.push(b);
   for (let k = 0; k < 6; k++) { const z0 = -.75 + k * .25, z1 = z0 + .25, e = Math.min(Math.abs(z0), Math.abs(z1)), c = z0 < 0 && z1 > 0 ? 0 : e; solid(x - .65, x + .65, z + z0, z + z1, .75 - Math.sqrt(.5625 - c * c), .75 + Math.sqrt(.5625 - c * c), 'grass'); } // slices across the round
 }
 // pumpkins behind the house
@@ -375,7 +375,7 @@ building.cover.push(instanced(unit, barkMat, trunks), instanced(unit, leafMat, l
 instanced(unit, barkMat, farTrunks); instanced(unit, leafMat, farLeaves);
 const swing = live(new THREE.Group()); swing.position.set(-9.4, 4.6 * 1.05 - .1, 16); add(swing);
 for (const s of [-1, 1]) { const r = box(.03, 3.3, .03, oldWood); r.position.set(0, -1.65, s * .2); swing.add(r); }
-{ const t = new THREE.Mesh(new THREE.TorusGeometry(.32, .12, 6, 12), rubber); t.position.y = -3.4; t.rotation.y = Math.PI / 2; swing.add(t); }
+{ const t = new THREE.Mesh(pxTorus(.32, .12, 6, 12), rubber); t.position.y = -3.4; t.rotation.y = Math.PI / 2; swing.add(t); }
 
 // outside: hills, a dirt road with power poles, plowed fields
 {

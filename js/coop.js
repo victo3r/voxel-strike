@@ -242,7 +242,7 @@ function zDied(e) {
 function zCredit(by, z, head) {
   if (!by) return;
   if (by !== net.pid) { const r = net.recOf(by); if (r) r.kills++; return; }
-  kills++; coins += (z?.coins ?? 2) + (head ? 2 : 0); missionKill(head); hitMarker('kill');
+  kills++; coins += (z?.coins ?? 2) + (head ? 2 : 0); missionKill(head); seasonZombie(); hitMarker('kill');
   if (z?.boss) { bossKills++; sfx('killSpecial'); banner(`BOSS DOWN!\n+${z.coins} ${COIN}`, true); }
   if (BASE[cur].soul && z) soulHeal(null, z.g.position.clone().setY(z.g.position.y + 1), SOUL_Z);
 }

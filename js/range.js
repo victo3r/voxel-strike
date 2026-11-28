@@ -115,7 +115,7 @@ function renderRack() {
   const el = $('rack'); $('menu').classList.toggle('rk', mode === 'range');
   if (mode !== 'range') { el.style.display = 'none'; el.innerHTML = ''; return; }
   rackCat ??= BASE[cur].cat;
-  const list = BASE.map((w, i) => i).filter(i => BASE[i].cat === rackCat).sort((a, b) => listAt(a) - listAt(b));
+  const list = BASE.map((w, i) => i).filter(i => BASE[i].cat === rackCat && (!BASE[i].season || hasGun(i) || seasonOn(BASE[i].season))).sort((a, b) => listAt(a) - listAt(b)); // a season's guns in their month, or once they're yours
   el.style.display = '';
   el.innerHTML = `<div class="rkTabs">${CATS.map(([c, n]) => `<button data-rc="${c}"${c === rackCat ? ' class="on"' : ''}>${n}</button>`).join('')}</div>` +
     `<div class="rkList">${list.map(i => { const held = slotGun[slotOf(i)] === i;

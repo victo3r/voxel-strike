@@ -12,6 +12,7 @@ const TRAILS = {
   tisword: { a: [2, -8], b: [5, -44], band: [.5, 1.03], op: .4, life: .09, inner: 0, cols: [0xdcecff, 0x8fc0ff, 0x4f9dff], edges: [[1, 1, .035]], bits: 'glint' },
   stunwand: { a: [0, -20], b: [0, -33], band: [.3, 1.12], op: .55, life: .1, inner: .15, cols: [0xfff6a0, 0xffd23a, 0xffa020], edge: 0xfffbe0, edges: [[1, 1, .08], [.6, .6, .06]], zap: true, bits: 'sparks' },
   scythe: { win: [.24, .3, .58, .66], a: [0, -24], b: [0, -42, 32], band: [0, 1], op: .5, life: .15, inner: .3, cols: [0xeee8ff, 0xc4b4ff, 0x8a6ee0, 0x4a3290], edge: 0xf6f2ff, edges: [[1, .7], [.55, .25, .03]] },
+  candycane: { a: [1, -8], b: [1, -30], band: [.3, 1.05], op: .5, life: .11, inner: .2, cols: [0xffffff, 0xffb4b4, 0xe2403a], edge: 0xfff4f4, edges: [[1, .7], [.55, .3, .03]] },
   monarch: { a: [.5, -2], b: [.5, -16.5], band: [.4, 1.06], op: .5, life: .09, inner: .15, cols: [0xffd88a, 0xf9a23c, 0xf28c1e, 0xb8500a], edge: 0xfff4dc, edges: [[1, .6], [.62, .22, .03]], bits: 'fly' },
 };
 for (const T of Object.values(TRAILS)) { T.cols = (T.cols || [0xffffff]).map(c => new THREE.Color(c)); T.edge = new THREE.Color(T.edge ?? 0xffffff); }
@@ -41,8 +42,9 @@ const trSmooth = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a)));
 const TRAIL_WIN = [.31, .36, .48, .56]; // a slash's trail fades in and out between these (the scythe's sweep has its own)
 const trailE = (s, w = TRAIL_WIN) => s < 0 ? 0 : trSmooth(w[0], w[1], s) * (1 - trSmooth(w[2], w[3], s)); // only the slash itself, not the wind-up or the way back
 // each frame a weapon is held: s is how far through its swing (-1 when it isn't), sp what the trail is drawn in (the camera for yours)
-function bladeTrail(g, w, s, sp) {
-  const T = TRAILS[w.id]; if (!T || gfx.q === 'low') return;
+const trailAlts = {}, trailAlt = (id, i) => TRAILS[id] && (trailAlts[id] ??= { ...TRAILS[id], cols: TRAILS[id].cols.map(c => new THREE.Color(shotCol(i, 'alt', c.getHex()))), edge: new THREE.Color(shotCol(i, 'alt', TRAILS[id].edge.getHex())) }); // a trail in the colours of the blade's own skin
+function bladeTrail(g, w, s, sp, alt = -1) { // alt: the weapon, when it wears its own skin
+  const T = alt < 0 ? TRAILS[w.id] : trailAlt(w.id, alt); if (!T || gfx.q === 'low') return;
   let t = trails.get(g);
   if (!t || t.T !== T) trails.set(g, t = { T, pts: [], sp, s: -1, acc: 0, px: GPX * (GUN_SCALE[w.id] || 1), v: null });
   if (s >= 0 && (t.s < 0 || s < t.s)) { const R = Math.random; t.v = { op: .85 + R() * .3, life: .85 + R() * .3, b0: (R() - .5) * .08, ej: T.edges?.map((e, k) => k ? (R() - .5) * .14 : 0), glint: false }; t.acc = 0; t.shedT = null; } // each swing a little different

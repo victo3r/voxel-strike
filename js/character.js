@@ -38,6 +38,9 @@ const SECRETS = {
     look: { skin: 2, eyes: 'blue', hair: 'long', hairC: 'black', top: 'jacket', topC: 0x3a3630, top2: 0xb3a88e, bottom: 'pants', bottomC: 0x2f2b27, shoes: 'boots', shoeC: 0x2a2119, secret: 'creature' } },
   evergreen: { name: 'EVERGREEN', sk: [178, 130, 106], eye: 0x3dff6a, halo: false, eyes: [[2, 4, 1], [5, 4, 1]], whites: [[1, 4], [6, 4]], glint: 0xffcc33, star: [0, 3.5, 2], sheen: 0xffd36a, paint: paintEvergreen,
     look: { skin: 2, eyes: 'green', brows: 'none', hair: 'side', hairC: 'dark', top: 'long', topC: 0x19a020, top2: 0xebebeb, bottom: 'pants', bottomC: 0x4d4d4d, shoes: 'plain', shoeC: 0x3d3d3d, secret: 'evergreen' } },
+  // from the Christmas presents (season.js), not a code (event: its season): icing eyes that glow, gumdrops standing out from its chest, a glint of sugar now and then
+  gingerbread: { name: 'GINGERBREAD', event: 'xmas26', sk: [178, 114, 62], sleeve: 0, eye: 0xfff3d6, halo: false, glint: 0xffffff, drops: [[3, 2, 0xd63438], [3, 5, 0x3caa5a], [3, 8, 0xd63438]], paint: paintGingerbread,
+    look: { skin: 4, eyes: 'dark', brows: 'none', hair: 'buzz', hairC: 'brown', top: 'tee', topC: 0xb2723e, bottom: 'pants', bottomC: 0xb2723e, shoes: 'plain', shoeC: 0xb2723e, secret: 'gingerbread' } },
 };
 
 // seeded random so a look always paints the same
@@ -328,6 +331,20 @@ function paintCreature({ at, F, head, body, neck, limb, SK, TOP, BOT, SHOE, rnd 
   }
 }
 
+// Gingerbread: baked brown all over, icing piped round the wrists, ankles and hem, gumdrop buttons, an icing smile
+function paintGingerbread({ at, F, head, body, neck, limb }) {
+  const G = [178, 114, 62], GD = [156, 96, 50], IC = [250, 246, 238], RED = [214, 52, 56], GRN = [60, 170, 90];
+  const fill = (r, w, h) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) at(r, x, y, (x * 5 + y * 3) % 7 ? G : GD, 8); };
+  for (const r of [F, head.top, head.back, head.left, head.right]) fill(r, 8, 8);
+  for (const f of ['front', 'back', 'left', 'right']) { fill(body[f], body[f][2], 12); fill(neck[f], neck[f][2], neck[f][3]); }
+  for (const x of [2, 5]) at(F, x, 4, IC); // icing eyes
+  for (const [x, y] of [[1, 5], [2, 6], [3, 6], [4, 6], [5, 6], [6, 5]]) at(F, x, y, IC); // and a smile
+  for (const x of [0, 7]) for (const y of [0, 1]) at(F, x, y, IC); // piped corners
+  [[2, RED], [5, GRN], [8, RED]].forEach(([y, c]) => { at(body.front, 3, y, c); at(body.front, 4, y, c); }); // gumdrop buttons
+  for (const f of ['front', 'back', 'left', 'right']) for (let x = 0; x < body[f][2]; x++) at(body[f], x, 10 + x % 2, IC); // a wavy hem
+  for (const p of ['armR', 'armL', 'legR', 'legL']) { const r = limb(p); for (const f of ['front', 'back', 'left', 'right']) { fill(r[f], 4, 12); for (let x = 0; x < 4; x++) at(r[f], x, 9 + x % 2, IC); } }
+}
+
 // Evergreen: a knitted jumper with a gold-starred tree; its green follows the shirt colour so teams still read
 const EVERGREEN_PX = 'IU1NTRmgICK6K93e3uvr666vsB+4KD09PWtraz8/P7m6upZfQSgoKKp9ZpZvWykpKWpAMNLS0lExJczOz4dVO8jHx9maHP/POgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQQQTTTTVBxxxxx1AQQQQQQQUhEhEU0UwQQQTTTTRgggggghgQQQQQQQREhEkU0UwQQQTTTTVAggggglAQQQQQQQUhEhE0U0QQQQTTTTRhxxxxxxgQQQQQQQREhEk0U0QQUAQQQQQSAQQQQSFhlhhRBRBBRBRlhllBRBRRBVBixixBRBRixixBRBQUEAQQQQQSAQQQQQRwhwgwgwgwgwhwhwgwgwgwgwgwgwgwgwgwgwgwgwgUAQQQQQQSAQQQQQQhwhwgwmFwwgwhwhwgwgwgwgwgwgwgwhwgwgwgwgwUAQQQQQQSAQQQQQRwhwgwgxRAgwhwhwgwgwgwgwixixhRBRCxixhBRBQUAQQQQQQQSASCCCAhwhwgxRRRAgwhwhwgwgwgwgxixixBRBRixixRBRAUAQQSCAQSCASCCCBwhwgwgxRAgwhwhwgwgwgwgwixixhRBRCxixhBRBQUAQQQQQQSAQQQQQQhwhwgxRRRAgwhwhwgwgwgwgwgwgwgwgwgwgwwgwgQQQQQQQQSAQQQQQRwhwgxRRRRRAhwhwgwgwgwgwgwgwgwgwgwgwggwgwQQQQQQQQQQQQQQQQhwhwgwkUQwgwhwhwgwgwgwgxixixBRBRixixRBRCigQQQQQQQSiiSSSRwhwgwgwgwgwhwhwgwgwgwgwjDFTDjjjjDDDDjzjyiiiiSSSSiiiiSSSVhlhhVBRBBVBRlhllBRBRRBVDDFTDjjzlTFTDjzjyiiiiSSSSiiiiSSSQUAQQQQQQQSEAUAQQQQSEAQQTDDDDzjz1TDDDjzjwQQQTTTTREhEk0U0QQQQTTTTUhEhE0U0QQQQTTTTREhEkU0UwQQQTTTTUhEhEU0UwQSAQQQQQUAQSAQQSxixhRBRCxixhRBRAQSAQQQQQUEAQQQQQgwgwgwgwgwgwgwgwQSAQQQQQQUAQQQQQwgwgwgwgwgwgwgwgQSAQQQQQQUAQQQQRixixBRBRixixRBRASAQQQQQQQUASCCCCxixhRBRCxixhBRBQSCAQSCAQQUASCCCBixixBRBRixixRBRAQSAQQQQQQUAQQQQQwgwgwgwgwggggwgwQSAQQQQQQQQQQQQQgwgwgwgwgwgwwgwgQQQQQQQQQQQQQQQSxixhRBRCxixhBRBSigQQQQQQQSiiSSSTDDDDjjjjFTDDzjziiiiiSSSSiiiiSSSTFTFTjzjjFTDDzjziiiiiSSSSiiiiSSSTDDFTzzjzDDDDzjzg==';
 const KNIT = [0x19a020, 0x22ba2b, 0x1fb828];
@@ -369,7 +386,7 @@ function buildChar(look, U = 1 / 16, own = false) {
   const parts = [head, neck, body, armRM, armLM, legRM, legLM];
   const ch = { g, head, headPiv, body, armR, armL, legR, legL, parts, mats: [mat], U, armor: null, boots: null, hat: null };
   const S = !pxShown(look) && SECRETS[look.secret];
-  if (S) secretFx(ch, S);
+  if (S && !S.plain) secretFx(ch, S);
   ch.dispose = () => { parts.forEach(m => m.geometry.dispose()); if (own) mat.map.dispose(); mat.dispose(); ch.armor?.mat.dispose(); ch.boots?.mat.dispose(); ch.hat?.mat.dispose(); ch.shine?.dispose(); ch.hat?.fx?.own?.dispose(); };
   return ch;
 }
@@ -405,6 +422,10 @@ function secretFx(ch, S) {
   }
   for (const [x, y] of S.whites ?? []) { const e = new THREE.Mesh(EYE_GEO, M.white); e.position.set((x - 3.5) * U, (3.5 - y) * U, 4.02 * U); e.scale.set(U, U, 1); eyes.add(e); } // lit whites
   ch.head.add(eyes);
+  for (const [x, y, c] of S.drops ?? []) { // sweets stuck on its front, two pixels wide, standing a pixel proud
+    const d = new THREE.Mesh(ZAP_BOX, (M.drops ??= {})[c] ??= new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: .5 })), body = ch.parts[2], { height: H, depth: D } = body.geometry.parameters;
+    d.scale.set(2 * U, 1.5 * U, U); d.position.set((x - 3) * U, H / 2 - (y + .5) * U, D / 2 + .5 * U); body.add(d);
+  }
   ch.zap = S.glint ? { parts: ch.parts, eyes, U, mats: M, star: S.star, gl: null, t: .3 + Math.random(), root: ch.g, sheen: S.sheen ? sheenOn(ch, S.sheen) : null, tick: glintTick, off: glintOff }
     : { parts: ch.parts, eyes, U, mat: M.zap, segs: null, t: .4 + Math.random() * 2, on: 0, k: 0, site: [], tick: zapTick, off: zapOff };
 }

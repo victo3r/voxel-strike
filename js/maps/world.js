@@ -14,7 +14,7 @@ function startMap(id, def, build) {
 // a map's meshes are made the first time it's played
 function buildMap(m) {
   if (m.built) return m;
-  const was = building; building = m; m.built = true; m.build?.(); building = was;
+  const was = building; building = m; m.built = true; m.build?.(); if (seasonNow()?.snow && !m.winter) winterMap(m); building = was; // a snowy month dresses every map that isn't a winter one already
   return m;
 }
 const add = (...objs) => building.root.add(...objs);
@@ -256,7 +256,7 @@ function bakeMap(m) {
     if (!o.isMesh || !seen(o)) return;
     const mt = o.material, g = o.geometry, mts = Array.isArray(mt) ? mt : [mt];
     if (o.isInstancedMesh) { if (!live(o) && mts.every(solid) && !detailObjs.includes(o)) o.layers.enable(OCC_LAYER); return; } // trees still hide enemies
-    if (live(o)) { if (o.userData.far) return; if (!g.boundingSphere) g.computeBoundingSphere(); if (mts.every(solid) && g.boundingSphere.radius > .4) o.layers.enable(OCC_LAYER); return; } // moving parts bigger than a chicken
+    if (live(o)) { if (o.userData.far || o.userData.snow) return; if (!g.boundingSphere) g.computeBoundingSphere(); if (mts.every(solid) && (g.boundingSphere.radius > .4 || o.userData.occ)) o.layers.enable(OCC_LAYER); return; } // moving parts bigger than a chicken, or small bits of something big (occ)
     if (Array.isArray(mt)) { // cliffs and islands: each material's triangles
       const n = (g.index ? g.index.count : g.attributes.position.count) / 3 | 0, f = new Uint8Array(n);
       for (const gr of g.groups) { const x = mt[gr.materialIndex]; if (x && solid(x)) f.fill(side(x), gr.start / 3, Math.min(n, (gr.start + gr.count) / 3)); }
@@ -339,7 +339,7 @@ function makeNav(M, ref0, sea = () => false) {
         colStart[c] = ys.length;
         const x = gx(c % NG), z = gx(c / NG | 0);
         let feet = 60, last = 1e9;
-        for (let k = 0; k < 8; k++) {
+        for (let k = 0; k < 16; k++) { // a roof's strips and a stair's under it are a lot of levels
           const g = groundAt(x, z, BR, feet), s = groundSolid;
           if (g < last - .01) { if (stand(x, z, g)) ys.push(Math.round(g * 1000) / 1000); last = g; }
           if (!s) break;

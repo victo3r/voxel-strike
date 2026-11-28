@@ -1,6 +1,6 @@
 // lobbies: what's behind you in the menus, picked with the lobby button (prof.lobby); the ones with a price are bought or come from golden chests (chest), owned in prof.lobbies
 const LOBBIES = [
-  { id: 'show', name: 'SHOWCASE', ic: 'isle' },
+  { id: 'show', name: 'SHOWCASE', ic: 'isle', show: true }, // show: the game's own maps behind you (true: each in turn with bots fighting, a list: just those, quiet)
   { id: 'forest', name: 'FOREST', ic: 'pine' },
   { id: 'castle', name: 'CASTLE', ic: 'castle', unlock: 10, price: 250 },
   { id: 'canyon', name: 'CANYON', ic: 'cactus', unlock: 15, price: 300 },
@@ -11,11 +11,13 @@ const LOBBIES = [
   { id: 'aurora', name: 'AURORA', ic: 'aurora', unlock: 50, price: 1000 },
   { id: 'reef', name: 'REEF', ic: 'fish', chest: 1, price: 750, rar: 'legend' },
   { id: 'candy', name: 'CANDY', ic: 'candy', chest: 1, price: 750, rar: 'legend' },
+  { id: 'xmas', name: 'CHRISTMAS', ic: 'pine', price: 750, rar: 'legend', season: 'xmas26', show: ['town'], stand: { at: [-11.5, 5.6], yaw: -Math.PI / 2 } }, // you stand in the Christmas town itself at dusk, the tree behind you; from the season's last present
 ];
 const lobbyOwn = L => !L.price || !!prof.lobbies?.[L.id];
 const lobbyById = id => LOBBIES.find(L => L.id === id);
 const lobbyOf = id => { const L = lobbyById(id); return L && lobbyOwn(L) ? L : LOBBIES[0]; }; // yours, or the showcase
 let lobbyCur = LOBBIES[0];
+const isShow = () => !!lobbyCur.show, showMaps = () => Array.isArray(lobbyCur.show) ? lobbyCur.show : SHOW_MAPS;
 
 // ---- pixels that never stretch: boxes sized and placed in whole pixels, textures laid on at TX to the metre (like your skin and the maps)
 const TX = 16;
@@ -283,7 +285,7 @@ const LOBBY_MAKE = { forest: () => ({ g: forestG, sky: forestSky, fog: forestFog
 const lobbyWorld = id => lobbyMade[id] ??= (W => (W.g.visible = false, W))(LOBBY_MAKE[id]()); // made hidden: lobbyUse shows yours
 // the lobby's own life, every frame
 function lobbyTick(dt, t) {
-  if (lobbyCur.id !== 'show') {
+  if (!isShow()) {
     const W = lobbyMade[lobbyCur.id]; W.tick(dt, t);
     if (W.lit) litPut(litMix(W.lit, LIT0, plainTo(dt), litM));
     return;
@@ -293,7 +295,7 @@ function lobbyTick(dt, t) {
     o.t += dt * o.s; if (o.t > 1) { o.t -= 1; o.a = Math.random() * 6.3; o.r = .8 + Math.random() * 1.6; }
     o.m.position.set(Math.cos(o.a) * o.r, -1.6 + o.t * 2.6, Math.sin(o.a) * o.r); o.m.material.opacity = Math.sin(o.t * Math.PI) * .8;
   }
-  sGlow.color.setHSL(.48, .85, .5 + Math.sin(t * 2) * .08);
+  sGlow.color.setHSL(lobbyCur.season ? .11 : .48, .85, .5 + Math.sin(t * 2) * .08); // a season's platform glows gold
 }
 
 // ---- the showcase's map: bots fighting in the game's own world, seen through the lobby's camera carried round it
@@ -305,7 +307,7 @@ const SHOW_V = .55, SHOW_OFF = .2; // how fast it glides (m/s), how far it looks
 const SHOW_TAG = new THREE.SpriteMaterial({ visible: false });
 const SHOW = { on: false, i: -1, next: Math.max(0, SHOW_MAPS.indexOf('yard')), clock: 0, age: 0, last: 0, fade: 1, ready: true, gen: 0, recs: [], rig: null, plain: 0,
   cam: new THREE.PerspectiveCamera(), tex: [], vw: 2, vh: 2, drawn: false }; // drawn as a match is drawn, then copied: this frame and the last map's
-muLobbyAt = () => lobbyCur.id !== 'show' ? 0 : SHOW.i >= 0 ? SHOW.i : SHOW.next;
+muLobbyAt = () => lobbyCur.show !== true ? 0 : SHOW.i >= 0 ? SHOW.i : SHOW.next;
 const SHOW_BG = new THREE.Color(0x081416); // before a map is up
 const showMat = new THREE.ShaderMaterial({
   uniforms: { a: { value: null }, b: { value: null }, k: { value: 1 }, ga: { value: 1 }, gb: { value: 1 }, dark: { value: 1 }, bg: { value: SHOW_BG }, px: { value: new THREE.Vector2(.001, .001) } },
@@ -466,9 +468,9 @@ function showGo(i) {
   if (SHOW.i < 0 || !SHOW.drawn) u.dark.value = 1;
   else { SHOW.tex.reverse(); u.gb.value = SHOW.rig?.gain ?? 1; u.dark.value = 0; }
   SHOW.drawn = false;
-  SHOW.i = i; SHOW.next = (i + 1) % SHOW_MAPS.length; SHOW.clock = 0; SHOW.age = 0; SHOW.fade = 1;
+  SHOW.i = i; SHOW.next = (i + 1) % showMaps().length; SHOW.clock = 0; SHOW.age = 0; SHOW.fade = 1;
   litRead(litA); // the lights fade from what they are
-  showCtx(() => { worldClear(); useMap(SHOW_MAPS[i]); MAP.nav?.(_showNav, _showNav); setupPads(); emptyPads(); showRig(); showBots(); }); // the bots' walk grid made now, while the last map still shows
+  showCtx(() => { worldClear(); useMap(showMaps()[i]); MAP.nav?.(_showNav, _showNav); setupPads(); emptyPads(); showRig(); if (lobbyCur.show === true) showBots(); else SHOW.recs = []; }); // the bots' walk grid made now, while the last map still shows
   litMap(MAP.env, SHOW.rig.gain, litB);
   showCamTick();
   showWarm(++SHOW.gen);
@@ -486,23 +488,34 @@ function showWarm(g) {
   check();
 }
 // the camera: the lobby's own (its tilt, its lens, where it puts you on screen), carried round the map at one steady speed
+const _stv = new THREE.Vector3(), standBlob = (() => { // a soft shadow under your feet where there's no platform to stand on
+  const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 2, 16, 16, 16); gr.addColorStop(0, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(0, .51, 0); m.visible = false; lobbyScene.add(m); return m;
+})();
 function showCamTick() {
-  const R = SHOW.rig, cam = SHOW.cam, th = R.a + R.dir * R.w * SHOW.age, ang = th + Math.PI + R.off;
-  R.yaw = Math.atan2(-Math.cos(ang), -Math.sin(ang));
-  cam.position.set(Math.cos(th) * R.r, R.h, Math.sin(th) * R.r);
+  const R = SHOW.rig, cam = SHOW.cam, st = lobbyCur.stand;
+  if (st) { // a lobby where you stand in the map: its ground is your platform's top, the lobby's camera where it would be, swaying a little
+    R.yaw = st.yaw + Math.sin(SHOW.age * .11) * .06; _stv.copy(lobbyCam.position).sub(_lobPlat).applyAxisAngle(_up, R.yaw);
+    cam.position.set(st.at[0] + _stv.x, _stv.y, st.at[1] + _stv.z);
+  } else {
+    const th = R.a + R.dir * R.w * SHOW.age, ang = th + Math.PI + R.off;
+    R.yaw = Math.atan2(-Math.cos(ang), -Math.sin(ang));
+    cam.position.set(Math.cos(th) * R.r, R.h, Math.sin(th) * R.r);
+  }
   cam.quaternion.setFromAxisAngle(_up, R.yaw).multiply(lobbyCam.quaternion);
   cam.projectionMatrix.copy(lobbyCam.projectionMatrix); cam.projectionMatrixInverse.copy(lobbyCam.projectionMatrixInverse);
 }
 const _ssz = new THREE.Vector2(), _svp = new THREE.Vector4(), _s0 = new THREE.Vector2();
 function showSize() { // drawn in a corner of the screen at this size, then copied out
   renderer.getDrawingBufferSize(_ssz);
-  const pr = renderer.getPixelRatio(), k = SHOW_K[gfx.q] ?? .6, T = SHOW.tex;
+  const pr = renderer.getPixelRatio(), st = !!lobbyCur.stand, k = st ? gfx.q === 'low' ? .75 : 1 : SHOW_K[gfx.q] ?? .6, T = SHOW.tex; // a lobby you stand in is drawn sharp: it's the place itself, not a backdrop
   SHOW.vw = Math.max(2, Math.round(_ssz.x * k)) / pr; SHOW.vh = Math.max(2, Math.round(_ssz.y * k)) / pr;
   const w = Math.floor(SHOW.vw * pr), h = Math.floor(SHOW.vh * pr); // as three rounds the view
-  if (T[0]?.image.width === w && T[0]?.image.height === h) return;
+  if (T[0]?.image.width === w && T[0]?.image.height === h && SHOW.soft === !st) return;
+  SHOW.soft = !st;
   T.forEach(t => t.dispose());
   SHOW.tex = [0, 1].map(() => { const t = new THREE.FramebufferTexture(w, h); t.minFilter = t.magFilter = THREE.LinearFilter; return t; });
-  showMat.uniforms.px.value.set(.8 / w, .8 / h); showMat.uniforms.dark.value = 1; SHOW.drawn = false; // the last map's frame is gone
+  showMat.uniforms.px.value.set(st ? 0 : .8 / w, st ? 0 : .8 / h); showMat.uniforms.dark.value = 1; SHOW.drawn = false; // the last map's frame is gone
 }
 function showRender(dt) {
   showSize();
@@ -533,9 +546,9 @@ function lobbyShadow(dt) { // you and what's round you cast shadows from the lob
 }
 // draw the lobby (main.js): the showcase's map first, then you on your platform over it
 function lobbyDraw(dt) {
-  if (lobbyCur.id !== 'show' || !SHOW.on || bootFrames >= 0 || typeof net !== 'object' || net.on) { lobbyShadow(dt); renderer.render(lobbyScene, lobbyCam); return; } // loaded first; never with a room open
+  if (!isShow() || !SHOW.on || bootFrames >= 0 || typeof net !== 'object' || net.on) { lobbyShadow(dt); renderer.render(lobbyScene, lobbyCam); return; } // loaded first; never with a room open
   const now = performance.now(), rdt = Math.min(.1, (now - (SHOW.last || now)) / 1000); SHOW.last = now; // the camera keeps to the clock, not the game's capped steps
-  const mp = musicLobbyPos(), want = mp ? mp.i : SHOW.i < 0 ? SHOW.next : (SHOW.clock += dt) >= SHOW_T ? SHOW.next : SHOW.i;
+  const one = lobbyCur.show !== true, mp = musicLobbyPos(), want = one ? 0 : mp ? mp.i : SHOW.i < 0 ? SHOW.next : (SHOW.clock += dt) >= SHOW_T ? SHOW.next : SHOW.i; // a lobby with one map stays on it
   if (want !== SHOW.i) showGo(want);
   showTick(dt);
   SHOW.age += rdt; showCamTick(); showLight(dt); showRender(dt);
@@ -551,26 +564,26 @@ function showTick(dt) {
 // ---- picking one: yours at once; one you haven't bought stays behind you until you buy it or close the picker
 function lobbyUse(id) {
   lobbyCur = lobbyById(id) ?? LOBBIES[0];
-  const show = lobbyCur.id === 'show', W = show ? null : lobbyWorld(lobbyCur.id);
-  showG.visible = show;
+  const was = SHOW.kind, show = isShow(), W = show ? null : lobbyWorld(lobbyCur.id); SHOW.kind = show ? lobbyCur.id : '';
+  showG.visible = show && !lobbyCur.stand; standBlob.visible = show && !!lobbyCur.stand;
   for (const k in lobbyMade) lobbyMade[k].g.visible = lobbyMade[k] === W;
   lobbyScene.background = show ? SHOW_BG : W.sky; lobbyScene.fog = show ? null : W.fog;
-  if (show && inLobby) showOn(); else showOff();
+  if (show && inLobby) { if (was !== SHOW.kind) showOff(); showOn(); } else showOff(); // from one showcase to another: start over
   if (W?.lit) litPut(litMix(W.lit, LIT0, SHOW.plain, litM));
   renderLobbies();
 }
 const lobbyMine = () => lobbyOf(prof.lobby);
 function lobbyBack() { if (lobbyCur !== lobbyMine()) lobbyUse(lobbyMine().id); else renderLobbies(); } // back to yours from one you were looking at
-function lobbySeen(on) { lobbyBack(); if (lobbyCur.id === 'show') on ? showOn() : showOff(); } // the lobby opened or shut (showLobby)
+function lobbySeen(on) { lobbyBack(); if (isShow()) on ? showOn() : showOff(); } // the lobby opened or shut (showLobby)
 const lobPickOpen = () => $('lobPick').style.display === 'flex';
 function renderLobbies() {
   if (!lobPickOpen()) return;
   const mine = lobbyMine(), L = lobbyCur, lock = X => !lobbyOwn(X) && prof.lv < X.unlock;
-  const tag = X => X === mine ? ico('check') : lobbyOwn(X) ? '' : X.chest ? ico('key') : lock(X) ? ico('lock') + X.unlock : COIN + X.price;
-  const buy = lobbyOwn(L) ? '' : L.chest ? `<button id="lobChest">${ico('key')} IN GOLDEN CHESTS</button>` : lock(L) ? `<button disabled>${ico('lock')} LVL ${L.unlock}</button>` : `<button id="lobBuy"${prof.coins < L.price ? ' disabled' : ''}>BUY ${COIN}${L.price}</button>`;
+  const tag = X => X === mine ? ico('check') : lobbyOwn(X) ? '' : X.season ? ico('gift') : X.chest ? ico('key') : lock(X) ? ico('lock') + X.unlock : COIN + X.price;
+  const buy = lobbyOwn(L) ? '' : L.season ? `<button disabled>${ico('gift')} FROM THE ${seasonOf(L.season).name} PRESENTS</button>` : L.chest ? `<button id="lobChest">${ico('key')} IN GOLDEN CHESTS</button>` : lock(L) ? `<button disabled>${ico('lock')} LVL ${L.unlock}</button>` : `<button id="lobBuy"${prof.coins < L.price ? ' disabled' : ''}>BUY ${COIN}${L.price}</button>`;
   const at = $('lobBox').querySelector('.lobL')?.scrollTop | 0;
   $('lobBox').innerHTML = `<div class="lbTop"><h1>${ico('lobby')} LOBBY</h1><span class="lobCo">${COIN}${prof.coins}</span></div><div class="lobL">` +
-    LOBBIES.map(X => `<button class="lobC${X === L ? ' on' : ''}${lock(X) ? ' lk' : ''}" data-lob="${X.id}"><span class="lobI">${ico(X.ic)}</span>` +
+    LOBBIES.filter(X => !X.season || lobbyOwn(X) || seasonOn(X.season)).map(X => `<button class="lobC${X === L ? ' on' : ''}${lock(X) ? ' lk' : ''}" data-lob="${X.id}"><span class="lobI">${ico(X.ic)}</span>` +
       `<span class="lobT"><b${X.name.length > 9 ? ' class="sm"' : ''}>${X.name}</b></span><span class="lobS">${tag(X)}</span></button>`).join('') +
     `</div><div class="lbFoot">${buy}<button id="lobX">${ico('close')} DONE</button></div>`;
   $('lobBox').querySelector('.lobL').scrollTop = at; // the list stays where you scrolled it
@@ -584,7 +597,7 @@ function lobbyPick(on) {
 }
 function lobbyBuy() {
   const L = lobbyCur;
-  if (lobbyOwn(L) || L.chest || prof.lv < L.unlock || prof.coins < L.price) return;
+  if (lobbyOwn(L) || L.chest || L.season || prof.lv < L.unlock || prof.coins < L.price) return;
   prof.coins -= L.price; prof.lobbies = { ...prof.lobbies, [L.id]: 1 }; prof.lobby = L.id;
   sfx('buy'); saveProf(); showProf(); renderLobbies(); lobbyMade[L.id].hey?.();
 }

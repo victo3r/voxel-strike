@@ -175,7 +175,7 @@ function hurtZombie(zz, dmg, point, head, quiet = false, by = null, kind = 0, pj
   const mine = !by && !zFrom; // a teammate's hit on the host's zombie pays them
   if (mine && (!quiet || dies)) hitMarker(dies ? 'kill' : head ? 'head' : 'body');
   if (dies) {
-    if (mine) { kills++; coins += zz.coins + (head ? 2 : 0); if (zz.boss) bossKills++; if (zz.type !== 'bot') missionKill(head); }
+    if (mine) { kills++; coins += zz.coins + (head ? 2 : 0); if (zz.boss) bossKills++; if (zz.type !== 'bot') { missionKill(head); seasonZombie(); } }
     else if (zFrom) { const r = net.recOf(zFrom); if (r) r.kills++; }
     if (zz.type === 'bot') botDown(zz, by, head);
     else {
@@ -299,9 +299,11 @@ function blastFx(p, R, gust = false, cl = false, g = '') {
   else if (cl) { burst(p, 0xffd23a, 22); burst(p, 0xffffff, 10); burst(p, 0xff8800, 10); sfx('finaleBoom', { at: p, far: 120 }); } // a firework's gold burst (the bomblets bring the colours)
   else if (g === 'bombard') { burst(p, 0xff8800, 34); burst(p, 0x2a2a2a, 18); burst(p, 0x8a7a66, 14); sfx('bombardBoom', { at: p, far: 130 }); } // a cannon's: more fire, more earth thrown up
   else if (g === 'meteor') { burst(p, 0xff6a2a, 40); burst(p, 0x3a2c26, 22); burst(p, 0xffd890, 14); sfx('meteorBoom', { at: p, far: 160 }); } // fire, and the ground thrown up
+  else if (g === 'snowglobe') { burst(p, 0xffffff, 30); burst(p, 0xbfe4ff, 20); burst(p, 0xd8eef8, 10); sfx('globeBurst', { at: p, far: 110 }); } // glass and snow
+  else if (g === 'delivery') { burst(p, 0xd2312c, 20); burst(p, 0x2f8a4c, 14); burst(p, 0xffe08a, 16); burst(p, 0xffffff, 8); sfx('deliveryBoom', { at: p, far: 140 }); } // wrapping paper and ribbon
   else if (g === 'peregrine') { burst(p, 0xffc23a, 22); burst(p, 0xe9dfc8, 10); burst(p, 0x5c6b7a, 10); sfx('peregrineBoom', { at: p, far: 120 }); } // gold, with a puff of feathers
   else { burst(p, 0xff8800, 30); burst(p, 0x333333, 14); sfx('boom', { at: p, far: 120 }); }
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : cl ? 0xffe08a : g === 'peregrine' ? 0xffd88a : g === 'meteor' ? 0xff7a2a : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
+  const m = new THREE.Mesh(pxSphere(1), new THREE.MeshBasicMaterial({ color: gust ? 0xe2f6ff : cl ? 0xffe08a : g === 'peregrine' ? 0xffd88a : g === 'meteor' ? 0xff7a2a : g === 'snowglobe' ? 0xe8f6ff : g === 'delivery' ? 0xffe08a : 0xffaa33, transparent: true, opacity: gust ? .6 : .9 }));
   m.position.copy(p); scene.add(m); booms.push({ m, t: 0, R });
 }
 // el: the Ancient Wand's spell (0 fire, 1 ice, 2 wind), which never hurts whoever cast it
@@ -310,28 +312,31 @@ function blast(p, R, zDmg, pDmg, skip, by = null, rocket = false, pj = 0, el = -
   if (spell) spellFx(p, el); else if (!vortex && !lk0) blastFx(p, R, !!W?.gust, !!W?.cluster, W?.id); // a void has its own (voidPop)
   const k = spell ? longOf(by ? by.rec?.fx : youFx(), W) : 1, push = self => !self && spell && el === 2 ? SPELL_GUST : 1;
   const hex = o => { if (el === 0) applyBurn(o, W.burnT * k, W.burn, by, W.id, true, pj); else if (el === 1 && !net.pvp) shockHit(o, FROST, k); }; // online the server sends the ice
-  const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
+  const pd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z), many = skip instanceof Set, sk = o => many ? skip.has(o) : o === skip, got = o => { if (many) skip.add(o); }; // a Set: everyone a run of blasts has hit so far (the Special Delivery's)
   if (net.pvp) { // online the server works out who got hurt
     const kind = rocket ? 4 : 6;
-    if (pd < R && !dead && respawnT <= 0) {
+    if (pd < R && !dead && respawnT <= 0 && !sk(P)) {
+      got(P);
       if (pDmg) { net.claim(P, { kind, point: new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), gun, pj, by }); if (spell) hex(P); }
       if (rocket && !by && !vortex) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, 1 - pd / R, true, lk);
     }
     for (const o of zombies) {
-      if (o === skip || o.dead || !o.pid || noSelf && o === by) continue; // other players and room bots
+      if (sk(o) || o.dead || !o.pid || noSelf && o === by) continue; // other players and room bots
       const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p);
-      if (od < R) { net.claim(o, { kind, point: c, gun, pj, by }); if (spell) hex(o); }
+      if (od < R) { got(o); net.claim(o, { kind, point: c, gun, pj, by }); if (spell) hex(o); }
     }
     return;
   }
-  if (pd < R && !dead && respawnT <= 0 && !P.downed && !P.waiting && !(by && friendly(by, YOU_T))) {
+  if (pd < R && !dead && respawnT <= 0 && !P.downed && !P.waiting && !(by && friendly(by, YOU_T)) && !sk(P)) {
+    got(P);
     if (pDmg) { hurtPlayer(Math.round(pDmg * (1 - pd / R * .6)), false, by); if (spell) hex(P); }
     if (rocket && respawnT <= 0 && !dead && !(vortex && !by)) launch(P, new THREE.Vector3(P.pos.x, P.pos.y + 1, P.pos.z), p, (1 - pd / R) * push(!by), !by, lk);
   }
   for (const o of zombies) {
-    if (o === skip || o.dead || o.type === 'bot' && friendly(by, o)) continue;
+    if (sk(o) || o.dead || o.type === 'bot' && friendly(by, o)) continue;
     const c = o.g.position.clone().setY(o.g.position.y + o.scale), od = c.distanceTo(p), self = o === by;
     if (od >= R) continue;
+    got(o);
     if (!(noSelf && self)) hurtZombie(o, self ? ROCKET_SELF * (1 - od / R * .6) : zDmg * (1 - od / R * .5), c, false, false, by);
     if (spell && !self && !o.dead) hex(o);
     if (rocket && !o.dead && !(vortex && self)) launch(o, c, p, (1 - od / R) * push(self), self, lk);
@@ -386,6 +391,12 @@ const SHOP = [
   { gun: 'bombard', price: 540, desc: 'lobs a cannonball into the crowd' },
   { gun: 'peregrine', price: 600, desc: 'rockets that dive for the nearest one' },
   { gun: 'firefly', price: 140, desc: 'a little machine pistol that buzzes' },
+  { gun: 'sleighbells', price: 260, desc: 'a jingling pistol for each hand' },
+  { gun: 'candycane', price: 340, desc: 'a big peppermint cane that sends them flying' },
+  { gun: 'nutcracker', price: 380, desc: 'two barrels, two very big bites' },
+  { gun: 'northstar', price: 420, desc: 'a star that drops whatever it lands on' },
+  { gun: 'snowglobe', price: 460, desc: 'a blizzard that slows the whole pack' },
+  { gun: 'delivery', price: 620, desc: 'a sleigh drops presents all down the line' },
   { gun: 'longbow', price: 220, desc: 'draw it all the way back for a big hit' },
   { gun: 'rhino', price: 300, desc: 'big slow rounds that hit like a charge' },
   { gun: 'boomerang', price: 420, desc: 'hits on the way out and on the way back' },
@@ -422,7 +433,7 @@ function pickOffers() {
   BASE.forEach((w, g) => { if (owned[g]) held[w.cat] = Math.max(held[w.cat] ?? -1, tierOf(g)); });
   const cats = {};
   SHOP.forEach((it, i) => {
-    if (it.gun === undefined || owned[it.gun]) return;
+    if (it.gun === undefined || owned[it.gun] || BASE[it.gun].season && seasonNow()?.id !== BASE[it.gun].season) return; // season guns only in their month
     const cat = BASE[it.gun].cat;
     if (BASE[it.gun].start && (held[cat] ?? 0) > 0) return; // skip starter guns once you have better
     (cats[cat] ??= []).push(i);
@@ -542,7 +553,7 @@ function zombiesOver() {
   missionEnd(false); achEnd(false); dailyPlayed(); funnelEnd();
   const mx = missionXpTake(); if (mx) { const r = grant(mx, 0); runXp += mx; runBars += r.bars; runBoxes += r.boxes; }
   $('rewards').innerHTML = rewardRow([xpTile(runXp), coinTile(runCoins), barTile(runBars), boxTile(runBoxes), boostTile(), ...eventTiles()]) + `<div class="rl">LVL ${prof.lv} · ${xpText()}</div>${xpBar()}${unlockRow()}`
-    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + achRow() + missionsRow() + dailyRow();
+    + (wave > PAY_WAVES ? `<div class="rl">Past wave ${PAY_WAVES} a run pays no more</div>` : '') + achRow() + seasonRow() + missionsRow() + dailyRow();
   $('post').style.display = 'flex'; document.body.classList.add('results');
   sfx(newBest ? 'win' : 'lose');
   setTimeout(lvlShow, 700); // any levels this run reached

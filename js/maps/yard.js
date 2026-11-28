@@ -61,7 +61,7 @@ for (const yc of [1.8, 5.2]) for (const s of [-1.4, 1.4]) for (const d of [-1, 1
 }
 tw(3.8, .3, 3.8, 0, TH + .15, 0);
 for (const s of [-1.84, 1.84]) { tw(3.8, .9, .12, 0, TH + .75, s); tw(.12, .9, 3.8, s, TH + .75, 0); }
-const roof = new THREE.Mesh(new THREE.ConeGeometry(3.1, 1.4, 4), lam({ map: tex(g => noise(g, [120, 45, 35], 25)) }));
+const roof = new THREE.Mesh(pxCone(3.1, 1.4, 4), lam({ map: tex(g => noise(g, [120, 45, 35], 25)) }));
 roof.rotation.y = Math.PI / 4; roof.position.set(0, TH + 3.3, 0); tower.add(roof);
 for (const s of [-.35, .35]) tw(.1, TH + .3, .1, 1.75, (TH + .3) / 2, s);
 for (let y = .4; y < TH; y += .5) tw(.08, .08, .8, 1.75, y, 0);

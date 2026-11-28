@@ -73,6 +73,9 @@ function gunAttrs(w) {
   if (w.sweep) a.push('WIDE SWEEP');
   if (w.boomer) a.push('COMES BACK');
   if (w.meteor) a.push('METEOR STRIKE');
+  if (w.dual) a.push('ONE IN EACH HAND');
+  if (w.globe) a.push('BLIZZARD');
+  if (w.sleigh) a.push('ROW OF BLASTS');
   if (w.grow) a.push('GROWS WITH YOU');
   if (w.wisp) a.push('HOMING');
   if (w.saw || w.ricochet) a.push('RICOCHET');
@@ -144,6 +147,12 @@ const DESC = {
   juggernaut: 'A huge minigun that takes a moment to spin up, then never stops',
   scythe: 'One wide sweep of the blade takes everyone in front of you',
   meteor: 'Mark a spot and a meteor comes down on it a second later',
+  sleighbells: 'Dual pistols, jingling all the way',
+  candycane: 'A great big peppermint cane, and it does not taste as sweet as it looks',
+  nutcracker: 'Both barrels of a toy soldier with a very big bite',
+  northstar: 'Follow the star, it only ever leads to one place',
+  snowglobe: 'Not for the ones who like to stay warm',
+  delivery: "This Santa isn't so friendly",
   salvo: 'Four tubes, four rockets and a very bad day for anyone in front',
   apex: 'A white tiger of a sniper, sitting at the top of the food chain',
   tracker: 'Tag them once and there is nowhere left to hide',
@@ -201,15 +210,17 @@ function gunSpecs(i) {
   if (w.wallBreak) out.push(['THROUGH WALLS', `${Math.round(WALL_MUL * 100)}% DAMAGE`]);
   if (w.grow) out.push(['GROWS WITH YOU', growNext(i) ? 'NEXT AT LVL ' + growNext(i) : 'FULLY GROWN']);
   if (w.chest) out.push(['FOUND IN', w.gift ? 'THE WELCOME WEEK, GOLDEN CHESTS' : 'GOLDEN CHESTS']);
+  if (w.season) out.push(['EARNED IN', 'THE ' + seasonOf(w.season).name + ' SEASON']);
   else if (!w.start) out.push(['UNLOCKS AT', 'LVL ' + (w.unlock ?? 0)], ['PRICE', COIN + w.price]);
   return out;
 }
 // a category's list, by level. A chest gun joins it once it's yours, at its own level (your level, if it grows with you)
 const listAt = i => { const w = BASE[i]; return w.grow ? Math.min(prof.lv, w.grow.top) + .5 : w.unlock ?? 0; };
-const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat && (!BASE[i].chest || hasGun(i))).sort((a, b) => listAt(a) - listAt(b));
-const exclList = () => BASE.map((w, i) => i).filter(i => BASE[i].chest); // only from chests: the EXCLUSIVE page
+const catList = () => BASE.map((w, i) => i).filter(i => BASE[i].cat === armCat && (!BASE[i].chest && !BASE[i].season || hasGun(i))).sort((a, b) => listAt(a) - listAt(b));
+const RAR_RANK = { mythic: 4, legend: 3, epic: 2, rare: 1, common: 0 };
+const exclList = () => BASE.map((w, i) => i).filter(i => BASE[i].chest || BASE[i].season && (hasGun(i) || seasonOn(BASE[i].season))).sort((a, b) => RAR_RANK[rarOf(BASE[b])] - RAR_RANK[rarOf(BASE[a])] || a - b); // never sold: the EXCLUSIVE page, rarest first (a season's while it's on, after that only if they're yours)
 const isLocked = i => !hasGun(i) && prof.lv < (BASE[i].unlock ?? 0);
-const chestOnly = i => BASE[i].chest && !hasGun(i); // not for sale, only in golden chests
+const chestOnly = i => (BASE[i].chest || BASE[i].season) && !hasGun(i); // not for sale: only in golden chests, or earned in its season
 const starTxt = i => BASE[i].start ? '' : starRow(gunUse(i), gunStars(i), 3);
 // star picker under your character
 const lvPick = (k, label, lo, hi) => `<div class="lvp"><button data-${k}="-1" ${lo ? 'disabled' : ''}>${ico('left')}</button><span>${label}</span><button data-${k}="1" ${hi ? 'disabled' : ''}>${ico('right')}</button></div>`;
@@ -220,7 +231,8 @@ const GUN_ORDER = ['voxel', 'shotgun', 'ar', 'sniper', 'knife', 'flame', 'flare'
   'trex', 'starsmasher', 'blazesaber', 'windsaber', 'warhammer', 'crossbow', 'grenade', 'aerial', 'rubypierce', 'paragon', 'frostwand', 'windwand', 'stunwand', 'flamewand', 'soulwand', 'ancientwand',
   'hornet', 'salvo', 'apex', 'tracker', 'tempest', 'wisp', 'voidlantern', 'crystal', 'aurora',
   'tishot', 'tipistol', 'tisword', 'tisaw', 'tisniper', 'tirocket', 'daybreak', 'highnoon', 'cutlass', 'harpoon', 'conch', 'balisong', 'monarch', 'quasar', 'wildfire', 'finale', 'moonbeam', 'bombard', 'peregrine',
-  'firefly', 'longbow', 'rhino', 'boomerang', 'juggernaut', 'scythe', 'meteor'];
+  'firefly', 'longbow', 'rhino', 'boomerang', 'juggernaut', 'scythe', 'meteor',
+  'sleighbells', 'candycane', 'nutcracker', 'northstar', 'snowglobe', 'delivery'];
 const indexList = () => [...GUN_ORDER.map(gi), ...BASE.map((w, i) => i).filter(i => !GUN_ORDER.includes(BASE[i].id))], gunNo = i => indexList().indexOf(i) + 1;
 function renderIndex() {
   const list = indexList(), have = list.filter(hasGun).length;
@@ -239,42 +251,91 @@ let armPage = 'weapons', wearCat = 'skins', armorPrev = 0, armorCard = false, ge
 let armBare = false; // after TAKE OFF he shows what you wear, not the picked card
 const myArmor = () => Math.min(ARMOR_MAX, prof.armor | 0);
 const pageIcon = p => p === 'weapons' ? gunPic(loadoutGun('primary')) : p === 'exclusive' ? gunPic(exclList()[0]) : p === 'index' ? gunPic(gi(GUN_ORDER[0])) : armorPic(Math.max(0, wornArmor() - 1));
-const EXCL_DESC = 'Gifts and rare finds from golden chests, never for sale';
+let skinGun = -1, skinSel = ''; // the gun whose skins are being looked at, and which of them
+let exclTab = 'all', setSel = ''; // the EXCLUSIVE page's two tabs: every one of them, or the sets they make
+const exclSets = () => armPage === 'exclusive' && exclTab === 'sets' && setsShown().length > 0;
 function renderArmory() {
   $('armInfo').innerHTML = `LVL ${prof.lv}<span class="pc">${COIN}${prof.coins}</span>`;
   $('armPages').innerHTML = PAGES.map(([p, label]) =>
     `<button data-pg="${p}" class="${p === armPage ? 'sel' : ''}${p === 'exclusive' && !exclList().some(hasGun) ? ' dim' : ''}"><img class="ai" src="${pageIcon(p)}"><span>${label}</span></button>`).join('');
-  $('armTabs').style.display = armPage === 'exclusive' ? 'none' : '';
+  $('armTabs').style.display = armPage === 'exclusive' && !setsShown().length ? 'none' : '';
   if (armPage === 'wear') { renderWear(); return; }
   heroArmor(shownArmor()); wearGear();
   if (armPage === 'index') { renderIndex(); return; }
   const excl = armPage === 'exclusive', list = excl ? exclList() : catList(), on = i => loadoutGun(BASE[i].cat) === i;
+  if (excl && setsShown().length) $('armTabs').innerHTML = [['all', 'ALL', gunPic(list[0])], ['sets', 'SETS', gunPic(gi(setsShown()[0].guns[0]))]].map(([t, label, pic]) =>
+    `<button data-xt="${t}" class="${(exclSets() ? 'sets' : 'all') === t ? 'sel' : ''}"><img class="ai" src="${pic}"><span>${label}</span></button>`).join('');
+  if (exclSets()) { renderSets(); return; }
+  if (skinGun >= 0) { if (!hasGun(skinGun) || !gsTiers(BASE[skinGun]).length) skinGun = -1; else { renderGunSkins(); return; } }
+  heroSkin = null;
   if (!excl) $('armTabs').innerHTML = CATS.map(([c, label], s) =>
-    `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img class="ai" src="${gunPic(loadoutGun(c))}"><span>${label}</span></button>`).join('');
+    `<button data-c="${c}" class="${c === armCat ? 'sel' : ''}"><img class="ai" src="${gunPic(loadoutGun(c), gunSkin(loadoutGun(c)))}"><span>${label}</span></button>`).join('');
   if (!list.includes(armSel)) { armSel = list.find(on) ?? list[0]; armPick = false; }
   $('armList').style.display = armDet ? 'none' : '';
   $('armDet').style.display = armDet ? 'flex' : 'none';
   if (armDet) renderDetail();
-  else $('armList').innerHTML = (excl ? `<p class="wd">${EXCL_DESC}</p>` : '') + list.map(i => {
-    const w = BASE[i], tri = i === trialNow() && trialOk(), tag = tri ? (on(i) ? `${ico('check')} TRYING` : 'FREE THIS WEEK') : chestOnly(i) ? `${ico('lock')} ${w.gift ? 'WELCOME GIFT' : 'GOLDEN CHEST'}` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : on(i) ? 'EQUIPPED' : '';
+  else $('armList').innerHTML = list.map(i => {
+    const w = BASE[i], tri = i === trialNow() && trialOk(), tag = tri ? (on(i) ? `${ico('check')} TRYING` : 'FREE THIS WEEK') : chestOnly(i) ? `${ico('lock')} ${w.season ? seasonOf(w.season).name : w.gift ? 'WELCOME GIFT' : 'GOLDEN CHEST'}` : isLocked(i) ? `${ico('lock')} LVL ${w.unlock}` : !hasGun(i) ? COIN + w.price : on(i) ? 'EQUIPPED' : '';
     return `<div class="card rr${!tri && (isLocked(i) || chestOnly(i)) ? ' locked' : ''}${tri ? ' trial' : ''}${i === armSel && armPick ? ' sel' : ''}${on(i) ? ' on' : ''}${rarCls(w)}" data-i="${i}">` +
-      (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${gunPic(i)}">` +
-      `<div class="cn">${w.name} <span class="st">${starTxt(i)}</span></div></div>`;
+      (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai" src="${gunPic(i, gunSkin(i))}">` +
+      `<div class="cn">${w.name}${hasGun(i) ? ` <span class="st">${starTxt(i)}</span>` : ''}</div></div>`; // stars once it's yours: none is what not having it means
   }).join('');
   renderAct();
   if (inLobby) heroGun(armSel);
 }
+// a gun's skins: the one it comes in and the ones it earns, each with what it takes
+function renderGunSkins() {
+  const i = skinGun, w = BASE[i], T = ['', ...gsTiers(w)], on = gunSkin(i);
+  if (!T.includes(skinSel)) skinSel = on;
+  armDet = false; armSel = i; $('armList').style.display = ''; $('armDet').style.display = 'none';
+  $('armList').innerHTML = T.map(t => { const has = gsHas(i, t);
+    return `<div class="card rr gsk${t === skinSel ? ' sel' : ''}${t === on ? ' on' : ''}${has ? '' : ' locked'}" data-gsk="${t}" style="--rc:${t ? GS_COL[t] : '#c9ced6'}">` +
+      (t === on ? '<span class="tag">WEARING</span>' : has ? '' : `<span class="tag">${ico('lock')}</span>`) + `<img class="ai" src="${gunPic(i, t)}"><div class="cn">${gsName(i, t)}</div></div>`; }).join('');
+  renderSkinsAct(); heroSkin = skinSel; if (inLobby) heroGun(i);
+}
+function renderSkinsAct() {
+  renderHide();
+  const i = skinGun, w = BASE[i], t = skinSel, T = gsTiers(w), at = T.indexOf(t), has = gsHas(i, t), on = gunSkin(i) === t, prev = at > 0 && !gsDone(i, T[at - 1]) ? T[at - 1] : '';
+  const goals = gsGoals(w, t).map(G => { const n = Math.min(G[1], gsAt(w.id, G[0])), ok = n >= G[1]; return `<div class="snG${ok ? ' ok' : ''}"><span>${gsText(G)}</span><em>${ok ? ico('check') : `${n}/${G[1]}`}</em><u><i style="width:${n / G[1] * 100}%"></i></u></div>`; }).join('');
+  const body = t ? `<div class="gsl">${has ? '' : `<div class="tn">EARN IT WITH THE ${w.name.toUpperCase()}</div>`}${goals}${prev ? `<div class="tn">${ico('lock')} AFTER ITS ${gsName(i, prev).toUpperCase()} SKIN</div>` : ''}</div>` : '';
+  const btns = (on ? `<button class="eq" disabled>${ico('check')} WEARING</button>` : has ? `<button data-gswear="${t}">WEAR IT</button>` : `<button disabled>${ico('lock')} LOCKED</button>`) + `<button data-gsback="1">${ico('left')} BACK</button>`;
+  setAct(actCard(`${w.name} · ${gsName(i, t)}`, '', body, '', btns));
+  placeAct();
+}
+// the SETS tab: a card for each set, its weapons in a row, what owning them all pays
+function renderSets() {
+  const list = setsShown(); if (!list.some(T => T.id === setSel)) setSel = list[0].id;
+  armDet = false; $('armList').style.display = ''; $('armDet').style.display = 'none';
+  $('armList').innerHTML = list.map(T => {
+    const n = setHas(T), a = ACH.find(x => x.id === T.ach), full = n === T.guns.length;
+    return `<div class="card setc${T.id === setSel ? ' sel' : ''}${full ? ' on' : ''}" data-set="${T.id}" style="--rc:${T.col}"><span class="tag">${full ? ico('check') + ' COMPLETE' : n + ' / ' + T.guns.length}</span><div class="cn">${T.name}</div><div class="setg">` +
+      T.guns.map(id => `<span class="${prof.guns[id] ? 'own' : ''}" title="${BASE[gi(id)].name}"><img class="ai" src="${gunPic(gi(id))}"></span>`).join('') + '</div>' +
+      (a ? `<div class="setp">${achGot(a) ? ico('check') + ' REWARD CLAIMED' : (full ? 'YOURS TO CLAIM' : 'ALL ' + T.guns.length) + ' ' + achPayTags(a)}</div>` : '') + '</div>';
+  }).join('');
+  renderSetAct();
+  const T = list.find(x => x.id === setSel), show = T.guns.find(id => prof.guns[id]) ?? T.guns[0]; armSel = gi(show);
+  if (inLobby) heroGun(armSel);
+}
+function renderSetAct() {
+  renderHide();
+  const T = setsShown().find(x => x.id === setSel), n = setHas(T), a = ACH.find(x => x.id === T.ach), full = n === T.guns.length, on = T.guns.filter(id => prof.guns[id] && prof.loadout[BASE[gi(id)].cat] === id).length;
+  const rows = T.guns.map(id => { const w = BASE[gi(id)], own = !!prof.guns[id]; return `<div class="setr${own ? ' own' : ''}"><span>${CATS[CAT_I[w.cat]][1]}</span><b>${w.name}</b><em>${own ? ico('check') : ico('lock')}</em></div>`; }).join('');
+  let btns = n && on === n ? `<button class="eq" disabled>${ico('check')} EQUIPPED</button>` : `<button data-eqset="${T.id}" ${full ? '' : 'disabled'}>${full ? 'EQUIP THE SET' : ico('lock') + ' NOT OWNED'}</button>`;
+  if (a && full && !achGot(a)) btns += `<button class="go" data-setgift="${a.id}">CLAIM ${achPayTags(a)}</button>`;
+  setAct(actCard(T.name, '', `<div class="setl">${rows}</div>`, '', btns));
+  placeAct();
+}
 // ---- the item card in the corner
 const actCard = (name, stars, body, pick, btns) => `<div class="an"><span>${name} <span class="st">${stars}</span></span>` +
   (armDetOk() ? `<button class="more" data-det="1">${armDet ? ico('left') + ' LIST' : 'DETAILS ' + ico('right')}</button>` : '') + `</div>${body}${pick}<div class="ab">${btns}</div>`;
-const armDetOk = () => armPage !== 'wear' || (wearCat !== 'skins' && wearCat !== 'kfx' && (wearCat !== 'armor' || armorCard || !!suitSel));
+const armDetOk = () => !exclSets() && skinGun < 0 && (armPage !== 'wear' || (wearCat !== 'skins' && wearCat !== 'kfx' && (wearCat !== 'armor' || armorCard || !!suitSel)));
 function renderAct() {
   renderHide();
   if (armPage === 'wear') { if (wearCat === 'kfx') renderKfxAct(); else if (isGear()) renderGearAct(); else if (wearCat === 'skins') renderSkinAct(); else if (shownSuit()) renderSuitAct(); else renderArmorAct(); return; }
   const i = armSel, w = BASE[i], st = gunStars(i), eq = loadoutGun(w.cat);
   let btns;
   const tr = i === trialNow() && trialOk() ? (i === eq ? `<button class="eq" disabled>${ico('check')} TRYING IT</button>` : '<button class="go" data-try="1">TRY IT FREE</button>') : '';
-  if (chestOnly(i)) btns = `<button disabled>${ico('lock')} ${BASE[i].gift ? 'A WELCOME WEEK GIFT, OR IN GOLDEN CHESTS' : 'FOUND IN GOLDEN CHESTS'}</button>`;
+  if (chestOnly(i)) btns = BASE[i].season ? `<button data-season="${BASE[i].id}">${ico('gift')} EARN IT ON THE SEASON PAGE</button>` : `<button disabled>${ico('lock')} ${BASE[i].gift ? 'A WELCOME WEEK GIFT, OR IN GOLDEN CHESTS' : 'FOUND IN GOLDEN CHESTS'}</button>`;
   else if (isLocked(i)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${w.unlock}</button>`;
   else if (!hasGun(i)) btns = `<button data-buy="${i}" ${prof.coins < w.price ? 'disabled' : ''}>BUY ${COIN}${w.price}</button>`;
   else {
@@ -282,6 +343,7 @@ function renderAct() {
     if (!w.start && st < 3) btns += `<button data-up="${i}" ${prof.coins < upgPrice(i) ? 'disabled' : ''}>${starRow(st + 1)} ${COIN}${upgPrice(i)}</button>`;
   }
   if (tr) btns = tr + btns;
+  if (hasGun(i) && gsTiers(w).length) btns += `<button data-skins="${i}" title="Skins this gun can earn">${ico('star')} SKINS ${gsOwned(i).length}/${gsTiers(w).length}</button>`;
   if (inLobby) btns += `<button data-range="${i}" title="Try it on the target range">${ico('target')} RANGE</button>`;
   const u = gunUse(i), pick = !w.start && st > 1 ? lvPick('use', 'USING ' + starRow(u), u <= 1, u >= st) : '';
   setAct(actCard(w.name + ' ' + gunTags(w), starTxt(i), statBoxes(mainStats(i)) + attrTags(gunAttrs(w)), pick, btns));
@@ -362,7 +424,7 @@ function renderWear() {
     $('armList').innerHTML = `<p class="wd">${ARMOR_DESC}</p>` +
       `<div class="card rr${locked ? ' locked' : ''}${armorCard ? ' sel' : ''}${on ? ' on' : ''}${rarCls(T)}" data-armor="1">${tag ? `<span class="tag">${tag}</span>` : ''}` +
       `<img class="ai wr" src="${armorPic((w || 1) - 1)}"><div class="cn">${ARMOR_ITEM} <span class="st">${n ? armorStarTxt() : ''}</span></div></div>` +
-      SUITS.map(suitCard).join('');
+      SUITS.filter(S => !S.season || suitStars(S.id) || seasonOn(S.season)).map(suitCard).join(''); // a season's in its month, after that only if it's yours
   }
   const show = armBare ? wornArmor() : sid ? suitN(sid, suitShown(sid)) : armDet ? armorPrev : armorCard || !armorOff() ? w || 1 : 0;
   heroArmor(hidOn('armor') && show === wornArmor() ? 0 : show); // a hidden piece stays hidden, anything else you try on shows
@@ -413,15 +475,17 @@ const SUIT_ABOUT = {
   thornwood: 'Living bark that grows back once the shooting stops',
   skyrunner: 'Featherlight plates with glider wings for anyone who lives in the air',
   titanium: 'Polished titanium plate, as tough as steel at half the weight',
+  elf: 'A workshop elf\'s tunic, quick on its feet and cheered up by every kill',
 };
 const SET_TXT = { warrior: '+5% DMG, +5% DMG CUT', raider: 'TRIPLE JUMP, +8% SPEED', ironclad: '+5% DMG CUT, NO KNOCKBACK, NO SLOWS OR STUNS',
-  arcane: '+10% WAND DMG, WAND EFFECTS LAST 50% LONGER', thornwood: 'REGROWS AFTER 2S', skyrunner: 'SABER AIR DASH, +4% SPEED', titanium: '+5% DMG, +5% DMG CUT, +4% SPEED' };
-const SUIT_SPECIAL = { thornwood: 'REGROWS AFTER 4S', skyrunner: 'HOLD JUMP TO GLIDE' };
+  arcane: '+10% WAND DMG, WAND EFFECTS LAST 50% LONGER', thornwood: 'REGROWS AFTER 2S', skyrunner: 'SABER AIR DASH, +4% SPEED', titanium: '+5% DMG, +5% DMG CUT, +4% SPEED', elf: '+4% SPEED, +4% DMG CUT' };
+const SUIT_SPECIAL = { thornwood: 'REGROWS AFTER 4S', skyrunner: 'HOLD JUMP TO GLIDE', elf: 'HEALTH BACK FOR EVERY KILL' };
 const suitSpecial = id => SUIT_SPECIAL[id] ? `<div class="at sb"><span>SPECIAL</span><span>${SUIT_SPECIAL[id]}</span></div>` : '';
 const shownSuit = () => armPage === 'wear' && wearCat === 'armor' ? suitSel || (!armorCard && wornSuit()?.id) || '' : '';
 const suitShown = id => Math.max(1, suitUse(id));
 const suitStarTxt = id => starRow(suitUse(id), suitStars(id), SUIT_ST);
-const suitLocked = S => !suitStars(S.id) && prof.lv < S.unlock[0];
+const seasonGear = X => !!X.season, gearFrom = X => seasonOf(X.season).name + ' CHESTS'; // a season's wear: only from its chests
+const suitLocked = S => !suitStars(S.id) && (seasonGear(S) || prof.lv < S.unlock[0]);
 const lvlName = v => LEVEL_NAMES[v ?? 2];
 const armorBoxes = T => statBoxes([['ARMOR', '+' + T.hp, ''], ['DMG CUT', T.dr ? pct(T.dr) : 'NONE', ''], ['MOBILITY', lvlName(T.mob), ''], ['JUMP', lvlName(T.jump), '']]);
 // a full set: its cards get an outline and SET ACTIVE, its corner card the bonus
@@ -429,7 +493,7 @@ const setBonus = id => youFx().set === id ? `<div class="at sb"><span>SET BONUS<
 const setTag = (id, worn) => worn && youFx().set === id ? ['<span class="sa">SET ACTIVE</span>', ' set'] : ['', ''];
 function suitCard(S) {
   const st = suitStars(S.id), worn = wornSuit()?.id === S.id, locked = suitLocked(S), [sa, set] = setTag(S.id, worn);
-  const tag = locked ? `${ico('lock')} LVL ${S.unlock[0]}` : !st ? cost(S, S.price[0]) : worn ? wearTag('armor') : '';
+  const tag = locked ? `${ico('lock')} ${seasonGear(S) ? gearFrom(S) : 'LVL ' + S.unlock[0]}` : !st ? cost(S, S.price[0]) : worn ? wearTag('armor') : '';
   return `<div class="card rr${locked ? ' locked' : ''}${suitSel === S.id ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(S)}" data-suit="${S.id}">` +
     sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${armorPic(suitN(S.id, suitShown(S.id)) - 1)}">` +
     `<div class="cn">${S.name} <span class="st">${suitStarTxt(S.id)}</span></div></div>`;
@@ -448,7 +512,7 @@ function renderSuitDetail() {
 function renderSuitAct() {
   const id = shownSuit(), S = suitOf(id), st = suitStars(id), worn = wornSuit()?.id === id;
   let btns;
-  if (suitLocked(S)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${S.unlock[0]}</button>`;
+  if (suitLocked(S)) btns = `<button disabled>${ico('lock')} ${seasonGear(S) ? 'FOUND IN ' + gearFrom(S) : 'UNLOCKS AT LVL ' + S.unlock[0]}</button>`;
   else if (!st) btns = `<button data-sbuy="1" ${prof.coins < S.price[0] || barShort(S) ? 'disabled' : ''}>${S.bars ? 'CRAFT' : 'BUY'} ${cost(S, S.price[0])}</button>`;
   else {
     btns = worn ? '<button data-soff="1">TAKE OFF</button>' + hideBtn('armor') : '<button data-swear="1">WEAR</button>';
@@ -465,7 +529,7 @@ function suitClick(d) {
   const id = shownSuit(), S = suitOf(id); if (!S) return;
   const st = suitStars(id), own = prof.suits ??= {}, use = prof.suitUse ??= {};
   if (d.sbuy) {
-    if (st || prof.coins < S.price[0] || prof.lv < S.unlock[0] || barShort(S)) return;
+    if (st || S.season || prof.coins < S.price[0] || prof.lv < S.unlock[0] || barShort(S)) return;
     prof.coins -= S.price[0]; if (S.bars) prof.bars -= S.bars; own[id] = 1; prof.armorOn = id; unhide('armor'); sfx('buy');
   } else if (d.sup) {
     if (!st || st >= SUIT_ST || prof.coins < S.price[st] || prof.lv < S.unlock[st]) return;
@@ -495,16 +559,18 @@ const lookPic = L => skinPic(L, false), headPic = L => skinPic(L, true);
 const KFX_DESC = 'What becomes of whoever you take down';
 const KFX_ABOUT = { '': 'They float off with a halo and wings', ghost: 'They drift off as a wailing ghost', tombstone: 'Down they go, and up comes a headstone',
   chicken: 'Bawk! They turn into a chicken and run for it', shatter: 'They burst into a pile of their own blocks', frozen: 'Frozen solid, then smashed to bits',
-  fireworks: 'Up they go and out they pop in a burst of colour', lightning: 'A bolt from the blue leaves nothing but ash', blackhole: 'A tiny black hole swallows them whole', confetti: 'Pop! They go off in a shower of confetti' };
+  fireworks: 'Up they go and out they pop in a burst of colour', lightning: 'A bolt from the blue leaves nothing but ash', blackhole: 'A tiny black hole swallows them whole', confetti: 'Pop! They go off in a shower of confetti',
+  snowman: 'One puff of snow and there is a snowman where they stood', present: 'Wrapped up with a bow, and then the lid comes off' };
 let kfxSel = null; // the card picked ('' = angels)
-const kfxList = () => ['', ...KILL_FX.slice().sort((a, b) => (a.chest | 0) - (b.chest | 0) || a.unlock - b.unlock).map(K => K.id)];
-const kfxOwn = id => !id || !!prof.kfx?.[id], kfxLocked = K => !!K.id && !kfxOwn(K.id) && (K.chest || prof.lv < K.unlock);
+const kfxList = () => ['', ...KILL_FX.filter(K => !K.season || prof.kfx?.[K.id] || seasonOn(K.season)).sort((a, b) => !!a.season - !!b.season || (a.chest | 0) - (b.chest | 0) || a.unlock - b.unlock).map(K => K.id)]; // a season's show in its month, after that only if they're yours
+const kfxFrom = K => seasonOf(K.season).name + (K.chest ? ' CHESTS' : ' PRESENTS');
+const kfxOwn = id => !id || !!prof.kfx?.[id], kfxLocked = K => !!K.id && !kfxOwn(K.id) && (K.chest || K.season || prof.lv < K.unlock);
 function renderKfx() {
   heroArmor(shownArmor()); wearGear();
   const on = wornKfx(); if (kfxSel === null || (kfxSel && !kfxOf(kfxSel))) kfxSel = on;
   $('armList').innerHTML = `<p class="wd">${KFX_DESC}</p>` + kfxList().map(id => {
     const K = kfxOf(id) ?? ANGEL_FX, worn = id === on;
-    const tag = worn ? 'EQUIPPED' : kfxOwn(id) ? '' : K.chest ? `${ico('lock')} GOLDEN CHEST` : prof.lv < K.unlock ? `${ico('lock')} LVL ${K.unlock}` : cost(K);
+    const tag = worn ? 'EQUIPPED' : kfxOwn(id) ? '' : K.season ? `${ico('lock')} ${kfxFrom(K)}` : K.chest ? `${ico('lock')} GOLDEN CHEST` : prof.lv < K.unlock ? `${ico('lock')} LVL ${K.unlock}` : cost(K);
     return `<div class="card rr${kfxLocked(K) ? ' locked' : ''}${id === kfxSel ? ' sel' : ''}${worn ? ' on' : ''}${rarCls(K)}" data-kfx="${id}">` +
       (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${kfxPic(id)}"><div class="cn">${K.name}</div></div>`;
   }).join('');
@@ -516,6 +582,7 @@ function renderKfxAct() {
   let btns = inLobby && wideArm() ? `<button data-kplay="1">${ico('eye')} PREVIEW</button>` : '';
   if (id === wornKfx()) btns += '<button class="eq" disabled>EQUIPPED</button>';
   else if (kfxOwn(id)) btns += '<button data-kwear="1">EQUIP</button>';
+  else if (K.season) btns += `<button disabled>${ico('lock')} FROM THE ${kfxFrom(K)}</button>`;
   else if (K.chest) btns += `<button disabled>${ico('lock')} FOUND IN GOLDEN CHESTS</button>`;
   else if (prof.lv < K.unlock) btns += `<button disabled>${ico('lock')} UNLOCKS AT LVL ${K.unlock}</button>`;
   else btns += `<button data-kbuy="1" ${prof.coins < K.price ? 'disabled' : ''}>BUY ${cost(K)}</button>`;
@@ -526,7 +593,7 @@ function kfxClick(d) {
   const id = kfxSel ?? wornKfx(), K = kfxOf(id);
   if (d.kplay) { kfxPlay(id); return; }
   if (d.kbuy) {
-    if (!K || K.chest || kfxOwn(id) || prof.coins < K.price || prof.lv < K.unlock) return;
+    if (!K || K.chest || K.season || kfxOwn(id) || prof.coins < K.price || prof.lv < K.unlock) return;
     prof.coins -= K.price; prof.kfx = { ...prof.kfx, [id]: 1 }; prof.kfxOn = id; sfx('buy'); kfxPlay(id);
   } else if (d.kwear) { if (!kfxOwn(id)) return; prof.kfxOn = id; sfx('equip'); }
   saveProf(); showProf();
@@ -534,8 +601,8 @@ function kfxClick(d) {
 function renderSkins() {
   const list = lookChoices(), on = lookIndex();
   $('armList').innerHTML = `<p class="wd">${SKINS_DESC}</p>` + list.map((p, i) =>
-    `<div class="card${i === skinPick ? ' sel' : ''}${i === on ? ' on' : ''}${p.secret ? ' rr' : ''}" data-skin="${i}"${p.secret ? ' style="--rc:#a66bff"' : ''}>${i === on ? '<span class="tag">WEARING</span>' : ''}` +
-    `<img class="sk ai" src="${lookPic(p.look)}"><div class="cn">${p.name}</div>${p.secret ? '<small class="sec">SECRET</small>' : ''}</div>`).join('') +
+    `<div class="card${i === skinPick ? ' sel' : ''}${i === on ? ' on' : ''}${p.secret ? ' rr' : ''}" data-skin="${i}"${p.secret ? ` style="--rc:${p.event ? RARITY.event[1] : '#a66bff'}"` : ''}>${i === on ? '<span class="tag">WEARING</span>' : ''}` +
+    `<img class="sk ai" src="${lookPic(p.look)}"><div class="cn">${p.name}</div>${p.event ? `<small class="sec" style="color:${RARITY.event[1]}">${RARITY.event[0]}</small>` : p.secret ? '<small class="sec">SECRET</small>' : ''}</div>`).join('') +
     (inLobby ? '<div class="card" data-cust="1"><span class="plus">' + ico('pencil') + '</span><div class="cn">CUSTOMIZE</div><small>MAKE YOUR OWN LOOK</small></div>' : '') +
     (!prof.draw ? `<div class="card" data-dbuy="1"><span class="plus">${ico('pencil')}</span><div class="cn">DRAW</div><small>PAINT YOUR OWN SKINS<br>${COIN}${DRAW_PRICE}</small></div>`
       : inLobby && (prof.draws?.length || 0) < DRAW_MAX ? `<div class="card" data-dnew="1"><span class="plus">${ico('pencil')}</span><div class="cn">DRAW NEW</div><small>${prof.draws?.length || 0} / ${DRAW_MAX} SKINS</small></div>` : '') +
@@ -600,6 +667,7 @@ const GEAR = {
       thornwood: 'Rooty bark boots that slowly patch you up when nobody is hitting you',
       skyrunner: 'Featherweight runners for going fast and jumping high',
       titanium: 'Polished greaves that keep you quick and put weight behind every hit',
+      elf: 'Curly toed shoes that never feel the cold, so frost cannot slow you',
     } },
   hats: { list: HATS, I: HAT_I, own: 'hats', use: 'hatUse', on: 'hatOn', stars: hatStars, using: hatUse, worn: wornHat,
     pic: hatPic, model: hatModel, face: .5, put: h => heroHat(h), look: hatSkin,
@@ -612,6 +680,7 @@ const GEAR = {
       thornwood: 'A bark helm with thorny branches that stings anyone who hits you up close',
       skyrunner: 'A winged flight helm that takes the sting out of hits while you fly',
       titanium: 'A polished helm that turns hits and headshots aside',
+      elf: 'A pointed hat whose bell jingles when someone creeps up behind you',
     } },
 };
 const wearGear = () => { for (const k in GEAR) GEAR[k].put(hidOn(k) ? null : GEAR[k].worn()); };
@@ -628,8 +697,8 @@ function gearLines(B, st) {
   return o;
 }
 const GEAR_SHORT = { 'DAMAGE CUT': 'DMG CUT', DAMAGE: 'DMG', 'HEADSHOT BLOCK': 'HS BLOCK', 'HALF DAMAGE': 'HALF DMG', 'FASTER RELOAD': 'RELOAD', 'KNOCKBACK CUT': 'KB CUT', 'AIR DMG CUT': 'AIR CUT' };
-const gearList = G => G.list.map((B, i) => i).sort((a, b) => G.list[a].unlock - G.list[b].unlock);
-const gearLocked = (G, B) => !G.stars(B.id) && prof.lv < B.unlock;
+const gearList = G => G.list.map((B, i) => i).filter(i => !G.list[i].season || G.stars(G.list[i].id) || seasonOn(G.list[i].season)).sort((a, b) => !!G.list[a].season - !!G.list[b].season || G.list[a].unlock - G.list[b].unlock);
+const gearLocked = (G, B) => !G.stars(B.id) && (seasonGear(B) || prof.lv < B.unlock);
 const gearUpg = (G, B) => Math.round(B.price * UPG[G.stars(B.id) - 1]);
 const gearStarTxt = (G, id) => starRow(G.using(id), G.stars(id), 3);
 const gearShown = (G, B) => Math.max(1, G.using(B.id));
@@ -651,7 +720,7 @@ function renderGear() {
   if (armDet) renderGearDetail();
   else $('armList').innerHTML = `<p class="wd">${G.desc}</p>` + gearList(G).map(i => {
     const K = G.list[i], st = G.stars(K.id), worn = prof[G.on] === K.id && st, s = gearShown(G, K), [sa, set] = setTag(K.id, worn);
-    const tag = gearLocked(G, K) ? `${ico('lock')} LVL ${K.unlock}` : !st ? cost(K) : worn ? wearTag(wearCat) : '';
+    const tag = gearLocked(G, K) ? `${ico('lock')} ${seasonGear(K) ? gearFrom(K) : 'LVL ' + K.unlock}` : !st ? cost(K) : worn ? wearTag(wearCat) : '';
     return `<div class="card rr${gearLocked(G, K) ? ' locked' : ''}${i === gearSel && gearPick ? ' sel' : ''}${worn ? ' on' : ''}${set}${rarCls(K)}" data-gear="${i}">` +
       sa + (tag ? `<span class="tag">${tag}</span>` : '') + `<img class="ai wr" src="${G.pic(K.id, s, st && G.look?.(K.id))}">` +
       `<div class="cn">${K.name} <span class="st">${gearStarTxt(G, K.id)}</span></div></div>`;
@@ -685,7 +754,7 @@ function hskGrid(B) {
   const on = hatSkin(B.id), sel = hskSel ?? on, S = hatSkinOf(sel), own = id => !!prof.skins?.[id];
   const card = (id, pic, name, note, cls) => `<button class="hsc${cls}" data-hsk="${id}"><img src="${pic}"><b>${name}</b><small>${note}</small></button>`;
   return '<div class="hsg">' + card('', hatPic(B.id, hatUse(B.id)), 'DEFAULT', on ? '' : 'WEARING', (on ? '' : ' on') + (sel ? '' : ' sel')) +
-    HAT_SKINS.filter(K => !K.secret || own(K.id)).map(K => card(K.id, hatPic(B.id, 0, K.id), K.name.toUpperCase(), own(K.id) ? (on === K.id ? 'WEARING' : '') : ico('lock') + ' ' + (skinEvent(K.id)?.name ?? ''),
+    HAT_SKINS.filter(K => K.season ? own(K.id) || seasonOn(K.season) : !K.secret || own(K.id)).map(K => card(K.id, hatPic(B.id, 0, K.id), K.name.toUpperCase(), own(K.id) ? (on === K.id ? 'WEARING' : '') : ico('lock') + ' ' + (K.season ? seasonOf(K.season).name + (K.chest ? ' CHESTS' : ' PRESENTS') : skinEvent(K.id)?.name ?? ''),
       (own(K.id) ? '' : ' locked') + (on === K.id ? ' on' : '') + (sel === K.id ? ' sel' : ''))).join('') + '</div>' +
     `<p class="hsa">${S ? S.about : 'The hat just as it comes'}</p>` + (S && !own(S.id) ? `<div class="tn">${ico('lock')} WIN IT IN ${skinEvent(S.id)?.name ?? 'AN EVENT'}</div>` : '');
 }
@@ -700,7 +769,7 @@ function hskClick(d) {
 function renderGearAct() {
   const G = gearNow(), B = G.list[gearSel], st = G.stars(B.id), worn = prof[G.on] === B.id && st;
   let btns;
-  if (gearLocked(G, B)) btns = `<button disabled>${ico('lock')} UNLOCKS AT LVL ${B.unlock}</button>`;
+  if (gearLocked(G, B)) btns = `<button disabled>${ico('lock')} ${seasonGear(B) ? 'FOUND IN ' + gearFrom(B) : 'UNLOCKS AT LVL ' + B.unlock}</button>`;
   else if (!st) btns = `<button data-gbuy="1" ${prof.coins < B.price || barShort(B) ? 'disabled' : ''}>${B.bars ? 'CRAFT' : 'BUY'} ${cost(B)}</button>`;
   else {
     btns = worn ? '<button data-goff="1">TAKE OFF</button>' + hideBtn(wearCat) : '<button data-gwear="1">WEAR</button>';
@@ -718,7 +787,7 @@ function gearClick(d) {
   const G = GEAR[wearCat], B = G?.list[gearSel]; if (!B) return;
   const st = G.stars(B.id), own = prof[G.own] ??= {}, use = prof[G.use] ??= {};
   if (d.gbuy) {
-    if (st || prof.coins < B.price || prof.lv < B.unlock || barShort(B)) return;
+    if (st || B.season || prof.coins < B.price || prof.lv < B.unlock || barShort(B)) return;
     prof.coins -= B.price; if (B.bars) prof.bars -= B.bars; own[B.id] = 1; if (G.look) skinOver(B.id); prof[G.on] = B.id; unhide(wearCat); sfx('buy');
   } else if (d.gup) {
     if (!st || st >= 3 || prof.coins < gearUpg(G, B)) return;
@@ -815,6 +884,8 @@ $('armList').addEventListener('click', e => {
   if (c.dataset.armor) { if (armorCard) { armDet = true; armorPrev = basicWorn() || 1; } else { armorCard = true; suitSel = ''; } sfx('ui'); renderArmory(); return; }
   if (c.dataset.suit) { const id = c.dataset.suit; if (suitSel === id) armDet = true; else { suitSel = id; armorCard = false; } sfx('ui'); renderArmory(); return; }
   if (c.dataset.gear) { const i = +c.dataset.gear; if (i === gearSel && gearPick) armDet = true; else { gearSel = i; gearPick = true; } sfx('ui'); renderArmory(); return; }
+  if (c.dataset.set) { setSel = c.dataset.set; sfx('ui'); renderArmory(); return; }
+  if (c.dataset.gsk !== undefined) { skinSel = c.dataset.gsk; sfx('ui'); renderArmory(); return; }
   if (c.dataset.idx) { const k = +c.dataset.idx; armPage = chestOnly(k) ? 'exclusive' : 'weapons'; armCat = BASE[k].cat; armSel = k; armPick = true; armDet = false; sfx('ui'); renderArmory(); return; } // to that gun's card
   const i = +c.dataset.i;
   if (i === armSel && armPick) armDet = true; else { armSel = i; armPick = true; }
@@ -826,7 +897,7 @@ function armClick(e) {
   if (b.dataset.redeem) { redeem(); return; }
   if (b.dataset.dedit) { openDraw(+b.dataset.dedit); return; }
   if (b.dataset.ddel) { const i = +b.dataset.ddel; if (drawSure === i) { drawSure = -1; drawDelete(i); } else { drawSure = i; sfx('ui'); renderAct(); } return; }
-  if (b.dataset.pg) { if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; suitSel = ''; armSel = -1; gearSel = -1; skinPick = -1; codeOn = false; armBare = false; sfx('ui'); } }
+  if (b.dataset.pg) { skinGun = -1; if (b.dataset.pg !== armPage) { armPage = b.dataset.pg; armDet = false; armorPrev = 0; armorCard = false; suitSel = ''; armSel = -1; gearSel = -1; skinPick = -1; codeOn = false; armBare = false; sfx('ui'); } }
   else if (b.dataset.wc) { if (b.dataset.wc !== wearCat) { wearCat = b.dataset.wc; kfxSel = null; armDet = false; armorCard = false; suitSel = ''; armorPrev = 0; gearSel = -1; skinPick = -1; codeOn = false; armBare = false; sfx('ui'); } }
   else if (b.dataset.gbuy || b.dataset.gup || b.dataset.gwear || b.dataset.goff || b.dataset.gu) gearClick(b.dataset);
   else if (b.dataset.hsko || 'hsk' in b.dataset) hskClick(b.dataset);
@@ -849,10 +920,19 @@ function armClick(e) {
   }
   else if (b.dataset.range) { closeArmory(); startRange(+b.dataset.range); return; }
   else if (b.dataset.det) { armDet = !armDet; if (armDet && armPage === 'wear' && wearCat === 'armor') armorPrev = basicWorn() || 1; sfx('ui'); }
-  else if (b.dataset.c) { armCat = b.dataset.c; armDet = false; sfx('ui'); }
+  else if (b.dataset.c) { armCat = b.dataset.c; armDet = false; skinGun = -1; sfx('ui'); }
+  else if (b.dataset.xt) { exclTab = b.dataset.xt; armDet = false; armSel = -1; skinGun = -1; sfx('ui'); }
+  else if (b.dataset.skins) { skinGun = +b.dataset.skins; skinSel = gunSkin(skinGun); sfx('ui'); }
+  else if (b.dataset.gsback) { skinGun = -1; sfx('ui'); }
+  else if (b.dataset.gswear !== undefined) { if (gsWear(skinGun, b.dataset.gswear)) { sfx('equip'); if (inMatch()) { if (gunShown === skinGun) buildGun(); renderHotbar(); net.gearChanged?.(); } } }
+  else if (b.dataset.eqset) { // the whole set, each piece into its own slot
+    const T = GUN_SETS.find(x => x.id === b.dataset.eqset); if (!T || setHas(T) < T.guns.length) return;
+    for (const id of T.guns) { const c = BASE[gi(id)].cat; trialOff(c); prof.loadout[c] = id; }
+    saveProf(); sfx('equip');
+  } else if (b.dataset.setgift) { achClaim(b.dataset.setgift); return; }
   else if (b.id === 'detBack') { armDet = false; hskOpen = false; hskSel = null; sfx('ui'); }
   else if (b.dataset.buy) {
-    const i = +b.dataset.buy, w = BASE[i]; if (w.chest || prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
+    const i = +b.dataset.buy, w = BASE[i]; if (w.chest || w.season || prof.coins < w.price || prof.lv < (w.unlock ?? 0)) return;
     trialOff(w.cat); prof.coins -= w.price; prof.guns[w.id] = 1; prof.loadout[w.cat] = w.id; saveProf(); showProf();
     armSync(i, 'buy'); sfx('buy');
   } else if (b.dataset.up) {
@@ -862,6 +942,7 @@ function armClick(e) {
   } else if (b.dataset.eq) {
     const i = +b.dataset.eq; trialOff(BASE[i].cat); prof.loadout[BASE[i].cat] = BASE[i].id; saveProf();
     armSync(i, 'eq'); sfx('equip');
+  } else if (b.dataset.season) { openSeason('guns'); snSel = b.dataset.season; renderSeason();
   } else if (b.dataset.try) {
     trialSet(true); sfx('equip');
   } else if (b.id === 'armX') { closeArmory(); return; }
@@ -871,7 +952,7 @@ $('armory').addEventListener('click', armClick);
 $('armAct').addEventListener('click', armClick);
 $('armAct').addEventListener('pointerdown', e => e.stopPropagation());
 $('heroAct').addEventListener('pointerdown', e => e.stopPropagation());
-const armIcon = () => $('armIcon').src = gunPic(loadoutGun('primary')); // ARMORY button shows your primary
+const armIcon = () => $('armIcon').src = gunPic(loadoutGun('primary'), gunSkin(loadoutGun('primary'))); // ARMORY button shows your primary
 armIcon();
 function armShow(on) {
   $('armory').style.display = on ? 'flex' : 'none';
@@ -880,8 +961,8 @@ function armShow(on) {
   if (inLobby) { $('lobbyUI').style.display = on ? 'none' : ''; }
   else $('menu').style.display = on || locked || shopOpen || matchOver ? 'none' : 'flex';
 }
-function openArmory() { armOpen = true; kfxSel = null; armDet = false; armSel = -1; armorCard = false; suitSel = ''; skinPick = -1; codeOn = false; armBare = false; armShow(true); renderArmory(); }
-function closeArmory() { if (!armOpen) return; armOpen = false; armShow(false); armIcon(); armorPrev = 0; gearSel = -1; suitSel = ''; heroArmor(shownArmor()); wearGear(); }
+function openArmory() { armOpen = true; skinGun = -1; heroSkin = null; kfxSel = null; armDet = false; armSel = -1; armorCard = false; suitSel = ''; skinPick = -1; codeOn = false; armBare = false; armShow(true); renderArmory(); }
+function closeArmory() { if (!armOpen) return; armOpen = false; skinGun = -1; heroSkin = null; armShow(false); armIcon(); armorPrev = 0; gearSel = -1; suitSel = ''; heroArmor(shownArmor()); wearGear(); }
 $('armBtn').addEventListener('click', e => { e.stopPropagation(); openArmory(); }); // don't re-lock the mouse
 $('lobbyArm').addEventListener('click', openArmory);
 addEventListener('keydown', e => {

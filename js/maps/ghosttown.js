@@ -182,9 +182,9 @@ function sign(text, w, x, y, z, ry, fg = '#f2e4c2', bg = '#4a2c1a', two = false,
 }
 const FACE = s => -s * Math.PI / 2; // a sign on a building's front faces the street
 const barrel = (x, z, y0 = 0) => {
-  const b = new THREE.Mesh(new THREE.CylinderGeometry(.32, .3, .9, 10), beam); b.position.set(x, y0 + .45, z); add(b); building.cover.push(b);
+  const b = new THREE.Mesh(pxCyl(.32, .3, .9, 10), beam); b.position.set(x, y0 + .45, z); add(b); building.cover.push(b);
   building.solids.push({ mesh: null, minX: x - .32, maxX: x + .32, minZ: z - .32, maxZ: z + .32, bot: y0, top: y0 + .9, round: .32, surf: 'wood' });
-  for (const [y, rr] of [[.2, .312], [.7, .324]]) { const h = detail(new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, .05, 10, 1, true), iron)); h.position.set(x, y0 + y, z); add(h); }
+  for (const y of [.2, .7]) { const h = detail(new THREE.Mesh(pxBand(.32, .05, .02), iron)); h.position.set(x, y0 + y, z); add(h); }
 };
 const chair = (x, z, ry) => { slab(x - .2, x + .2, z - .2, z + .2, FL, FL + .45, beam); const b = piece(.4, .5, .06, beam, x - Math.sin(ry) * .17, FL + .7, z - Math.cos(ry) * .17); b.rotation.y = ry; building.cover.push(b); };
 
@@ -262,7 +262,7 @@ for (const z of [17.3, 19.7]) { slab(10.6, 12.9, z - .4, z + .4, FL, .85, beam);
 house(-1, -21, -16, 3.8, W_WHITE, { front: [[-19.6, 1.2, 0, 2.5], [-17.4, 1.2, 1.2, 2.3]], back: [[-18.5, 1.2, 1.2, 2.3]] });
 roofTop(-1, -21, -16, 3.8, W_WHITE, 5); porch(-1, -21, -16, 3.1);
 sign('BARBER', 3, -6.9, 4.45, -18.5, FACE(-1), '#30343c', '#e8e2d6');
-{ const p = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, 1.3, 8), lam({ map: tex(g => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = ((x + y) >> 2) % 2 ? '#e8e8e8' : '#c42a2a'; g.fillRect(x, y, 1, 1); } }, 1, 2) }));
+{ const p = new THREE.Mesh(pxCyl(.11, .11, 1.3, 8), lam({ map: tex(g => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = ((x + y) >> 2) % 2 ? '#e8e8e8' : '#c42a2a'; g.fillRect(x, y, 1, 1); } }, 1, 2) }));
   p.position.set(-6.82, 1.75, -20.4); add(p); building.cover.push(p); piece(.3, .12, .3, iron, -6.82, 2.46, -20.4); piece(.3, .12, .3, iron, -6.82, 1.04, -20.4); solid(-6.98, -6.66, -20.56, -20.24, FL, 2.52, 'metal'); }
 slab(-12.2, -11.2, -18.2, -17.2, FL, .9, cloth); slab(-12.2, -11.9, -18.2, -17.2, .9, 1.7, cloth); // the chair
 onWall(piece(.04, 1.1, 1.6, lam({ color: 0xb8c8cc, emissive: 0x2a3438 }), -14.73, 1.9, -17.7)); // the mirror
@@ -278,7 +278,7 @@ for (const [z0, z1] of [[-12.6, -9.4], [-7.6, -4.4]]) {
   slab(-11.6, -11, z0, z1, FL, 1.2, beam); // the tellers' counter, barred
   const b = new THREE.Mesh(new THREE.PlaneGeometry(z1 - z0, 1.1), barMat(z1 - z0)); b.position.set(-11.3, 1.76, (z0 + z1) / 2); b.rotation.y = Math.PI / 2; add(b); solid(-11.35, -11.25, z0, z1, 1.2, 2.31, 'metal');
 }
-{ const v = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, .18, 16), iron); v.rotation.z = Math.PI / 2; v.position.set(-14.66, 1.6, -8.5); add(v); building.cover.push(v); meshSolids(v, 'metal'); piece(.1, .5, .5, rust, -14.53, 1.6, -8.5); } // the vault
+{ const v = new THREE.Mesh(pxCyl(1.1, 1.1, .18, 16), iron); v.rotation.z = Math.PI / 2; v.position.set(-14.66, 1.6, -8.5); add(v); building.cover.push(v); meshSolids(v, 'metal'); piece(.1, .5, .5, rust, -14.53, 1.6, -8.5); } // the vault
 addBlock(-14.2, -12.2, .9, .9, FL + 1, iron); // the safe
 stairs('z', -4.6, -10.9, -16.4, -15, 0, 5);
 slab(-16.47, -15, -12.75, -10.9, 4.8, 5, deck);
@@ -335,7 +335,7 @@ for (const [x, z, ry] of [[-6.98, 15.8, Math.PI / 2], [-6.98, 18.2, Math.PI / 2]
   for (const dx of [-.95, .95]) for (const dz of [.05, 1.95]) piece(.2, 1.4, .2, beam, dx, 7.9, z0 + dz);
   for (const [w, y] of [[.42, 8.35], [.62, 8.1], [.8, 7.85]]) piece(w, .25, w, lam({ color: 0x9a7a3a, emissive: 0x1a1206 }), 0, y, z0 + 1);
   piece(2.4, .2, 2.4, beam, 0, 8.7, z0 + 1);
-  { const c = new THREE.Mesh(new THREE.ConeGeometry(1.75, 1.7, 4), shingle); c.rotation.y = Math.PI / 4; c.position.set(0, 9.65, z0 + 1); add(c); building.cover.push(c);
+  { const c = new THREE.Mesh(pxCone(1.75, 1.7, 4), shingle); c.rotation.y = Math.PI / 4; c.position.set(0, 9.65, z0 + 1); add(c); building.cover.push(c);
     const r = 1.75 / Math.SQRT2; building.solids.push({ mesh: null, minX: -r, maxX: r, minZ: z0 + 1 - r, maxZ: z0 + 1 + r, bot: 8.8, top: 10.5, peak: { x: 0, z: z0 + 1, rx: r, rz: r, edge: 8.8 }, surf: 'wood' }); } // up to its point
   piece(.1, 1, .1, beam, 0, 11, z0 + 1); piece(.55, .1, .1, beam, 0, 11.15, z0 + 1); // a cross on top
   for (const z of [23.6, 25]) for (const e of [-1, 1]) slab(e * 2 - .9, e * 2 + .9, z - .25, z + .25, FL, .75, beam); // pews
@@ -350,9 +350,9 @@ sign('POP. 0', 1.1, 5.6, 2.2, -24.77, Math.PI, '#2a1a10', '#d8c8a0');
 
 // --- out on the street ---
 { // the well
-  const w = new THREE.Mesh(new THREE.CylinderGeometry(.95, 1, .9, 12), stone); w.position.set(2.6, .45, 0); add(w); building.cover.push(w);
+  const w = new THREE.Mesh(pxCyl(.95, 1, .9, 12), stone); w.position.set(2.6, .45, 0); add(w); building.cover.push(w);
   building.solids.push({ mesh: null, minX: 1.65, maxX: 3.55, minZ: -.95, maxZ: .95, top: .9, round: .95, surf: 'stone' });
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(.75, 12), decal({ color: 0x1a1410 })); hole.rotation.x = -Math.PI / 2; hole.position.set(2.6, .905, 0); add(hole);
+  const hole = new THREE.Mesh(pxDisc(.75, 12), decal({ color: 0x1a1410 })); hole.rotation.x = -Math.PI / 2; hole.position.set(2.6, .905, 0); add(hole);
   for (const e of [-1, 1]) slab(2.6 + e * .85 - .07, 2.6 + e * .85 + .07, -.07, .07, .9, 2.4, beam);
   piece(1.9, .12, .12, beam, 2.6, 2.34, 0);
   for (const e of [-1, 1]) { const r = tbox(2.3, .1, 1.3, shingle); r.position.set(2.6, 2.62, e * .5); r.rotation.x = e * .6; add(r); meshSolids(r, 'wood'); }
@@ -367,7 +367,7 @@ addBlock(-3.9, -5.6, 1.3, .9, .9, hay); addBlock(-3.9, -6.5, 1.3, .9, .9, hay); 
   const g = new THREE.Group(); g.position.set(-3.2, 0, 10.6); g.rotation.set(0, 0, .08); add(g); // square to the street, so its hitboxes fit
   const bed = box(1.7, .5, 3.4, beam); bed.position.y = .85; g.add(bed); building.cover.push(bed); meshSolids(bed, 'wood');
   for (const e of [-1, 1]) { const sd = box(.08, .45, 3.4, deck); sd.position.set(e * .81, 1.32, 0); g.add(sd); building.cover.push(sd); meshSolids(sd, 'wood'); }
-  const wheel = (x, y, z, rz = 0) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, .1, 12), beam); w.rotation.set(0, 0, Math.PI / 2 + rz); w.position.set(x, y, z); g.add(w); meshSolids(w, 'wood'); };
+  const wheel = (x, y, z, rz = 0) => { const w = new THREE.Mesh(pxCyl(.55, .55, .1, 12), beam); w.rotation.set(0, 0, Math.PI / 2 + rz); w.position.set(x, y, z); g.add(w); meshSolids(w, 'wood'); };
   wheel(.95, .55, 1.1); wheel(.95, .55, -1.1); wheel(-.95, .55, 1.1); wheel(-1.5, .06, -1.7, 1.5);
 }
 for (const [x, z0, z1] of [[4.5, -8, -5.6], [4.5, -3.2, -.8], [-4.5, .8, 3.2], [-4.5, 5.8, 8.2]]) railing(x, z0, x, z1, 0, [true, true], 1); // hitching rails
@@ -389,10 +389,10 @@ const tower = (cx, cz, dir) => { // a platform on legs, stairs up to it from dir
 };
 { // the water tower
   const cx = 22.5, cz = -9, P = tower(cx, cz, 1);
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 3, 16), lam({ map: planks([120, 92, 66], 14, true) })); tank.position.set(cx, P + 1.5, cz); add(tank); building.cover.push(tank);
+  const tank = new THREE.Mesh(pxCyl(1.35, 1.35, 3, 16), lam({ map: planks([120, 92, 66], 14, true) })); tank.position.set(cx, P + 1.5, cz); add(tank); building.cover.push(tank);
   building.solids.push({ mesh: null, minX: cx - 1.35, maxX: cx + 1.35, minZ: cz - 1.35, maxZ: cz + 1.35, bot: P, top: P + 3, round: 1.35, surf: 'wood' });
-  for (const y of [.5, 1.5, 2.5]) { const ring = detail(new THREE.Mesh(new THREE.CylinderGeometry(1.39, 1.39, .07, 16, 1, true), iron)); ring.position.set(cx, P + y, cz); add(ring); }
-  const top = new THREE.Mesh(new THREE.ConeGeometry(1.55, 1, 16), shingle); top.position.set(cx, P + 3.5, cz); add(top); building.cover.push(top);
+  for (const y of [.5, 1.5, 2.5]) { const ring = detail(new THREE.Mesh(pxBand(1.35, .07, .04), iron)); ring.position.set(cx, P + y, cz); add(ring); }
+  const top = new THREE.Mesh(pxCone(1.55, 1, 16), shingle); top.position.set(cx, P + 3.5, cz); add(top); building.cover.push(top);
   building.solids.push({ mesh: null, minX: cx - 1.55, maxX: cx + 1.55, minZ: cz - 1.55, maxZ: cz + 1.55, bot: P + 3, top: P + 4, round: 1.55, peak: { x: cx, z: cz, rx: 1.55, rz: 1.55, edge: P + 3 }, surf: 'wood' }); // the lid, up to its point
   piece(.16, 1.4, .16, iron, cx + 1, P + .8, cz + 1); // the spout
 }
@@ -419,9 +419,9 @@ const blades = live(new THREE.Group());
   const body = box(1.7, 1.6, 2.8, W_RED); body.position.y = 1.5; g.add(body); building.cover.push(body); meshSolids(body, 'wood');
   const roof = box(1.9, .12, 3, beam); roof.position.y = 2.36; g.add(roof); meshSolids(roof, 'wood');
   for (const e of [-1, 1]) { const win = box(.02, .6, .7, black); win.position.set(e * .86, 1.75, 0); g.add(win); }
-  const wheel = (x, z, r) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, .1, 12), beam); w.rotation.z = Math.PI / 2; w.position.set(x, r, z); g.add(w); meshSolids(w, 'wood'); };
+  const wheel = (x, z, r) => { const w = new THREE.Mesh(pxCyl(r, r, .1, 12), beam); w.rotation.z = Math.PI / 2; w.position.set(x, r, z); g.add(w); meshSolids(w, 'wood'); };
   wheel(.95, 1.1, .6); wheel(-.95, 1.1, .6); wheel(.95, -1.1, .75);
-  const lost = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, .1, 12), beam); lost.position.set(-20.2, .05, -11.4); add(lost); building.solids.push({ mesh: null, minX: -20.95, maxX: -19.45, minZ: -12.15, maxZ: -10.65, top: .1, round: .75, surf: 'wood' }); // its wheel
+  const lost = new THREE.Mesh(pxCyl(.75, .75, .1, 12), beam); lost.position.set(-20.2, .05, -11.4); add(lost); building.solids.push({ mesh: null, minX: -20.95, maxX: -19.45, minZ: -12.15, maxZ: -10.65, top: .1, round: .75, surf: 'wood' }); // its wheel
 }
 { // boot hill
   for (const [x, z] of [[11, 24.6], [13.2, 25.3], [15.4, 24.4], [17.6, 25.4], [19.8, 24.7], [22, 25.2], [12.2, 22.9], [20.8, 23]]) {
@@ -445,7 +445,7 @@ const blades = live(new THREE.Group());
   const moon = decal({ map: tex(g => { g.clearRect(0, 0, 16, 16); g.fillStyle = '#20160e'; for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (Math.hypot(x - 8, y - 8) < 6 && Math.hypot(x - 10.5, y - 7) > 4.5) g.fillRect(x, y, 1, 1); }), alphaTest: .5 });
   moon.map.wrapS = moon.map.wrapT = THREE.ClampToEdgeWrapping;
   const mm = new THREE.Mesh(new THREE.PlaneGeometry(.35, .35), moon); mm.position.set(x, 1.9, z - .66); mm.rotation.y = Math.PI; add(mm);
-  for (let k = 0; k < 5; k++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(.14, .14, 1.4, 8), beam); l.rotation.x = Math.PI / 2; l.position.set(-16.6 + (k < 3 ? k * .3 : .15 + (k - 3) * .3), k < 3 ? .14 : .39, 25); add(l); }
+  for (let k = 0; k < 5; k++) { const l = new THREE.Mesh(pxCyl(.14, .14, 1.4, 8), beam); l.rotation.x = Math.PI / 2; l.position.set(-16.6 + (k < 3 ? k * .3 : .15 + (k - 3) * .3), k < 3 ? .14 : .39, 25); add(l); }
   solid(-16.8, -15.8, 24.3, 25.7, 0, .53);
 }
 // saguaros and rocks round the edge of town
@@ -510,7 +510,7 @@ const dusts = Array.from({ length: 10 }, () => {
   const o = { m, x: (rnd() * 2 - 1) * 5, z: (rnd() * 2 - 1) * GA, v: .8 + rnd() * .6, y: .2 + rnd() * .35 }; m.position.set(o.x, o.y, o.z); add(m); return o;
 });
 const weedMat = seeThru(tex(g => { g.clearRect(0, 0, 16, 16); g.fillStyle = '#8a6a40'; for (let i = 0; i < 26; i++) { const x = Math.random() * 16 | 0, y = Math.random() * 16 | 0, n = 2 + Math.random() * 4 | 0; Math.random() < .5 ? g.fillRect(x, y, n, 1) : g.fillRect(x, y, 1, n); } }));
-const weeds = [0, 1, 2, 3].map(i => { const m = live(new THREE.Mesh(new THREE.IcosahedronGeometry(.42, 1), weedMat)); add(m); return { m, x: -3 + rnd() * 6, z: -26 + i * 12, v: 2.4 + rnd() * 1.6, t: rnd() * 6 }; });
+const weeds = [0, 1, 2, 3].map(i => { const m = live(new THREE.Mesh(pxSphere(.42), weedMat)); add(m); return { m, x: -3 + rnd() * 6, z: -26 + i * 12, v: 2.4 + rnd() * 1.6, t: rnd() * 6 }; });
 
 // --- bots and zombies find the stairs up ---
 const NV = makeNav(M, [0, 0, 0]);

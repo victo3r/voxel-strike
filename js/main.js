@@ -93,7 +93,7 @@ function update(dt) {
     const len = Math.hypot(mx, mz), c = Math.cos(P.yaw), s = Math.sin(P.yaw), sp = 6 * runMul(w) * (P.swim ? SWIM_MUL : 1) * Math.min(1, len) / len; // a half-pushed stick walks
     tx = (mx * c + mz * s) * sp; tz = (-mx * s + mz * c) * sp;
   }
-  const ease = 1 - Math.exp(-MOVE_EASE * dt);
+  const ease = 1 - Math.exp(-(P.onGround && MAP.ice?.(P.pos.x, P.pos.z, P.pos.y) ? ICE_EASE : MOVE_EASE) * dt); // you slide on ice
   P.mvx += (tx - P.mvx) * ease; P.mvz += (tz - P.mvz) * ease;
   if (Math.abs(P.mvx) + Math.abs(P.mvz) > .02) {
     if (!walkTo(P.pos, P.pos.x + P.mvx * dt, P.pos.z, .35, P.onGround)) P.mvx = 0; // a wall stops you
@@ -156,6 +156,7 @@ function update(dt) {
   if (gunPulse) pulseShow(gunPulse, flashT > 0);
   if (gunMag && w.flare && gunShown === cur) gunMag.visible = ammo[cur] > 0 || (reloading > 0 && reloading / reloadFull < .6); // flare leaves the muzzle when fired
   if (gunG && WEAPONS[gunShown]?.boomer) gunG.visible = !boomerOut(null); // your Boomerang is out
+  else if (gunG && WEAPONS[gunShown]?.thrown) gunG.visible = kick < .45 && (ammo[gunShown] > 0 || reloading > 0); // thrown: your hand's empty till the next one's out
   if (gunRound) { // rocket leaves the tube when fired
     const k = reloading > 0 ? reloading / reloadFull : 0;
     gunRound.visible = ammo[cur] > 0 || (reloading > 0 && k < .4);
@@ -204,16 +205,19 @@ function update(dt) {
     lanV.z += ((-mx * .12 - lanA.z) * 60 - lanV.z * 6) * dt; lanA.z += lanV.z * dt;
     if (gunBody) lanternPose(bob, kick * .09);
     if (gunSwing) gunSwing.rotation.set(lanA.x, 0, lanA.z + bob * 1.5);
+  } else if (vhold === 'dual') { // one either side of the middle
+    vm.position.set(DUAL_VM[0], DUAL_VM[1] + adsT * .03 + bob, DUAL_VM[2]); vm.rotation.set(0, 0, 0);
   } else {
     vm.position.set(.32 * (1 - adsT), -.3 + adsT * .08 + bob, -.55);
     vm.rotation.set(0, 0, 0);
     if (vhold === 'pistol') vm.position.y += .09 * (1 - adsT); // pistols sit higher
+    if (vw.thrown) vm.position.set(.2, -.24 + bob, -.7); // a globe held up where you can see it (vmRest)
     if (vw.zoom && gunHolo) vm.position.y += (-gunHolo[0] - vm.position.y) * adsT; // holo sight to the middle
   }
   // kicks, swings, wand flicks and reloads: the same moves every view shows (held.js)
   const rk = reloading > 0 && gunShown === cur ? 1 - reloading / reloadFull : -1;
   fpHeld(heldAnim(vw, { kick: vhold === 'lantern' ? 0 : kick, swing: vw.melee && kick > 0 ? 1 - kick : -1, sv: swingV, rl: rk, level: wandK, two: !!gunArmL, ads: adsT, insp: vw === w ? inspT : -1, draw: vw === w && w.charge ? chargeT / w.charge : 0, ct: vw.boomer ? boomCatchK : 0 }), vw, adsT);
-  bladeTrail(gunG, vw, vw.melee && kick > 0 ? 1 - kick : -1, camera); // a swing's trail stays in your view
+  bladeTrail(gunG, vw, vw.melee && kick > 0 ? 1 - kick : -1, camera, altBy(null, gunShown)); // a swing's trail stays in your view
   reloadSwap(vmRl, w.id, rk, gunMag, scene); // mag swap
   if (rk >= 0 && w.id === 'eradicator' && reloading / reloadFull < .12) gunSpinV = Math.max(gunSpinV, 16);
   // weapon swap
@@ -423,20 +427,22 @@ function worldTick(dt, down) {
       if (r.ghost) continue; // the server places other players' blasts
       const at = onYou ? youHitP.clone() : hit ? hit.point.clone() : r.m.position.clone();
       if (r.meteor) { net.boom(r.id, at, r.by); callMeteor(at, r.by, r.dmg, r.g, r.id, false, r.dir); continue; } // the beacon: the meteor comes later
+      if (r.sleigh) { net.boom(r.id, at, r.by); callSleigh(at, r.by, r.dmg, r.g, r.id, false, r.dir); continue; } // or the sleigh
       const fn = r.cluster && (hit?.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : r.dir.clone().negate()).toArray().map(v => Math.round(v * 100) / 100), seed = Math.random() * 65536 | 0; // a cluster shell's bomblets fly out from what it hit
       net.boom(r.id, at, r.by, fn && { s: seed, n: fn });
       // rocket self damage
       blast(at, boomR(r), r.dmg, r.by ? r.dmg : ROCKET_SELF, null, r.by, r.g, r.id);
+      if (r.globe) snowCloud(at, r.by, r.dmg, r.g, r.id, false); // its blizzard stays a while
       if (fn) clusterBurst(at, new THREE.Vector3(...fn).normalize(), seed, r.by, false, r.id, r.g, r.dmg);
       continue;
     }
     r.m.position.addScaledVector(r.dir, step);
     if (r.gust) r.m.rotateZ(dt * 18);
     if (r.lob) r.m.rotateX(dt * 6); else if (r.seek) r.m.lookAt(tmp.copy(r.m.position).add(r.dir));
-    if ((r.smoke -= dt) <= 0) { r.smoke = .03; if (r.cluster) fxBit(CLUSTER_BITS[Math.random() * CLUSTER_N | 0], scene, r.m.position, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5), .4, 3); else burst(r.m.position, r.gust ? 0xe8f7ff : r.lob ? 0x6a6a6a : r.seek ? 0xd8dde4 : r.meteor ? 0xff8a3a : 0x888888, 1); } // a firework sparkles
+    if ((r.smoke -= dt) <= 0) { r.smoke = .03; if (r.cluster) fxBit(CLUSTER_BITS[Math.random() * CLUSTER_N | 0], scene, r.m.position, .08, new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5), .4, 3); else burst(r.m.position, r.gust ? 0xe8f7ff : r.globe ? 0xeaf6ff : r.lob ? 0x6a6a6a : r.seek ? 0xd8dde4 : r.meteor ? 0xff8a3a : 0x888888, 1); } // a firework sparkles
   }
 
-  updateFlares(dt); updateGrenades(dt); mythTick(dt); updateBoomers(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt); patchTick(dt); bombletTick(dt); meteorTick(dt);
+  updateFlares(dt); updateGrenades(dt); mythTick(dt); updateBoomers(dt); beamTick(dt); arcTick(dt); tracerTick(dt); lanceTick(dt); globTick(dt); patchTick(dt); seasonGunTick(dt); bombletTick(dt); meteorTick(dt);
 
   for (let i = flames.length - 1; i >= 0; i--) {
     const f = flames[i]; f.life -= dt;
